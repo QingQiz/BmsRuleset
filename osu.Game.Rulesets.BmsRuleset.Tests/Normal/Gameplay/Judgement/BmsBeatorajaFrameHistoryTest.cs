@@ -130,7 +130,7 @@ public class BmsBeatorajaFrameHistoryTest
             {
                 if (applied) health.ApplySyntheticLongNoteEndpoint(new BmsLongNoteJudgementResult(note.CreateSyntheticEndpoint(endpoint.ExpectedTime), note.CreateJudgement(), [endpoint]) { Type = endpoint.Result });
             };
-            context.Output.BodyTick += (_, holding, scale, frame) => health.ApplyHellChargeTick(holding, scale, frame.SimulationTime);
+            context.Output.BodyTick += (_, holding, scale, frame) => health.ApplyHellChargeTick(holding, scale);
         }
 
         private void time(double t) { clock.CurrentTime = t; framed.ProcessFrame(); }

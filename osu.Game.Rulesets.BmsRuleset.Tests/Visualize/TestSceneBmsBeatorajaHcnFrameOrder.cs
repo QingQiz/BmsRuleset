@@ -110,7 +110,7 @@ public partial class TestSceneBmsBeatorajaHcnFrameOrder : BmsPlayerTestScene
             var events = ((BmsScoreProcessor)Player.ScoreProcessor).JudgementEvents.ToArray();
             var health = Player.HealthProcessor.Health.Value;
             var boundary = released ? 3202 : 3200;
-            var interval = ((BmsHealthProcessor)Player.HealthProcessor).GaugeHistory.Where(e => e.Time > boundary && e.Time <= time).ToArray();
+            var interval = SimulateGaugeHistory().Where(e => e.Time > boundary && e.Time <= time).ToArray();
             var frameHealth = interval
                 .Select(e => e.States.Single(s => s.GaugeType == BmsGaugeType.Normal).Health).ToArray();
             var columns = released && time == boundary ? new[] { hcnColumn, hcnColumn }

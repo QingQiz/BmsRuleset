@@ -544,9 +544,7 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
 
     private void assertHealthDelta(string modeName, LongNoteVisualCase testCase, CaseExpectation expected, CaseSnapshot before, CaseSnapshot after)
     {
-        var history = ((BmsHealthProcessor)Player.HealthProcessor).GaugeHistory;
-        var recent = string.Join(", ", history.TakeLast(12).Select(e => $"{e.Time}:{e.States[0].Health}"));
-        Assert.That(after.Health, Is.EqualTo(expected.HealthAfter(before.Health)).Within(0.000001), $"{modeName} {testCase.Text}: health; {recent}");
+        Assert.That(after.Health, Is.EqualTo(expected.HealthAfter(before.Health)).Within(0.000001), $"{modeName} {testCase.Text}: health");
     }
 
     private static void assertNoJudgementScoreComboChange(string modeName, LongNoteVisualCase testCase, CaseSnapshot before, CaseSnapshot after)

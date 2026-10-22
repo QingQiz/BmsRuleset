@@ -49,8 +49,8 @@ public class BmsCourseHealthInheritanceTest
             var score = archive(mods);
             saved.Add((score, expected));
 
-            health.RegisterNonConsumingJudgement(HitResult.Ok, 1000);
-            health.ApplyHellChargeTick(true, eventTime: 1200);
+            health.RegisterNonConsumingJudgement(HitResult.Ok);
+            health.ApplyHellChargeTick(true);
             Assert.That(health.HasPassedAtEnd(), Is.True);
             Assert.That(health.Health.Value, Is.LessThan(expected[0].Health));
             expected = health.CurrentGaugeStates.ToArray();
@@ -97,11 +97,11 @@ public class BmsCourseHealthInheritanceTest
             if (stage < 2)
             {
                 for (var miss = 0; health.GaugeType == tierAtStart && miss < 200; miss++)
-                    health.RegisterNonConsumingJudgement(HitResult.Ok, 1000 + miss);
+                    health.RegisterNonConsumingJudgement(HitResult.Ok);
                 Assert.That(health.GaugeType, Is.Not.EqualTo(tierAtStart), "The stage must exercise a real AG downgrade.");
             }
             else
-                health.RegisterNonConsumingJudgement(HitResult.Ok, 1000);
+                health.RegisterNonConsumingJudgement(HitResult.Ok);
 
             Assert.That(health.HasPassedAtEnd(), Is.True);
             mods.OfType<BmsModAutoGauge>().Single().ApplyToScore(score.ScoreInfo);
@@ -141,7 +141,7 @@ public class BmsCourseHealthInheritanceTest
         session.ConfigureHealthProcessor(health);
         Assert.That(health.Health.Value, Is.EqualTo(remaining));
         Assert.That(health.HasPassedAtEnd(), Is.True);
-        health.RegisterNonConsumingJudgement(HitResult.Ok, 1000);
+        health.RegisterNonConsumingJudgement(HitResult.Ok);
         if (remaining <= 0.005)
         {
             Assert.That(health.Health.Value, Is.Zero);
@@ -167,7 +167,7 @@ public class BmsCourseHealthInheritanceTest
         applyMods(persistMods(session.Mods), health);
         var initial = health.CurrentGaugeStates.ToArray();
 
-        health.RegisterNonConsumingJudgement(HitResult.Ok, 1000);
+        health.RegisterNonConsumingJudgement(HitResult.Ok);
         Assert.That(health.HasFailed, Is.True);
         health.ResetReplayState();
         Assert.Multiple(() =>
@@ -178,7 +178,7 @@ public class BmsCourseHealthInheritanceTest
             Assert.That(health.HasEverFailed, Is.False);
             Assert.That(health.HasPassedAtEnd(), Is.True);
         });
-        health.RegisterNonConsumingJudgement(HitResult.Ok, 1000);
+        health.RegisterNonConsumingJudgement(HitResult.Ok);
         Assert.That(health.HasPassedAtEnd(), Is.False);
     }
 
@@ -201,7 +201,7 @@ public class BmsCourseHealthInheritanceTest
         session.ConfigureHealthProcessor(health);
         BmsGaugeStateSnapshot[] expected = [new(BmsGaugeType.Class, 0.001, false)];
         Assert.That(health.CurrentGaugeStates, Is.EqualTo(expected));
-        health.RegisterNonConsumingJudgement(HitResult.Ok, 1000);
+        health.RegisterNonConsumingJudgement(HitResult.Ok);
         Assert.That(health.HasFailed, Is.True);
         Assert.That(health.HasPassedAtEnd(), Is.False);
         session.FailCurrentStage(new ScoreInfo { Passed = false }, health.CurrentGaugeStates);

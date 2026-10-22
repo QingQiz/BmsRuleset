@@ -212,19 +212,19 @@ public class BmsOperationSequenceTest
             {
                 var result = output.GetMainResult(note);
                 events.Add(new("main", frame.SimulationTime, column, result.Type, result.TimeOffset));
-                health.RegisterNonConsumingJudgement(result.Type, frame.SimulationTime);
+                health.RegisterNonConsumingJudgement(result.Type);
             };
             output.SyntheticEndpoint = (endpoint, applied) =>
             {
                 if (!applied) return;
                 var time = endpoint.ApplicationTime ?? endpoint.EventTime;
                 events.Add(new("endpoint", time, column, endpoint.Result, endpoint.TimeOffset));
-                health.RegisterNonConsumingJudgement(endpoint.Result, time);
+                health.RegisterNonConsumingJudgement(endpoint.Result);
             };
             output.BodyTick = (_, held, scale, frame) =>
             {
                 events.Add(new(held ? "recovery" : "damage", frame.SimulationTime, column, HitResult.None, 0));
-                health.ApplyHellChargeTick(held, scale, frame.SimulationTime);
+                health.ApplyHellChargeTick(held, scale);
             };
             return new BmsJudgementColumnDefinition(objects, layout, column, output);
         }).ToArray();

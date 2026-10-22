@@ -244,7 +244,7 @@ public partial class TestSceneBmsCoreSchedulingGeneration : BmsPlayerTestScene
             var replay = new osu.Game.Replays.Replay { Frames = replayFrames().Where(f => f.Time <= 4003).Concat([new BmsReplayFrame(4003)]).ToList() };
             var simulated = BmsReplaySimulation.Run(Playfield.Beatmap, replay, new osu.Game.Scoring.ScoreInfo { Mods = Player.DrawableRuleset.Mods.ToArray() });
             Assert.That(JsonSerializer.Serialize(((BmsScoreProcessor)Player.ScoreProcessor).JudgementEvents), Is.EqualTo(JsonSerializer.Serialize(simulated.Judgements)));
-            Assert.That(JsonSerializer.Serialize(((BmsHealthProcessor)Player.HealthProcessor).GaugeHistory), Is.EqualTo(JsonSerializer.Serialize(simulated.Gauges)));
+            Assert.That(((BmsHealthProcessor)Player.HealthProcessor).CurrentGaugeStates, Is.EqualTo(simulated.Gauges[^1].States));
             Assert.That(recorder.ReplayPolls, Is.GreaterThan(0));
             Assert.That(recorder.StabilityUpdates, Is.GreaterThan(0));
             stopRecording();
@@ -281,7 +281,7 @@ public partial class TestSceneBmsCoreSchedulingGeneration : BmsPlayerTestScene
             startRecording();
             var score = (BmsScoreProcessor)Player.ScoreProcessor;
             var health = (BmsHealthProcessor)Player.HealthProcessor;
-            var before = JsonSerializer.Serialize(new { score.JudgementEvents, health.GaugeHistory });
+            var before = JsonSerializer.Serialize(new { score.JudgementEvents, health.CurrentGaugeStates });
             for (var iteration = 0; iteration < 5; iteration++)
             {
                 foreach (var column in Playfield.Stage.Columns)
@@ -299,7 +299,7 @@ public partial class TestSceneBmsCoreSchedulingGeneration : BmsPlayerTestScene
             }
             Assert.That(recorder!.Rows.Any(r => r.Split('|')[4].Split('/')[^1] is "note.passive>" or "long.passive>" or "long.finish>" or "body.sample>" or "body.tick>"
                 or "history.rewind>" or "index.rebuild>" or "result.revert>"), Is.False);
-            Assert.That(JsonSerializer.Serialize(new { score.JudgementEvents, health.GaugeHistory }), Is.EqualTo(before));
+            Assert.That(JsonSerializer.Serialize(new { score.JudgementEvents, health.CurrentGaugeStates }), Is.EqualTo(before));
             TestContext.WriteLine("P3A07_VISUAL_ONLY " + JsonSerializer.Serialize(new { afterRewind, operations = recorder.Rows.Count, unchanged = true }));
         }));
     }

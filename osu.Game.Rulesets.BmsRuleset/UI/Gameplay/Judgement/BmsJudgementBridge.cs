@@ -272,7 +272,7 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
     }
 
     public void ApplyBodyTick(BmsLongNote note, bool holding, double scale, in BmsFrameContext frame)
-        => playfield.ApplyHellChargeTick(holding, scale, frame.SimulationTime);
+        => playfield.ApplyHellChargeTick(holding, scale);
 
     public void ApplyNonConsumingBad(BmsHitObject note, in BmsFrameContext frame)
     {

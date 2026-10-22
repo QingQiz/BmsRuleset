@@ -418,7 +418,6 @@ public partial class TestSceneBmsReplayRebuild : BmsPlayerTestScene
             Rank = score.Rank.Value,
             score.ScoringJudgementEventCount,
             score.JudgementEvents,
-            Gauges = health.GaugeHistory.ToArray(),
             health.CurrentGaugeStates,
             health.HasFailed,
             health.HasEverFailed,

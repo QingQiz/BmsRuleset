@@ -137,7 +137,7 @@ public partial class TestSceneBmsMods : BmsPlayerTestScene
         // before Hard fails, so the cascade could never land on it without the autoplay buffer.
         AddUntilStep("gauge downgraded through Normal", () =>
             Player.GameplayState.HealthProcessor is BmsHealthProcessor hp
-            && hp.GaugeHistory.Any(e => e.ActiveGaugeType == BmsGaugeType.Normal));
+            && hp.GaugeType == BmsGaugeType.Normal);
     }
 
     [Test]

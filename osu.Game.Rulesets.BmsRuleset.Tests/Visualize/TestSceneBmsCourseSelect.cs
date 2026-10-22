@@ -177,7 +177,6 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
                 BeatmapHash = beatmap.Hash,
                 Status = BmsCourseStageStatus.Passed,
                 ScoreId = score.ID,
-                EndingHealth = 0.8,
             },
         ],
     };

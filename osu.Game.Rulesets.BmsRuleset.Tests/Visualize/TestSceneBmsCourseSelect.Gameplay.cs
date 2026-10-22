@@ -45,7 +45,7 @@ public partial class TestSceneBmsCourseSelect
         DeferredImportCoursePlayer player = null!;
         BmsBeatmap playable = null!;
         BmsJudgementEvent[] liveEvents = [];
-        BmsGaugeHistoryEvent[] liveGauges = [];
+        BmsGaugeStateSnapshot[] liveGaugeStates = [];
         var courseId = Guid.NewGuid().ToString();
         var directory = string.Empty;
         Task import = null!;
@@ -123,7 +123,8 @@ public partial class TestSceneBmsCourseSelect
         AddStep("finish score import", () =>
         {
             liveEvents = ((BmsScoreProcessor)player.GameplayState.ScoreProcessor).JudgementEvents.ToArray();
-            liveGauges = ((BmsHealthProcessor)player.GameplayState.HealthProcessor).GaugeHistory.ToArray();
+            var health = (BmsHealthProcessor)player.GameplayState.HealthProcessor;
+            liveGaugeStates = health.CurrentGaugeStates.ToArray();
             player.AllowImport();
         });
         AddUntilStep("player exits", () => Stack.CurrentScreen, () => Is.SameAs(songSelect));
@@ -158,7 +159,8 @@ public partial class TestSceneBmsCourseSelect
                 Assert.That(liveEvents.SelectMany(item => item.TimingObservations).Count(item => item.Kind == BmsTimingObservationKind.LongNoteTail), Is.EqualTo(1));
                 var simulated = BmsReplaySimulation.Run(playable, saved.Replay, saved.ScoreInfo);
                 Assert.That(JsonSerializer.Serialize(simulated.Judgements), Is.EqualTo(JsonSerializer.Serialize(liveEvents)));
-                Assert.That(JsonSerializer.Serialize(simulated.Gauges), Is.EqualTo(JsonSerializer.Serialize(liveGauges)));
+                Assert.That(simulated.Gauges, Is.Not.Empty);
+                Assert.That(simulated.Gauges[^1].States, Is.EqualTo(liveGaugeStates));
             });
         }
 

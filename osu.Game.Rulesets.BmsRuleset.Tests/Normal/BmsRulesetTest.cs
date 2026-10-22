@@ -154,9 +154,13 @@ public class BmsRulesetTest
     [Test]
     public void TestCreateHealthProcessor()
     {
-        var processor = ruleset.CreateHealthProcessor(0);
+        using var processor = ruleset.CreateHealthProcessor(0);
 
         Assert.That(processor, Is.TypeOf<BmsHealthProcessor>());
+        var health = (BmsHealthProcessor)processor;
+        var initialHealth = health.Health.Value;
+        health.ApplyHellChargeTick(false);
+        Assert.That(health.Health.Value, Is.LessThan(initialHealth));
     }
 
     [Test]

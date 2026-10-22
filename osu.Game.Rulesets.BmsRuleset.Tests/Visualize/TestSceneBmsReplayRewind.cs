@@ -121,7 +121,7 @@ public partial class TestSceneBmsReplayRewind : BmsPlayerTestScene
         var health = (BmsHealthProcessor)Player.HealthProcessor;
         return new Snapshot(score.Statistics.OrderBy(p => p.Key).Where(p => p.Value != 0).ToArray(), score.Combo.Value,
             score.HighestCombo.Value, score.ScoringJudgementEventCount, score.JudgementEvents.SelectMany(e => e.TimingObservations).ToArray(),
-            health.CurrentGaugeStates.ToArray(), health.GaugeHistory.Count, health.HasFailed, health.HasEverFailed);
+            health.CurrentGaugeStates.ToArray(), health.HasFailed, health.HasEverFailed);
     }
 
     private void assertSnapshot(string label, Func<Snapshot> expected)
@@ -137,7 +137,6 @@ public partial class TestSceneBmsReplayRewind : BmsPlayerTestScene
                 Assert.That(actual.ScoringEvents, Is.EqualTo(previous.ScoringEvents));
                 Assert.That(actual.Observations, Is.EqualTo(previous.Observations));
                 Assert.That(actual.Gauges, Is.EqualTo(previous.Gauges), label);
-                Assert.That(actual.GaugeEvents, Is.EqualTo(previous.GaugeEvents), label);
                 Assert.That(actual.Failed, Is.EqualTo(previous.Failed));
                 Assert.That(actual.EverFailed, Is.EqualTo(previous.EverFailed));
             });
@@ -145,5 +144,5 @@ public partial class TestSceneBmsReplayRewind : BmsPlayerTestScene
         });
 
     private sealed record Snapshot(KeyValuePair<HitResult, int>[] Statistics, int Combo, int HighestCombo, int ScoringEvents,
-                                   BmsTimingObservation[] Observations, BmsGaugeStateSnapshot[] Gauges, int GaugeEvents, bool Failed, bool EverFailed);
+                                   BmsTimingObservation[] Observations, BmsGaugeStateSnapshot[] Gauges, bool Failed, bool EverFailed);
 }

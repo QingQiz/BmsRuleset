@@ -111,7 +111,7 @@ public partial class TestSceneBmsBeatorajaHcnLandmineFrameOrder : BmsPlayerTestS
         AddStep("capture " + label, () =>
         {
             var health = Player.HealthProcessor.Health.Value;
-            var history = ((BmsHealthProcessor)Player.HealthProcessor).GaugeHistory.ToArray();
+            var history = SimulateGaugeHistory().ToArray();
             var interval = history.Where(e => e.Time > (time == 3202 ? 3201 : 3200) && e.Time <= time).ToArray();
             var frameHealth = interval
                 .Select(e => e.States.Single(s => s.GaugeType == BmsGaugeType.Normal).Health).ToArray();
@@ -135,7 +135,6 @@ public partial class TestSceneBmsBeatorajaHcnLandmineFrameOrder : BmsPlayerTestS
                 Assert.That(frameHealth, Is.EqualTo(expectedFrameHealth).Within(1e-8), "ordered NORMAL gauge history " + label);
                 if (time == 3201)
                     Assert.That(interval.Select(e => e.Time), Is.EqualTo(expectedMine ? new[] { Math.BitIncrement(3200), time } : new[] { Math.BitIncrement(3200) }));
-                Assert.That(history.Any(e => e.Time > time), Is.False, "no future gauge history after rewind " + label);
                 Assert.That(events.Select(e => e.Result), Is.EqualTo(expectedResults), "results, without extra endpoints " + label);
                 Assert.That(events.Select(e => e.Source.Kind), Is.EqualTo(expectedKinds), "source kinds " + label);
                 Assert.That(events.Select(e => e.Source.Column), Is.EqualTo(expectedColumns), "source columns " + label);

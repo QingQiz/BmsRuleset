@@ -129,10 +129,10 @@ public partial class TestSceneBmsAdvancingJudgementPerformance : BmsPlayerTestSc
                 var health = (BmsHealthProcessor)Player.HealthProcessor;
                 Assert.That(score.JudgementEvents.Count, Is.GreaterThanOrEqualTo(objects), "Every sample must execute new results instead of repeatedly timing completed notes.");
                 Assert.That(Player.DrawableRuleset.FrameStableClock.CurrentTime, Is.EqualTo(endTime).Within(.001));
-                var verification = JsonSerializer.Serialize(new { score.JudgementEvents, health.GaugeHistory, Score = score.TotalScore.Value, Combo = score.Combo.Value });
+                var verification = JsonSerializer.Serialize(new { score.JudgementEvents, health.CurrentGaugeStates, Score = score.TotalScore.Value, Combo = score.Combo.Value });
                 var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(verification)));
                 if (sampleIndex >= 0)
-                    samples.Add(new Sample(elapsed, allocated, retained, peakAlive, frameTimes, score.JudgementEvents.Count, health.GaugeHistory.Count, hash));
+                    samples.Add(new Sample(elapsed, allocated, retained, peakAlive, frameTimes, score.JudgementEvents.Count, hash));
             });
         }
 
@@ -191,6 +191,5 @@ public partial class TestSceneBmsAdvancingJudgementPerformance : BmsPlayerTestSc
         int PeakAlive,
         double[] FrameMilliseconds,
         int Results,
-        int GaugeHistoryEntries,
         string VerificationHash);
 }

@@ -59,7 +59,6 @@ public partial class TestSceneBmsInvertGameplay : BmsPlayerTestScene
     {
         BmsGaugeStateSnapshot[] heldGauges = [];
         BmsGaugeStateSnapshot[] completedGauges = [];
-        var completedGaugeEvents = 0;
         AddStep("load ordinary notes with IN", () =>
         {
             skin = skinKind;
@@ -92,7 +91,6 @@ public partial class TestSceneBmsInvertGameplay : BmsPlayerTestScene
         AddStep("capture completed gauge states", () =>
         {
             completedGauges = ((BmsHealthProcessor)Player.HealthProcessor).CurrentGaugeStates.ToArray();
-            completedGaugeEvents = ((BmsHealthProcessor)Player.HealthProcessor).GaugeHistory.Count;
         });
 
         seek(1550);
@@ -101,7 +99,6 @@ public partial class TestSceneBmsInvertGameplay : BmsPlayerTestScene
         seek(5900);
         assertCompleted(mode);
         AddAssert("replay restores completed gauge states", () => ((BmsHealthProcessor)Player.HealthProcessor).CurrentGaugeStates, () => Is.EqualTo(completedGauges));
-        AddAssert("replay does not duplicate gauge events", () => ((BmsHealthProcessor)Player.HealthProcessor).GaugeHistory.Count, () => Is.EqualTo(completedGaugeEvents));
 
         seek(0);
         AddAssert("rewind clears all judgement statistics", () => Player.ScoreProcessor.Statistics.Values.All(count => count == 0));
@@ -109,7 +106,7 @@ public partial class TestSceneBmsInvertGameplay : BmsPlayerTestScene
         assertHolding();
         seek(5900);
         assertCompleted(mode);
-        AddAssert("full replay preserves gauge events", () => ((BmsHealthProcessor)Player.HealthProcessor).GaugeHistory.Count, () => Is.EqualTo(completedGaugeEvents));
+        AddAssert("full replay preserves gauge states", () => ((BmsHealthProcessor)Player.HealthProcessor).CurrentGaugeStates, () => Is.EqualTo(completedGauges));
     }
 
     private void seek(double time)

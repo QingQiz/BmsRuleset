@@ -15,7 +15,6 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.Scoring;
@@ -85,14 +84,14 @@ public partial class TestSceneBmsBeatorajaHcnKeyboardInput : BmsPlayerTestScene
                 .Invoke(inputManager, [keyboard]);
         });
 
-        checkpoint(3000, .24, [HitResult.Perfect], [3000], [0], [.24]);
-        checkpoint(3200, .24, [HitResult.Perfect], [3000], [0], []);
-        checkpoint(3201, .26, [HitResult.Perfect], [3000], [0], [.26]);
-        checkpoint(4000, .32, [HitResult.Perfect], [3000], [0], []);
+        checkpoint(3000, .24, [HitResult.Perfect], [3000], [0]);
+        checkpoint(3200, .24, [HitResult.Perfect], [3000], [0]);
+        checkpoint(3201, .26, [HitResult.Perfect], [3000], [0]);
+        checkpoint(4000, .32, [HitResult.Perfect], [3000], [0]);
         // Both release and reversal occur after the elapsed held interval crosses its threshold.
-        checkpoint(4001, .38, [HitResult.Perfect, HitResult.Great], [3000, 4001], [0, -100], [.34, .38]);
-        checkpoint(4002, .38, [HitResult.Perfect, HitResult.Great], [3000, 4001], [0, -100], []);
-        checkpoint(4003, .38, [HitResult.Perfect, HitResult.Great], [3000, 4001], [0, -100], []);
+        checkpoint(4001, .38, [HitResult.Perfect, HitResult.Great], [3000, 4001], [0, -100]);
+        checkpoint(4002, .38, [HitResult.Perfect, HitResult.Great], [3000, 4001], [0, -100]);
+        checkpoint(4003, .38, [HitResult.Perfect, HitResult.Great], [3000, 4001], [0, -100]);
         AddStep("assert keyboard transition phase and complete timeline", () => Assert.Multiple(() =>
         {
             assertNoReplay();
@@ -130,7 +129,7 @@ public partial class TestSceneBmsBeatorajaHcnKeyboardInput : BmsPlayerTestScene
     }
 
     private void checkpoint(double time, double expectedHealth, HitResult[] expectedResults, double[] expectedTimes,
-                            double[] expectedOffsets, double[] expectedFrameHealth)
+                            double[] expectedOffsets)
     {
         AddStep("seek " + time, () => Player.GameplayClockContainer.Seek(time));
         AddUntilStep("reached " + time, () => Math.Abs(Player.DrawableRuleset.FrameStableClock.CurrentTime - time) < .001);
@@ -139,9 +138,7 @@ public partial class TestSceneBmsBeatorajaHcnKeyboardInput : BmsPlayerTestScene
             assertNoReplay();
             var health = Player.HealthProcessor.Health.Value;
             var events = ((BmsScoreProcessor)Player.ScoreProcessor).JudgementEvents.ToArray();
-            var frameHealth = ((BmsHealthProcessor)Player.HealthProcessor).GaugeHistory.Where(e => e.Time > time - 1 && e.Time <= time)
-                .Select(e => e.States.Single(s => s.GaugeType == BmsGaugeType.Normal).Health).ToArray();
-            TestContext.WriteLine($"{time}: HP={health:R}; frame=[{string.Join(",", frameHealth)}]; replay=null; "
+            TestContext.WriteLine($"{time}: HP={health:R}; replay=null; "
                                   + string.Join("; ", events.Select(e => $"{e.Result}@{e.TimingObservations.Single().ActualTime}")));
             assertions.Add(() =>
             {
@@ -150,7 +147,6 @@ public partial class TestSceneBmsBeatorajaHcnKeyboardInput : BmsPlayerTestScene
                 Assert.That(events.Select(e => e.Source.Column), Is.All.EqualTo(scratch ? 0 : 1));
                 Assert.That(events.Select(e => e.TimingObservations.Single().ActualTime), Is.EqualTo(expectedTimes), "keyboard input times at " + time);
                 Assert.That(events.Select(e => e.TimingObservations.Single().TimeOffset), Is.EqualTo(expectedOffsets), "keyboard offsets at " + time);
-                Assert.That(frameHealth, Is.EqualTo(expectedFrameHealth).Within(1e-8), "keyboard NORMAL gauge history at " + time);
             });
         });
     }

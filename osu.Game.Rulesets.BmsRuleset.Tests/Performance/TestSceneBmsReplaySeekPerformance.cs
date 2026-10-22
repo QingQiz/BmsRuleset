@@ -207,7 +207,7 @@ public partial class TestSceneBmsReplaySeekPerformance : BmsPlayerTestScene
             Statistics = score.Statistics.Where(pair => pair.Value != 0).OrderBy(pair => pair.Key).ToArray(),
             Combo = score.Combo.Value, HighestCombo = score.HighestCombo.Value, Score = score.TotalScore.Value,
             UnmodifiedScore = score.TotalScoreWithoutMods.Value, Accuracy = score.Accuracy.Value, Rank = score.Rank.Value,
-            score.ScoringJudgementEventCount, score.JudgementEvents, Gauges = health.GaugeHistory.ToArray(),
+            score.ScoringJudgementEventCount, score.JudgementEvents,
             health.CurrentGaugeStates, health.HasFailed, health.HasEverFailed,
             Columns = Playfield.Stage.Columns.Cast<BmsColumn>().Select(column => new
             {

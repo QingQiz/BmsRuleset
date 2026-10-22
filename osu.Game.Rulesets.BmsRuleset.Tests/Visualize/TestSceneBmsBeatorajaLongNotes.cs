@@ -143,7 +143,7 @@ public partial class TestSceneBmsBeatorajaLongNotes : BmsPlayerTestScene
             var tail = ((BmsScoreProcessor)Player.ScoreProcessor).JudgementEvents.Last().TimingObservations.Last();
             Assert.That(tail.ActualTime, Is.EqualTo(1500));
             Assert.That(tail.TimeOffset, Is.EqualTo(-1500));
-            Assert.That(((BmsHealthProcessor)Player.HealthProcessor).GaugeHistory.Last().Time, Is.EqualTo(1700));
+            Assert.That(SimulateGaugeHistory().Last().Time, Is.EqualTo(1700));
         }
     }
 

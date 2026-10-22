@@ -153,13 +153,16 @@ public partial class TestSceneBmsColumnJudgement : BmsPlayerTestScene
                 progression = BmsExScore.CreateProgression(score.JudgementEvents),
                 combo = score.Combo.Value,
                 total = score.TotalScore.Value,
-                health = ((BmsHealthProcessor)Player.HealthProcessor).GaugeHistory,
+                health = ((BmsHealthProcessor)Player.HealthProcessor).CurrentGaugeStates,
             });
             TestContext.WriteLine("P2_TRACE " + trace);
             var expected = baseline.RootElement.GetProperty("traces").GetProperty(scenario).GetProperty(checkpoint);
             var expectedState = JsonNode.Parse(expected.GetRawText())!.AsObject();
             // The old trace included synthetic endpoint callbacks; seeks now publish the final state.
             expectedState.Remove("results");
+            // The recorded trajectory's final snapshot remains the reference for the current gauge layers.
+            var expectedHistory = expected.GetProperty("health");
+            expectedState["health"] = JsonNode.Parse(expectedHistory.EnumerateArray().Last().GetProperty("States").GetRawText());
             Assert.That(trace, Is.EqualTo(expectedState.ToJsonString()), "ordered trace with logical judgement deadlines");
             var results = CurrentResults.Select(r => new { id = Array.IndexOf(objects, r.HitObject), r.Type, r.TimeAbsolute, r.GameplayRate });
             var expectedResults = expected.GetProperty("results").EnumerateArray()

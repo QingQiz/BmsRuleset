@@ -501,14 +501,14 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     internal void RegisterEmptyPoor(double expectedTime, int column, double? eventTime = null)
     {
         scoreProcessor?.RegisterEmptyPoor(eventTime ?? Time.Current, expectedTime, column);
-        healthProcessor?.RegisterEmptyPoor(eventTime ?? Time.Current);
+        healthProcessor?.RegisterEmptyPoor();
         requestJudgementDisplay(HitResult.Miss);
     }
 
     internal void RegisterNonConsumingBad(double expectedTime, int column, double? eventTime = null)
     {
         scoreProcessor?.RegisterNonConsumingJudgement(HitResult.Ok, eventTime ?? Time.Current, expectedTime, column);
-        healthProcessor?.RegisterNonConsumingJudgement(HitResult.Ok, eventTime ?? Time.Current);
+        healthProcessor?.RegisterNonConsumingJudgement(HitResult.Ok);
         requestJudgementDisplay(HitResult.Ok);
     }
 
@@ -550,7 +550,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     /// <summary>
     ///     Applies a HellChargeNote body gauge tick for the currently pressed column.
     /// </summary>
-    public void ApplyHellChargeTick(bool holding, double scale = 0.5, double? eventTime = null) => healthProcessor?.ApplyHellChargeTick(holding, scale, eventTime ?? Time.Current);
+    public void ApplyHellChargeTick(bool holding, double scale = 0.5) => healthProcessor?.ApplyHellChargeTick(holding, scale);
 
     #endregion
 

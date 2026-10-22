@@ -145,7 +145,7 @@ public partial class TestSceneBmsBeatorajaLandmineRewindLifecycle : BmsPlayerTes
             var events = ((BmsScoreProcessor)Player.ScoreProcessor).JudgementEvents.ToArray();
             var mines = events.Count(e => e.Source.Kind == BmsJudgementSourceKind.Landmine);
             var observations = events.SelectMany(e => e.TimingObservations).ToArray();
-            var history = ((BmsHealthProcessor)Player.HealthProcessor).GaugeHistory.ToArray();
+            var history = SimulateGaugeHistory().ToArray();
             var interval = history.Where(e => e.Time > (time == 3210 ? 3200 : 3201) && e.Time <= time).ToArray();
             var frameHealth = interval
                 .Select(e => e.States.Single(s => s.GaugeType == BmsGaugeType.Normal).Health).ToArray();
@@ -172,7 +172,6 @@ public partial class TestSceneBmsBeatorajaLandmineRewindLifecycle : BmsPlayerTes
                 if (time == 3210)
                     Assert.That(interval.Select(e => e.Time), Is.EqualTo(expectedMine
                         ? new[] { Math.BitIncrement(3200), 3201 } : [Math.BitIncrement(3200)]));
-                Assert.That(history.Any(e => e.Time > time), Is.False, "no future gauge history " + label);
                 Assert.That(events.Select(e => e.Result), Is.EqualTo(expectedResults), "results, without extra endpoints " + label);
                 Assert.That(events.Select(e => e.Source.Kind), Is.EqualTo(expectedKinds), "source kinds " + label);
                 Assert.That(events.Select(e => e.Source.Column), Is.EqualTo(expectedColumns), "source columns " + label);

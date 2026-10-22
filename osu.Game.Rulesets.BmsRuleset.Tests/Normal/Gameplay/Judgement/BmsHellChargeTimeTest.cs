@@ -100,7 +100,7 @@ public class BmsHellChargeTimeTest
         var held = new BmsLongNote { Beatmap = beatmap, Column = 2, StartTime = 1000, Duration = 3000 };
         var output = new BmsRecordingJudgementOutput();
         var health = createHealth();
-        output.BodyTick = (_, holding, scale, frame) => health.ApplyHellChargeTick(holding, scale, frame.SimulationTime);
+        output.BodyTick = (_, holding, scale, frame) => health.ApplyHellChargeTick(holding, scale);
         var engine = new BmsJudgementEngine(
             new([released], beatmap.LayoutVariant, 1, output),
             new([held], beatmap.LayoutVariant, 2, output));
@@ -121,9 +121,8 @@ public class BmsHellChargeTimeTest
         ];
         Assert.That(output.BodyTicks.Select(tick => (tick.Note.Column, tick.Holding, tick.Time)), Is.EqualTo(expected));
         var expectedHealth = createHealth();
-        foreach (var tick in expected) expectedHealth.ApplyHellChargeTick(tick.Holding, eventTime: tick.Time);
+        foreach (var tick in expected) expectedHealth.ApplyHellChargeTick(tick.Holding);
         Assert.That(health.CurrentGaugeStates, Is.EqualTo(expectedHealth.CurrentGaugeStates));
-        Assert.That(health.GaugeHistory.Select(entry => entry.Time), Is.Ordered);
 
         static BmsHealthProcessor createHealth()
         {

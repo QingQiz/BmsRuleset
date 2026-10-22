@@ -64,7 +64,7 @@ public partial class TestSceneBmsPauseCountdown : BmsPlayerTestScene
             Assert.That(Player.Pause(), Is.True);
             pauseTime = Player.GameplayClockContainer.CurrentTime;
             judgements = JsonSerializer.Serialize(score.JudgementEvents);
-            gauges = JsonSerializer.Serialize(health.GaugeHistory);
+            gauges = JsonSerializer.Serialize(health.CurrentGaugeStates);
         });
         AddStep("change physical input while paused", () =>
         {
@@ -88,7 +88,7 @@ public partial class TestSceneBmsPauseCountdown : BmsPlayerTestScene
             Assert.That(Player.GameplayClockContainer.CurrentTime, Is.EqualTo(pauseTime).Within(.001));
             Assert.That(column.Judgements.GetLongNoteState(note).TailJudged, Is.False);
             Assert.That(JsonSerializer.Serialize(score.JudgementEvents), Is.EqualTo(judgements));
-            Assert.That(JsonSerializer.Serialize(health.GaugeHistory), Is.EqualTo(gauges));
+            Assert.That(JsonSerializer.Serialize(health.CurrentGaugeStates), Is.EqualTo(gauges));
         });
         AddUntilStep("countdown resumes gameplay", () => !Player.IsResuming && !Player.GameplayClockContainer.IsPaused.Value);
         AddUntilStep("physical state synchronised", () => column.IsPressed == (pausedInput != PausedInput.Released));
@@ -108,7 +108,7 @@ public partial class TestSceneBmsPauseCountdown : BmsPlayerTestScene
             var saved = BmsTestReplayArchive.RoundTrip(Player.Score.DeepClone());
             var result = BmsReplaySimulation.Run(Playfield.Beatmap, saved.Replay, saved.ScoreInfo);
             Assert.That(JsonSerializer.Serialize(result.Judgements), Is.EqualTo(JsonSerializer.Serialize(score.JudgementEvents)));
-            Assert.That(JsonSerializer.Serialize(result.Gauges), Is.EqualTo(JsonSerializer.Serialize(health.GaugeHistory)));
+            Assert.That(health.CurrentGaugeStates, Is.EqualTo(result.Gauges[^1].States));
             var times = Player.Score.Replay.Frames.Select(frame => frame.Time).ToArray();
             Assert.That(times, Is.Ordered);
         });

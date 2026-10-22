@@ -111,7 +111,7 @@ public class BmsCourseSessionTest
             Assert.That(session.Status, Is.EqualTo(BmsCourseStatus.Aborted));
             Assert.That(session.CurrentStage.Status, Is.EqualTo(BmsCourseStageStatus.Aborted));
             Assert.That(session.CurrentStage.Score?.TotalScore, Is.EqualTo(1000));
-            Assert.That(session.CurrentStage.EndingHealth, Is.EqualTo(0.3));
+            Assert.That(session.CurrentGaugeStates, Is.EqualTo(gaugeStates(0.3)));
         });
     }
 
@@ -247,11 +247,7 @@ public class BmsCourseSessionTest
         session.BeginCurrentStage();
         session.CompleteCurrentStage(createScore(true), states);
 
-        Assert.Multiple(() =>
-        {
-            Assert.That(session.CurrentGaugeStates, Is.EqualTo(states));
-            Assert.That(session.CurrentHealth, Is.EqualTo(0.42));
-        });
+        Assert.That(session.CurrentGaugeStates, Is.EqualTo(states));
     }
 
     [Test]
@@ -689,8 +685,9 @@ public class BmsCourseSessionTest
         Assert.ThrowsAsync<OperationCanceledException>(async () => await store.GetHistoryAsync("other", cancellationToken));
     }
 
-    [Test]
-    public void TestCourseScoreHistoryPersists()
+    [TestCase(false)]
+    [TestCase(true)]
+    public void TestCourseScoreHistoryPersists(bool legacyEndingHealth)
     {
         var store = new BmsCourseResultStore(courseResultsDirectory);
         var firstScore = createScore(true, 900_000);
@@ -706,7 +703,6 @@ public class BmsCourseSessionTest
                     BeatmapHash = "first-stage",
                     Status = BmsCourseStageStatus.Passed,
                     ScoreId = firstScore.ID,
-                    EndingHealth = 0.75,
                 },
             ],
         };
@@ -715,6 +711,13 @@ public class BmsCourseSessionTest
 
         store.Record("course", BmsCourseStatus.Passed, firstScore.Rank, firstScore, firstAttempt);
         store.Record("course", BmsCourseStatus.Passed, secondScore.Rank, secondScore);
+
+        if (legacyEndingHealth)
+        {
+            var path = store.GetHistory("course")[0].SourcePath;
+            File.WriteAllText(path, File.ReadAllText(path).Replace("\"BeatmapHash\":\"first-stage\",",
+                "\"BeatmapHash\":\"first-stage\",\"EndingHealth\":0.75,", StringComparison.Ordinal));
+        }
 
         store = new BmsCourseResultStore(courseResultsDirectory);
         Assert.That(store.TryGet("course", out var result), Is.True);
@@ -813,7 +816,7 @@ public class BmsCourseSessionTest
             Assert.That(session.Status, Is.EqualTo(BmsCourseStatus.Failed));
             Assert.That(session.CurrentStage.Status, Is.EqualTo(BmsCourseStageStatus.Failed));
             Assert.That(session.CurrentStage.Score?.TotalScore, Is.EqualTo(654321));
-            Assert.That(session.CurrentHealth, Is.Zero);
+            Assert.That(session.CurrentGaugeStates, Is.EqualTo(gaugeStates(0, true)));
             Assert.That(session.Stages[1].Status, Is.EqualTo(BmsCourseStageStatus.NotPlayed));
             Assert.That(session.Stages[1].Score, Is.Null);
         });
@@ -868,7 +871,7 @@ public class BmsCourseSessionTest
         {
             Assert.That(session.Status, Is.EqualTo(BmsCourseStatus.InProgress));
             Assert.That(session.CurrentStage.Status, Is.EqualTo(BmsCourseStageStatus.Passed));
-            Assert.That(session.CurrentHealth, Is.EqualTo(0.42));
+            Assert.That(session.CurrentGaugeStates, Is.EqualTo(gaugeStates(0.42)));
             Assert.That(session.CurrentStage.Score, Is.Not.SameAs(score));
         });
 
@@ -880,7 +883,7 @@ public class BmsCourseSessionTest
             Assert.That(session.CurrentStageIndex, Is.EqualTo(1));
             Assert.That(session.CurrentStage.Status, Is.EqualTo(BmsCourseStageStatus.NotPlayed));
             Assert.That(session.AdvanceRequested, Is.False);
-            Assert.That(session.CurrentHealth, Is.EqualTo(0.42));
+            Assert.That(session.CurrentGaugeStates, Is.EqualTo(gaugeStates(0.42)));
         });
     }
 }

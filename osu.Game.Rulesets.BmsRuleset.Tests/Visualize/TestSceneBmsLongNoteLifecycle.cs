@@ -314,7 +314,7 @@ public partial class TestSceneBmsLongNoteLifecycle : BmsPlayerTestScene
                 progression = BmsExScore.CreateProgression(score.JudgementEvents),
                 combo = score.Combo.Value,
                 total = score.TotalScore.Value,
-                health = ((BmsHealthProcessor)Player.HealthProcessor).GaugeHistory,
+                health = ((BmsHealthProcessor)Player.HealthProcessor).CurrentGaugeStates,
             });
             TestContext.WriteLine("P3_TRACE " + trace);
             var time = Playfield.Time.Current;
@@ -328,7 +328,7 @@ public partial class TestSceneBmsLongNoteLifecycle : BmsPlayerTestScene
                 var replay = new Replay { Frames = frames.Cast<ReplayFrame>().ToList(), HasReceivedAllFrames = true };
                 var expected = BmsReplaySimulation.Run(Playfield.Beatmap, replay, simulationScore);
                 Assert.That(JsonSerializer.Serialize(score.JudgementEvents), Is.EqualTo(JsonSerializer.Serialize(expected.Judgements)));
-                Assert.That(JsonSerializer.Serialize(((BmsHealthProcessor)Player.HealthProcessor).GaugeHistory), Is.EqualTo(JsonSerializer.Serialize(expected.Gauges)));
+                Assert.That(((BmsHealthProcessor)Player.HealthProcessor).CurrentGaugeStates, Is.EqualTo(expected.Gauges[^1].States));
             }
 
             // Keep the pre-refactor score expectations while allowing intentional logical timestamp changes.

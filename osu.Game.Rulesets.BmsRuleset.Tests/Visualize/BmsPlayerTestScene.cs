@@ -15,6 +15,8 @@ using osu.Game.Beatmaps;
 using osu.Game.IO;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.Replays;
@@ -98,6 +100,14 @@ public abstract partial class BmsPlayerTestScene : PlayerTestScene, IStorageReso
     protected GameHost Host { get; private set; } = null!;
 
     protected override Ruleset CreatePlayerRuleset() => new BmsRuleset();
+
+    // Timeline assertions exercise the result simulation; live gameplay only exposes current gauge states.
+    protected IReadOnlyList<BmsGaugeHistoryEvent> SimulateGaugeHistory()
+    {
+        var replay = Player.DrawableRuleset.ReplayScore?.Replay ?? Player.Score.Replay;
+        return BmsReplaySimulation.Run(Playfield.Beatmap, replay, Player.Score.ScoreInfo).Gauges
+            .Where(entry => entry.Time <= Player.DrawableRuleset.FrameStableClock.CurrentTime).ToArray();
+    }
 
     /// <summary>
     /// Creates a <see cref="BmsTestSkins.SkinnedTestPlayer"/> backed by the requested skin.

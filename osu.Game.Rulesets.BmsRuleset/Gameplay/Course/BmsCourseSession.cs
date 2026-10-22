@@ -32,7 +32,7 @@ internal enum BmsCourseStageStatus
 
 internal sealed record BmsResolvedCourseStage(BmsCourseStage Definition, BeatmapInfo Beatmap);
 
-internal sealed record BmsRestoredCourseStage(BmsCourseStageStatus Status, ScoreInfo? Score, double? EndingHealth);
+internal sealed record BmsRestoredCourseStage(BmsCourseStageStatus Status, ScoreInfo? Score);
 
 internal sealed class BmsCourseStageAttempt(BmsResolvedCourseStage stage)
 {
@@ -41,8 +41,6 @@ internal sealed class BmsCourseStageAttempt(BmsResolvedCourseStage stage)
     internal BmsCourseStageStatus Status { get; set; }
 
     internal ScoreInfo? Score { get; set; }
-
-    internal double? EndingHealth { get; set; }
 }
 
 internal sealed class BmsCourseSession
@@ -68,8 +66,6 @@ internal sealed class BmsCourseSession
     internal bool CanContinue => Status == BmsCourseStatus.InProgress;
 
     internal int CurrentStageIndex { get; private set; }
-
-    internal double CurrentHealth { get; private set; } = 1;
 
     internal IReadOnlyList<BmsGaugeStateSnapshot> CurrentGaugeStates { get; private set; }
 
@@ -117,13 +113,9 @@ internal sealed class BmsCourseSession
         {
             session.stages[i].Status = attempts[i].Status;
             session.stages[i].Score = attempts[i].Score?.DeepClone();
-            session.stages[i].EndingHealth = attempts[i].EndingHealth;
         }
 
         session.CurrentStageIndex = Math.Max(0, attempts.TakeWhile(attempt => attempt.Status != BmsCourseStageStatus.NotPlayed).Count() - 1);
-        session.CurrentHealth = attempts.Take(session.CurrentStageIndex + 1)
-            .Select(attempt => attempt.EndingHealth)
-            .LastOrDefault(health => health.HasValue) ?? 1;
         return session;
     }
 
@@ -446,9 +438,7 @@ internal sealed class BmsCourseSession
     private void storeResult(ScoreInfo score, IReadOnlyList<BmsGaugeStateSnapshot> gaugeStates, BmsCourseStageStatus stageStatus)
     {
         CurrentGaugeStates = gaugeStates.Select(state => state with { }).ToArray();
-        CurrentHealth = CurrentGaugeStates.FirstOrDefault(state => !state.Failed)?.Health ?? 0;
         CurrentStage.Score = score.DeepClone();
-        CurrentStage.EndingHealth = CurrentHealth;
         CurrentStage.Status = stageStatus;
     }
 

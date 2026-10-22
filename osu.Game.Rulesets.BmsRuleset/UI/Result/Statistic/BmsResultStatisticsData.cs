@@ -46,8 +46,6 @@ internal sealed record BmsResultStatisticsData(
     private static BmsResultStatisticsData create(ScoreInfo score, IBeatmap beatmap, IReadOnlyList<HitEvent> hitEvents,
                                                   IReadOnlyList<HitEvent> scoringEvents, IReadOnlyList<BmsGaugeHistoryEvent> gauges)
     {
-        // The processor expands snapshots on read; reuse them within this statistics request.
-        gauges = gauges as BmsGaugeHistoryEvent[] ?? gauges.ToArray();
         var timeline = BmsTimelineStatistic.CreateData(beatmap, hitEvents, scoringEvents);
         return new BmsResultStatisticsData(
             BmsGaugeHistoryGraph.CreateSeries(score, beatmap, scoringEvents, gauges),

@@ -375,8 +375,7 @@ internal partial class BmsCourseHistoryArea : VisibilityContainer
 
             restoredStages[i] = new BmsRestoredCourseStage(
                 attempt.Stages[i].Status,
-                stageScore,
-                attempt.Stages[i].EndingHealth);
+                stageScore);
         }
 
         var ruleset = resolvedStages[0].Beatmap.Ruleset.CreateInstance();

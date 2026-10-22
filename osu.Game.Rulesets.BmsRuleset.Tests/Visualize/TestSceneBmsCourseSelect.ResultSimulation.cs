@@ -81,7 +81,7 @@ public partial class TestSceneBmsCourseSelect
                 session.ConfigureHealthProcessor(health);
                 openings[stage] = health.CurrentGaugeStates.ToArray();
                 foreach (var note in beatmap.HitObjects)
-                    health.RegisterNonConsumingJudgement(HitResult.Meh, note.StartTime);
+                    health.RegisterNonConsumingJudgement(HitResult.Meh);
                 Assert.That(health.HasPassedAtEnd(), Is.True);
 
                 var score = new Score
@@ -109,7 +109,7 @@ public partial class TestSceneBmsCourseSelect
             }
 
             restored = BmsCourseSession.Restore(course, stages, autoGauge ? [new BmsModAutoGauge()] : [BmsCourseSession.CreateGaugeMod(gaugeType)],
-                gaugeType, session.Status, session.Stages.Select(stage => new BmsRestoredCourseStage(stage.Status, stage.Score, stage.EndingHealth)).ToArray());
+                gaugeType, session.Status, session.Stages.Select(stage => new BmsRestoredCourseStage(stage.Status, stage.Score)).ToArray());
             Add(panel = new HistoricalCourseStatistics(restored, replays) { RelativeSizeAxes = Axes.Both });
         });
         AddUntilStep("historical summary simulated", () => panel.LoadedStatistics != null);

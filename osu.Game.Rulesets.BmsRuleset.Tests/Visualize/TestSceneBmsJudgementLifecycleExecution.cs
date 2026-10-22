@@ -511,7 +511,7 @@ public partial class TestSceneBmsJudgementLifecycleExecution : BmsPlayerTestScen
             trace.Add(JsonSerializer.Serialize(new { checkpoint, result = Output.GetMainResult(Note), state = Note is BmsLongNote n ? Context.GetLongNoteState(n) : (BmsLongNoteState?)null,
                 pending = Recorded.GetPendingLongNoteTails().Select(n => n.StartTime), bodies = Recorded.GetActiveBodies().Select(n => n.StartTime) }));
             scores.Add(JsonSerializer.Serialize(new { checkpoint, events = Score.JudgementEvents, combo = Score.Combo.Value, total = Score.TotalScore.Value,
-                health = Health.GaugeHistory, states = Health.CurrentGaugeStates }));
+                states = Health.CurrentGaugeStates }));
         }
 
         internal void Finish(string scenario)

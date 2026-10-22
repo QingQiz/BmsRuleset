@@ -56,12 +56,19 @@ internal static class BmsReplaySimulation
             foreach (var mod in mods.OfType<IApplicableToHealthProcessor>())
                 mod.ApplyToHealthProcessor(health);
 
+        var gauges = new List<BmsGaugeHistoryEvent>();
+        if (courseGaugeStates?.Count > 0 || (courseGaugeStates == null &&
+            (mods.OfType<BmsModAutoGauge>().FirstOrDefault() is { } seededAutoGauge
+                ? seededAutoGauge.ClassHealth.Value.HasValue || seededAutoGauge.ExClassHealth.Value.HasValue || seededAutoGauge.ExHardClassHealth.Value.HasValue
+                : mods.OfType<BmsModGauge>().Any(mod => mod.InitialHealth.Value.HasValue))))
+            recordGauge(0);
+
         var objects = beatmap.HitObjects.Where(note => note is BmsNote or BmsLongNote or BmsLandmine).OrderBy(note => note.StartTime).ToArray();
         var columnCount = Math.Max(beatmap.TotalColumns, objects.Select(note => note.Column + 1).DefaultIfEmpty(1).Max());
         var engine = new BmsJudgementEngine(Enumerable.Range(0, columnCount).Select(index =>
         {
             var notes = objects.Where(note => note.Column == index).ToArray();
-            return new BmsJudgementColumnDefinition(notes, beatmap.LayoutVariant, index, new SimulationOutput(score, health));
+            return new BmsJudgementColumnDefinition(notes, beatmap.LayoutVariant, index, new SimulationOutput(score, health, recordGauge));
         }).ToArray());
 
         AdvanceTo(beatmap, replay, mods, engine, columnCount, frames[^1].Time, time =>
@@ -70,7 +77,14 @@ internal static class BmsReplaySimulation
             clock.ProcessFrame();
         }, cancellationToken);
 
-        return (score.JudgementEvents, health.GaugeHistory);
+        return (score.JudgementEvents, gauges);
+
+        void recordGauge(double time)
+        {
+            var states = health.CurrentGaugeStates;
+            if (states.Count > 0)
+                gauges.Add(new BmsGaugeHistoryEvent(time, states.FirstOrDefault(state => !state.Failed)?.GaugeType ?? states[^1].GaugeType, states));
+        }
     }
 
     internal static void AdvanceTo(BmsBeatmap beatmap, Replay replay, IReadOnlyList<Mod> mods, BmsJudgementEngine engine,
@@ -140,7 +154,7 @@ internal static class BmsReplaySimulation
         }
     }
 
-    private sealed class SimulationOutput(BmsScoreProcessor score, BmsHealthProcessor health) : IBmsJudgementOutput
+    private sealed class SimulationOutput(BmsScoreProcessor score, BmsHealthProcessor health, Action<double> recordGauge) : IBmsJudgementOutput
     {
         private readonly Dictionary<BmsHitObject, BmsJudgementResult> results = new(ReferenceEqualityComparer.Instance);
         private Action<BmsHitObject> stateCheckpoint = null!;
@@ -169,15 +183,25 @@ internal static class BmsReplaySimulation
             results.Add(note, result);
             score.ApplyResult(result);
             health.ApplyResult(result);
+            recordGauge(result is BmsLongNoteJudgementResult longNoteResult
+                ? longNoteResult.EndpointResults[^1].ApplicationTime ?? result.TimeAbsolute
+                : result.EventTime);
             stateCheckpoint(note);
             checkpoint(note);
         }
 
         public void ApplySyntheticEndpoint(BmsLongNoteEndpointResult endpoint, in BmsFrameContext frame, bool suppressPenalty)
-            => health.ApplySyntheticLongNoteEndpoint(score.ApplySyntheticLongNoteEndpoint(endpoint, suppressPenalty));
+        {
+            health.ApplySyntheticLongNoteEndpoint(score.ApplySyntheticLongNoteEndpoint(endpoint, suppressPenalty));
+            // PMS releases apply after their grace period while retaining the key-up judgement time.
+            recordGauge(endpoint.ApplicationTime ?? endpoint.EventTime);
+        }
 
         public void ApplyBodyTick(BmsLongNote note, bool holding, double scale, in BmsFrameContext frame)
-            => health.ApplyHellChargeTick(holding, scale, frame.SimulationTime);
+        {
+            health.ApplyHellChargeTick(holding, scale);
+            recordGauge(frame.SimulationTime);
+        }
 
         public void ApplyNonConsumingBad(BmsHitObject note, in BmsFrameContext frame)
             => nonConsuming(HitResult.Ok, note.StartTime, note.Column, frame);
@@ -188,7 +212,8 @@ internal static class BmsReplaySimulation
         private void nonConsuming(HitResult type, double expectedTime, int column, in BmsFrameContext frame)
         {
             score.RegisterNonConsumingJudgement(type, frame.SimulationTime, expectedTime, column);
-            health.RegisterNonConsumingJudgement(type, frame.SimulationTime);
+            health.RegisterNonConsumingJudgement(type);
+            recordGauge(frame.SimulationTime);
         }
 
         public void PublishState(BmsLongNote note, in BmsLongNoteState state, in BmsFrameContext frame)

@@ -50,13 +50,12 @@ public class BmsReplayRebuildTest
 
         for (var attempt = 0; attempt < 3; attempt++)
         {
-            processor.ApplyHellChargeTick(false, eventTime: 1000);
+            processor.ApplyHellChargeTick(false);
             processor.ResetReplayState();
             Assert.Multiple(() =>
             {
                 Assert.That(processor.Health.Value, Is.EqualTo(0.43));
                 Assert.That(processor.CurrentGaugeStates.Single().Health, Is.EqualTo(0.43));
-                Assert.That(processor.GaugeHistory, Has.Count.EqualTo(explicitSeed ? 1 : 0));
                 Assert.That(processor.HasFailed, Is.False);
                 Assert.That(processor.HasEverFailed, Is.False);
             });

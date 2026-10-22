@@ -302,7 +302,6 @@ internal sealed record BmsCourseAttemptData
             BeatmapHash = stage.Stage.Beatmap.Hash,
             Status = stage.Status,
             ScoreId = stage.Score?.ID,
-            EndingHealth = stage.EndingHealth,
         }).ToArray(),
     };
 }
@@ -314,8 +313,6 @@ internal sealed record BmsCourseStageAttemptData
     public BmsCourseStageStatus Status { get; init; }
 
     public Guid? ScoreId { get; init; }
-
-    public double? EndingHealth { get; init; }
 }
 
 internal sealed record BmsCourseScoreData

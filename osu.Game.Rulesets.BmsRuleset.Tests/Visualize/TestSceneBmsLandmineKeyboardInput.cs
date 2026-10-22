@@ -14,7 +14,6 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.Scoring;
@@ -72,10 +71,10 @@ public partial class TestSceneBmsLandmineKeyboardInput : BmsPlayerTestScene
 
         // Elapsed body recovery precedes a later mine crossing. NORMAL TOTAL240 / 3
         // gives head +80%, body +40%, then the held mine deducts 10%.
-        checkpoint(3000, false, [1]);
-        checkpoint(3200, false, []);
-        checkpoint(3201, !releaseAtMine, releaseAtMine ? [] : [.9]);
-        checkpoint(3202, !releaseAtMine, []);
+        checkpoint(3000, false);
+        checkpoint(3200, false);
+        checkpoint(3201, !releaseAtMine);
+        checkpoint(3202, !releaseAtMine);
         AddStep("assert keyboard mine timeline", () => Assert.Multiple(() =>
         {
             foreach (var assertion in assertions)
@@ -90,7 +89,7 @@ public partial class TestSceneBmsLandmineKeyboardInput : BmsPlayerTestScene
         Assert.That(((RulesetInputManagerInputState<BmsAction>)inputManager.CurrentState).LastReplayState, Is.Null);
     }
 
-    private void checkpoint(double time, bool expectedMine, double[] expectedFrameHealth)
+    private void checkpoint(double time, bool expectedMine)
     {
         AddStep("seek " + time, () => Player.GameplayClockContainer.Seek(time));
         AddUntilStep("reached " + time, () => Math.Abs(Player.DrawableRuleset.FrameStableClock.CurrentTime - time) < .001);
@@ -99,13 +98,10 @@ public partial class TestSceneBmsLandmineKeyboardInput : BmsPlayerTestScene
             assertNoReplay();
             var health = Player.HealthProcessor.Health.Value;
             var events = ((BmsScoreProcessor)Player.ScoreProcessor).JudgementEvents.ToArray();
-            var frameHealth = ((BmsHealthProcessor)Player.HealthProcessor).GaugeHistory.Where(e => e.Time == time)
-                .Select(e => e.States.Single(s => s.GaugeType == BmsGaugeType.Normal).Health).ToArray();
-            TestContext.WriteLine($"keyboard {time}: HP={health:R}; frame=[{string.Join(",", frameHealth)}]; replay=null");
+            TestContext.WriteLine($"keyboard {time}: HP={health:R}; replay=null");
             assertions.Add(() =>
             {
                 Assert.That(health, Is.EqualTo(expectedMine ? .9 : 1).Within(1e-8), "final keyboard health at " + time);
-                Assert.That(frameHealth, Is.EqualTo(expectedFrameHealth).Within(1e-8), "ordered keyboard gauge history at " + time);
                 Assert.That(events.Select(e => e.Result), Is.EqualTo(expectedMine
                     ? new[] { HitResult.Perfect, HitResult.Meh } : [HitResult.Perfect]), "no extra endpoints at " + time);
                 Assert.That(events.Select(e => e.Source.Kind), Is.EqualTo(expectedMine

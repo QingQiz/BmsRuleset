@@ -21,68 +21,36 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Health;
 public class BmsHealthProcessorTest
 {
     [Test]
-    public void RecordingWarmedGaugeHistoryDoesNotAllocateSnapshots()
+    public void GaugeStatesMatchAcrossRebuildAndNewBranch([Values] BmsGaugeProfileFamily family)
     {
-        const int events = 2048;
-        var processor = new BmsHealthProcessor();
-        processor.SetGaugeTypes(BmsModAutoGauge.AUTO_GAUGE_CHAIN);
-        for (var i = 0; i < events; i++)
-            processor.ApplyHellChargeTick(true, eventTime: i);
-        processor.ResetReplayState();
-
-        var before = GC.GetAllocatedBytesForCurrentThread();
-        for (var i = 0; i < events; i++)
-            processor.ApplyHellChargeTick(true, eventTime: i);
-        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
-        TestContext.WriteLine($"{events} warmed six-layer gauge updates allocated {allocated} bytes.");
-
-        Assert.That(processor.GaugeHistory, Has.Count.EqualTo(events));
-        Assert.That(allocated, Is.LessThan(4096), "Recording must defer snapshot objects until history is read.");
-    }
-
-    [Test]
-    public void GaugeHistoryMatchesAppliedStatesAcrossRebuildAndNewBranch([Values] BmsGaugeProfileFamily family)
-    {
-        var processor = new BmsHealthProcessor();
+        using var processor = new BmsHealthProcessor();
         processor.SetGaugeTypes(Enum.GetValues<BmsGaugeType>(), profileFamilyOverride: family);
-        var history = processor.GaugeHistory;
         var expected = new List<BmsGaugeStateSnapshot[]>();
         for (var i = 0; i < 40; i++)
         {
-            // Guts, recovery ceilings and failed layers must keep their exact applied values.
-            if (i % 3 == 0)
-                processor.RegisterNonConsumingJudgement(HitResult.Ok, i / 2);
-            else
-                processor.ApplyHellChargeTick(i % 3 == 1, eventTime: i / 2);
+            apply(i);
             expected.Add(processor.CurrentGaugeStates.ToArray());
         }
 
-        Assert.That(history, Has.Count.EqualTo(expected.Count));
-        for (var i = 0; i < expected.Count; i++)
-            Assert.That(history[i].States, Is.EqualTo(expected[i]), "event " + i);
-
-        var discarded = history[^1];
-        rebuild();
-        Assert.That(history, Has.Count.EqualTo(16));
-        Assert.That(processor.CurrentGaugeStates, Is.EqualTo(expected[15]));
-        processor.ApplyHellChargeTick(true, eventTime: 8);
-        Assert.That(history, Has.Count.EqualTo(17));
-        Assert.That(history[^1].States, Is.EqualTo(processor.CurrentGaugeStates));
-        Assert.That(discarded.States, Is.EqualTo(expected[^1]), "Read snapshots must survive truncation and storage reuse.");
-
-        rebuild();
-        Assert.That(processor.CurrentGaugeStates, Is.EqualTo(expected[15]));
-
-        void rebuild()
+        var discarded = processor.CurrentGaugeStates;
+        for (var attempt = 0; attempt < 2; attempt++)
         {
             processor.ResetReplayState();
             for (var i = 0; i < 16; i++)
             {
-                if (i % 3 == 0)
-                    processor.RegisterNonConsumingJudgement(HitResult.Ok, i / 2);
-                else
-                    processor.ApplyHellChargeTick(i % 3 == 1, eventTime: i / 2);
+                apply(i);
+                Assert.That(processor.CurrentGaugeStates, Is.EqualTo(expected[i]), "event " + i);
             }
+            processor.ApplyHellChargeTick(true);
+            Assert.That(discarded, Is.EqualTo(expected[^1]), "Snapshots must survive later gauge changes.");
+        }
+
+        void apply(int index)
+        {
+            if (index % 3 == 0)
+                processor.RegisterNonConsumingJudgement(HitResult.Ok);
+            else
+                processor.ApplyHellChargeTick(index % 3 == 1);
         }
     }
 
@@ -91,31 +59,28 @@ public class BmsHealthProcessorTest
     {
         var processor = createProcessorWithClock(1200);
         processor.SetGaugeType(BmsGaugeType.Hazard);
-        processor.ApplyHellChargeTick(true, eventTime: 500);
+        processor.ApplyHellChargeTick(true);
         var note = new BmsNote { StartTime = 1000, Column = 1 };
         processor.ApplyResult(new JudgementResult(note, note.CreateJudgement()) { Type = HitResult.Ok });
-        Assert.That(processor.GaugeHistory[^1].Time, Is.EqualTo(1000));
         Assert.That(processor.HasFailed, Is.True);
         Assert.That(processor.HasEverFailed, Is.True);
 
         processor.ResetReplayState();
-        processor.ApplyHellChargeTick(true, eventTime: 500);
-        Assert.That(processor.GaugeHistory, Has.Count.EqualTo(1));
+        processor.ApplyHellChargeTick(true);
         Assert.That(processor.HasFailed, Is.False);
         Assert.That(processor.HasEverFailed, Is.False);
         Assert.That(processor.Health.Value, Is.EqualTo(1));
-        processor.ApplyHellChargeTick(true, eventTime: 1300);
+        processor.ApplyHellChargeTick(true);
         Assert.That(processor.HasFailed, Is.False);
-        Assert.That(processor.GaugeHistory[^1].States.Single().Failed, Is.False);
     }
 
     [TestCase(false, 1000)]
     [TestCase(true, 1100)]
-    public void DelayedEngineResultRecordsItsLogicalApplicationTime(bool syntheticTail, double applicationTime)
+    public void DelayedEngineResultCanBeRebuilt(bool syntheticTail, double applicationTime)
     {
         var processor = createProcessorWithClock(1200);
         processor.SetGaugeType(BmsGaugeType.Hazard);
-        processor.ApplyHellChargeTick(true, eventTime: 500);
+        processor.ApplyHellChargeTick(true);
         BmsJudgementResult result;
         if (syntheticTail)
         {
@@ -131,16 +96,14 @@ public class BmsHealthProcessorTest
         result.Type = HitResult.Ok;
         result.SetTiming(1000, 1);
         processor.ApplyResult(result);
-        Assert.That(processor.GaugeHistory[^1].Time, Is.EqualTo(applicationTime));
 
         Assert.That(processor.HasFailed, Is.True);
         Assert.That(processor.Health.Value, Is.Zero);
         processor.ResetReplayState();
-        processor.ApplyHellChargeTick(true, eventTime: 500);
+        processor.ApplyHellChargeTick(true);
         Assert.That(processor.HasFailed, Is.False);
         Assert.That(processor.HasEverFailed, Is.False);
         Assert.That(processor.Health.Value, Is.EqualTo(1));
-        Assert.That(processor.GaugeHistory, Has.Count.EqualTo(1));
     }
 
     [Test]
@@ -153,22 +116,21 @@ public class BmsHealthProcessorTest
             new(BmsGaugeType.Normal, 0.2, false),
         ]);
         var initial = processor.CurrentGaugeStates.ToArray();
-        processor.RegisterEmptyPoor(1000);
+        processor.RegisterEmptyPoor();
         var afterMiss = processor.CurrentGaugeStates.ToArray();
         Assert.That(afterMiss[0].Failed, Is.True);
 
-        processor.ApplyHellChargeTick(false, 100, 1200);
+        processor.ApplyHellChargeTick(false, 100);
         Assert.That(processor.HasFailed, Is.False);
         Assert.That(processor.HasEverFailed, Is.False);
         processor.ResetReplayState();
-        processor.RegisterEmptyPoor(1000);
+        processor.RegisterEmptyPoor();
         Assert.That(processor.CurrentGaugeStates, Is.EqualTo(afterMiss));
         Assert.That(processor.HasFailed, Is.False);
         Assert.That(processor.HasEverFailed, Is.False);
         processor.ResetReplayState();
         Assert.That(processor.CurrentGaugeStates, Is.EqualTo(initial));
         Assert.That(processor.GaugeType, Is.EqualTo(BmsGaugeType.Hard));
-        Assert.That(processor.GaugeHistory, Has.Count.EqualTo(1));
     }
 
     [Test]
@@ -218,7 +180,7 @@ public class BmsHealthProcessorTest
     }
 
     [Test]
-    public void TestProvidedInitialGaugeStatesAreRecordedAtStageStart()
+    public void TestProvidedInitialGaugeStatesAreAppliedAtStageStart()
     {
         var processor = new BmsHealthProcessor();
 
@@ -231,14 +193,13 @@ public class BmsHealthProcessorTest
                 new BmsGaugeStateSnapshot(BmsGaugeType.Normal, 0.42, false),
             ]);
 
-        var initialEvent = processor.GaugeHistory.Single();
+        var states = processor.CurrentGaugeStates;
 
         Assert.Multiple(() =>
         {
-            Assert.That(initialEvent.Time, Is.Zero);
-            Assert.That(initialEvent.ActiveGaugeType, Is.EqualTo(BmsGaugeType.Normal));
-            Assert.That(initialEvent.States.Single(state => state.GaugeType == BmsGaugeType.Hard).Failed, Is.True);
-            Assert.That(initialEvent.States.Single(state => state.GaugeType == BmsGaugeType.Normal).Health, Is.EqualTo(0.42));
+            Assert.That(processor.GaugeType, Is.EqualTo(BmsGaugeType.Normal));
+            Assert.That(states.Single(state => state.GaugeType == BmsGaugeType.Hard).Failed, Is.True);
+            Assert.That(states.Single(state => state.GaugeType == BmsGaugeType.Normal).Health, Is.EqualTo(0.42));
         });
     }
 
@@ -343,7 +304,7 @@ public class BmsHealthProcessorTest
     }
 
     [Test]
-    public void TestGaugeHistoryRecordsLayerFailureAndActiveGaugeSwitch()
+    public void TestGaugeStatesRetainLayerFailureAndActiveGaugeSwitch()
     {
         var processor = new BmsHealthProcessor();
         processor.SetGaugeTypes([BmsGaugeType.Hard, BmsGaugeType.Normal]);
@@ -357,57 +318,13 @@ public class BmsHealthProcessorTest
         processor.ApplyBeatmap(beatmap);
 
         processor.Health.Value = 0.01;
-        processor.ApplyHellChargeTick(false, eventTime: 1000);
-
-        var history = processor.GaugeHistory;
-        Assert.That(history, Has.Count.EqualTo(1));
-        Assert.That(history[0].ActiveGaugeType, Is.EqualTo(BmsGaugeType.Normal));
-        Assert.That(history[0].States.Single(s => s.GaugeType == BmsGaugeType.Hard).Failed, Is.True);
-        Assert.That(history[0].States.Single(s => s.GaugeType == BmsGaugeType.Hard).Health, Is.Zero);
-        Assert.That(history[0].States.Single(s => s.GaugeType == BmsGaugeType.Normal).Failed, Is.False);
-    }
-
-    [Test]
-    public void TestEmptyPoorGaugeHistoryDefaultsToCurrentTime()
-    {
-        const double current_time = 1234;
-        var processor = createProcessorWithClock(current_time);
-
-        processor.RegisterEmptyPoor();
-
-        Assert.That(processor.GaugeHistory.Single().Time, Is.EqualTo(current_time));
-    }
-
-    [Test]
-    public void TestHellChargeGaugeHistoryDefaultsToCurrentTime()
-    {
-        const double current_time = 1234;
-        var processor = createProcessorWithClock(current_time);
-
         processor.ApplyHellChargeTick(false);
 
-        Assert.That(processor.GaugeHistory.Single().Time, Is.EqualTo(current_time));
-    }
-
-    [Test]
-    public void TestLongNoteGaugeHistoryUsesJudgementTime()
-    {
-        var processor = new BmsHealthProcessor();
-        var longNote = new BmsLongNote { StartTime = 1000, Duration = 500, Column = 1 };
-        var beatmap = new BmsBeatmap
-        {
-            LayoutVariant = BmsLayoutVariant.Bme7K,
-            TotalColumns = 8,
-            HitObjects = { longNote },
-        };
-        processor.ApplyBeatmap(beatmap);
-
-        processor.ApplyResult(new JudgementResult(longNote, longNote.CreateJudgement())
-        {
-            Type = HitResult.Great,
-        });
-
-        Assert.That(processor.GaugeHistory.Single().Time, Is.EqualTo(longNote.EndTime));
+        var states = processor.CurrentGaugeStates;
+        Assert.That(processor.GaugeType, Is.EqualTo(BmsGaugeType.Normal));
+        Assert.That(states.Single(s => s.GaugeType == BmsGaugeType.Hard).Failed, Is.True);
+        Assert.That(states.Single(s => s.GaugeType == BmsGaugeType.Hard).Health, Is.Zero);
+        Assert.That(states.Single(s => s.GaugeType == BmsGaugeType.Normal).Failed, Is.False);
     }
 
     [Test]

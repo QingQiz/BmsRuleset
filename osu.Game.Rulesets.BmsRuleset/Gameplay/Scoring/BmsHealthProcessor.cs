@@ -14,7 +14,6 @@ namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 
 public partial class BmsHealthProcessor : HealthProcessor
 {
-
     public Bindable<BmsGaugeDisplayProfile> DisplayProfile { get; } =
         new(BmsGaugeProfileFactory.Create(BmsGaugeType.Normal).Display);
 
@@ -31,8 +30,6 @@ public partial class BmsHealthProcessor : HealthProcessor
     /// </summary>
     public bool HasEverFailed { get; private set; }
 
-    public IReadOnlyList<BmsGaugeHistoryEvent> GaugeHistory => gaugeHistory;
-
     public BmsGaugeType GaugeType { get; private set; } = BmsGaugeType.Normal;
 
     public BmsGaugeProfile GaugeProfile { get; private set; } = BmsGaugeProfileFactory.Create(BmsGaugeType.Normal);
@@ -44,7 +41,6 @@ public partial class BmsHealthProcessor : HealthProcessor
     internal BmsGaugeProfileFamily? ConfiguredProfileFamily { get; private set; }
 
     private IReadOnlyList<BmsGaugeStateSnapshot>? replayInitialStates;
-    private bool replayInitialGaugeHistory;
 
     internal void ResetReplayState()
     {
@@ -55,12 +51,9 @@ public partial class BmsHealthProcessor : HealthProcessor
         Reset(false);
         RestoreGaugeStates(replayInitialStates);
         initialGaugeStates = replayInitialStates;
-        if (replayInitialGaugeHistory)
-            recordGaugeHistory(0);
     }
 
     private readonly List<GaugeState> gaugeStates = [];
-    private readonly GaugeHistoryBuffer gaugeHistory = new();
     private IReadOnlyList<BmsGaugeStateSnapshot>? initialGaugeStates;
 
     private int activeGaugeIndex;
@@ -85,9 +78,9 @@ public partial class BmsHealthProcessor : HealthProcessor
     /// <summary>
     ///     Applies an Empty POOR gauge penalty directly — no note is consumed.
     /// </summary>
-    public void RegisterEmptyPoor(double? eventTime = null) => RegisterNonConsumingJudgement(HitResult.Miss, eventTime);
+    public void RegisterEmptyPoor() => RegisterNonConsumingJudgement(HitResult.Miss);
 
-    public void RegisterNonConsumingJudgement(HitResult result, double? eventTime = null)
+    public void RegisterNonConsumingJudgement(HitResult result)
     {
         ensureInitialized();
         syncActiveStateFromHealth();
@@ -107,7 +100,6 @@ public partial class BmsHealthProcessor : HealthProcessor
 
         resolveActiveState();
         markEverFailedIfEmpty();
-        recordGaugeHistory(eventTime ?? currentTime);
     }
 
     /// <summary>
@@ -124,7 +116,7 @@ public partial class BmsHealthProcessor : HealthProcessor
     ///     The default scale applies half-GREAT gauge recovery or half-BAD gauge damage.
     ///     Does not add judgement count, combo, or score.
     /// </summary>
-    public void ApplyHellChargeTick(bool holding, double scale = 0.5, double? eventTime = null)
+    public void ApplyHellChargeTick(bool holding, double scale = 0.5)
     {
         ensureInitialized();
         syncActiveStateFromHealth();
@@ -146,7 +138,6 @@ public partial class BmsHealthProcessor : HealthProcessor
 
         resolveActiveState();
         markEverFailedIfEmpty();
-        recordGaugeHistory(eventTime ?? currentTime);
     }
 
     public void SetGaugeType(BmsGaugeType gaugeType, BmsGaugeProfileFamily? profileFamilyOverride = null)
@@ -215,7 +206,6 @@ public partial class BmsHealthProcessor : HealthProcessor
             return;
 
         replayInitialStates = null;
-        replayInitialGaugeHistory = initialStates?.Count > 0;
         gaugeStates.AddRange(newStates);
         gaugeStates.Sort((a, b) => ((int)b.GaugeType).CompareTo((int)a.GaugeType));
 
@@ -225,9 +215,6 @@ public partial class BmsHealthProcessor : HealthProcessor
         resolveActiveState();
 
         initialized = false;
-
-        if (initialStates?.Count > 0)
-            recordGaugeHistory(0);
     }
 
     public void RestoreGaugeStates(IReadOnlyList<BmsGaugeStateSnapshot> states)
@@ -278,7 +265,6 @@ public partial class BmsHealthProcessor : HealthProcessor
         Health.MaxValue = GaugeProfile.MaxHealth;
         Health.Value = GaugeProfile.InitialHealth;
         HasEverFailed = false;
-        gaugeHistory.Clear();
         initialGaugeStates = null;
 
         // Reset all gauge states to their initial values for a fresh play.
@@ -301,15 +287,6 @@ public partial class BmsHealthProcessor : HealthProcessor
 
         if (!HasEverFailed && Health.Value <= 0)
             HasEverFailed = true;
-
-        // A PMS release is observed at key-up but takes effect after its grace period.
-        // Synthetic results have no framework RawTime, so retain that application time explicitly.
-        var applicationTime = result is BmsLongNoteJudgementResult longNoteResult
-            ? longNoteResult.EndpointResults[^1].ApplicationTime ?? result.TimeAbsolute
-            : result is BmsJudgementResult bms
-                ? bms.EventTime
-                : result.TimeAbsolute;
-        recordGaugeHistory(applicationTime);
     }
 
     // Gauge layers deplete at exact zero; the framework's epsilon can fail AG before its active layer is replaced.
@@ -466,18 +443,6 @@ public partial class BmsHealthProcessor : HealthProcessor
         Health.Value = active.CurrentHp;
     }
 
-    private void recordGaugeHistory(double eventTime)
-    {
-        if (gaugeStates.Count == 0)
-            return;
-
-        var activeGaugeType = activeGaugeIndex < gaugeStates.Count
-            ? gaugeStates[activeGaugeIndex].GaugeType
-            : gaugeStates[^1].GaugeType;
-
-        gaugeHistory.Record(gaugeStates, eventTime, activeGaugeType);
-    }
-
     private BmsGaugeStateSnapshot[] snapshotGaugeStates()
     {
         var snapshots = new BmsGaugeStateSnapshot[gaugeStates.Count];
@@ -489,9 +454,6 @@ public partial class BmsHealthProcessor : HealthProcessor
 
         return snapshots;
     }
-
-    // ReSharper disable once ConditionalAccessQualifierIsNonNullableAccordingToAPIContract
-    private double currentTime => Clock?.CurrentTime ?? 0;
 
     private sealed class GaugeState
     {

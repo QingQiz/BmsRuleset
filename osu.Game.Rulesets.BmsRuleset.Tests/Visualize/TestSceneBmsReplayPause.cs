@@ -79,7 +79,7 @@ public partial class TestSceneBmsReplayPause : BmsPlayerTestScene
             var replay = new osu.Game.Replays.Replay { Frames = [.. inputs()] };
             var expected = BmsReplaySimulation.Run(Playfield.Beatmap, replay, source);
             Assert.That(JsonSerializer.Serialize(((BmsScoreProcessor)Player.ScoreProcessor).JudgementEvents), Is.EqualTo(JsonSerializer.Serialize(expected.Judgements)));
-            Assert.That(JsonSerializer.Serialize(((BmsHealthProcessor)Player.HealthProcessor).GaugeHistory), Is.EqualTo(JsonSerializer.Serialize(expected.Gauges)));
+            Assert.That(((BmsHealthProcessor)Player.HealthProcessor).CurrentGaugeStates, Is.EqualTo(expected.Gauges[^1].States));
         });
     }
 
@@ -125,7 +125,7 @@ public partial class TestSceneBmsReplayPause : BmsPlayerTestScene
             var events = ((BmsScoreProcessor)Player.ScoreProcessor).JudgementEvents;
             Assert.That(events.SelectMany(item => item.TimingObservations).Count(item => item.Kind == BmsTimingObservationKind.LongNoteTail), Is.EqualTo(1));
             Assert.That(JsonSerializer.Serialize(events), Is.EqualTo(JsonSerializer.Serialize(expected.Judgements)));
-            Assert.That(JsonSerializer.Serialize(((BmsHealthProcessor)Player.HealthProcessor).GaugeHistory), Is.EqualTo(JsonSerializer.Serialize(expected.Gauges)));
+            Assert.That(((BmsHealthProcessor)Player.HealthProcessor).CurrentGaugeStates, Is.EqualTo(expected.Gauges[^1].States));
         });
     }
 
@@ -188,7 +188,7 @@ public partial class TestSceneBmsReplayPause : BmsPlayerTestScene
         {
             var expected = BmsReplaySimulation.Run(Playfield.Beatmap, courseReplay!.Replay, courseReplay.ScoreInfo);
             Assert.That(JsonSerializer.Serialize(((BmsScoreProcessor)Player.ScoreProcessor).JudgementEvents), Is.EqualTo(JsonSerializer.Serialize(expected.Judgements)));
-            Assert.That(JsonSerializer.Serialize(((BmsHealthProcessor)Player.HealthProcessor).GaugeHistory), Is.EqualTo(JsonSerializer.Serialize(expected.Gauges)));
+            Assert.That(((BmsHealthProcessor)Player.HealthProcessor).CurrentGaugeStates, Is.EqualTo(expected.Gauges[^1].States));
         });
         AddStep("seek back to dan opening", () => Player.GameplayClockContainer.Seek(0));
         AddUntilStep("rewind completed", () => Math.Abs(Player.DrawableRuleset.FrameStableClock.CurrentTime) < .001);
@@ -204,10 +204,10 @@ public partial class TestSceneBmsReplayPause : BmsPlayerTestScene
             Player.GameplayClockContainer.Seek(5500);
         });
         AddUntilStep("forward replay completed", () => Math.Abs(Player.DrawableRuleset.FrameStableClock.CurrentTime - 5500) < .001);
-        AddStep("replaying produces the same gauge history", () =>
+        AddStep("replaying produces the same gauge states", () =>
         {
             var expected = BmsReplaySimulation.Run(Playfield.Beatmap, courseReplay!.Replay, courseReplay.ScoreInfo);
-            Assert.That(JsonSerializer.Serialize(((BmsHealthProcessor)Player.HealthProcessor).GaugeHistory), Is.EqualTo(JsonSerializer.Serialize(expected.Gauges)));
+            Assert.That(((BmsHealthProcessor)Player.HealthProcessor).CurrentGaugeStates, Is.EqualTo(expected.Gauges[^1].States));
         });
     }
 

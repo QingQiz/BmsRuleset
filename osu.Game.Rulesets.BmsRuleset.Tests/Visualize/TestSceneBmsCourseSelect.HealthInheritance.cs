@@ -218,15 +218,15 @@ public partial class TestSceneBmsCourseSelect
                 if (autoGauge && stageIndex < 2)
                 {
                     for (var bad = 0; player.Health.GaugeType == tierAtStart && bad < 200; bad++)
-                        player.Health.RegisterNonConsumingJudgement(HitResult.Ok, 1000 + bad);
+                        player.Health.RegisterNonConsumingJudgement(HitResult.Ok);
                     Assert.That(player.Health.GaugeType, Is.Not.EqualTo(tierAtStart));
                 }
                 else
-                    player.Health.RegisterNonConsumingJudgement(HitResult.Ok, 1000);
+                    player.Health.RegisterNonConsumingJudgement(HitResult.Ok);
 
                 expected = player.Health.CurrentGaugeStates.Where(state => !state.Failed).ToArray();
                 saved[stageIndex] = player.CompleteStage();
-                Assert.That(session.CurrentHealth, Is.EqualTo(expected[0].Health));
+                Assert.That(session.CurrentGaugeStates.Where(state => !state.Failed), Is.EqualTo(expected));
                 player.Exit();
             });
             AddUntilStep("return from stage", () => Stack.CurrentScreen == songSelect);

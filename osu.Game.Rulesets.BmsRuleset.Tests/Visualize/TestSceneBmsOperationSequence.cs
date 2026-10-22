@@ -119,7 +119,7 @@ public partial class TestSceneBmsOperationSequence : BmsPlayerTestScene
             }
             var score = (BmsScoreProcessor)Player.ScoreProcessor;
             Assert.That(JsonSerializer.Serialize(score.JudgementEvents), Is.EqualTo(JsonSerializer.Serialize(expected.Judgements)));
-            Assert.That(JsonSerializer.Serialize(health.GaugeHistory), Is.EqualTo(JsonSerializer.Serialize(expected.Gauges)));
+            Assert.That(health.CurrentGaugeStates, Is.EqualTo(expected.Gauges[^1].States));
             var timings = score.JudgementEvents.SelectMany(item => item.TimingObservations).ToArray();
             Assert.That(timings.Single(item => item.Kind == BmsTimingObservationKind.LongNoteHead && item.ExpectedTime == 3000).ActualTime, Is.EqualTo(3000));
             Assert.That(score.JudgementEvents.Count(item => item.Source.Kind == BmsJudgementSourceKind.Landmine), Is.EqualTo(1));
