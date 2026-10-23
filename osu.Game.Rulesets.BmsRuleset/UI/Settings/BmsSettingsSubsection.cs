@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using osu.Framework.Allocation;
@@ -13,7 +14,6 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
-using osu.Game.Localisation;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Settings;
 using osu.Game.Overlays.Settings.Sections.Maintenance;
@@ -127,10 +127,11 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
         [
             new SettingsItemV2(new FormSliderBar<double>
             {
-                Caption = RulesetSettingsStrings.ScrollSpeed,
+                Caption = BmsStrings.ScrollSpeed,
+                HintText = BmsStrings.ScrollSpeedHint,
                 Current = manager.GetBindable<double>(BmsRulesetSetting.ScrollSpeed),
                 KeyboardStep = 0.1f,
-                LabelFormat = v => RulesetSettingsStrings.ScrollSpeedTooltip((int)BmsDrawableRuleset.ComputeScrollTime(v), v),
+                LabelFormat = formatScrollSpeed,
             }),
             new SettingsItemV2(new FormEnumDropdown<BmsReferenceBpmMode>
             {
@@ -270,6 +271,12 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
                 ],
             },
         ];
+    }
+
+    private static LocalisableString formatScrollSpeed(double speed)
+    {
+        var duration = Math.Round(BmsDrawableRuleset.ComputeScrollTime(speed), MidpointRounding.AwayFromZero);
+        return BmsStrings.ScrollSpeedValue(speed, duration, BmsGameplayScrollController.ComputeGreenNumber(duration));
     }
 
     private sealed partial class BeatmapManagementSettings : SettingsSubsection

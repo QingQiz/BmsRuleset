@@ -46,6 +46,9 @@
   <data name="exscore" xml:space="preserve"><value>EX分数</value></data>
   <data name="max_combo" xml:space="preserve"><value>最大连击</value></data>
   <data name="standard_deviation" xml:space="preserve"><value>标准差 {0:0.0} ms</value></data>
+  <data name="scroll_speed" xml:space="preserve"><value>滚动速度</value></data>
+  <data name="scroll_speed_hint" xml:space="preserve"><value>显示基准 BPM 和标准轨道长度下的基准可见时间及绿字。皮肤判定线位置和谱面变速会影响游玩中的实际值。</value></data>
+  <data name="scroll_speed_value" xml:space="preserve"><value>{0:0.0} · {1:0} 毫秒 · 绿字 {2:0}</value></data>
   <data name="reference_bpm" xml:space="preserve"><value>基准 BPM</value></data>
   <data name="soft_constant" xml:space="preserve"><value>固定音符可见时长</value></data>
   <data name="soft_constant_hint" xml:space="preserve"><value>让减速段音符在更接近判定线的位置出现，可见时间以当前基准滚速为准。</value></data>

@@ -9,6 +9,26 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay;
 [TestFixture]
 public class BmsGameplayScrollControllerTest
 {
+    [TestCase(2, 5743, 3445)]
+    [TestCase(8, 1436, 861)]
+    [TestCase(10, 1149, 689)]
+    [TestCase(16, 718, 430)]
+    [TestCase(23, 499, 299)]
+    public void TestReferenceVisibleTimeAndGreenNumberMatchTravel(double speed, int duration, int greenNumber)
+    {
+        var controller = new BmsGameplayScrollController(null);
+        controller.SetHitTargetPosition(124.8f);
+        controller.SetConfiguredScrollSpeed(speed);
+        var visibleTime = BmsGameplayScrollController.ComputeScrollTime(speed);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(visibleTime, Is.EqualTo(duration).Within(0.5));
+            Assert.That(controller.YForScrollProgress(visibleTime, 768, 124.8), Is.Zero.Within(0.001));
+            Assert.That(BmsGameplayScrollController.ComputeGreenNumber(visibleTime), Is.EqualTo(greenNumber));
+        });
+    }
+
     [Test]
     public void TestAdjustScrollSpeedAppliesPresetAndNotifies()
     {

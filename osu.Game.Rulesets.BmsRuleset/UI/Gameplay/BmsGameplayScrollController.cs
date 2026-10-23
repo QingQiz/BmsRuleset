@@ -121,6 +121,13 @@ internal sealed class BmsGameplayScrollController(BmsTimingMap? timingMap)
 
     public static double ComputeScrollTime(double scrollSpeed) => MAX_TIME_RANGE / Math.Max(1, scrollSpeed);
 
+    public static int ComputeGreenNumber(double visibleTime)
+    {
+        // beatoraja rounds the duration to milliseconds before applying its integer 3/5 conversion.
+        var duration = (int)Math.Round(visibleTime, MidpointRounding.AwayFromZero);
+        return duration * 3 / 5;
+    }
+
     public void SetHitTargetPosition(float hitTargetPosition)
     {
         const float reference_scroll_distance = 768f - 124.8f;

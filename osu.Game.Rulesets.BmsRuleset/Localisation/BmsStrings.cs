@@ -156,6 +156,12 @@ public static class BmsStrings
 
     public static LocalisableString StandardDeviation(double value) => get("standard_deviation", value);
 
+    public static LocalisableString ScrollSpeed => get("scroll_speed");
+
+    public static LocalisableString ScrollSpeedHint => get("scroll_speed_hint");
+
+    public static LocalisableString ScrollSpeedValue(double speed, double duration, int greenNumber) => get("scroll_speed_value", speed, duration, greenNumber);
+
     public static LocalisableString ReferenceBpm => get("reference_bpm");
 
     public static LocalisableString SoftConstant => get("soft_constant");
