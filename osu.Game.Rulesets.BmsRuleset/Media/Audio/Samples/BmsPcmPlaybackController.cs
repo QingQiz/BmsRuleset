@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
+using System.Threading.Tasks;
 using osu.Framework.Bindables;
 using osu.Game.Rulesets.BmsRuleset.IO.ResourceStore;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Mixing.Pcm;
@@ -49,6 +50,9 @@ internal sealed class BmsPcmPlaybackController : IDisposable
     internal bool IsInitialised => assetCache != null;
 
     internal IEnumerable<ushort> PreparedSampleKeys => leases.Keys;
+
+    internal Task WaitForPreparedSamplesAsync(CancellationToken cancellationToken)
+        => Task.WhenAll(leases.Values.Select(lease => lease.Ready).ToArray()).WaitAsync(initial_ready_timeout, cancellationToken);
 
     internal double MaxSampleLengthMilliseconds => sampleLengths.Count == 0
         ? leases.Count == 0 ? 0 : leases.Values.Max(lease => getOriginalLength(lease.Asset))

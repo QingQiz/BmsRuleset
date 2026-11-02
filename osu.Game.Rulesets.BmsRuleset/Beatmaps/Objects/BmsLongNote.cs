@@ -42,6 +42,7 @@ public class BmsLongNote : BmsHitObject, IHasDuration
         {
             ln.Duration = Duration;
             ln.ScrollPositionAtEndTime = ScrollPositionAtEndTime;
+            ln.VisualScrollPositionAtEndTime = VisualScrollPositionAtEndTime;
             ln.TailSampleKey = TailSampleKey;
             ln.TailSampleVolume = TailSampleVolume;
         }

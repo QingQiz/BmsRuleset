@@ -84,7 +84,8 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
         cancellationToken.ThrowIfCancellationRequested();
 
         if (original is BmsHitObject bmsObject)
-            yield return bmsObject.ToTypedHitObject();
+            // Converted objects are modifiable, while the source can also back previews and later attempts.
+            yield return bmsObject.CloneForConversion();
     }
 
     private static int inferTotalColumns(IBeatmap original, IReadOnlyList<BmsHitObject> hitObjects)
@@ -186,7 +187,7 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
     {
         var converted = new BmsBeatmap
         {
-            BeatmapInfo = original.BeatmapInfo,
+            BeatmapInfo = original.BeatmapInfo.Clone(),
             ControlPointInfo = original.ControlPointInfo,
             Breaks = original.Breaks,
             AudioLeadIn = original.AudioLeadIn,
@@ -249,7 +250,7 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
             ReferenceBpmMode ?? BmsRulesetRuntime.CurrentReferenceBpmMode);
         var beatmap = new BmsDecodedBeatmap
         {
-            BeatmapInfo = decoded.BeatmapInfo,
+            BeatmapInfo = decoded.BeatmapInfo.Clone(),
             ControlPointInfo = new ControlPointInfo(),
             Breaks = decoded.Breaks,
             AudioLeadIn = decoded.AudioLeadIn,

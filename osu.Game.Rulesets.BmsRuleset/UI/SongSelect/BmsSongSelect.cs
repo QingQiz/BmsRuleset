@@ -51,6 +51,7 @@ using osu.Game.Rulesets.BmsRuleset.Gameplay.DifficultyTable;
 using osu.Game.Rulesets.BmsRuleset.UI.Result;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Course;
+using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
 using osu.Game.Screens;
 using osu.Game.Screens.Footer;
@@ -364,19 +365,21 @@ public abstract partial class BmsSongSelect : ScreenWithBeatmapBackground, IKeyB
     /// </summary>
     protected abstract void OnStart();
 
+    protected virtual Bindable<IReadOnlyList<Mod>> FooterMods => Mods;
+
     public override IReadOnlyList<ScreenFooterButton> CreateFooterButtons() =>
     [
         new FooterButtonMods(ModSelectOverlay)
         {
             Hotkey = GlobalAction.ToggleModSelection,
-            Mods = Mods,
+            Mods = FooterMods,
             Ruleset = Ruleset,
             RequestDeselectAllMods = () =>
             {
                 if (ModSelectOverlay.State.Value == Visibility.Visible)
                     ModSelectOverlay.DeselectAll();
                 else
-                    Mods.Value = [];
+                    FooterMods.Value = [];
             },
         },
         new FooterButtonRandom
@@ -883,6 +886,7 @@ public abstract partial class BmsSongSelect : ScreenWithBeatmapBackground, IKeyB
 
     private void onLeavingScreen()
     {
+        ModSelectOverlay.Hide();
         CancelBeatmapSelection();
         backgroundMetadataCancellation?.Cancel();
         backgroundMetadataCancellation = null;

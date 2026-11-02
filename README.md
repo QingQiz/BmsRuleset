@@ -135,6 +135,17 @@ Results are saved locally and shown on course cards in song select.
 Courses require all stages to be installed and cannot be paused. The next song starts automatically after
 99 seconds between stages. See [course rules and missing charts](./docs/difficulty-tables.md#courses).
 
+### Practice Mode
+
+Select a range visually, practise with your chosen mods, and repeat manually or automatically.
+View overall and per-attempt statistics. See the [practice guide](./docs/gameplay.md#practice).
+
+<p align="center">
+  <img src="docs/images/practice-mode-en.png" width="900" alt="Practice settings with visual range selection, chart thumbnails, and density overview">
+  <br>
+  <sub>Visual range selection and practice settings</sub>
+</p>
+
 ### Result Screen
 
 Open any saved score to view detailed analysis without watching its replay. This includes gauge history, note and
@@ -172,7 +183,7 @@ make notes fully visible later, and 0 makes them appear instantly. See [settings
 
 | Guide                                              | Contents                                                               |
 |----------------------------------------------------|------------------------------------------------------------------------|
-| [Gameplay and settings](./docs/gameplay.md)        | Judgements, scoring, gauges, mods, key bindings, and settings          |
+| [Gameplay and settings](./docs/gameplay.md)        | Practice, judgements, scoring, gauges, mods, key bindings, and settings |
 | [Difficulty tables](./docs/difficulty-tables.md)   | Importing and managing LR2/beatoraja difficulty tables                 |
 | [Skin system](./docs/skin-system.md)               | `skin.ini` reference, osu!mania compatibility, and editable components |
 | [BMS format support](./docs/bms-format-support.md) | Parser behavior, supported commands and channels, and reference links  |

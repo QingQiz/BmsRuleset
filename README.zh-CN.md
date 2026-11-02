@@ -127,6 +127,17 @@
 段位须备齐所有曲目，游玩中不能暂停；曲目间最多停留 99 秒，之后自动开始下一首。
 详见[段位规则与缺失谱面处理](./docs/difficulty-tables.zh-CN.md#段位)。
 
+### 练习模式
+
+可视化选择区间，使用所选 Mods 手动或自动循环练习，并查看汇总及每轮统计。
+详见[练习指南](./docs/gameplay.zh-CN.md#练习)。
+
+<p align="center">
+  <img src="docs/images/practice-mode-en.png" width="900" alt="练习设置页，显示可视化区间选择、谱面缩略图和密度图">
+  <br>
+  <sub>可视化区间选择与练习设置</sub>
+</p>
+
 ### 结算界面
 
 已保存的成绩可直接查看详细分析，无需播放回放。分析内容包括血量历史、音符与判定时间线、Fast/Slow 分布、
@@ -163,7 +174,7 @@ osu!mania 7K 谱面可使用 BMS 游玩，7 条轨道映射到 BME 键盘列，�
 
 | 文档                                           | 内容                                                   |
 |----------------------------------------------|------------------------------------------------------|
-| [游玩机制与设置](./docs/gameplay.zh-CN.md)          | 判定、计分、血量、Mods、键位与设置                              |
+| [游玩机制与设置](./docs/gameplay.zh-CN.md)          | 练习、判定、计分、血量、Mods、键位与设置                         |
 | [难度表](./docs/difficulty-tables.zh-CN.md)         | 导入和管理 LR2/beatoraja 难度表                            |
 | [皮肤系统](./docs/skin-system.zh-CN.md)             | `skin.ini` 参考、osu!mania 兼容与可编辑组件                   |
 | [BMS 格式支持（英文）](./docs/bms-format-support.md) | Parser 行为、支持的命令与通道、参考资料                           |

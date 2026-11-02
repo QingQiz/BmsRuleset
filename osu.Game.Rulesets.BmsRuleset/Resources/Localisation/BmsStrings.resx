@@ -422,4 +422,141 @@
   <data name="course_gauge_profile" xml:space="preserve">
     <value>Course gauge profile</value>
   </data>
+  <data name="practice" xml:space="preserve">
+    <value>Practice</value>
+  </data>
+  <data name="practice_select_range" xml:space="preserve">
+    <value>Select range</value>
+  </data>
+  <data name="practice_set_start" xml:space="preserve">
+    <value>Set start (s)</value>
+  </data>
+  <data name="practice_set_end" xml:space="preserve">
+    <value>Set end (s)</value>
+  </data>
+  <data name="practice_locate_start" xml:space="preserve">
+    <value>Locate start</value>
+  </data>
+  <data name="practice_locate_end" xml:space="preserve">
+    <value>Locate end</value>
+  </data>
+  <data name="practice_count_in" xml:space="preserve">
+    <value>Count In</value>
+  </data>
+  <data name="practice_count_in_off" xml:space="preserve">
+    <value>Off</value>
+  </data>
+  <data name="practice_count_in_seconds" xml:space="preserve">
+    <value>{0} s</value>
+  </data>
+  <data name="practice_begin" xml:space="preserve">
+    <value>Start practice</value>
+  </data>
+  <data name="practice_full_chart" xml:space="preserve">
+    <value>Full chart</value>
+  </data>
+  <data name="practice_fit_range" xml:space="preserve">
+    <value>Fit range</value>
+  </data>
+  <data name="practice_zoom_in" xml:space="preserve">
+    <value>Zoom in</value>
+  </data>
+  <data name="practice_zoom_out" xml:space="preserve">
+    <value>Zoom out</value>
+  </data>
+  <data name="practice_view_hint" xml:space="preserve">
+    <value>Choose start/end, browse, then click to place. {0} grid · Ctrl + scroll: zoom · Alt: free placement</value>
+  </data>
+  <data name="practice_snap" xml:space="preserve">
+    <value>Snap</value>
+  </data>
+  <data name="practice_snap_measure" xml:space="preserve">
+    <value>Measure</value>
+  </data>
+  <data name="practice_snap_division" xml:space="preserve">
+    <value>1/{0}</value>
+  </data>
+  <data name="practice_invalid_range" xml:space="preserve">
+    <value>Select a range containing at least one playable note.</value>
+  </data>
+  <data name="practice_loading" xml:space="preserve">
+    <value>Updating chart preview…</value>
+  </data>
+  <data name="practice_preparing" xml:space="preserve">
+    <value>Preparing the next attempt…</value>
+  </data>
+  <data name="practice_paused" xml:space="preserve">
+    <value>Countdown paused · Press Enter to restart the countdown</value>
+  </data>
+  <data name="practice_retry" xml:space="preserve">
+    <value>Retry</value>
+  </data>
+  <data name="practice_completed" xml:space="preserve">
+    <value>Attempt complete</value>
+  </data>
+  <data name="practice_aborted" xml:space="preserve">
+    <value>Attempt stopped</value>
+  </data>
+  <data name="practice_loading_failed" xml:space="preserve">
+    <value>The practice chart could not be loaded. Adjust the range or Mods and try again.</value>
+  </data>
+  <data name="practice_overall_results" xml:space="preserve">
+    <value>Practice results</value>
+  </data>
+  <data name="practice_completed_attempts" xml:space="preserve"><value>{0} completed attempts</value></data>
+  <data name="practice_attempt_metrics" xml:space="preserve"><value>EX {0} · Combo {1} · Gauge {2:0}%</value></data>
+  <data name="practice_input_time" xml:space="preserve">
+    <value>{0:0.000}</value>
+  </data>
+  <data name="practice_time" xml:space="preserve">
+    <value>{0:0.000} s</value>
+  </data>
+  <data name="practice_view_duration" xml:space="preserve">
+    <value>View: {0:0.00} s</value>
+  </data>
+  <data name="practice_countdown_number" xml:space="preserve">
+    <value>{0}</value>
+  </data>
+  <data name="practice_attempt" xml:space="preserve">
+    <value>Attempt {0}</value>
+  </data>
+  <data name="practice_range_summary" xml:space="preserve">
+    <value>{0} notes · {1:0.00} s · {2:0.00}×</value>
+  </data>
+  <data name="practice_timing" xml:space="preserve">
+    <value>FAST {0} · SLOW {1}</value>
+  </data>
+  <data name="practice_chart_title" xml:space="preserve">
+    <value>{0} / {1}</value>
+  </data>
+  <data name="practice_progress" xml:space="preserve">
+    <value>{0:0.00} / {1:0.00} s</value>
+  </data>
+  <data name="practice_invalid_time" xml:space="preserve">
+    <value>Enter chart times in seconds, with the start earlier than the end.</value>
+  </data>
+  <data name="practice_start_line" xml:space="preserve">
+    <value>Start</value>
+  </data>
+  <data name="practice_end_line" xml:space="preserve">
+    <value>End</value>
+  </data>
+  <data name="practice_measure" xml:space="preserve">
+    <value>#{0}</value>
+  </data>
+  <data name="practice_density_window" xml:space="preserve">
+    <value>{0}–{1} · {2:0.0} notes/s</value>
+  </data>
+  <data name="practice_skip_results" xml:space="preserve">
+    <value>Skip results and repeat automatically</value>
+  </data>
+  <data name="practice_skip_results_description" xml:space="preserve">
+    <value>Reload each attempt, then start after Count In. Quit from the pause menu to view all completed attempts and their details.</value>
+  </data>
+  <data name="practice_return_to_settings" xml:space="preserve">
+    <value>Practice settings</value>
+  </data>
+  <data name="practice_next_attempt" xml:space="preserve">
+    <value>Start next attempt</value>
+  </data>
 </root>

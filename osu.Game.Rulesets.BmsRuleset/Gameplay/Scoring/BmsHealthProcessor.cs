@@ -386,20 +386,22 @@ public partial class BmsHealthProcessor : HealthProcessor
             });
         }
 
-        var noteCount = beatmap?.HitObjects.Where(h => h is not BmsLandmine and not BmsInvisibleNote)
-            .Sum(h => h is BmsLongNote && beatmap is BmsBeatmap { LockedLongNoteMode: BmsLongNoteMode.ChargeNote or BmsLongNoteMode.HellChargeNote } ? 2 : 1) ?? 0;
-        if (noteCount == 0) noteCount = 1;
+        var noteCount = Math.Max(1, beatmap?.CountScoringNotes() ?? 0);
 
         double total = 0;
         if (beatmap is BmsBeatmap bmsBeatmap)
             total = bmsBeatmap.Total;
 
+        var fullNoteCount = beatmap is BmsBeatmap { PracticeFullNoteCount: { } fullCount } ? Math.Max(1, fullCount) : noteCount;
         if (total <= 0)
-            total = BmsGaugeCalculator.CalculateDefaultTotal(noteCount, effectiveProfileFamily);
+            total = BmsGaugeCalculator.CalculateDefaultTotal(fullNoteCount, effectiveProfileFamily);
 
         foreach (var state in gaugeStates)
         {
-            state.Calculator = new BmsGaugeCalculator(state.Profile, total, noteCount, effectiveProfileFamily);
+            // Mixed Auto Gauge chains need the full chart context for survival algorithms and proportional TOTAL for recovery gauges.
+            var calculatorTotal = state.Profile.Algorithm == BmsGaugeAlgorithm.Total ? total * noteCount / fullNoteCount : total;
+            var calculatorNoteCount = state.Profile.Algorithm == BmsGaugeAlgorithm.Total ? noteCount : fullNoteCount;
+            state.Calculator = new BmsGaugeCalculator(state.Profile, calculatorTotal, calculatorNoteCount, effectiveProfileFamily);
         }
     }
 

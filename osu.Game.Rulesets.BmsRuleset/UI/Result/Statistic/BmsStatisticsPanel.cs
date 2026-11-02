@@ -60,6 +60,10 @@ internal partial class BmsStatisticsPanel : VisibilityContainer
     protected virtual Task<Score> LoadReplayAsync(ScoreInfo score, CancellationToken cancellationToken) =>
         BmsReplayPatcher.LoadScoreAsync(scores, score, cancellationToken);
 
+    protected virtual BmsResultOverview CreateOverview(ScoreInfo score) => new(score);
+
+    protected virtual bool RecreateOverviewOnScoreChange => true;
+
     protected virtual async Task<BmsResultStatisticsData?> LoadStatisticsAsync(ScoreInfo score, CancellationToken cancellationToken)
     {
         var replay = await LoadReplayAsync(score, cancellationToken).ConfigureAwait(false);
@@ -80,12 +84,19 @@ internal partial class BmsStatisticsPanel : VisibilityContainer
         CancelLoading();
         content.Clear();
         statistics = null;
-        overview?.Clear();
-
         if (change.NewValue is not { } score)
+        {
+            overview?.Clear();
             return;
+        }
 
-        overview?.Child = new BmsResultOverview(score);
+        if (overview != null)
+        {
+            if (!RecreateOverviewOnScoreChange && overview.Children.SingleOrDefault() is BmsResultOverview currentOverview)
+                currentOverview.SetScore(score);
+            else
+                overview.Child = CreateOverview(score);
+        }
 
         content.Child = statistics = new BmsResultStatisticsGrid();
         var cancellation = loadCancellation = new CancellationTokenSource();

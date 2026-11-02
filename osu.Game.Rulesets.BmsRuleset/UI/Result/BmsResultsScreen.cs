@@ -273,6 +273,11 @@ internal partial class BmsResultsScreen : ScreenWithBeatmapBackground, IKeyBindi
 
         switch (e.Action)
         {
+            case GlobalAction.Back:
+                if (!OnBackButton())
+                    this.Exit();
+                return true;
+
             case GlobalAction.QuickExit:
                 this.Exit();
                 return true;

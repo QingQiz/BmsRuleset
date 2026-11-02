@@ -389,7 +389,7 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
 
     public bool OnPressed(KeyBindingPressEvent<GlobalAction> e)
     {
-        if (!IsCourseMode)
+        if (!IsCourseMode || !songSelect.IsCurrentScreen())
             return false;
 
         // The mod overlay is owned by song select in the BMS implementation rather than
@@ -406,7 +406,8 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
                 return CourseCarousel.MoveKeyboardSelection(e, 1);
 
             case GlobalAction.Back:
-                songSelect.ReplaceCourseMode(false);
+                if (!e.Repeat)
+                    songSelect.OnBackButton();
                 return true;
 
             default:

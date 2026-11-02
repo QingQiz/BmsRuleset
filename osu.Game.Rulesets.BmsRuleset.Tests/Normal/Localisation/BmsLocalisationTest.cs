@@ -64,6 +64,15 @@ public class BmsLocalisationTest
             Is.EqualTo("已载入难度表：Satellite（3 张谱面）"));
     }
 
+    [TestCase("en", "2.000 s–3.000 s · 12.0 notes/s")]
+    [TestCase("zh", "2.000 秒–3.000 秒 · 每秒 12.0 个音符")]
+    public void TestPracticeMeasureAndDensityUseLocalisedNotation(string locale, string density)
+    {
+        config.SetValue(FrameworkSetting.Locale, locale);
+        Assert.That(localisation.GetLocalisedString(BmsStrings.PracticeMeasure(12)), Is.EqualTo("#12"));
+        Assert.That(localisation.GetLocalisedString(BmsStrings.PracticeDensityWindow(2000, 3000, 12)), Is.EqualTo(density));
+    }
+
     [Test]
     public void TestFormattedInstancesKeepIndependentArgumentsWhenLanguageChanges()
     {

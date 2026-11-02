@@ -21,12 +21,14 @@ internal partial class BmsResultOverview : CompositeDrawable
     private readonly Container timingContent;
     private readonly Container judgementsContent;
     private readonly BmsResultSoloHeader? soloHeader;
+    private readonly bool showComparison;
     private Vector2 lastLayoutSize;
 
     internal ScoreInfo Score { get; private set; } = null!;
 
-    internal BmsResultOverview(ScoreInfo score, Drawable? header = null)
+    internal BmsResultOverview(ScoreInfo score, Drawable? header = null, bool showComparison = true)
     {
+        this.showComparison = showComparison;
         RelativeSizeAxes = Axes.Both;
         InternalChild = layout = new GridContainer
         {
@@ -71,8 +73,8 @@ internal partial class BmsResultOverview : CompositeDrawable
                 new BmsResultJudgementRow(result, score.Statistics.GetValueOrDefault(result), totalJudgements),
             }).ToArray(),
         };
-        // Course aggregates use their own history store; a chart comparison would show unrelated scores.
-        judgementsContent.Child = soloHeader == null
+        // Course and practice statistics cannot be compared against full-chart solo scores.
+        judgementsContent.Child = soloHeader == null || !showComparison
             ? judgements
             : new GridContainer
             {

@@ -116,44 +116,7 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable, IBmsResul
     }
 
     internal static HitOffsetStatistics CreateCourseStatistics(IReadOnlyList<(IBeatmap Beatmap, IReadOnlyList<HitEvent> HitEvents)> stages)
-    {
-        var overall = new List<(double offset, HitResult result)>();
-        var hitsByKey = new Dictionary<int, List<(double offset, HitResult result)>>();
-        var labels = new List<string>();
-
-        foreach (var (beatmap, hitEvents) in stages)
-        {
-            var displayed = hitEvents.Where(e =>
-                e.HitObject is not BmsLandmine
-                && e.Result.IsBasic()
-                && (e.HitObject is BmsHitObject || e.Result == HitResult.Miss)).ToArray();
-            overall.AddRange(displayed.Select(e => (e.TimeOffset, e.Result)));
-
-            var variant = beatmap is BmsBeatmap bms ? bms.LayoutVariant : BmsLayoutVariant.Bms5K;
-            var totalColumns = beatmap is BmsBeatmap { TotalColumns: > 0 } bmsWithColumns
-                ? bmsWithColumns.TotalColumns
-                : Math.Max(BmsLayout.GetTotalColumns(variant), displayed.Where(e => e.HitObject is BmsHitObject)
-                    .Select(e => ((BmsHitObject)e.HitObject).Column + 1).DefaultIfEmpty(0).Max());
-            var keyIndex = 0;
-
-            for (var column = 0; column < totalColumns; column++)
-            {
-                var label = labelFor(column, variant, ref keyIndex);
-                if (!hitsByKey.TryGetValue(column, out var hits))
-                {
-                    hitsByKey[column] = hits = [];
-                    labels.Add(label);
-                }
-
-                hits.AddRange(displayed.Where(e => e.HitObject is BmsHitObject hitObject && hitObject.Column == column)
-                    .Select(e => (e.TimeOffset, e.Result)));
-            }
-        }
-
-        return new HitOffsetStatistics(
-            createSummary(overall),
-            labels.Select((label, index) => new KeyHitOffsetStatistics(label, createSummary(hitsByKey[index]))).ToArray());
-    }
+        => CombineStatistics(stages.Select(stage => (CreateStatistics(stage.Beatmap, stage.HitEvents), stage.HitEvents)).ToArray());
 
     private static string labelFor(int column, BmsLayoutVariant variant, ref int keyIndex)
     {
@@ -161,6 +124,20 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable, IBmsResul
             return "Scratch";
 
         return $"Key {++keyIndex}";
+    }
+
+    internal static HitOffsetStatistics CombineStatistics(IReadOnlyList<(HitOffsetStatistics Statistics, IReadOnlyList<HitEvent> HitEvents)> attempts)
+    {
+        var hits = attempts.SelectMany(attempt => attempt.HitEvents).Where(e =>
+            e.HitObject is not BmsLandmine && e.Result.IsBasic()
+            && (e.HitObject is BmsHitObject || e.Result == HitResult.Miss)).ToArray();
+        var keyCount = attempts.Select(attempt => attempt.Statistics.Keys.Count).DefaultIfEmpty().Max();
+        var hitsByColumn = hits.Where(e => e.HitObject is BmsHitObject).ToLookup(e => ((BmsHitObject)e.HitObject).Column);
+        return new HitOffsetStatistics(
+            createSummary(hits.Select(e => (e.TimeOffset, e.Result))),
+            Enumerable.Range(0, keyCount).Select(column => new KeyHitOffsetStatistics(
+                attempts.First(attempt => attempt.Statistics.Keys.Count > column).Statistics.Keys[column].Label,
+                createSummary(hitsByColumn[column].Select(e => (e.TimeOffset, e.Result))))).ToArray());
     }
 
     private void rebuild()

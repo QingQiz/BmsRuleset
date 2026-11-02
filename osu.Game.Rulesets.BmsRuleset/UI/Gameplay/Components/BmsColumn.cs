@@ -199,7 +199,9 @@ public partial class BmsColumn : Playfield, IBmsColumn
         showInvisibleNotes.BindValueChanged(_ => updateInvisibleNotes(), true);
         ((BmsColumnHitObjectContainer)HitObjectContainer).InitializeMineBatch(this);
 
-        keySound = new BmsColumnKeySound(columnHitObjects, Judgements, invisibleNotes);
+        var keySoundNotes = invisibleNotes.Concat(ParentPlayfield.Beatmap.PracticeInitialKeySounds.Where(note => note.Column == Index))
+            .OrderBy(note => note.StartTime).ToArray();
+        keySound = new BmsColumnKeySound(columnHitObjects, Judgements, keySoundNotes);
         AddInternal(keySound);
 
         NewResult += JudgementBridge.OnFrameworkNewResult;

@@ -138,6 +138,15 @@ internal sealed class BmsHitObjectLifetimeEntry(
         lifetimeComputed = true;
     }
 
+    internal double GetPracticeVisibilityStart()
+    {
+        if (HitObject is not BmsHitObject hitObject)
+            return LifetimeStart;
+
+        // Point markers remain alive for scroll indexing, but practice needs their finite visual entry time.
+        return computeLifetimeStartWithVisualOffset(hitObject.StartTime - computeFutureLifetime(hitObject));
+    }
+
     public void ApplyVisualOffset()
     {
         if (lifetimeStartWithoutVisualOffset is not { } baseLifetimeStart)

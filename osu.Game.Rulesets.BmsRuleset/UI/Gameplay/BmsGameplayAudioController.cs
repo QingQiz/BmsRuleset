@@ -69,7 +69,7 @@ internal sealed class BmsGameplayAudioController
         stoppedPreviewForGameplay = true;
     }
 
-    internal void Dispose(double? previewRestoreTime)
+    internal void Dispose(double? previewRestoreTime, bool restorePreview = true)
     {
         BackgroundAudioPaused.UnbindAll();
 
@@ -77,7 +77,7 @@ internal sealed class BmsGameplayAudioController
             return;
 
         // A newly selected beatmap owns its own preview and must not be replaced by the old session.
-        if (BmsWorkingBeatmap.ActivePreviewTrack == previewTrackBeforePlay)
+        if (restorePreview && BmsWorkingBeatmap.ActivePreviewTrack == previewTrackBeforePlay)
             BmsWorkingBeatmap.RestoreActivePreview(previewRestoreTime);
 
         previewTrackBeforePlay = null;
@@ -98,7 +98,7 @@ internal sealed class BmsGameplayAudioController
         foreach (var evt in beatmap.BackgroundSampleEvents)
             yield return new BmsSampleUsage(evt.SampleKey, evt.Time, ResumeAfterSeek: true);
 
-        foreach (var invisibleColumn in beatmap.InvisibleNotes.GroupBy(n => n.Column))
+        foreach (var invisibleColumn in beatmap.InvisibleNotes.Concat(beatmap.PracticeInitialKeySounds).GroupBy(n => n.Column))
         {
             // Empty presses can still use these samples long after the notes leave the screen.
             // Judged LNs do not replace them, so retain them through intervening long notes.

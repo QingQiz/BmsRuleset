@@ -2,6 +2,26 @@
 
 [Back to README](../README.md) | [中文](./gameplay.zh-CN.md)
 
+## Practice
+
+Select a chart and choose **Practice** from the footer or the chart's context menu. Choose **Set start** or **Set end**
+and click the static chart to place that boundary, or drag its line. Browse at a close zoom to set distant endpoints
+separately; the locate buttons return to either endpoint. Scroll to browse, use **Ctrl + scroll** or the zoom controls for detail,
+and choose **Fit range** to bring the selection into view. Choose a bar or note division for snapping; hold **Alt**
+to select freely. The time fields accept seconds and align to the selected grid when committed.
+Use the chart thumbnail and density overview to locate patterns; hover over density for notes per second, or click and drag either overview to browse at the current zoom. Long charts split into thumbnail columns, ordered from left to right with time increasing upward in each column.
+
+Choose **Mods** in the footer for this practice session, including the playback rate and gauge, then choose **Start practice**.
+Choose **Practice** again or press **Escape** to close the settings.
+Selected holds continue to their tails, and notes at the start scroll into view before reaching the judgement line.
+
+Each attempt starts with fresh combo and gauge state and has its own temporary statistics. An empty gauge lets
+you finish the range. The result screen shows gauge history and judgement statistics. Choose **Practice settings** to edit
+the range or Mods, or **Start next attempt** (Enter) to restart the range when ready.
+Enable **Skip results and repeat automatically** in practice settings to reveal **Count In** (0–5 seconds). Each completed attempt immediately reloads the range, then counts down at the beginning before play starts.
+Press **Escape** to pause, using the same hold preference as normal gameplay. When automatic repeats are enabled, quit from the pause menu to open the aggregate result screen. Click an attempt to view its full statistics; click it again, click the summary heading, or press Escape to return to the aggregate. Press Enter to start another attempt, or choose **Practice settings** to return to the range editor.
+After focus loss, press Enter to restart a paused countdown. The last started range, result preference and Count In are remembered for each chart.
+
 ## Input and Key Bindings
 
 Use **Up/Down** to temporarily increase/decrease scroll speed during play. Rebind controls in

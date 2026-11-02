@@ -134,7 +134,8 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
             AddStep($"set UI scale to {scale}", () => config.SetValue(OsuSetting.UIScale, scale));
             AddUntilStep("layout stays fixed during scaling", () =>
             {
-                Assert.That(originalBounds.All(pair => pair.Key.ScreenSpaceDrawQuad.AlmostEquals(pair.Value)), Is.True);
+                Assert.That(originalBounds.Where(pair => !pair.Key.ScreenSpaceDrawQuad.AlmostEquals(pair.Value))
+                    .Select(pair => $"{pair.Key.GetType().Name}: expected {pair.Value}, actual {pair.Key.ScreenSpaceDrawQuad}").ToArray(), Is.Empty);
                 return Math.Abs(scaling.Scale.X - scale) < 0.0001f;
             });
             AddAssert("charts still fit", () => ChartsFitViewport(screen));

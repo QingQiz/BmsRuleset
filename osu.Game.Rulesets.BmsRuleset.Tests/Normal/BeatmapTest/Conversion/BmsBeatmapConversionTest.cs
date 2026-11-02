@@ -321,9 +321,12 @@ public class BmsBeatmapConversionTest
 
         var converted = (BmsBeatmap)new BmsRuleset().CreateBeatmapConverter(beatmap).Convert();
         var timingMap = converted.TimingMap!;
+        var convertedLongNote = converted.HitObjects.OfType<BmsLongNote>().Single();
 
         Assert.That(timingMap.ProjectTickToTime(timingMap.Measures[^1].StartTick), Is.GreaterThanOrEqualTo(longNote.EndTime));
-        Assert.That(longNote.ScrollPositionAtEndTime, Is.GreaterThan(longNote.ScrollPositionAtStartTime));
+        Assert.That(convertedLongNote.ScrollPositionAtEndTime, Is.GreaterThan(convertedLongNote.ScrollPositionAtStartTime));
+        Assert.That(longNote.ScrollPositionAtEndTime, Is.Zero);
+        Assert.That(longNote.ScrollPositionAtStartTime, Is.Zero);
     }
 
     [Test]

@@ -7,6 +7,7 @@ using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Gauge;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Practice;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
@@ -20,6 +21,75 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Scoring;
 
 public partial class BmsScoreProcessorTest
 {
+    [Test]
+    public void TestPracticeCompletionIncludesTrailingSilence()
+    {
+        var full = createThreeNoteBeatmap();
+        var practice = BmsPracticeBeatmap.Create(full, new BmsPracticeSettings { StartTime = 0, EndTime = 2500 });
+        var manualClock = new ManualClock();
+        var framedClock = new FramedClock(manualClock);
+        var processor = new TestBmsScoreProcessor { Clock = framedClock };
+        processor.ApplyBeatmap(practice);
+
+        foreach (var note in practice.HitObjects)
+            processor.ApplyResult(new JudgementResult(note, note.CreateJudgement()) { Type = HitResult.Perfect });
+
+        manualClock.CurrentTime = 2499;
+        framedClock.ProcessFrame();
+        processor.UpdateCompletion();
+        Assert.That(processor.HasCompleted.Value, Is.False);
+
+        manualClock.CurrentTime = 2500;
+        framedClock.ProcessFrame();
+        processor.UpdateCompletion();
+        Assert.That(processor.HasCompleted.Value, Is.True);
+    }
+
+    [Test]
+    public void TestPracticeEndPreservesCompleteHoldAndSlowWindow(
+        [Values(BmsLongNoteMode.LongNote, BmsLongNoteMode.ChargeNote, BmsLongNoteMode.HellChargeNote)] BmsLongNoteMode mode)
+    {
+        var source = new BmsLongNote { StartTime = 1000, Duration = 1000, Column = 1 };
+        var full = new BmsBeatmap
+        {
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            TotalColumns = 8,
+            LockedLongNoteMode = mode,
+            HitObjects = { source },
+        };
+        source.Beatmap = full;
+        var practice = BmsPracticeBeatmap.Create(full, new BmsPracticeSettings { StartTime = 0, EndTime = 1500 });
+        var hold = (BmsLongNote)practice.HitObjects.Single();
+        var manualClock = new ManualClock { CurrentTime = 1500 };
+        var framedClock = new FramedClock(manualClock);
+        var processor = new TestBmsScoreProcessor { Clock = framedClock };
+        processor.ApplyBeatmap(practice);
+        if (mode != BmsLongNoteMode.LongNote)
+            processor.ApplyResult(createEndpointResult(hold, BmsLongNoteEndpointKind.Head, hold.StartTime));
+
+        processor.UpdateCompletion();
+        Assert.That(processor.HasCompleted.Value, Is.False);
+
+        manualClock.CurrentTime = hold.EndTime;
+        framedClock.ProcessFrame();
+        processor.ApplyResult(mode == BmsLongNoteMode.LongNote
+            ? createLongNoteResult(hold, hold.StartTime, hold.EndTime)
+            : createEndpointResult(hold, BmsLongNoteEndpointKind.Tail, hold.EndTime));
+        processor.UpdateCompletion();
+        Assert.That(processor.HasCompleted.Value, Is.False);
+
+        var lastJudgementTime = hold.EndTime + hold.HitWindows.WindowFor(HitResult.Ok);
+        manualClock.CurrentTime = lastJudgementTime - 1;
+        framedClock.ProcessFrame();
+        processor.UpdateCompletion();
+        Assert.That(processor.HasCompleted.Value, Is.False);
+
+        manualClock.CurrentTime = lastJudgementTime;
+        framedClock.ProcessFrame();
+        processor.UpdateCompletion();
+        Assert.That(processor.HasCompleted.Value, Is.True);
+    }
+
     [Test]
     public void TestCompletionWaitsForFinalGaugeDamage([Values] bool autoGauge, [Values(1280, 1281, 2000)] double completionTime)
     {

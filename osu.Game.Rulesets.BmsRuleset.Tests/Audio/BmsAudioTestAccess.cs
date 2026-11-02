@@ -45,6 +45,20 @@ internal static class BmsAudioTestAccess
         return mixer == null ? 0 : getRequiredPropertyValue<int>(mixer, "ActiveVoiceCount");
     }
 
+    internal static double? GetDecodedSampleDuration(BmsSamplePlayback playback, ushort sampleKey)
+    {
+        var session = getSession(playback);
+        var controller = session == null ? null : getOptionalPropertyValue<object>(session, "Controller");
+        if (controller == null)
+            return null;
+
+        var leases = getRequiredFieldValue<Dictionary<ushort, BmsPcmAssetLease>>(controller, "leases");
+        if (!leases.TryGetValue(sampleKey, out var lease) || !lease.Asset.IsComplete)
+            return null;
+
+        return lease.Asset.TotalFrameCount * 1000d / lease.Asset.SampleRate;
+    }
+
     internal static bool IsSessionDisposed(BmsSamplePlayback playback) => getSession(playback) == null;
 
     internal static int GetCachedAssetCount(BmsSamplePlayback playback)

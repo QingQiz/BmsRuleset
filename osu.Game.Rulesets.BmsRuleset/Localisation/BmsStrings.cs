@@ -6,11 +6,105 @@ using System.Globalization;
 using System.Resources;
 using osu.Framework.Localisation;
 
-
 namespace osu.Game.Rulesets.BmsRuleset.Localisation;
 
 public static class BmsStrings
 {
+    public static LocalisableString PracticeMeasure(int measure) => get("practice_measure", measure);
+
+    public static LocalisableString PracticeDensityWindow(double startMs, double endMs, double notesPerSecond)
+        => get("practice_density_window", PracticeTime(startMs), PracticeTime(endMs), notesPerSecond);
+
+    public static LocalisableString PracticeSnap => get("practice_snap");
+
+    public static LocalisableString PracticeSnapMeasure => get("practice_snap_measure");
+
+    public static LocalisableString PracticeSnapDivision(int divisor) => get("practice_snap_division", divisor);
+
+    public static LocalisableString PracticeInvalidTime => get("practice_invalid_time");
+
+    public static LocalisableString PracticeProgress(double elapsedMilliseconds, double durationMilliseconds) => get("practice_progress", elapsedMilliseconds / 1000, durationMilliseconds / 1000);
+
+    public static LocalisableString PracticeChartTitle(string title, string difficulty) => get("practice_chart_title", title, difficulty);
+
+    public static LocalisableString Practice => get("practice");
+
+    public static LocalisableString PracticeSelectRange => get("practice_select_range");
+
+    public static LocalisableString PracticeSetStart => get("practice_set_start");
+
+    public static LocalisableString PracticeSetEnd => get("practice_set_end");
+
+    public static LocalisableString PracticeLocateStart => get("practice_locate_start");
+
+    public static LocalisableString PracticeLocateEnd => get("practice_locate_end");
+
+    public static LocalisableString PracticeSkipResults => get("practice_skip_results");
+
+    public static LocalisableString PracticeSkipResultsDescription => get("practice_skip_results_description");
+
+    public static LocalisableString PracticeReturnToSettings => get("practice_return_to_settings");
+
+    public static LocalisableString PracticeNextAttempt => get("practice_next_attempt");
+
+    public static LocalisableString PracticeCountIn => get("practice_count_in");
+
+    public static LocalisableString PracticeCountInOff => get("practice_count_in_off");
+
+    public static LocalisableString PracticeCountInSeconds(int seconds) => get("practice_count_in_seconds", seconds);
+
+    public static LocalisableString PracticeBegin => get("practice_begin");
+
+    public static LocalisableString PracticeFullChart => get("practice_full_chart");
+
+    public static LocalisableString PracticeFitRange => get("practice_fit_range");
+
+    public static LocalisableString PracticeZoomIn => get("practice_zoom_in");
+
+    public static LocalisableString PracticeZoomOut => get("practice_zoom_out");
+
+    public static LocalisableString PracticeViewHint(LocalisableString division) => get("practice_view_hint", division);
+
+    public static LocalisableString PracticeInvalidRange => get("practice_invalid_range");
+
+    public static LocalisableString PracticeLoading => get("practice_loading");
+
+    public static LocalisableString PracticePreparing => get("practice_preparing");
+
+    public static LocalisableString PracticePaused => get("practice_paused");
+
+    public static LocalisableString PracticeRetry => get("practice_retry");
+
+    public static LocalisableString PracticeCompleted => get("practice_completed");
+
+    public static LocalisableString PracticeAborted => get("practice_aborted");
+
+    public static LocalisableString PracticeLoadingFailed => get("practice_loading_failed");
+
+    public static LocalisableString PracticeOverallResults => get("practice_overall_results");
+
+    public static LocalisableString PracticeCompletedAttempts(int attempts) => get("practice_completed_attempts", attempts);
+
+    public static LocalisableString PracticeAttemptMetrics(int ex, int combo, double health) => get("practice_attempt_metrics", ex, combo, health * 100);
+
+    public static LocalisableString PracticeInputTime(double milliseconds) => get("practice_input_time", milliseconds / 1000);
+
+    public static LocalisableString PracticeTime(double milliseconds) => get("practice_time", milliseconds / 1000);
+
+    public static LocalisableString PracticeViewDuration(double milliseconds) => get("practice_view_duration", milliseconds / 1000);
+
+    public static LocalisableString PracticeCountdownNumber(int seconds) => get("practice_countdown_number", seconds);
+
+    public static LocalisableString PracticeAttempt(int attempt) => get("practice_attempt", attempt);
+
+    public static LocalisableString PracticeRangeSummary(int notes, double duration, double rate) => get("practice_range_summary", notes, duration / 1000, rate);
+
+    public static LocalisableString PracticeTiming(int fast, int slow) => get("practice_timing", fast, slow);
+
+    public static LocalisableString PracticeStartLine => get("practice_start_line");
+
+    public static LocalisableString PracticeEndLine => get("practice_end_line");
+
     public static LocalisableString ReplayVisualizerTimeRange => get("replay_visualizer_time_range");
 
     public static LocalisableString ReplayVisualizerTimeRangeDescription => get("replay_visualizer_time_range_description");

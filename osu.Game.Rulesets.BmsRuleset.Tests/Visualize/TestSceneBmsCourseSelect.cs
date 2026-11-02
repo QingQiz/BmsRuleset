@@ -67,6 +67,7 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
     private RealmDetachedBeatmapStore beatmapStore = null!;
     private OsuConfigManager config = null!;
     private BmsSongSelect songSelect = null!;
+    private int scoreCountAtTestStart;
 
     [Resolved]
     private Bindable<RulesetInfo> globalRuleset { get; set; } = null!;
@@ -141,7 +142,12 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
             config.SetValue(OsuSetting.SongSelectGroupMode, GroupMode.None);
         });
 
-        AddStep("delete all scores", () => scoreManager.Delete());
+        AddStep("delete all scores", () =>
+        {
+            scoreManager.Delete();
+            // Soft-deleted scores remain in Realm when tests share this fixture.
+            scoreCountAtTestStart = Realm.Run(realm => realm.All<ScoreInfo>().Count());
+        });
         AddStep("delete all beatmaps", () => beatmaps.Delete());
     }
 
@@ -539,8 +545,9 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
             && songSelect.ChildrenOfType<FilterControl>().Single().Alpha == 0);
     }
 
-    [Test]
-    public void TestModOverlayBackDoesNotExitCourseMode()
+    [TestCase(false)]
+    [TestCase(true)]
+    public void TestModOverlayBackDoesNotExitCourseMode(bool keyboard)
     {
         AddStep("load real song select", () => Stack.Push(songSelect = new BmsSoloSongSelect()));
         AddUntilStep("wait for song select load", () => Stack.CurrentScreen == songSelect && songSelect.IsLoaded);
@@ -549,7 +556,7 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
         AddUntilStep("course mode visible", () => controller.IsCourseMode);
         AddStep("show mod overlay", () => songSelect.ModSelectOverlay.Show());
         AddUntilStep("mod overlay visible", () => songSelect.ModSelectOverlay.State.Value == Visibility.Visible);
-        AddStep("press escape", () => InputManager.Key(Key.Escape));
+        AddStep("press back", () => pressNavigationBack(keyboard));
         AddUntilStep("mod overlay hidden", () => songSelect.ModSelectOverlay.State.Value != Visibility.Visible);
         AddAssert("course mode remains visible", () => controller.IsCourseMode);
     }

@@ -1,3 +1,4 @@
+using System.Linq;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 using osu.Game.Rulesets.Judgements;
@@ -43,14 +44,26 @@ public class BmsHitObject : HitObject
         return new BmsNote();
     }
 
-    public BmsHitObject ToTypedHitObject()
+    internal BmsHitObject CloneForConversion()
     {
-        if (GetType() != typeof(BmsHitObject))
-            return this;
+        BmsHitObject clone = this switch
+        {
+            BmsLongNote => new BmsLongNote(),
+            BmsLandmine => new BmsLandmine(),
+            BmsInvisibleNote => new BmsInvisibleNote(),
+            _ => new BmsNote(),
+        };
+        CopyTo(clone);
+        clone.Samples = Samples.ToList();
+        return clone;
+    }
 
-        var typed = CreateForKind(this is BmsLongNote, this is BmsLandmine);
-        CopyTo(typed);
-        return typed;
+    internal BmsInvisibleNote CreateKeySoundState(IBmsBeatmap beatmap)
+    {
+        var clone = new BmsInvisibleNote();
+        CopyTo(clone);
+        clone.Beatmap = beatmap;
+        return clone;
     }
 
     public override Judgement CreateJudgement() => new BmsJudgement(this);

@@ -103,7 +103,8 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable, IBmsResult
     internal static TimelineData CreateData(ScoreInfo score, IBeatmap playableBeatmap)
         => CreateData(playableBeatmap, score.HitEvents, score.HitEvents);
 
-    internal static TimelineData CreateData(IBeatmap playableBeatmap, IReadOnlyList<HitEvent> timingEvents, IReadOnlyList<HitEvent> scoringEvents)
+    internal static TimelineData CreateData(IBeatmap playableBeatmap, IReadOnlyList<HitEvent> timingEvents, IReadOnlyList<HitEvent> scoringEvents,
+        double minimumDuration = 0)
     {
         var variant = playableBeatmap is BmsBeatmap bms ? bms.LayoutVariant : BmsLayoutVariant.Bms5K;
 
@@ -111,7 +112,7 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable, IBmsResult
         var timingHitEvents = timingEvents.ToArray();
         var scoringHitEvents = scoringEvents.ToArray();
         var hitEventsMax = timingHitEvents.Length == 0 ? 0 : timingHitEvents.Max(e => e.HitObject.GetEndTime());
-        var duration = Math.Max(1, Math.Max(beatmapMax, hitEventsMax));
+        var duration = Math.Max(Math.Max(1, minimumDuration), Math.Max(beatmapMax, hitEventsMax));
 
         var notes = createNotesSubplot(playableBeatmap, variant, duration);
         var judgements = createJudgementSubplot(scoringHitEvents, duration);

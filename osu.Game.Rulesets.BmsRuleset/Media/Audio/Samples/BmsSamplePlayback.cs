@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Graphics;
@@ -53,6 +54,9 @@ public partial class BmsSamplePlayback(
     internal bool HasSampleDefinition(ushort sampleKey) => controller?.HasSampleDefinition(sampleKey) == true;
 
     internal bool IsPlaybackAvailable => controller != null;
+
+    internal Task WaitForPreparedSamplesAsync(CancellationToken cancellationToken)
+        => controller?.WaitForPreparedSamplesAsync(cancellationToken) ?? Task.CompletedTask;
 
     internal void QueueLivePlay(ushort sampleKey, int volume = 100) => controller?.QueueLivePlay(sampleKey, volume);
 

@@ -122,14 +122,15 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable, IBmsResult
         => CreateSeries(score, playableBeatmap, score.HitEvents, []);
 
     internal static IReadOnlyList<GaugeSeries> CreateSeries(ScoreInfo score, IBeatmap playableBeatmap,
-                                                            IReadOnlyList<HitEvent> hitEvents, IReadOnlyList<BmsGaugeHistoryEvent> gaugeHistory)
+                                                            IReadOnlyList<HitEvent> hitEvents, IReadOnlyList<BmsGaugeHistoryEvent> gaugeHistory,
+                                                            double minimumDuration = 0)
     {
         var profileFamily = playableBeatmap is BmsBeatmap bmsBeatmap
             ? BmsGaugeProfileFamilyProvider.FromLayout(bmsBeatmap.LayoutVariant)
             : BmsGaugeProfileFamily.SevenKeys;
 
         if (gaugeHistory.Count > 0)
-            return createSeries(score, gaugeHistory, graphDuration(playableBeatmap, gaugeHistory.Max(e => e.Time)), profileFamily);
+            return createSeries(score, gaugeHistory, Math.Max(minimumDuration, graphDuration(playableBeatmap, gaugeHistory.Max(e => e.Time))), profileFamily);
 
         if (hitEvents.Count == 0)
             return [];
@@ -139,7 +140,7 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable, IBmsResult
             noteCount = 1;
 
         var total = playableBeatmap is BmsBeatmap bms ? bms.Total : 0;
-        var duration = graphDuration(playableBeatmap, hitEvents.Max(e => e.HitObject.GetEndTime()));
+        var duration = Math.Max(minimumDuration, graphDuration(playableBeatmap, hitEvents.Max(e => e.HitObject.GetEndTime())));
 
         var gaugeTypes = gaugeTypesFor(score.Mods).ToArray();
         var finalGaugeType = finalGaugeTypeFor(score.Mods, gaugeTypes);

@@ -14,6 +14,7 @@ using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Gauge;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Practice;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
@@ -86,6 +87,9 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
     [Resolved(CanBeNull = true)]
     private GameplayClockContainer? gameplayClockContainer { get; set; }
 
+    [Resolved(CanBeNull = true)]
+    private BmsPracticeSession? practiceSession { get; set; }
+
     [Resolved]
     private GameHost host { get; set; } = null!;
 
@@ -110,7 +114,7 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
         if (gameplayClockContainer != null)
             gameplayClockContainer.OnSeek -= onReplaySeek;
         gameplayEvents.ReplaySeeked -= synchroniseReplayState;
-        audioController.Dispose(previewRestoreTime);
+        audioController.Dispose(previewRestoreTime, restorePreview: practiceSession == null);
     }
 
     public static double ComputeScrollTime(double scrollSpeed) => BmsGameplayScrollController.ComputeScrollTime(scrollSpeed);
@@ -171,7 +175,7 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
 
         audioController.BindPauseSource(gameplayClockContainer?.IsPaused ?? IsPaused);
 
-        if (scoreProcessor != null && healthProcessor != null && gameplayState != null)
+        if (practiceSession == null && scoreProcessor != null && healthProcessor != null && gameplayState != null)
             completionController = new BmsGameplayCompletionController(
                 scoreProcessor,
                 healthProcessor,

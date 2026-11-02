@@ -78,7 +78,7 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResu
         this.stages = stages;
     }
 
-    internal static HitScatterStatistics CreateStatistics(IBeatmap playableBeatmap, IReadOnlyList<HitEvent> hitEvents)
+    internal static HitScatterStatistics CreateStatistics(IBeatmap playableBeatmap, IReadOnlyList<HitEvent> hitEvents, double minimumDuration = 0)
     {
         var scatterHits = hitEvents.Where(isScatterHit).ToArray();
         var bmsHitEvents = scatterHits.Where(e => e.HitObject is BmsHitObject).ToArray();
@@ -92,13 +92,13 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResu
         var keyIndex = 0;
 
         var keyGroups = Enumerable.Range(0, totalColumns)
-            .Select(column => new KeyHitScatterStatistics(labelFor(column, variant, ref keyIndex), CreateData(hitsByColumn[column].ToArray())))
+            .Select(column => new KeyHitScatterStatistics(labelFor(column, variant, ref keyIndex), CreateData(hitsByColumn[column].ToArray(), minimumDuration)))
             .ToArray();
 
-        return new HitScatterStatistics(CreateData(scatterHits), keyGroups);
+        return new HitScatterStatistics(CreateData(scatterHits, minimumDuration), keyGroups);
     }
 
-    internal static ScatterData CreateData(IReadOnlyList<HitEvent> hitEvents)
+    internal static ScatterData CreateData(IReadOnlyList<HitEvent> hitEvents, double minimumDuration = 0)
     {
         var points = hitEvents
             .Where(isScatterHit)
@@ -106,7 +106,7 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResu
             .OrderBy(p => p.Time)
             .ToArray();
 
-        var duration = Math.Max(1, points.Select(p => p.Time).DefaultIfEmpty(0).Max());
+        var duration = Math.Max(Math.Max(1, minimumDuration), points.Select(p => p.Time).DefaultIfEmpty(0).Max());
         var maxMagnitude = Math.Clamp(
             points.Where(p => p.Result is not (HitResult.Meh or HitResult.Miss)).Select(p => Math.Abs(p.Offset)).DefaultIfEmpty(0).Max(),
             minimum_offset_range,
@@ -129,6 +129,11 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResu
     internal static HitScatterStatistics CreateCourseStatistics(IReadOnlyList<(IBeatmap Beatmap, IReadOnlyList<HitEvent> HitEvents)> stages)
     {
         var stageStatistics = stages.Select(stage => CreateStatistics(stage.Beatmap, stage.HitEvents)).ToArray();
+        return CombineStatistics(stageStatistics);
+    }
+
+    internal static HitScatterStatistics CombineStatistics(IReadOnlyList<HitScatterStatistics> stageStatistics)
+    {
         var durations = stageStatistics.Select(stage => stage.Overall.Duration).ToArray();
         var keyCount = stageStatistics.Select(stage => stage.Keys.Count).DefaultIfEmpty(0).Max();
 

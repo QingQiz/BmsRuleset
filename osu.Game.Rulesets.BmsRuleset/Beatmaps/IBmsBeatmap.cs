@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
+using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 
@@ -54,6 +55,11 @@ public interface IBmsBeatmap
 
 internal static class BmsBeatmapExtensions
 {
+    internal static int CountScoringNotes(this IBeatmap beatmap) => beatmap.HitObjects
+        .Where(note => note is not BmsLandmine and not BmsInvisibleNote)
+        .Sum(note => note is BmsLongNote && beatmap is BmsBeatmap
+            { LockedLongNoteMode: BmsLongNoteMode.ChargeNote or BmsLongNoteMode.HellChargeNote } ? 2 : 1);
+
     public static void CopyBmsDataFrom(this IBmsBeatmap target, IBmsBeatmap source)
     {
         target.TickResolution = source.TickResolution;
@@ -66,7 +72,7 @@ internal static class BmsBeatmapExtensions
         target.SampleDefinitions = source.SampleDefinitions;
         target.BackgroundSampleEvents = source.BackgroundSampleEvents;
         target.LongNoteTailSampleEvents = source.LongNoteTailSampleEvents;
-        target.InvisibleNotes = source.InvisibleNotes.Select(n => n.CloneForBeatmap(target)).ToArray();
+        target.InvisibleNotes = source.InvisibleNotes.Select(n => n.CreateKeySoundState(target)).ToArray();
         target.BranchDecisions = source.BranchDecisions;
         target.TextEvents = source.TextEvents;
         target.Bga = source.Bga;

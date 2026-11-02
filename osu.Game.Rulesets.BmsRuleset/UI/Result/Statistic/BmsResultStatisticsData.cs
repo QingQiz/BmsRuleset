@@ -27,7 +27,7 @@ internal sealed record BmsResultStatisticsData(
     internal IReadOnlyList<BmsGaugeStateSnapshot> EndingGaugeStates { get; init; } = [];
 
     internal static BmsResultStatisticsData Create(ScoreInfo score, IBeatmap beatmap, IReadOnlyList<BmsGaugeHistoryEvent>? gauges = null)
-        => create(score, beatmap, score.HitEvents, score.HitEvents, gauges ?? []);
+        => Create(score, beatmap, score.HitEvents, score.HitEvents, gauges ?? []);
 
     internal static BmsResultStatisticsData? Load(ScoreInfo score, IBeatmap beatmap, Replay replay, CancellationToken cancellationToken,
                                                   IReadOnlyList<BmsGaugeStateSnapshot>? courseGaugeStates = null, BmsGaugeProfileFamily? courseGaugeProfileFamily = null)
@@ -38,20 +38,20 @@ internal sealed record BmsResultStatisticsData(
 
         var simulated = BmsReplaySimulation.Run(bmsBeatmap, replay, score, cancellationToken, courseGaugeStates, courseGaugeProfileFamily);
         cancellationToken.ThrowIfCancellationRequested();
-        return create(score, beatmap,
+        return Create(score, beatmap,
             BmsJudgementEventProjection.CreateTimingHitEvents(simulated.Judgements),
             BmsJudgementEventProjection.CreateScoringHitEvents(simulated.Judgements), simulated.Gauges);
     }
 
-    private static BmsResultStatisticsData create(ScoreInfo score, IBeatmap beatmap, IReadOnlyList<HitEvent> hitEvents,
-                                                  IReadOnlyList<HitEvent> scoringEvents, IReadOnlyList<BmsGaugeHistoryEvent> gauges)
+    internal static BmsResultStatisticsData Create(ScoreInfo score, IBeatmap beatmap, IReadOnlyList<HitEvent> hitEvents,
+        IReadOnlyList<HitEvent> scoringEvents, IReadOnlyList<BmsGaugeHistoryEvent> gauges, double minimumDuration = 0)
     {
-        var timeline = BmsTimelineStatistic.CreateData(beatmap, hitEvents, scoringEvents);
+        var timeline = BmsTimelineStatistic.CreateData(beatmap, hitEvents, scoringEvents, minimumDuration);
         return new BmsResultStatisticsData(
-            BmsGaugeHistoryGraph.CreateSeries(score, beatmap, scoringEvents, gauges),
+            BmsGaugeHistoryGraph.CreateSeries(score, beatmap, scoringEvents, gauges, minimumDuration),
             [],
             timeline,
-            BmsHitScatterStatistic.CreateStatistics(beatmap, hitEvents),
+            BmsHitScatterStatistic.CreateStatistics(beatmap, hitEvents, minimumDuration),
             BmsHitOffsetStatistic.CreateStatistics(beatmap, hitEvents))
         {
             HitEvents = hitEvents,
@@ -62,16 +62,25 @@ internal sealed record BmsResultStatisticsData(
 
     internal static BmsResultStatisticsData CreateCourse(IReadOnlyList<(IBeatmap Beatmap, BmsResultStatisticsData Data)> stages)
     {
-        var durations = stages.Select(stage => stage.Data.GaugeDuration).ToArray();
         var played = stages.Where(stage => stage.Data.HitEvents.Count > 0).Select(stage => (stage.Beatmap, stage.Data.HitEvents)).ToArray();
+        return combine(stages.Select(stage => stage.Data).ToArray(),
+            BmsHitScatterStatistic.CreateCourseStatistics(played), BmsHitOffsetStatistic.CreateCourseStatistics(played));
+    }
+
+    internal static BmsResultStatisticsData Combine(IReadOnlyList<BmsResultStatisticsData> attempts)
+        => combine(attempts, BmsHitScatterStatistic.CombineStatistics(attempts.Select(attempt => attempt.Scatter).ToArray()),
+            BmsHitOffsetStatistic.CombineStatistics(attempts.Select(attempt => (attempt.Offset, attempt.HitEvents)).ToArray()));
+
+    private static BmsResultStatisticsData combine(IReadOnlyList<BmsResultStatisticsData> stages,
+        BmsHitScatterStatistic.HitScatterStatistics scatter, BmsHitOffsetStatistic.HitOffsetStatistics offset)
+    {
+        var durations = stages.Select(stage => stage.GaugeDuration).ToArray();
         return new BmsResultStatisticsData(
-            BmsGaugeHistoryGraph.CreateCourseSeries(stages.Select(stage => stage.Data.Gauges).ToArray(), durations),
+            BmsGaugeHistoryGraph.CreateCourseSeries(stages.Select(stage => stage.Gauges).ToArray(), durations),
             BmsGaugeHistoryGraph.CreateCourseStageBoundaries(durations),
-            BmsTimelineStatistic.CreateCourseData(stages.Select(stage => stage.Data.Timeline).ToArray()),
-            BmsHitScatterStatistic.CreateCourseStatistics(played),
-            BmsHitOffsetStatistic.CreateCourseStatistics(played))
+            BmsTimelineStatistic.CreateCourseData(stages.Select(stage => stage.Timeline).ToArray()), scatter, offset)
         {
-            HitEvents = stages.SelectMany(stage => stage.Data.HitEvents).ToArray(),
+            HitEvents = stages.SelectMany(stage => stage.HitEvents).ToArray(),
             GaugeDuration = durations.Sum(),
         };
     }

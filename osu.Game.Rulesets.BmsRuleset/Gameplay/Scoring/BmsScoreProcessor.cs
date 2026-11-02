@@ -63,17 +63,20 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
         base.ApplyBeatmap(beatmap);
 
         if (beatmap.HitObjects.Count == 0)
-        {
             latestEndTime = 0;
-            return;
+        else
+        {
+            // Latest possible judgement time = max object end time + worst-case slow window.
+            var maxEndTime = beatmap.HitObjects.Max(h => h.GetEndTime());
+            var slowWindow = beatmap.HitObjects[0].HitWindows?.WindowFor(HitResult.Ok)
+                             ?? BmsHitWindows.FALLBACK_BAD_WINDOW;
+
+            latestEndTime = maxEndTime + slowWindow;
         }
 
-        // Latest possible judgement time = max object end time + worst-case slow window.
-        var maxEndTime = beatmap.HitObjects.Max(h => h.GetEndTime());
-        var slowWindow = beatmap.HitObjects[0].HitWindows?.WindowFor(HitResult.Ok)
-                         ?? BmsHitWindows.FALLBACK_BAD_WINDOW;
-
-        latestEndTime = maxEndTime + slowWindow;
+        // A selected interval includes its trailing silence, while complete holds and slow judgements may extend beyond it.
+        if (beatmap is BmsBeatmap { PracticeEndTime: { } practiceEndTime })
+            latestEndTime = Math.Max(latestEndTime, practiceEndTime);
     }
 
     public override int GetBaseScoreForResult(HitResult result) => result switch
