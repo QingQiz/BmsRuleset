@@ -51,12 +51,34 @@ internal sealed class BmsPcmPlaybackController : IDisposable
 
     internal IEnumerable<ushort> PreparedSampleKeys => leases.Keys;
 
-    internal Task WaitForPreparedSamplesAsync(CancellationToken cancellationToken)
-        => Task.WhenAll(leases.Values.Select(lease => lease.Ready).ToArray()).WaitAsync(initial_ready_timeout, cancellationToken);
+    internal Task WaitForPreparedSamplesAsync(CancellationToken cancellationToken, IReadOnlyDictionary<ushort, double>? offsets = null)
+    {
+        var prepared = leases.Select(pair => (pair.Value, Offset: offsets?.GetValueOrDefault(pair.Key) ?? 0,
+            NeedLength: offsets?.ContainsKey(pair.Key) == true)).ToArray();
+        return waitForPreparedSamples(prepared, cancellationToken);
+    }
 
-    internal double MaxSampleLengthMilliseconds => sampleLengths.Count == 0
-        ? leases.Count == 0 ? 0 : leases.Values.Max(lease => getOriginalLength(lease.Asset))
-        : sampleLengths.Values.Max();
+    private async Task waitForPreparedSamples((BmsPcmAssetLease Lease, double Offset, bool NeedLength)[] prepared, CancellationToken cancellationToken)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(initial_ready_timeout);
+        try
+        {
+            await Task.WhenAll(prepared.Select(sample => sample.Lease.Ready)).WaitAsync(timeout.Token).ConfigureAwait(false);
+            while (prepared.Any(sample => sample.Lease.Asset.State is not (BmsPcmAssetState.Failed or BmsPcmAssetState.Disposed)
+                                          && (!isReadyAtOffset(sample.Lease.Asset, sample.Offset)
+                                              || (sample.NeedLength && getOriginalLength(sample.Lease.Asset) <= 0 && !sample.Lease.Asset.IsComplete))))
+                await Task.Delay(10, timeout.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new TimeoutException("Timed out while preparing BMS sample seek buffers.");
+        }
+    }
+
+    internal double MaxSampleLengthMilliseconds => Math.Max(
+        sampleLengths.Values.DefaultIfEmpty(0).Max(),
+        leases.Values.Select(lease => getOriginalLength(lease.Asset)).DefaultIfEmpty(0).Max());
 
     internal BmsPcmPlaybackController(
         IReadOnlyDictionary<ushort, string> sampleDefinitions,
@@ -80,8 +102,15 @@ internal sealed class BmsPcmPlaybackController : IDisposable
         lastMasterGain = sanitiseAggregateVolume();
     }
 
-    internal void Initialise(CancellationToken cancellationToken, double chartTime, bool waitForInitialAssets = true)
+    internal void Initialise(CancellationToken cancellationToken, double chartTime, bool waitForInitialAssets = true,
+                             IReadOnlyDictionary<ushort, double>? knownLengths = null)
     {
+        if (knownLengths != null)
+        {
+            foreach (var (key, length) in knownLengths)
+                sampleLengths[key] = length;
+        }
+
         if (string.IsNullOrEmpty(basePath) || !Directory.Exists(basePath))
             return;
 
@@ -126,10 +155,12 @@ internal sealed class BmsPcmPlaybackController : IDisposable
         resolvedResources.ContainsKey(sampleKey)
         && (!leases.TryGetValue(sampleKey, out var lease) || lease.Asset.State != BmsPcmAssetState.Failed);
 
-    internal double GetSampleLength(ushort sampleKey) =>
-        leases.TryGetValue(sampleKey, out var lease)
-            ? rememberSampleLength(sampleKey, lease.Asset)
-            : sampleLengths.GetValueOrDefault(sampleKey);
+    internal double GetSampleLength(ushort sampleKey)
+    {
+        if (leases.TryGetValue(sampleKey, out var lease))
+            rememberSampleLength(sampleKey, lease.Asset);
+        return sampleLengths.GetValueOrDefault(sampleKey);
+    }
 
     internal bool IsSampleReady(ushort sampleKey) =>
         leases.TryGetValue(sampleKey, out var lease)
@@ -141,14 +172,22 @@ internal sealed class BmsPcmPlaybackController : IDisposable
             || lease.Asset.State is not (BmsPcmAssetState.Ready or BmsPcmAssetState.Complete))
             return false;
 
-        if (lease.Asset.IsComplete)
+        return isReadyAtOffset(lease.Asset, offset);
+    }
+
+    private bool isReadyAtOffset(BmsPcmAsset asset, double offset)
+    {
+        if (asset.IsComplete)
             return true;
+
+        if (asset.State != BmsPcmAssetState.Ready)
+            return false;
 
         var sourceOffset = clockMapper.MapSourceOffset(offset);
         // A voice seeking past the published frontier would be released by the real-time mixer
         // before the decoder can catch up, so retain the same startup margin used at offset zero.
         var requiredFrames = sourceOffset + BmsFixedRatePcmProcessor.DEFAULT_CHUNK_FRAMES * 2L;
-        return lease.Asset.PublishedFrameCount >= requiredFrames;
+        return asset.PublishedFrameCount >= requiredFrames;
     }
 
     internal void PrepareSample(ushort sampleKey) => ensureLease(sampleKey);
@@ -190,7 +229,7 @@ internal sealed class BmsPcmPlaybackController : IDisposable
 
         foreach (var pending in livePlays)
         {
-            if (!tryGetReadyAsset(pending.SampleKey, out var asset))
+            if (!IsSampleReady(pending.SampleKey, pending.Offset) || !tryGetReadyAsset(pending.SampleKey, out var asset))
             {
                 // Decoder contention must not turn a live key/BGM event into permanent silence.
                 // Keep only the newest trigger for a definition, just as the mixer retriggers it.
@@ -223,12 +262,13 @@ internal sealed class BmsPcmPlaybackController : IDisposable
 
         ensureLease(sampleKey);
 
-        if (!tryGetReadyAsset(sampleKey, out var asset))
+        if (!IsSampleReady(sampleKey, offset) || !tryGetReadyAsset(sampleKey, out var asset))
         {
             pendingPlays[sampleKey] = new PendingPlay(volume, Math.Max(0, offset), currentTime());
             return;
         }
 
+        pendingPlays.Remove(sampleKey);
         submitSingle(asset, sampleKey, volume, offset);
     }
 
@@ -309,12 +349,13 @@ internal sealed class BmsPcmPlaybackController : IDisposable
             if (playbackBlocked)
                 break;
 
-            if (!tryGetReadyAsset(sampleKey, out var asset))
+            var elapsed = Math.Max(0, chartTime - pending.RequestedAt);
+            var offset = pending.Offset + elapsed;
+            if (!IsSampleReady(sampleKey, offset) || !tryGetReadyAsset(sampleKey, out var asset))
                 continue;
 
             pendingPlays.Remove(sampleKey);
-            var elapsed = Math.Max(0, chartTime - pending.RequestedAt);
-            submitSingle(asset, sampleKey, pending.Volume, pending.Offset + elapsed);
+            submitSingle(asset, sampleKey, pending.Volume, offset);
         }
 
         maintainLeases(chartTime);
@@ -433,31 +474,9 @@ internal sealed class BmsPcmPlaybackController : IDisposable
 
         foreach (var (sampleKey, definition) in sampleDefinitions)
         {
-            foreach (var lookup in new BmsSampleInfo(definition).LookupNames)
-            {
-                if (tryResolveWithExtensions(lookup, out var identity))
-                {
-                    resolvedResources[sampleKey] = identity;
-                    break;
-                }
-            }
+            if (resourceStore.ResolveSamplePath(definition) is { } identity)
+                resolvedResources[sampleKey] = identity;
         }
-    }
-
-    private bool tryResolveWithExtensions(string lookup, [NotNullWhen(true)] out string? identity)
-    {
-        if (resourceStore!.TryResolve(lookup, out identity))
-            return true;
-
-        var stem = Path.ChangeExtension(lookup, null);
-        foreach (var extension in BmsAudioResourceStore.Extensions)
-        {
-            if (resourceStore.TryResolve($"{stem}.{extension}", out identity))
-                return true;
-        }
-
-        identity = null;
-        return false;
     }
 
     private SampleLifetime[] createLifetimes()
@@ -505,9 +524,8 @@ internal sealed class BmsPcmPlaybackController : IDisposable
         while (nextLifetimeIndex < lifetimes.Length && lifetimes[nextLifetimeIndex].StartTime <= chartTime)
         {
             var sampleKey = lifetimes[nextLifetimeIndex].SampleKey;
-            var knownLength = sampleLengths.GetValueOrDefault(sampleKey);
-            var mayStillBePlaying = resumableSamples.Contains(sampleKey)
-                                    && (knownLength <= 0 || lifetimeEnds[sampleKey] + knownLength >= chartTime);
+            var hasKnownLength = sampleLengths.TryGetValue(sampleKey, out var knownLength);
+            var mayStillBePlaying = resumableSamples.Contains(sampleKey) && (!hasKnownLength || lifetimeEnds[sampleKey] + knownLength >= chartTime);
 
             // Only background samples need their duration resolved after a seek. Historical
             // keysounds must stay skipped even though their duration is not known yet.

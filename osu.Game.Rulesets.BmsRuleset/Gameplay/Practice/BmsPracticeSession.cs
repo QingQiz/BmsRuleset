@@ -10,6 +10,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps.Conversion;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Gauge;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Practice.Audio;
 using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Practice;
@@ -29,6 +30,8 @@ public sealed class BmsPracticeSession
     private readonly List<BmsPracticeAttemptResult> attemptResults = [];
 
     internal IReadOnlyList<BmsPracticeAttemptResult> AttemptResults => attemptResults;
+
+    internal BmsSampleDurationCache SampleDurations { get; } = new();
 
     public BmsPracticeSession(WorkingBeatmap source, BmsPracticeSettings settings, IReadOnlyList<Mod> mods)
     {

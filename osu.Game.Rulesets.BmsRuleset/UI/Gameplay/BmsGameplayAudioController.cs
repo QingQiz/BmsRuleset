@@ -22,9 +22,9 @@ internal sealed class BmsGameplayAudioController
 
     internal BindableBool BackgroundAudioPaused { get; } = new(true);
 
-    internal BmsGameplayAudioController(BmsBeatmap beatmap, IReadOnlyList<Mod>? mods)
+    internal BmsGameplayAudioController(BmsBeatmap beatmap, IReadOnlyList<Mod>? mods, BmsSamplePlayback? samplePlayback = null)
     {
-        SamplePlayback = new BmsSamplePlayback(
+        SamplePlayback = samplePlayback ?? new BmsSamplePlayback(
             beatmap.SampleDefinitions,
             ResolveBeatmapSource(beatmap),
             GetPlaybackRate(mods),

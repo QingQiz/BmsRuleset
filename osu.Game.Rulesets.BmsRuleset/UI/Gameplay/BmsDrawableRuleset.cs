@@ -35,7 +35,7 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
         : base(ruleset, beatmap, mods)
     {
         var bmsBeatmap = (BmsBeatmap)beatmap;
-        audioController = new BmsGameplayAudioController(bmsBeatmap, Mods);
+        audioController = createGameplayAudioController(bmsBeatmap, Mods);
         samplePlayback = audioController.SamplePlayback;
     }
 
@@ -71,7 +71,7 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
     private BmsGameplaySettingsController? settingsController;
     private double previousVisualUpdateMs;
 
-    [Cached]
+    [Cached(typeof(BmsSamplePlayback))]
     private readonly BmsSamplePlayback samplePlayback;
 
     // Resolved from Player's DI cache — available after Player.LoadComplete registers them.

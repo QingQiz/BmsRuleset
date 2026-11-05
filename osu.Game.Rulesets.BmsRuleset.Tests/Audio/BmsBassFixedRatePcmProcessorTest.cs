@@ -1,11 +1,16 @@
 #nullable enable
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using ManagedBass;
 using NUnit.Framework;
+using osu.Framework.Bindables;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Practice.Audio;
+using osu.Game.Rulesets.BmsRuleset.IO.ResourceStore;
+using osu.Game.Rulesets.BmsRuleset.Media.Audio.Mixing.Pcm;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Processing;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 
@@ -140,6 +145,62 @@ public class BmsBassFixedRatePcmProcessorTest
         await lease.Ready.WaitAsync(TimeSpan.FromSeconds(5));
         cache.EvictUnused();
         Assert.That(lease.Asset.State, Is.EqualTo(BmsPcmAssetState.Disposed));
+    }
+
+    [TestCase(0.5)]
+    [TestCase(1)]
+    [TestCase(2)]
+    public async Task PracticeProbesDurationsBeforeDecodingAndRetainsFuturePrefetch(double rate)
+    {
+        var directory = Directory.CreateTempSubdirectory("bms-practice-audio").FullName;
+        var chartTime = 1000d;
+        try
+        {
+            File.WriteAllBytes(Path.Combine(directory, "long.wav"), createWave(44100, 88200, 440));
+            File.WriteAllBytes(Path.Combine(directory, "short.wav"), createWave(44100, 22050, 440));
+            BmsSampleUsage[] usages =
+            [
+                new(1, 0, ResumeAfterSeek: true), new(1, 200, ResumeAfterSeek: true),
+                new(2, 0, ResumeAfterSeek: true), new(3, 1000, ResumeAfterSeek: true),
+                new(4, 2000, ResumeAfterSeek: true), new(5, 0, ResumeAfterSeek: true), new(5, 25000, ResumeAfterSeek: true),
+            ];
+            var definitions = new Dictionary<ushort, string>
+            {
+                [1] = "long.wav", [2] = "short.wav", [3] = "long.wav", [4] = "long.wav", [5] = "short.wav",
+            };
+            using var store = new BmsAudioResourceStore(directory);
+            var resolved = definitions.ToDictionary(pair => pair.Key, pair => store.ResolveSamplePath(pair.Value)!);
+            var plan = new BmsPracticeAudioPreparation(usages);
+            var resources = plan.GetDurationResources(chartTime, resolved);
+            Assert.That(resources.Keys, Is.EquivalentTo((ushort[])[1, 2, 3, 5]));
+            var calls = 0;
+            var cache = new BmsSampleDurationCache(path =>
+            {
+                System.Threading.Interlocked.Increment(ref calls);
+                return BmsSampleDurationCache.Probe(path);
+            });
+            var durations = await cache.GetAsync(resources.Values, default);
+            await cache.GetAsync(resources.Values, default);
+            Assert.That(calls, Is.EqualTo(2), "Sample aliases and repeated attempts share one query per resource.");
+            plan.SetDurations(resources.ToDictionary(pair => pair.Key, pair => durations[pair.Value]));
+            using var controller = new BmsPcmPlaybackController(definitions, directory, rate, plan.GetPlaybackUsages(usages, chartTime),
+                new BindableDouble(1), () => chartTime, new BmsPcmVoiceMixer());
+            controller.Initialise(default, chartTime, knownLengths: plan.KnownLengths);
+            await controller.WaitForPreparedSamplesAsync(default, plan.GetResumeOffsets(chartTime, new Dictionary<ushort, double>()));
+            Assert.That(controller.PreparedSampleKeys, Is.EquivalentTo((ushort[])[1, 3, 4]));
+            Assert.That(controller.IsSampleReady(1, 800), Is.True);
+            Assert.That(controller.GetSampleLength(1), Is.EqualTo(2000).Within(1));
+            Assert.That(controller.GetSampleLength(2), Is.EqualTo(500).Within(1));
+            chartTime = 15000;
+            controller.Update(chartTime);
+            Assert.That(controller.PreparedSampleKeys, Does.Contain((ushort)5), "Skipping an expired trigger must not skip a later prefetch for the same key.");
+        }
+        finally
+        {
+            foreach (var path in Directory.EnumerateFiles(directory))
+                File.Delete(path);
+            Directory.Delete(directory);
+        }
     }
 
     private static byte[] createWave(int sampleRate, int frames, double frequency)

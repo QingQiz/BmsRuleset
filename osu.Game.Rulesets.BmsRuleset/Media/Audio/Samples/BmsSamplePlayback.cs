@@ -21,7 +21,7 @@ public partial class BmsSamplePlayback(
     double rate = 1.0,
     IEnumerable<BmsSampleUsage>? sampleUsages = null) : Component
 {
-    private BmsPcmPlaybackSession? playbackSession;
+    private protected BmsPcmPlaybackSession? playbackSession;
     private bool gameplayFrameOpen;
     private bool maintainedInFrame;
 
@@ -100,18 +100,17 @@ public partial class BmsSamplePlayback(
     }
 
     [BackgroundDependencyLoader]
-    private void load(CancellationToken? cancellationToken)
+    private void load(CancellationToken? cancellationToken) => LoadSamples(cancellationToken ?? CancellationToken.None);
+
+    protected private BmsPcmPlaybackSession CreatePlaybackSession(IEnumerable<BmsSampleUsage>? usages)
+        => new(sampleDefinitions, basePath, rate, usages, audioManager, () => Time.Current);
+
+    internal virtual void LoadSamples(CancellationToken cancellationToken)
     {
         try
         {
-            playbackSession = new BmsPcmPlaybackSession(
-                sampleDefinitions,
-                basePath,
-                rate,
-                sampleUsages,
-                audioManager,
-                () => Time.Current);
-            playbackSession.Initialise(cancellationToken ?? CancellationToken.None, Time.Current);
+            playbackSession = CreatePlaybackSession(sampleUsages);
+            playbackSession.Initialise(cancellationToken, Time.Current);
 
             if (playbackSession.IsInitialised)
                 return;

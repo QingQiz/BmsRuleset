@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using osu.Framework.IO.Stores;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Decoding;
+using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 
 namespace osu.Game.Rulesets.BmsRuleset.IO.ResourceStore;
 
@@ -61,6 +62,23 @@ internal sealed class BmsAudioResourceStore(string basePath, CancellationToken c
     public IEnumerable<string> GetAvailableResources() => [];
 
     internal bool TryResolve(string? name, [NotNullWhen(true)] out string? path) => fileStore.TryResolve(name, out path);
+
+    internal string? ResolveSamplePath(string definition)
+    {
+        foreach (var lookup in new BmsSampleInfo(definition).LookupNames)
+        {
+            if (TryResolve(lookup, out var path))
+                return path;
+
+            var stem = Path.ChangeExtension(lookup, null);
+            foreach (var extension in fallback_extensions)
+            {
+                if (TryResolve($"{stem}.{extension}", out path))
+                    return path;
+            }
+        }
+        return null;
+    }
 
     public void Dispose()
     {

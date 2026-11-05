@@ -18,6 +18,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Practice.Audio;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.Objects;
@@ -188,14 +189,15 @@ internal partial class BmsPracticePlayer : Player
             return;
         }
 
-        _ = finishPreparingSamples();
+        _ = finishPreparingSamples(start);
     }
 
-    private async Task finishPreparingSamples()
+    private async Task finishPreparingSamples(double start)
     {
+        var samples = (BmsPracticeSamplePlayback)PracticeRuleset.SamplePlayback;
         try
         {
-            await PracticeRuleset.SamplePlayback.WaitForPreparedSamplesAsync(preparationCancellation.Token).ConfigureAwait(false);
+            await samples.PrepareAsync(start, session.SampleDurations, preparationCancellation.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
@@ -208,8 +210,20 @@ internal partial class BmsPracticePlayer : Player
 
         Schedule(() =>
         {
-            if (!exiting && this.IsCurrentScreen())
-                Prepared?.Invoke();
+            if (exiting || !this.IsCurrentScreen())
+                return;
+
+            if (samples.IsPreparationSuccessful)
+                samples.ApplyPreparedSamples();
+
+            // A skin or scrolling change during preparation can move the actual audio start.
+            if (Math.Abs(computeStartTime() - start) >= 0.001)
+            {
+                SetGameplayStartTime(computeStartTime());
+                ScheduleAfterChildren(prepareGameplayFrame);
+                return;
+            }
+            Prepared?.Invoke();
         });
     }
 

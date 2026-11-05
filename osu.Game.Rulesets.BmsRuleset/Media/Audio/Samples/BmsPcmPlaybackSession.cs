@@ -55,7 +55,8 @@ internal sealed class BmsPcmPlaybackSession : IDisposable
 
     private AudioMixer? outputMixer;
 
-    internal void Initialise(CancellationToken cancellationToken, double chartTime, bool waitForInitialAssets = true)
+    internal void Initialise(CancellationToken cancellationToken, double chartTime, bool waitForInitialAssets = true,
+                             IReadOnlyDictionary<ushort, double>? knownLengths = null)
     {
         BmsPcmMixerPatcher.InstallOnce();
 
@@ -73,7 +74,7 @@ internal sealed class BmsPcmPlaybackSession : IDisposable
             aggregateVolume ?? audioManager.AggregateVolume,
             currentTime,
             pcmMixer);
-        Controller.Initialise(cancellationToken, chartTime, waitForInitialAssets);
+        Controller.Initialise(cancellationToken, chartTime, waitForInitialAssets, knownLengths);
         pcmBridge.EnsureAttached();
     }
 

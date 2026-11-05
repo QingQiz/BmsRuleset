@@ -22,6 +22,7 @@ using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.IO.Import;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
+using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Tests.Audio;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
@@ -331,13 +332,87 @@ public partial class TestSceneBmsCourseSelect
         AddAssert("practice still saved no scores", () => Realm.Run(realm => realm.All<ScoreInfo>().Count()), () => Is.EqualTo(scoreCountAtTestStart));
     }
 
-    private static void writePracticeWave(string path)
+    [TestCase(0.75)]
+    [TestCase(1.25)]
+    public void TestPracticePreparesBackgroundSpanningPrerollBeforeCountdown(double rate)
+    {
+        var directory = string.Empty;
+        Task import = null!;
+        BmsPracticeSession session = null!;
+        PracticeIsolationScreen practice = null!;
+        AddStep("import long background chart", () =>
+        {
+            directory = Path.Combine(LocalStorage.GetFullPath(string.Empty), $"practice-audio-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(directory);
+            writePracticeWave(Path.Combine(directory, "long.wav"), 30);
+            writePracticeWave(Path.Combine(directory, "short.wav"));
+            File.WriteAllText(Path.Combine(directory, "chart.bms"), """
+                #PLAYER 1
+                #TITLE Practice Background Resume
+                #ARTIST Test
+                #BPM 120
+                #PLAYLEVEL 1
+                #DIFFICULTY 1
+                #WAV01 long.wav
+                #WAV02 short.wav
+                #00001:01
+                #00001:02
+                #01011:0002
+                #01111:0002
+                #02001:02
+                #03011:02
+                """);
+            import = new BmsFileImporter(Realm, LocalStorage).Import(directory);
+        });
+        AddUntilStep("chart imported", () => import.IsCompleted);
+        AddStep("open song select", () =>
+        {
+            import.GetAwaiter().GetResult();
+            Stack.Push(songSelect = new BmsSoloSongSelect());
+        });
+        AddUntilStep("song select loaded", () => songSelect.IsLoaded && Stack.CurrentScreen == songSelect);
+        AddStep("prepare middle of background", () =>
+        {
+            var info = Realm.Run(realm => realm.All<BeatmapInfo>().AsEnumerable().Single(chart => chart.Metadata.Source == directory).Detach());
+            var source = beatmaps.GetWorkingBeatmap(info);
+            Beatmap.Value = source;
+            session = new BmsPracticeSession(source,
+                new BmsPracticeSettings { StartTime = 21000, EndTime = 27000, SkipResults = true, CountIn = 5 },
+                [rate < 1 ? new BmsModHalfTime { SpeedChange = { Value = rate } } : new BmsModDoubleTime { SpeedChange = { Value = rate } }]);
+            Stack.Push(practice = new PracticeIsolationScreen(session));
+        });
+        AddUntilStep("countdown ready", () => practice.Countdown.IsReady);
+        AddStep("verify resume is prepared before countdown", () =>
+        {
+            practice.PauseCountdown();
+            var player = practice.Players.Single();
+            var start = player.ChildrenOfType<GameplayClockContainer>().Single().CurrentTime;
+            var playback = player.PracticeRuleset.SamplePlayback;
+            var controller = BmsPcmMaintenanceTest.Field<BmsPcmPlaybackSession>(playback, "playbackSession").Controller!;
+            Assert.That(start, Is.InRange(1000, 21000));
+            Assert.That(controller.IsSampleReady(1, start), Is.True, "The actual preroll seek position must be buffered before count-in starts.");
+            Assert.That(controller.GetSampleLength(1), Is.EqualTo(30000).Within(1));
+            Assert.That(session.Attempts, Is.Zero);
+            Assert.That(player.PracticeRuleset.BackgroundAudioPaused.Value, Is.True);
+        });
+        AddStep("start prepared practice", () =>
+        {
+            practice.ResumeCountdown();
+            practice.SkipCountdown();
+        });
+        AddUntilStep("background spanning start reaches mixer", () => session.Attempts == 1
+            && BmsAudioTestAccess.GetActiveVoiceCount(practice.Players.Single().PracticeRuleset.SamplePlayback) > 0);
+        AddStep("exit prepared practice", () => practice.AdjustRange());
+        AddUntilStep("song select restored", () => Stack.CurrentScreen == songSelect);
+    }
+
+    private static void writePracticeWave(string path, int seconds = 1)
     {
         const int sample_rate = 44100;
-        const int data_size = sample_rate * sizeof(short);
+        var dataSize = sample_rate * sizeof(short) * seconds;
         using var writer = new BinaryWriter(File.Create(path));
         writer.Write("RIFF"u8);
-        writer.Write(36 + data_size);
+        writer.Write(36 + dataSize);
         writer.Write("WAVEfmt "u8);
         writer.Write(16);
         writer.Write((short)1);
@@ -347,8 +422,8 @@ public partial class TestSceneBmsCourseSelect
         writer.Write((short)sizeof(short));
         writer.Write((short)16);
         writer.Write("data"u8);
-        writer.Write(data_size);
-        writer.Write(new byte[data_size]);
+        writer.Write(dataSize);
+        writer.Write(new byte[dataSize]);
     }
 
     private partial class PracticeIsolationScreen : BmsPracticeScreen
