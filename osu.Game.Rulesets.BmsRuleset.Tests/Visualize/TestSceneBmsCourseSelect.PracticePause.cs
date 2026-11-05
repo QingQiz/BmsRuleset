@@ -86,6 +86,7 @@ public partial class TestSceneBmsCourseSelect
         if (duringCountIn)
         {
             AddAssert("count-in is paused before first attempt", () => practice.Countdown.IsPaused && session.Attempts == 0);
+            AddStep("pause menu draws above count-in", () => assertPracticePauseLayer(player));
             AddStep("continue count-in through pause menu", () => player.ChildrenOfType<PauseOverlay>().Single().Buttons.First().TriggerClick());
             AddUntilStep("count-in resumed", () => !practice.Countdown.IsPaused && !player.IsPauseMenuVisible);
             AddAssert("continuing count-in keeps gameplay stopped", () => !player.HasAttemptStarted
@@ -139,6 +140,7 @@ public partial class TestSceneBmsCourseSelect
             Assert.That(practice.Countdown.RemainingMilliseconds, Is.EqualTo(countIn * 1000));
             Assert.That(reloaded.ChildrenOfType<GameplayClockContainer>().Single().CurrentTime, Is.LessThan(session.Settings.StartTime));
             Assert.That(reloaded.HasAttemptStarted, Is.False);
+            assertPracticePauseLayer(reloaded);
         });
         AddWaitStep("paused reload cannot start itself", 3);
         AddAssert("only the completed attempt has started", () => session.Attempts, () => Is.EqualTo(1));
@@ -164,5 +166,13 @@ public partial class TestSceneBmsCourseSelect
                 player.AttemptCompleted += _ => player.Pause();
             return player;
         }
+    }
+
+    private static void assertPracticePauseLayer(BmsPracticePlayer player)
+    {
+        var pause = player.ChildrenOfType<PauseOverlay>().Single();
+        var countInLayer = player.CountInOverlay.Parent!;
+        Assert.That(countInLayer.Parent, Is.SameAs(pause.Parent));
+        Assert.That(countInLayer.Depth, Is.GreaterThan(pause.Depth), "The pause menu must cover the countdown and its message.");
     }
 }

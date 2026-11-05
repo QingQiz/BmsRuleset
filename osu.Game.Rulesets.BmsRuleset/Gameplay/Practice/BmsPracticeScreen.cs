@@ -19,6 +19,7 @@ using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.UI.Result.Practice;
 using osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Screens;
 
 namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Practice;
 
@@ -26,6 +27,7 @@ internal partial class BmsPracticeScreen : BmsPracticeResultScreen
 {
     public override bool? AllowGlobalTrackControl => false;
     public override bool? ApplyModTrackAdjustments => false;
+    public override float BackgroundParallaxAmount => session.Settings.SkipResults ? 0.1f : base.BackgroundParallaxAmount;
 
     public event Action? AdjustRangeRequested;
 
@@ -36,6 +38,7 @@ internal partial class BmsPracticeScreen : BmsPracticeResultScreen
     private CancellationTokenSource? loadingCancellation;
     private BmsPracticePlayer? pendingPlayer;
     private BmsPracticePlayer? activePlayer;
+    private BmsPracticePlayer? retainedPlayer;
     private BmsPracticeAttemptResult? lastResult;
     private int loadGeneration;
     private bool inAttempt;
@@ -81,6 +84,10 @@ internal partial class BmsPracticeScreen : BmsPracticeResultScreen
     }
 
     protected override BmsStatisticsPanel CreateStatisticsPanel() => new BmsPracticeStatisticsPanel(() => lastResult?.Statistics);
+
+    protected override BackgroundScreen CreateBackground() => session.Settings.SkipResults
+        ? new BmsPracticeBackgroundScreen(session.Source)
+        : base.CreateBackground();
 
     protected override void LoadComplete()
     {
@@ -137,6 +144,7 @@ internal partial class BmsPracticeScreen : BmsPracticeResultScreen
         {
             switchingAttempt = false;
             inAttempt = false;
+            retainedPlayer = activePlayer;
             pushPreparedPlayer(pendingPlayer!, activePlayer?.IsPauseMenuVisible == true);
             return;
         }
@@ -320,7 +328,6 @@ internal partial class BmsPracticeScreen : BmsPracticeResultScreen
         title.Text = BmsStrings.PracticeAttempt(session.Attempts + 1);
         preparationMessage.Text = BmsStrings.PracticePreparing;
         NextAttemptButton.Enabled.Value = false;
-        outgoing?.ShowPreparation();
 
         BmsWorkingBeatmap.SwitchActivePreviewToGameplayClockOnly();
         Beatmap.Value = session.CreateWorkingBeatmap(audio);
@@ -332,6 +339,7 @@ internal partial class BmsPracticeScreen : BmsPracticeResultScreen
         {
             if (exitRequested || activePlayer != player)
                 return;
+            releaseRetainedPlayer();
             countdown.Ready(countInSeconds, !IsWindowActive || player.IsPauseMenuVisible);
             player.ResetPreparationTimestamp();
             updateCountdownDisplay();
@@ -367,7 +375,8 @@ internal partial class BmsPracticeScreen : BmsPracticeResultScreen
             if (outgoing != null)
             {
                 switchingAttempt = true;
-                outgoing.ExitForNextAttempt();
+                ready.WaitForPreparedPresentation();
+                outgoing.ExitForNextAttempt(retainPresentation: true);
             }
             else
                 pushPreparedPlayer(ready, false);
@@ -423,6 +432,7 @@ internal partial class BmsPracticeScreen : BmsPracticeResultScreen
 
     private void cancelPreparation()
     {
+        releaseRetainedPlayer();
         loadGeneration++;
         countdown.Cancel();
         var cancellation = loadingCancellation;
@@ -432,6 +442,12 @@ internal partial class BmsPracticeScreen : BmsPracticeResultScreen
         if (pendingPlayer is { LoadState: >= LoadState.Ready, IsPracticeDisposed: false, Parent: null } ready)
             ready.Dispose();
         pendingPlayer = null;
+    }
+
+    private void releaseRetainedPlayer()
+    {
+        retainedPlayer?.ReleasePresentation();
+        retainedPlayer = null;
     }
 
     private void failLoad()

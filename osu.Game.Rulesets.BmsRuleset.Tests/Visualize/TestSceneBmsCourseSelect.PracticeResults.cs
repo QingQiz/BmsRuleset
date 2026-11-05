@@ -40,17 +40,21 @@ public partial class TestSceneBmsCourseSelect
         internal int Frames { get; private set; }
         internal int ResultFrames { get; private set; }
         internal int TransitionFrames { get; private set; }
+        internal Action? ObserveFrame { get; set; }
 
         protected override void UpdateAfterChildren()
         {
             base.UpdateAfterChildren();
+            ObserveFrame?.Invoke();
             Frames++;
             if (currentScreen() is not BmsPracticePlayer player)
             {
                 ResultFrames++;
                 return;
             }
-            if (player.IsLoaded && (player.Alpha != 1 || player.Scale != Vector2.One
+            var retainedPresentation = player.Parent?.ChildrenOfType<BmsPracticePlayer>()
+                .Any(previous => previous != player && previous.IsAlive && previous.Alpha == 1) == true;
+            if (player.IsLoaded && ((!retainedPresentation && player.Alpha != 1) || player.Scale != Vector2.One
                 || player.ChildrenOfType<GameplayClockContainer>().Single().Alpha != 1))
                 TransitionFrames++;
         }

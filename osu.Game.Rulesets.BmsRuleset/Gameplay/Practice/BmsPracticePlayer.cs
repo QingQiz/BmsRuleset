@@ -23,6 +23,8 @@ using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Scoring;
+using osu.Game.Screens;
+using osu.Game.Screens.Backgrounds;
 using osu.Game.Screens.Play;
 using osu.Game.Screens.Ranking;
 using osuTK;
@@ -35,6 +37,7 @@ internal partial class BmsPracticePlayer : Player
     private readonly BmsPracticeSession session;
     private readonly List<BmsGaugeHistoryEvent> gaugeHistory = [];
     private readonly CancellationTokenSource preparationCancellation = new();
+    private readonly BindableBool visualBreakTime = new();
     private bool completionPending;
     private bool attemptStarted;
     private bool exiting;
@@ -43,7 +46,12 @@ internal partial class BmsPracticePlayer : Player
     private BmsPracticeCountInOverlay countInOverlay = null!;
     private bool instantExit;
     private bool internalExit;
+    private bool retainForRepeat;
+    private bool revealWhenPrepared;
     private OsuSpriteText? progress;
+
+    protected override bool PlayExitSound => !instantExit && base.PlayExitSound;
+    protected override bool ShouldBeAlive => retainForRepeat || base.ShouldBeAlive;
 
     internal event Action? AttemptStarted;
     internal event Action<BmsPracticeAttemptResult>? AttemptCompleted;
@@ -83,6 +91,11 @@ internal partial class BmsPracticePlayer : Player
 
     protected override bool CheckModsAllowFailure() => false;
 
+    // Attempts have separate working tracks but share one background for the entire session.
+    protected override BackgroundScreen CreateBackground() => session.Settings.SkipResults
+        ? new BmsPracticeBackgroundScreen(session.Source)
+        : new BackgroundScreenBeatmap(session.Source);
+
     protected override GameplayClockContainer CreateGameplayClockContainer(WorkingBeatmap beatmap, double gameplayStart)
         => new PracticeGameplayClockContainer(beatmap, gameplayStart);
 
@@ -118,7 +131,27 @@ internal partial class BmsPracticePlayer : Player
         };
         PauseOverlay.Buttons.Last().Action = () => this.Exit();
         ScoreProcessor.HasCompleted.BindValueChanged(onCompleted);
-        AddInternal(PracticeRuleset.CreatePlayfieldAdjustmentContainer().WithChild(countInOverlay = new BmsPracticeCountInOverlay()));
+        // Share the native overlay layer so the pause menu also covers the practice count-in.
+        ((Container)PauseOverlay.Parent!).Add(PracticeRuleset.CreatePlayfieldAdjustmentContainer().With(container =>
+        {
+            container.Depth = 1;
+            container.Child = countInOverlay = new BmsPracticeCountInOverlay();
+        }));
+        AddInternal(new OsuSpriteText
+        {
+            Anchor = Anchor.TopCentre,
+            Origin = Anchor.TopCentre,
+            Y = 12,
+            Text = BmsStrings.PracticeAttempt(session.Attempts + 1),
+            Font = OsuFont.GetFont(size: 18),
+        });
+        AddInternal(progress = new OsuSpriteText
+        {
+            Anchor = Anchor.TopCentre,
+            Origin = Anchor.TopCentre,
+            Y = 36,
+            Font = OsuFont.GetFont(size: 14),
+        });
     }
 
     internal void RequestRetry()
@@ -144,11 +177,24 @@ internal partial class BmsPracticePlayer : Player
 
     internal void ShowCountdown(BmsPracticeCountdown countdown) => countInOverlay.Display(countdown);
 
-    internal void ExitForNextAttempt()
+    internal void ExitForNextAttempt(bool retainPresentation = false)
     {
+        retainForRepeat = retainPresentation;
         instantExit = true;
         internalExit = true;
         this.Exit();
+    }
+
+    internal void WaitForPreparedPresentation()
+    {
+        revealWhenPrepared = true;
+        AlwaysPresent = true;
+    }
+
+    internal void ReleasePresentation()
+    {
+        retainForRepeat = false;
+        this.Hide();
     }
 
     private double computeStartTime()
@@ -174,7 +220,7 @@ internal partial class BmsPracticePlayer : Player
         if (exiting || !this.IsCurrentScreen())
             return;
 
-        if (!PracticeRuleset.UpdatePracticePreparation())
+        if (!PracticeRuleset.UpdatePracticePreparation() || !prepareHudLayout())
         {
             ScheduleAfterChildren(prepareGameplayFrame);
             return;
@@ -216,22 +262,50 @@ internal partial class BmsPracticePlayer : Player
             if (samples.IsPreparationSuccessful)
                 samples.ApplyPreparedSamples();
 
-            // A skin or scrolling change during preparation can move the actual audio start.
-            if (Math.Abs(computeStartTime() - start) >= 0.001)
-            {
-                SetGameplayStartTime(computeStartTime());
-                ScheduleAfterChildren(prepareGameplayFrame);
-                return;
-            }
-            Prepared?.Invoke();
+            ScheduleAfterChildren(() => completePreparation(start));
         });
+    }
+
+    private void completePreparation(double preparedStart)
+    {
+        if (exiting || !this.IsCurrentScreen())
+            return;
+
+        if (!PracticeRuleset.UpdatePracticePreparation() || !prepareHudLayout())
+        {
+            ScheduleAfterChildren(() => completePreparation(preparedStart));
+            return;
+        }
+
+        // A skin or scrolling change during preparation can move the actual audio start.
+        if (Math.Abs(computeStartTime() - preparedStart) >= 0.001)
+        {
+            SetGameplayStartTime(computeStartTime());
+            ScheduleAfterChildren(prepareGameplayFrame);
+            return;
+        }
+        if (revealWhenPrepared)
+        {
+            revealWhenPrepared = false;
+            Alpha = 1;
+            AlwaysPresent = false;
+        }
+        previousPracticeLayout = [];
+        Prepared?.Invoke();
     }
 
     public override void OnEntering(ScreenTransitionEvent e)
     {
         base.OnEntering(e);
+        if (session.Settings.SkipResults)
+        {
+            ((Bindable<bool>)DimmableStoryboard.IsBreakTime).UnbindBindings();
+            DimmableStoryboard.IsBreakTime.BindTo(visualBreakTime);
+            IsBreakTime.BindValueChanged(_ => updateVisualBreakTime());
+            ApplyToBackground(background => ((BmsPracticeBackgroundScreen)background).BindVisualBreakTime(visualBreakTime));
+        }
         this.ClearTransforms();
-        Alpha = 1;
+        Alpha = revealWhenPrepared ? 0 : 1;
         Scale = Vector2.One;
         GameplayClockContainer.ClearTransforms();
         GameplayClockContainer.Alpha = 1;
@@ -248,21 +322,6 @@ internal partial class BmsPracticePlayer : Player
         GameplayClockContainer.Show();
 
         session.BeginAttempt();
-        AddInternal(new OsuSpriteText
-        {
-            Anchor = Anchor.TopCentre,
-            Origin = Anchor.TopCentre,
-            Y = 12,
-            Text = BmsStrings.PracticeAttempt(session.Attempts),
-            Font = OsuFont.GetFont(size: 18),
-        });
-        AddInternal(progress = new OsuSpriteText
-        {
-            Anchor = Anchor.TopCentre,
-            Origin = Anchor.TopCentre,
-            Y = 36,
-            Font = OsuFont.GetFont(size: 14),
-        });
         recordGaugeState();
         AttemptStarted?.Invoke();
         PracticeRuleset.KeyBindingInputManager.UseParentInput = true;
@@ -272,6 +331,8 @@ internal partial class BmsPracticePlayer : Player
     protected override void UpdateAfterChildren()
     {
         base.UpdateAfterChildren();
+        if (session.Settings.SkipResults && !exiting)
+            updateVisualBreakTime();
         if ((!attemptStarted || completionPending) && !exiting)
         {
             // Count-in is real time, independent of both gameplay rate and an accelerated parent/test clock.
@@ -289,6 +350,11 @@ internal partial class BmsPracticePlayer : Player
             recordGaugeState();
     }
 
+    private void updateVisualBreakTime()
+        => visualBreakTime.Value = attemptStarted && !completionPending
+                                                && GameplayClockContainer.CurrentTime >= DrawableRuleset.GameplayStartTime
+                                                && IsBreakTime.Value;
+
     public override bool OnExiting(ScreenExitEvent e)
     {
         if (!internalExit)
@@ -300,8 +366,10 @@ internal partial class BmsPracticePlayer : Player
         var blocked = base.OnExiting(e);
         if (instantExit)
         {
+            // Player's normal exit bypasses user dim settings; a repeat stays in gameplay throughout.
+            ApplyToBackground(background => background.IgnoreUserSettings.Value = false);
             this.ClearTransforms();
-            this.Hide();
+            Alpha = retainForRepeat ? 1 : 0;
         }
         return blocked;
     }
