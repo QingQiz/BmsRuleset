@@ -69,39 +69,17 @@ public static class BmsTableJsonParser
             || (charts is not { Count: > 0 } && header?.Courses is not { Count: > 0 }))
             return null;
 
-        var validCharts = new List<(RawChartItem chart, string hash, string level)>();
+        var entries = new List<TableEntry>();
 
         foreach (var chart in charts ?? [])
         {
             var hash = PickHash(chart.Md5, chart.Sha256);
-            if (hash != null)
-                validCharts.Add((chart, hash, chart.Level ?? string.Empty));
-        }
-
-        var levelOrder = header?.LevelOrder;
-
-        if (levelOrder == null || levelOrder.Length == 0)
-        {
-            levelOrder = validCharts
-                .Select(c => c.level)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(level => level, LevelOrderComparer.INSTANCE)
-                .ToArray();
-        }
-
-        var levelIndexMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        for (var i = 0; i < levelOrder.Length; i++)
-            levelIndexMap[levelOrder[i]] = i;
-
-        var entries = new List<TableEntry>();
-        foreach (var (chart, hash, level) in validCharts)
-        {
-            var levelIndex = levelIndexMap.GetValueOrDefault(level, int.MaxValue);
+            if (hash == null)
+                continue;
 
             entries.Add(new TableEntry
             {
-                Level = level,
-                LevelIndex = levelIndex,
+                Level = chart.Level ?? string.Empty,
                 Md5Hash = hash,
                 Sha256Hash = IsValidSha256(chart.Sha256) ? chart.Sha256!.ToLowerInvariant() : null,
                 Title = chart.Title,
@@ -109,6 +87,16 @@ public static class BmsTableJsonParser
                 Url = chart.Url,
                 UrlDiff = chart.UrlDiff,
             });
+        }
+
+        var levelOrder = header?.LevelOrder;
+        if (levelOrder == null || levelOrder.Length == 0)
+        {
+            levelOrder = entries
+                .Select(entry => entry.Level)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(level => level, LevelOrderComparer.INSTANCE)
+                .ToArray();
         }
 
         return new DifficultyTable

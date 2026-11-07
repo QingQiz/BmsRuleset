@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
@@ -45,7 +44,6 @@ internal partial class DifficultyTableSettings : FillFlowContainer
     private DifficultyTableStore? difficultyTableStore;
     private CollectionSyncManager? collectionSyncManager;
     private DifficultyTableAutocomplete? autocomplete;
-    private CancellationTokenSource? importCancellation;
 
     [Resolved(CanBeNull = true)]
     private RealmAccess? realm { get; set; }
@@ -111,13 +109,6 @@ internal partial class DifficultyTableSettings : FillFlowContainer
             },
             autocomplete,
         ];
-    }
-
-    protected override void Dispose(bool isDisposing)
-    {
-        importCancellation?.Cancel();
-        importCancellation?.Dispose();
-        base.Dispose(isDisposing);
     }
 
     private void initialiseStore()
@@ -243,19 +234,6 @@ internal partial class DifficultyTableSettings : FillFlowContainer
                     notification.CompletionText = BmsStrings.DifficultyTableAlreadyImported(pathOrUrl);
                     notification.State = ProgressNotificationState.Completed;
                 });
-                return;
-            }
-
-            if (importCancellation != null) await importCancellation.CancelAsync();
-            importCancellation = new CancellationTokenSource();
-            var cancellationToken = importCancellation.Token;
-
-            try
-            {
-                await Task.Delay(300, cancellationToken).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
                 return;
             }
 

@@ -116,6 +116,35 @@ public class BmsTableJsonParserTest
     }
 
     [Test]
+    public void TestMergePreservesExplicitLevelsAndChartSequence()
+    {
+        var parsed = BmsTableJsonParser.Parse("""
+            {
+              "name": "Explicit levels",
+              "level_order": ["2", "1", "2"],
+              "charts": [
+                { "md5": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "title": "No level" },
+                { "level": "2", "md5": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB" },
+                { "level": "unlisted", "md5": "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC" },
+                { "level": "ignored", "md5": "invalid" }
+              ]
+            }
+            """);
+        var table = BmsTableJsonParser.Merge("explicit.json", TableSource.LocalFile, parsed!.Header, parsed.Charts)!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(table.LevelOrder, Is.EqualTo(new[] { "2", "1", "2" }));
+            Assert.That(table.Entries.Select(entry => entry.Level), Is.EqualTo(new[] { "", "2", "unlisted" }));
+            Assert.That(table.Entries.Select(entry => entry.Md5Hash), Is.EqualTo(new[]
+            {
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "cccccccccccccccccccccccccccccccc",
+            }));
+            Assert.That(table.Entries[0].Title, Is.EqualTo("No level"));
+        });
+    }
+
+    [Test]
     public void TestMergeWithChartsWrapper()
     {
         var result = BmsTableJsonParser.Parse(combined_json);

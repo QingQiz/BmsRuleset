@@ -120,8 +120,9 @@ public class CollectionSyncManager
 
         if (IsSubdivided(table))
         {
+            var hashesByLevel = table.Entries.ToLookup(entry => entry.Level, entry => entry.Md5Hash, StringComparer.OrdinalIgnoreCase);
             var levelsWithEntries = table.LevelOrder
-                .Where(l => table.Entries.Any(e => e.Level.Equals(l, StringComparison.OrdinalIgnoreCase)))
+                .Where(hashesByLevel.Contains)
                 .ToList();
 
             var indexWidth = levelsWithEntries.Count > 0
@@ -132,9 +133,7 @@ public class CollectionSyncManager
             {
                 var level = levelsWithEntries[index];
                 var indexStr = index.ToString($"D{indexWidth}");
-                var entries = table.Entries
-                    .Where(e => e.Level.Equals(level, StringComparison.OrdinalIgnoreCase))
-                    .Select(e => e.Md5Hash)
+                var entries = hashesByLevel[level]
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToList();
 

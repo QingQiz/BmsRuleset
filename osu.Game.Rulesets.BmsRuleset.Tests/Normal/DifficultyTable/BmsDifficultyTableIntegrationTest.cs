@@ -90,7 +90,11 @@ public partial class BmsDifficultyTableIntegrationTest
                 Name = "Original", SourcePath = path, Symbol = "ST",
                 Entries = [new TableEntry { Md5Hash = "11111111111111111111111111111111", Level = "1" }],
             };
+            var before = new global::osu.Game.Rulesets.BmsRuleset.Gameplay.DifficultyTable.DifficultyTable { Name = "Before" };
+            var after = new global::osu.Game.Rulesets.BmsRuleset.Gameplay.DifficultyTable.DifficultyTable { Name = "After" };
+            store.RestoreTable(before);
             store.RestoreTable(oldTable);
+            store.RestoreTable(after);
             var rebuilds = 0;
             var refreshes = 0;
             var tableChanges = 0;
@@ -101,7 +105,7 @@ public partial class BmsDifficultyTableIntegrationTest
             var result = await store.ImportAsync(path, new ProgressNotification(), oldTable).ConfigureAwait(false);
 
             Assert.That(result, Is.Not.Null);
-            Assert.That(store.Tables.Single(), Is.SameAs(result!.Table));
+            Assert.That(store.Tables, Is.EqualTo(new[] { before, result!.Table, after }));
             Assert.That(store.GetMarkers("11111111111111111111111111111111").Single().entry.Level, Is.EqualTo("2"));
             Assert.That((rebuilds, refreshes, tableChanges), Is.EqualTo((1, 1, 1)));
         });
@@ -417,6 +421,72 @@ public partial class BmsDifficultyTableIntegrationTest
 
                 realm.Run(r => Assert.That(r.All<BeatmapCollection>().Single().BeatmapMD5Hashes,
                     Is.EquivalentTo(expectedHashes)));
+            }
+            finally
+            {
+                BmsRulesetRuntime.DifficultyTableStore = previousStore;
+            }
+
+            return Task.CompletedTask;
+        });
+    }
+
+    [TestCase(0, 1)]
+    [TestCase(8, 1)]
+    [TestCase(9, 2)]
+    [TestCase(99, 3)]
+    public void TestSubdividePreservesLevelOrderIndexWidthAndMembership(int levelCount, int indexWidth)
+    {
+        runIntegrationTest((realm, storage) =>
+        {
+            var levels = Enumerable.Range(1, levelCount).Reverse().Select(index => $"L{index}").ToArray();
+            var firstHash = new string('a', 32);
+            var secondHash = new string('b', 32);
+            var table = new global::osu.Game.Rulesets.BmsRuleset.Gameplay.DifficultyTable.DifficultyTable
+            {
+                Name = "Explicit Level Order",
+                Symbol = "T",
+                SourcePath = "explicit-level-order",
+                LevelOrder = ["missing", ..levels, ..levels.Take(1).Select(level => level.ToLowerInvariant())],
+                Entries = levels.SelectMany(level => new[]
+                {
+                    new TableEntry { Level = level.ToLowerInvariant(), Md5Hash = firstHash },
+                    new TableEntry { Level = level, Md5Hash = firstHash.ToUpperInvariant() },
+                    new TableEntry { Level = level, Md5Hash = secondHash },
+                }).Append(new TableEntry { Level = "unlisted", Md5Hash = new string('c', 32) }).ToList(),
+            };
+            var syncManager = new CollectionSyncManager();
+            var store = new DifficultyTableStore(null, Path.Combine(storage.GetFullPath(string.Empty), "dt-cache"), syncManager, realm);
+            var previousStore = BmsRulesetRuntime.DifficultyTableStore;
+            BmsRulesetRuntime.DifficultyTableStore = store;
+            try
+            {
+                store.AddTable(table);
+                syncManager.ToggleSubdivide(realm, table);
+                var expectedLevels = levels.Concat(levels.Take(1).Select(level => level.ToLowerInvariant())).ToArray();
+                var expectedNames = expectedLevels.Select((level, index) =>
+                    $"{CollectionSyncManager.COLLECTION_PREFIX}{table.Name} [{index.ToString($"D{indexWidth}")}] T{level}").ToArray();
+                var ids = realm.Run(r =>
+                {
+                    var collections = r.All<BeatmapCollection>().OrderBy(collection => collection.Name).ToArray();
+                    Assert.That(collections.Select(collection => collection.Name), Is.EqualTo(expectedNames));
+                    foreach (var collection in collections)
+                        Assert.That(collection.BeatmapMD5Hashes, Is.EqualTo(new[] { firstHash, secondHash }));
+                    return collections.Select(collection => collection.ID).ToArray();
+                });
+
+                table.Entries.Add(new TableEntry { Level = levels.FirstOrDefault() ?? "unlisted", Md5Hash = new string('d', 32) });
+                store.NotifyToRebuildTableList(null);
+                realm.Run(r =>
+                {
+                    var collections = r.All<BeatmapCollection>().OrderBy(collection => collection.Name).ToArray();
+                    Assert.That(collections.Select(collection => collection.ID), Is.EqualTo(ids));
+                    if (levelCount > 0)
+                    {
+                        Assert.That(collections[0].BeatmapMD5Hashes, Is.EqualTo(new[] { firstHash, secondHash, new string('d', 32) }));
+                        Assert.That(collections[^1].BeatmapMD5Hashes, Is.EqualTo(collections[0].BeatmapMD5Hashes));
+                    }
+                });
             }
             finally
             {

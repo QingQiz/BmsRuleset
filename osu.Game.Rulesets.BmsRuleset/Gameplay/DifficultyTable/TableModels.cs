@@ -29,8 +29,6 @@ public class TableEntry
 {
     public string Level { get; init; } = string.Empty;
 
-    public int LevelIndex { get; init; }
-
     public string Md5Hash { get; init; } = string.Empty;
 
     public string? Sha256Hash { get; init; }
