@@ -1,7 +1,6 @@
 using System;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
@@ -48,7 +47,7 @@ internal sealed partial class BmsResolvedNotePiece : CompositeDrawable
 
     private void setTextures(Texture[] textures)
     {
-        InternalChild = noteAnimation = createTextureDrawable(textures, true).With(d =>
+        InternalChild = noteAnimation = createTextureDrawable(textures).With(d =>
         {
             d.Anchor = Anchor.TopLeft;
             d.Origin = Anchor.TopLeft;
@@ -59,13 +58,7 @@ internal sealed partial class BmsResolvedNotePiece : CompositeDrawable
     {
         base.Update();
 
-        var texture = noteAnimation switch
-        {
-            BmsResolvedTextureAnimation animation when animation.FrameCount > 0 => animation.CurrentFrame,
-            Sprite sprite => sprite.Texture,
-            TextureAnimation animation when animation.FrameCount > 0 => animation.CurrentFrame,
-            _ => null,
-        };
+        var texture = (noteAnimation as Sprite)?.Texture;
 
         if (texture == null)
             return;
@@ -80,7 +73,7 @@ internal sealed partial class BmsResolvedNotePiece : CompositeDrawable
         noteAnimation?.Scale = Vector2.Divide(new Vector2(DrawWidth, noteWidth), Math.Max(1, texture.DisplayWidth));
     }
 
-    private static Drawable createTextureDrawable(Texture[] textures, bool looping)
+    private static Drawable createTextureDrawable(Texture[] textures)
     {
         if (textures.Length == 0)
             return Empty();
@@ -88,6 +81,6 @@ internal sealed partial class BmsResolvedNotePiece : CompositeDrawable
         if (textures.Length == 1)
             return new Sprite { Texture = textures[0] };
 
-        return new BmsResolvedTextureAnimation(textures) { Loop = looping };
+        return new BmsResolvedTextureAnimation(textures);
     }
 }

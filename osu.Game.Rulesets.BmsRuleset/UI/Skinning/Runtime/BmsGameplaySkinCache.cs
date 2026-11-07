@@ -15,7 +15,6 @@ internal sealed class BmsGameplaySkinCache : IDisposable
 {
     private readonly ISkinSource skin;
     private readonly Dictionary<BmsDrawableFactoryCacheKey, BmsResolvedDrawableFactory> drawableFactories = new();
-    private readonly Dictionary<BmsDrawableFactoryCacheKey, BmsResolvedNoteMetrics> noteMetrics = new();
     private readonly Dictionary<BmsLongNoteBodyCacheKey, BmsLongNoteBodyTextureSet?> longNoteBodyTextureSets = new();
     private readonly BmsLongNoteBodySource.BmsLongNoteBodyTextureCache rawLongNoteBodyTextures = new();
     private readonly object drawableLock = new();
@@ -96,19 +95,6 @@ internal sealed class BmsGameplaySkinCache : IDisposable
         return factory;
     }
 
-    public float GetNoteHeight(BmsSkinComponentLookup lookup, float drawWidth)
-    {
-        var key = BmsDrawableFactoryCacheKey.From(lookup);
-
-        if (!noteMetrics.TryGetValue(key, out var metrics))
-        {
-            metrics = BmsGameplaySkinMetricsResolver.ResolveNoteMetrics(skin, lookup);
-            noteMetrics[key] = metrics;
-        }
-
-        return metrics.HeightFor(drawWidth);
-    }
-
     public BmsLongNoteBodyTextureSet? GetLongNoteBodyTextureSet(BmsSkinComponentLookup lookup, IRenderer renderer)
     {
         var key = BmsLongNoteBodyCacheKey.From(lookup, renderer);
@@ -150,7 +136,6 @@ internal sealed class BmsGameplaySkinCache : IDisposable
     private void clearResources()
     {
         drawableFactories.Clear();
-        noteMetrics.Clear();
         longNoteBodyTextureSets.Clear();
         rawLongNoteBodyTextures.Clear();
     }

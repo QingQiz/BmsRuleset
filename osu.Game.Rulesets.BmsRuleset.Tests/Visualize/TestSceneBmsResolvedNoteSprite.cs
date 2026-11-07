@@ -22,13 +22,13 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 [HeadlessTest]
 public partial class TestSceneBmsResolvedNoteSprite : OsuTestScene
 {
-    [TestCase(20, 10, 1f, null)]
-    [TestCase(40, 20, 2f, null)]
-    [TestCase(1, 1, 1f, null)]
-    [TestCase(20, 10, 1f, 30f)]
-    [TestCase(40, 20, 2f, 30f)]
-    [TestCase(1, 1, 1f, 30f)]
-    public void TestStaticSpriteMatchesComposite(int width, int height, float textureScale, float? referenceWidth)
+    [TestCase(20, 10, 1f, null, 21f)]
+    [TestCase(40, 20, 2f, null, 21f)]
+    [TestCase(1, 1, 1f, null, 42f)]
+    [TestCase(20, 10, 1f, 30f, 15f)]
+    [TestCase(40, 20, 2f, 30f, 15f)]
+    [TestCase(1, 1, 1f, 30f, 30f)]
+    public void TestStaticSpriteMatchesComposite(int width, int height, float textureScale, float? referenceWidth, float expectedHeight)
     {
         const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
         var generate = typeof(Drawable).GetMethod("GenerateDrawNodeSubtree", flags)!
@@ -67,6 +67,7 @@ public partial class TestSceneBmsResolvedNoteSprite : OsuTestScene
         });
         AddUntilStep("skin hosts loaded", () => oldPiece.IsLoaded && direct.IsLoaded);
         AddStep("compare geometry and all draw buffers", compare);
+        AddAssert("skin dimensions determine actual height", () => direct.Height, () => Is.EqualTo(expectedHeight).Within(0.0001));
         AddStep("compare parent resizing", () =>
         {
             oldHost.Width = directHost.Width = 67.5f;

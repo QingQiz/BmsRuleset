@@ -48,8 +48,6 @@ public class BmsSkinningHelperTest
 
         public Dictionary<LegacyManiaSkinConfigurationLookups, string> StringConfigs { get; } = new();
 
-        public Dictionary<LegacyManiaSkinConfigurationLookups, float> FloatConfigs { get; } = new();
-
         public virtual Drawable GetDrawableComponent(ISkinComponentLookup lookup) => null;
 
         public virtual Texture GetTexture(string componentName, WrapMode wrapModeS, WrapMode wrapModeT)
@@ -66,15 +64,9 @@ public class BmsSkinningHelperTest
             where TLookup : notnull
             where TValue : notnull
         {
-            if (lookup is BmsSkinConfigurationLookup bmsLookup)
-            {
-                if (typeof(TValue) == typeof(string) && StringConfigs.TryGetValue(bmsLookup.Lookup, out var text))
-                    return SkinUtils.As<TValue>(new Bindable<string>(text));
-
-                if (typeof(TValue) == typeof(float) && FloatConfigs.TryGetValue(bmsLookup.Lookup, out var number))
-                    return SkinUtils.As<TValue>(new Bindable<float>(number));
-
-            }
+            if (lookup is BmsSkinConfigurationLookup bmsLookup
+                && typeof(TValue) == typeof(string) && StringConfigs.TryGetValue(bmsLookup.Lookup, out var text))
+                return SkinUtils.As<TValue>(new Bindable<string>(text));
 
             return null;
         }
@@ -344,46 +336,6 @@ public class BmsSkinningHelperTest
     }
 
     [Test]
-    public void TestGameplaySkinCacheReusesResolvedNoteHeight()
-    {
-        var skin = new CountingTextureSkin(renderer)
-        {
-            StringConfigs = { [LegacyManiaSkinConfigurationLookups.NoteImage] = "custom-note" },
-            TextureSizes =
-            {
-                ["custom-note"] = (20, 10),
-            },
-        };
-        var source = new TestSkinSource(skin);
-        using var cache = new BmsGameplaySkinCache(source);
-        var lookup = new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1);
-
-        Assert.That(cache.GetNoteHeight(lookup, 80), Is.EqualTo(40));
-        var lookupsAfterFirstResolve = skin.TextureLookups;
-
-        Assert.That(cache.GetNoteHeight(lookup, 80), Is.EqualTo(40));
-        Assert.That(skin.TextureLookups, Is.EqualTo(lookupsAfterFirstResolve));
-    }
-
-    [Test]
-    public void TestGameplaySkinCacheUsesTailTextureForTailHeight()
-    {
-        var skin = new CountingTextureSkin(renderer)
-        {
-            TextureSizes =
-            {
-                ["mania-note1"] = (20, 10),
-                ["mania-note1T"] = (20, 40),
-            },
-        };
-        var source = new TestSkinSource(skin);
-        using var cache = new BmsGameplaySkinCache(source);
-        var lookup = new BmsSkinComponentLookup(BmsSkinComponents.HoldNoteTail, BmsLayoutVariant.Bme7K, 1);
-
-        Assert.That(cache.GetNoteHeight(lookup, 20), Is.EqualTo(40));
-    }
-
-    [Test]
     public void TestGameplaySkinCacheWarmsLongNoteTexturesForBeatmapColumns()
     {
         var skin = new CountingTextureSkin(renderer)
@@ -613,40 +565,6 @@ public class BmsSkinningHelperTest
         var textures = BmsLegacyTextureResolver.ResolveNoteTextures(skin, lookup);
         Assert.That(textures, Has.Length.EqualTo(1));
         Assert.That(textures[0].DisplayWidth, Is.EqualTo(10));
-    }
-
-    [Test]
-    public void TestNoteSizingFallsBackToConfiguredReferenceWidthWhenTextureMissing()
-    {
-        var lookup = new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1);
-        var skin = new TestSkinSource(new TestSkin(renderer)
-        {
-            FloatConfigs = { [LegacyManiaSkinConfigurationLookups.WidthForNoteHeightScale] = 30 },
-        });
-
-        Assert.That(BmsGameplaySkinMetricsResolver.ResolveNoteHeight(skin, lookup, 80), Is.EqualTo(30));
-    }
-
-    [Test]
-    public void TestNoteSizingUsesConfiguredReferenceWidthNotDrawWidth()
-    {
-        var lookup = new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1);
-        var skin = new TestSkinSource(new TestSkin(renderer)
-        {
-            TextureSizes = { ["custom-note"] = (20, 10) },
-            StringConfigs = { [LegacyManiaSkinConfigurationLookups.NoteImage] = "custom-note" },
-            FloatConfigs = { [LegacyManiaSkinConfigurationLookups.WidthForNoteHeightScale] = 30 },
-        });
-
-        Assert.That(BmsGameplaySkinMetricsResolver.ResolveNoteHeight(skin, lookup, 80), Is.EqualTo(15));
-    }
-
-    [Test]
-    public void TestNoteSizingUsesDefaultWhenNoTextureOrReferenceWidthExists()
-    {
-        var lookup = new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1);
-
-        Assert.That(BmsGameplaySkinMetricsResolver.ResolveNoteHeight(new TestSkinSource(new TestSkin(renderer)), lookup, 80), Is.EqualTo(BmsGameplaySkinMetricsResolver.DEFAULT_NOTE_HEIGHT));
     }
 
     [Test]

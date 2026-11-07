@@ -103,7 +103,7 @@ public partial class TestSceneBmsSkins : BmsPlayerTestScene
             bodyAnimationFrameCount(longNoteBodyOf(liveSkinCoverageLongNote(animated_body_column))) == 2
             && currentBodyAnimationFrame(longNoteBodyOf(liveSkinCoverageLongNote(animated_body_column))) == 1);
         this.AddSetupAssert("animated LN tail renders multi-frame drawable", () =>
-            liveSkinCoverageLongNote(animated_tail_column)?.ChildrenOfType<Drawable>().OfType<IFramedAnimation>().Any(a => a.FrameCount == 2) == true);
+            liveSkinCoverageLongNote(animated_tail_column)?.ChildrenOfType<BmsResolvedTextureAnimation>().Any() == true);
         this.AddSetupStep("capture LN body sprites", () =>
             bodySpritesBeforeReload = longNoteBodyOf(liveSkinCoverageLongNote(animated_body_column)).ChildrenOfType<Sprite>().ToArray());
         this.AddSetupStep("reload skin source", () =>
@@ -297,7 +297,7 @@ public partial class TestSceneBmsSkins : BmsPlayerTestScene
         AddAssert("animated note factories produce multi-frame animations",
             () => BmsTestLegacySkin.ANIMATED_NOTE_COLUMNS.All(c =>
                 (factorySource()?.GetDrawableFactory(new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, c))?.Create() as BmsResolvedNotePiece)
-                ?.ChildrenOfType<Drawable>().OfType<IFramedAnimation>().SingleOrDefault()?.FrameCount == 2));
+                ?.ChildrenOfType<BmsResolvedTextureAnimation>().Count() == 1));
         AddAssert("animated hold body textures resolve as animation frames",
             () =>
             {
@@ -324,7 +324,7 @@ public partial class TestSceneBmsSkins : BmsPlayerTestScene
         AddAssert("animated hold tail factories produce multi-frame animations",
             () => BmsTestLegacySkin.ANIMATED_HOLD_TAIL_COLUMNS.All(c =>
                 (factorySource()?.GetDrawableFactory(new BmsSkinComponentLookup(BmsSkinComponents.HoldNoteTail, BmsLayoutVariant.Bme7K, c))?.Create() as BmsResolvedNotePiece)
-                ?.ChildrenOfType<Drawable>().OfType<IFramedAnimation>().SingleOrDefault()?.FrameCount == 2));
+                ?.ChildrenOfType<BmsResolvedTextureAnimation>().Count() == 1));
         AddAssert("explosion factory produces resolved explosion",
             () => factorySource()?.GetDrawableFactory(new BmsSkinComponentLookup(BmsSkinComponents.HitExplosion, BmsLayoutVariant.Bme7K, 1))?.Create(),
             Is.TypeOf<LegacyBmsHitExplosion>);

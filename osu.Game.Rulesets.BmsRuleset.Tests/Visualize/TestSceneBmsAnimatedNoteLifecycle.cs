@@ -1,13 +1,15 @@
 #nullable enable
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Sprites;
+using osu.Framework.Graphics.Textures;
 using osu.Framework.Testing;
+using osu.Framework.Timing;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
@@ -119,7 +121,7 @@ public partial class TestSceneBmsAnimatedNoteLifecycle : BmsPlayerTestScene
         AddStep("animated children released", () => Assert.That(finalAnimations.All(isDisposed), Is.True));
 
         Drawable[] animations() => notes.SelectMany(n => n.ChildrenOfType<BmsResolvedNotePiece>())
-            .SelectMany(p => p.ChildrenOfType<Drawable>()).Where(d => d is IFramedAnimation).ToArray();
+            .SelectMany(p => p.ChildrenOfType<Drawable>()).Where(d => d is BmsResolvedTextureAnimation).ToArray();
 
         void checkFrames()
         {
@@ -127,18 +129,22 @@ public partial class TestSceneBmsAnimatedNoteLifecycle : BmsPlayerTestScene
             Assert.That(children, Has.Length.EqualTo(3));
             foreach (var child in children)
             {
-                var animation = (IFramedAnimation)child;
-                Assert.That(animation.FrameCount, Is.EqualTo(2));
-                for (var index = 0; index < 2; index++)
+                var manual = new ManualClock();
+                var clock = new FramedClock(manual);
+                var previousClock = child.Clock;
+                child.Clock = clock;
+                var frames = new HashSet<Texture>();
+                for (var index = 0; index < 4; index++)
                 {
-                    animation.GotoAndStop(index);
+                    manual.CurrentTime += 17;
+                    clock.ProcessFrame();
                     // The parent scales using the prior frame; check after both sides of
                     // that existing update ordering have consumed the new frame.
                     for (var update = 0; update < 3; update++)
                         foreach (var note in notes) note.UpdateSubTree();
-                    Assert.That(animation.CurrentFrameIndex, Is.EqualTo(index));
-                    var sprite = child as Sprite ?? child.ChildrenOfType<Sprite>().Single();
+                    var sprite = (Sprite)child;
                     Assert.That(sprite.Texture, Is.Not.Null);
+                    frames.Add(sprite.Texture);
                     for (var slot = 0; slot < 3; slot++)
                     {
                         var node = generate(sprite, ++frame, slot, false)!;
@@ -149,6 +155,8 @@ public partial class TestSceneBmsAnimatedNoteLifecycle : BmsPlayerTestScene
                         Assert.That(coordinates.All(float.IsFinite), Is.True);
                     }
                 }
+                child.Clock = previousClock;
+                Assert.That(frames, Has.Count.EqualTo(2));
             }
         }
     }

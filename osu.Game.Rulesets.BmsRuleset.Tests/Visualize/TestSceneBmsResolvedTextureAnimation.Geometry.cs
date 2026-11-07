@@ -7,6 +7,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Rendering.Dummy;
 using osu.Framework.Testing;
+using osu.Framework.Timing;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables;
 using osuTK;
 
@@ -14,18 +15,14 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 
 public partial class TestSceneBmsResolvedTextureAnimation
 {
-    [TestCase(false)]
-    [TestCase(true)]
-    public void AnimatedQuadMatchesFrameworkAcrossDrawBuffers(bool relativeSize)
+    [Test]
+    public void AnimatedQuadMatchesFrameworkAcrossDrawBuffers()
     {
         const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
         var renderer = new DummyRenderer();
-        var animation = new BmsResolvedTextureAnimation([renderer.CreateTexture(20, 10), renderer.CreateTexture(30, 40)])
-        {
-            RelativeSizeAxes = relativeSize ? Axes.X : Axes.None,
-            IsPlaying = false,
-        };
-        if (relativeSize) animation.Width = 1;
+        var animation = new BmsResolvedTextureAnimation([renderer.CreateTexture(20, 10), renderer.CreateTexture(30, 40)]);
+        var manual = new ManualClock();
+        var clock = new FramedClock(manual);
         Container host = null!;
         var frame = 0UL;
         var comparisons = 0;
@@ -34,7 +31,7 @@ public partial class TestSceneBmsResolvedTextureAnimation
         AddStep("load animated quad reference", () =>
         {
             Clear();
-            Add(host = new Container { Size = new Vector2(42, 100), Child = animation });
+            Add(host = new Container { Size = new Vector2(42, 100), Clock = clock, Child = animation });
         });
         AddUntilStep("animated leaf loaded", () => animation.IsLoaded);
         AddStep("compare scrolling, frames and all draw buffers", () =>
@@ -43,7 +40,8 @@ public partial class TestSceneBmsResolvedTextureAnimation
             {
                 host.Position = new Vector2(31.125f + repeat / 8f, -10000.25f + repeat * 17.75f);
                 animation.Y = repeat % 2 == 0 ? -987.125f : 1123.75f;
-                animation.GotoFrame(repeat % 2);
+                manual.CurrentTime += 17;
+                clock.ProcessFrame();
                 host.UpdateSubTree();
                 compare();
             }

@@ -60,14 +60,6 @@ public static class BmsLegacyTextureResolver
         return [];
     }
 
-    /// <summary>
-    /// Resolves the first valid note texture for the given component.
-    /// Convenience wrapper around <see cref="ResolveNoteTextures"/> for callers that only
-    /// need a single texture's dimensions rather than a full animation frame set.
-    /// </summary>
-    public static Texture? ResolveNoteTexture(ISkin skin, BmsSkinComponentLookup lookup)
-        => ResolveNoteTextures(skin, lookup).FirstOrDefault();
-
     public static IEnumerable<string?> HoldBodyImageCandidates(ISkin skin, BmsSkinComponentLookup lookup)
     {
         var fallback = FallbackColumnIndex(lookup);
