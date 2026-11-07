@@ -80,23 +80,12 @@ public static class BmsReplayArchive
             : new MemoryStream(data);
         using var reader = new StreamReader(input, Encoding.UTF8);
         var json = reader.ReadToEnd();
-        var version = 0;
-        var algorithm = BmsJudgementAlgorithm.Combo;
-        BmsReplayFrame[] frames;
-        if (json.TrimStart().StartsWith('['))
-            frames = (json.Deserialize<List<InputFrame?>>() ?? []).OfType<InputFrame>()
-                .Select(frame => new BmsReplayFrame(frame.Time, frame.Actions ?? [])).ToArray();
-        else
-        {
-            var payload = json.Deserialize<Payload>() ?? new Payload();
-            version = payload.Version;
-            algorithm = payload.Algorithm;
-            // Old archives contribute input only; their result ledgers are never restored.
-            frames = (payload.Frames ?? []).OfType<InputFrame>().Where(frame => frame.Time != -1000000000)
-                .Select(frame => new BmsReplayFrame(frame.Time, frame.Actions ?? [])).ToArray();
-            if (frames.Length > 0 && payload.LegacyFrameTimes is { Length: > 0 } times && times[^1] != frames[^1].Time)
-                frames = [.. frames, new BmsReplayFrame(times[^1], frames[^1].Actions.ToArray())];
-        }
+        var payload = json.Deserialize<Payload>() ?? new Payload();
+        var version = payload.Version;
+        var algorithm = payload.Algorithm;
+        // Old archives contribute input only; their result ledgers are never restored.
+        var frames = (payload.Frames ?? []).OfType<InputFrame>().Where(frame => frame.Time != -1000000000)
+            .Select(frame => new BmsReplayFrame(frame.Time, frame.Actions ?? [])).ToArray();
 
         frames = operationFrames(frames).ToArray();
         if (version < 5 && scoreInfo.BeatmapInfo is { Ruleset.ShortName: Constant.SHORT_NAME, Hash.Length: >= 2 } beatmapInfo
@@ -155,9 +144,5 @@ public static class BmsReplayArchive
         public BmsJudgementAlgorithm Algorithm { get; init; }
 
         public InputFrame?[]? Frames { get; init; }
-
-        // Only the old recording's endpoint is needed; intermediate samples are never restored.
-        [JsonProperty("frame_times")]
-        public double[]? LegacyFrameTimes { get; init; }
     }
 }

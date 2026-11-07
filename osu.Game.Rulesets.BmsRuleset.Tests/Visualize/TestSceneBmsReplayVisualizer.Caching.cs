@@ -7,17 +7,20 @@ using System.Reflection;
 using NUnit.Framework;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
+using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
+using osu.Game.Rulesets.Scoring;
 using osuTK;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 
 public partial class TestSceneBmsReplayVisualizer
 {
-    private IEnumerable<BmsReplayVisualizer.TimelineRectangle> cachedRectangles()
+    private IEnumerable<BmsReplayVisualizer.TimelineRectangle> cachedRectangles(BmsReplayVisualizer? target = null)
     {
-        _ = visualizer.Plot.GeometryVersion;
-        return visualizer.Plot.Timeline!.Blocks.SelectMany(block => block.Rectangles);
+        target ??= visualizer;
+        _ = target.Plot.GeometryVersion;
+        return target.Plot.Timeline!.Blocks.SelectMany(block => block.Rectangles);
     }
 
     [Test]
@@ -93,7 +96,7 @@ public partial class TestSceneBmsReplayVisualizer
         seek(500);
         AddStep("remember cached blocks", () =>
         {
-            _ = primitives();
+            _ = visualizer.Plot.GeometryVersion;
             blocks = visualizer.Plot.Timeline!.Blocks.ToArray();
             versions = blocks.Select(block => block.Version).ToArray();
         });
@@ -103,7 +106,8 @@ public partial class TestSceneBmsReplayVisualizer
         seek(1025);
         AddStep("judgement changes cached note colour", () =>
         {
-            var expected = primitives().First(rectangle => rectangle.Kind == BmsReplayVisualizer.PlotElementKind.Note).Colour;
+            _ = visualizer.Plot.GeometryVersion;
+            var expected = (Colour4)BmsHitResultColours.ForHitResult(HitResult.Great);
             var note = visualizer.Plot.Timeline!.Blocks.SelectMany(block => block.Rectangles)
                 .Single(rectangle => rectangle.Kind == BmsReplayVisualizer.TimelineKind.Note && rectangle.TopTime == 1000);
             Assert.That(note.Colour, Is.EqualTo(expected));

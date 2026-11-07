@@ -215,11 +215,10 @@ public class BmsReplayArchiveTest
                 new JObject { ["time"] = 1020.125, ["actions"] = new JArray((int)BmsAction.Key1) },
                 new JObject { ["time"] = 1020.125, ["actions"] = new JArray() },
                 new JObject { ["time"] = 1020.125, ["actions"] = new JArray((int)BmsAction.Key1) },
+                new JObject { ["time"] = 5000.375, ["actions"] = new JArray((int)BmsAction.Key1) },
             },
             ["judgement_events"] = "deliberately not a judgement ledger",
             ["gauge_history"] = "deliberately not a gauge history",
-            ["input_indices"] = "unused old compaction data",
-            ["frame_times"] = new JArray(0, 20, 1000.125, 1020.125, 1020.125, 1020.125, 5000.375),
         };
         var restored = read(encode(payload.ToString(), compressed));
         var frames = restored.Replay.Frames.Cast<BmsReplayFrame>().ToArray();
@@ -239,15 +238,6 @@ public class BmsReplayArchiveTest
         var restored = read("""{"version":1,"has_received_all_frames":true}"""u8.ToArray());
         Assert.That(restored.Replay.Frames, Is.Empty);
         Assert.That(restored.ScoreInfo.HitEvents, Is.Empty);
-    }
-
-    [Test]
-    public void TestBareInputArraysRemainReadable()
-    {
-        var restored = read("""[{"time":0,"actions":[]},{"time":1000,"actions":[0]}]"""u8.ToArray());
-        Assert.That(restored.Replay.Frames.Select(frame => frame.Time), Is.EqualTo(new double[] { 0, 1000 }));
-        Assert.That(BmsReplayFrame.GetAlgorithm(restored.Replay), Is.EqualTo(BmsJudgementAlgorithm.Combo));
-        Assert.That(BmsReplayFrame.GetVersion(restored.Replay), Is.Zero);
     }
 
     [Test]

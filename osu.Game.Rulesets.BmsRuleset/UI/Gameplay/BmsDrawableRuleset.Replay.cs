@@ -1,10 +1,8 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using osu.Framework.Graphics;
 using osu.Framework.Testing;
-using osu.Framework.Timing;
 using osu.Game.Input.Handlers;
 using osu.Game.Replays;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
@@ -29,37 +27,6 @@ public partial class BmsDrawableRuleset
         if (FrameStableClock is FrameStabilityContainer { ReplayInputHandler: BmsFramedReplayInputHandler handler })
             handler.RequestSeek();
     }
-
-    private void configureReplayClock()
-    {
-        if (FrameStableClock is not FrameStabilityContainer stability)
-            return;
-
-        ref var reference = ref frameStabilityReferenceClock(stability);
-        if (reference == null)
-            return;
-        if (reference is StreamingReplayClock previous)
-            reference = previous.Source;
-        if (ReplayScore?.Replay is { HasReceivedAllFrames: false } replay)
-            reference = new StreamingReplayClock(reference, replay, stability.CurrentTime);
-    }
-
-    // Frame stability updates its exposed clock even when the replay returns no usable time.
-    // Bound its reference so waiting for streamed input cannot advance visuals beyond known state.
-    private sealed class StreamingReplayClock(IClock source, Replay replay, double emptyTime) : IClock
-    {
-        internal IClock Source { get; } = source;
-
-        public double CurrentTime => replay.HasReceivedAllFrames ? Source.CurrentTime
-            : Math.Min(Source.CurrentTime, replay.Frames.Count > 0 ? replay.Frames[^1].Time : emptyTime);
-
-        public double Rate => Source.Rate;
-
-        public bool IsRunning => Source.IsRunning;
-    }
-
-    [UnsafeAccessor(UnsafeAccessorKind.Field, Name = "referenceClock")]
-    private static extern ref IClock frameStabilityReferenceClock(FrameStabilityContainer stability);
 
     protected override ReplayInputHandler CreateReplayInputHandler(Replay replay)
     {

@@ -93,7 +93,7 @@ public sealed partial class BmsReplayVisualizer : BmsHudComponent
             Children =
             [
                 background,
-                Plot = new PlotLayer(prepareGeometry) { RelativeSizeAxes = Axes.Both, InspectGeometry = inspectGeometry },
+                Plot = new PlotLayer(prepareGeometry) { RelativeSizeAxes = Axes.Both },
             ],
         };
         BackgroundOpacity.BindValueChanged(change => background.Alpha = change.NewValue, true);
@@ -207,29 +207,18 @@ public sealed partial class BmsReplayVisualizer : BmsHudComponent
         }
 
         Plot.Timeline = null;
-        buildGeometry(geometry, true);
+        buildGeometry(geometry);
     }
 
-    private GeometryState? inspectedGeometry;
-
-    private void inspectGeometry()
+    private void buildGeometry(GeometryState geometry)
     {
-        if (preparedGeometry is not { } geometry || inspectedGeometry == geometry)
-            return;
-
-        buildGeometry(geometry, false);
-    }
-
-    private void buildGeometry(GeometryState geometry, bool invalidate)
-    {
-        inspectedGeometry = geometry;
         var now = geometry.Time;
         var range = geometry.Range * 1000;
         var firstTime = now - range * (1 - judgement_line);
         var lastTime = now + range * judgement_line;
         var processor = scoreProcessor as BmsScoreProcessor;
         judgements.Update(processor?.JudgementEvents);
-        Plot.Clear(invalidate);
+        Plot.Clear();
 
         var columnWidth = DrawWidth / columnCount;
         foreach (var lane in geometry.ShowNotes ? notes : geometry.ShowInputs ? longNotes : [])
@@ -273,7 +262,7 @@ public sealed partial class BmsReplayVisualizer : BmsHudComponent
         }
 
         rectangle(0, DrawHeight * judgement_line - 0.5f, DrawWidth, 1, Colour4.White, PlotElementKind.Judgement);
-        Plot.Commit(invalidate);
+        Plot.Commit();
     }
 
     private void drawInput(InputStroke stroke, double now, double range, float columnWidth)

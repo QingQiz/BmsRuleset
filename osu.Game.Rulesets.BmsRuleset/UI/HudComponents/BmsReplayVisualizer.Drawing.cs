@@ -33,7 +33,6 @@ public sealed partial class BmsReplayVisualizer
 
     internal sealed partial class PlotLayer(Action? prepareGeometry = null) : Drawable, ITexturedShaderDrawable
     {
-        internal Action? InspectGeometry;
         private readonly List<PlotRectangle> rectangles = [];
         private Texture texture = null!;
         private PlotShaderManager? plotShaders;
@@ -45,7 +44,6 @@ public sealed partial class BmsReplayVisualizer
             get
             {
                 prepareGeometry?.Invoke();
-                InspectGeometry?.Invoke();
                 return rectangles;
             }
         }

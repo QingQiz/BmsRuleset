@@ -7,7 +7,6 @@ using osu.Framework.Input.Events;
 using osu.Framework.Input.States;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
-using osu.Game.Replays;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
@@ -25,7 +24,6 @@ using osu.Game.Screens.Play.HUD;
 using osu.Game.Screens.Play.HUD.JudgementCounter;
 using osu.Game.Skinning;
 using osu.Game.Tests.Visual;
-using osu.Game.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 
@@ -35,15 +33,12 @@ public partial class TestSceneBmsReplayRebuild : BmsPlayerTestScene
     private BmsLayoutVariant layout;
     private bool scratchReplay;
     private bool disableFailure;
-    private bool streaming;
     private bool emptyReplay;
 
     [SetUp]
-    public void ResetReplayMode() => streaming = emptyReplay = false;
+    public void ResetReplayMode() => emptyReplay = false;
 
-    protected override TestPlayer CreatePlayer(Ruleset ruleset) => streaming
-        ? new StreamingPlayer(BmsTestSkins.CreateSkinSource(BmsTestSkins.SkinKind.Argon, this), createReplayFrames())
-        : disableFailure
+    protected override TestPlayer CreatePlayer(Ruleset ruleset) => disableFailure
         ? new FailurePolicyPlayer(BmsTestSkins.CreateSkinSource(BmsTestSkins.SkinKind.Argon, this), _ => createReplayFrames())
         : CreateBmsPlayer(_ => createReplayFrames());
 
@@ -295,96 +290,6 @@ public partial class TestSceneBmsReplayRebuild : BmsPlayerTestScene
         }
     }
 
-    [Test]
-    public void StreamingSeeksMatchCompleteReplay(
-        [Values(BmsLongNoteMode.LongNote, BmsLongNoteMode.ChargeNote, BmsLongNoteMode.HellChargeNote)] BmsLongNoteMode mode,
-        [Values] bool scratch)
-    {
-        var snapshots = new Dictionary<double, string>();
-        loadReplay(false);
-        foreach (var time in new[] { 1000d, 1500, 3000, 4100 })
-        {
-            AddStep("capture complete replay", () =>
-            {
-                SeekReplayInFrames(time);
-                snapshots[time] = snapshot();
-            });
-        }
-
-        loadReplay(true);
-        AddStep("seek beyond available frames", () =>
-        {
-            jump(4100, 1500);
-            Assert.That(snapshot(), Is.EqualTo(snapshots[1500]));
-            Player.DrawableRuleset.UpdateSubTree();
-            Assert.That(Player.DrawableRuleset.FrameStableClock.CurrentTime, Is.EqualTo(1500));
-            Assert.That(snapshot(), Is.EqualTo(snapshots[1500]));
-        });
-        AddStep("receive through first equal-time frame", () =>
-        {
-            var replay = ((StreamingPlayer)Player).Stream;
-            foreach (var frame in createReplayFrames().Skip(replay.Frames.Count))
-            {
-                replay.Frames.Add(frame);
-                if (frame.Time == 3000) break;
-            }
-            Player.DrawableRuleset.UpdateSubTree();
-            Assert.That(Player.DrawableRuleset.FrameStableClock.CurrentTime, Is.EqualTo(3000));
-            Assert.That(((BmsColumn)Playfield.Stage.Columns[scratch ? 0 : 1]).Judgements.PressedDirections, Is.Zero);
-        });
-        AddStep("receive another frame at the same timestamp", () =>
-        {
-            var replay = ((StreamingPlayer)Player).Stream;
-            replay.Frames.Add(createReplayFrames()[replay.Frames.Count]);
-            Player.DrawableRuleset.UpdateSubTree();
-            Assert.That(Player.DrawableRuleset.FrameStableClock.CurrentTime, Is.EqualTo(3000));
-            Assert.That(snapshot(), Is.EqualTo(snapshots[3000]));
-        });
-        AddStep("rewind and seek forward while streaming", () =>
-        {
-            jump(1000, 1000);
-            Assert.That(snapshot(), Is.EqualTo(snapshots[1000]));
-            jump(4100, 3000);
-            Assert.That(snapshot(), Is.EqualTo(snapshots[3000]));
-        });
-        AddStep("finish receiving and reach the original target", () =>
-        {
-            var replay = ((StreamingPlayer)Player).Stream;
-            replay.Frames.AddRange(createReplayFrames().Skip(replay.Frames.Count));
-            replay.HasReceivedAllFrames = true;
-            Player.DrawableRuleset.UpdateSubTree();
-            Assert.That(Player.DrawableRuleset.FrameStableClock.CurrentTime, Is.EqualTo(4100));
-            Assert.That(snapshot(), Is.EqualTo(snapshots[4100]));
-        });
-
-        void jump(double target, double expected)
-        {
-            Player.GameplayClockContainer.Stop();
-            Player.GameplayClockContainer.Seek(target);
-            Player.DrawableRuleset.UpdateSubTree();
-            Assert.That(Player.DrawableRuleset.FrameStableClock.CurrentTime, Is.EqualTo(expected));
-        }
-
-        void loadReplay(bool stream)
-        {
-            AddStep("load replay", () =>
-            {
-                layout = BmsLayoutVariant.Bme7K;
-                scratchReplay = scratch;
-                disableFailure = false;
-                streaming = stream;
-                Mod noteMode = mode switch
-                {
-                    BmsLongNoteMode.ChargeNote => new BmsModChargeNote(),
-                    BmsLongNoteMode.HellChargeNote => new BmsModHellChargeNote(),
-                    _ => new BmsModLongNote(),
-                };
-                LoadPlayer([noteMode, new BmsModAutoGauge()]);
-            });
-            AddUntilStep("player loaded", () => Player.IsLoaded && Player.LoadedBeatmapSuccessfully && Player.Alpha == 1);
-        }
-    }
-
     private void verifyRebuilds(double[] times)
     {
         var snapshots = new Dictionary<double, string>();
@@ -446,11 +351,4 @@ public partial class TestSceneBmsReplayRebuild : BmsPlayerTestScene
         protected override bool CheckModsAllowFailure() => false;
     }
 
-    private sealed partial class StreamingPlayer(ISkinSource skin, IList<ReplayFrame> frames)
-        : BmsTestSkins.SkinnedTestPlayer(skin, null)
-    {
-        internal Replay Stream { get; } = new() { HasReceivedAllFrames = false, Frames = [.. frames.TakeWhile(frame => frame.Time <= 1500)] };
-
-        protected override void PrepareReplay() => DrawableRuleset.SetReplayScore(new Score { Replay = Stream });
-    }
 }

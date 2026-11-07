@@ -3,6 +3,7 @@ using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Primitives;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
@@ -73,7 +74,7 @@ public partial class TestSceneBmsReplayVisualizer : BmsPlayerTestScene
     [TestCase(BmsLayoutVariant.Bme7K2P)]
     [TestCase(BmsLayoutVariant.Bme7KDouble)]
     [TestCase(BmsLayoutVariant.Pms9KDouble)]
-    public void TestReplaySeekingPauseAndSettings(BmsLayoutVariant variant)
+    public void TestGradientReplaySeekingPauseAndSettings(BmsLayoutVariant variant)
     {
         AddStep("set layout and load player", () =>
         {
@@ -87,6 +88,7 @@ public partial class TestSceneBmsReplayVisualizer : BmsPlayerTestScene
             Anchor = Anchor.Centre,
             Origin = Anchor.Centre,
             Size = new Vector2(360, 480),
+            Colour = ColourInfo.GradientHorizontal(Colour4.Cyan, Colour4.White),
         }));
         AddUntilStep("visualizer loaded", () => visualizer.IsLoaded);
 
@@ -217,8 +219,16 @@ public partial class TestSceneBmsReplayVisualizer : BmsPlayerTestScene
         AddStep("freeze live time source", () =>
             typeof(GameplayClockContainer).GetMethod("StopGameplayClock", BindingFlags.Instance | BindingFlags.NonPublic)!
                                           .Invoke(Player.GameplayClockContainer, null));
-        AddStep("add live visualizer", () => Player.HUDOverlay.Add(visualizer = new BmsReplayVisualizer()));
-        AddUntilStep("visualizer loaded", () => visualizer.IsLoaded);
+        BmsReplayVisualizer cachedVisualizer = null!;
+        AddStep("add both rendering modes", () =>
+        {
+            Player.HUDOverlay.Add(visualizer = new BmsReplayVisualizer
+            {
+                Colour = ColourInfo.GradientHorizontal(Colour4.Cyan, Colour4.White),
+            });
+            Player.HUDOverlay.Add(cachedVisualizer = new BmsReplayVisualizer());
+        });
+        AddUntilStep("visualizers loaded", () => visualizer.IsLoaded && cachedVisualizer.IsLoaded);
         seek(1000);
         AddStep("press and release between HUD frames", () =>
         {
@@ -229,32 +239,32 @@ public partial class TestSceneBmsReplayVisualizer : BmsPlayerTestScene
         AddAssert("short live press displayed and coloured", () => primitives().Count(drawable =>
             drawable.Kind == BmsReplayVisualizer.PlotElementKind.Input && !drawable.Outline &&
             drawable.Colour == (Colour4)BmsHitResultColours.ForHitResult(HitResult.Perfect)) == 1);
-        AddAssert("cached short press matches", () => cachedRectangles().Count(rectangle =>
+        AddAssert("cached short press matches", () => cachedRectangles(cachedVisualizer).Count(rectangle =>
             rectangle.Kind == BmsReplayVisualizer.TimelineKind.Input && rectangle.TopTime == 1000 && rectangle.BottomTime == 1000 &&
             rectangle.Colour == (Colour4)BmsHitResultColours.ForHitResult(HitResult.Perfect)) == 1);
         seek(2000);
-        AddStep("hide notes before long note input", () => visualizer.ShowNotes.Value = false);
-        AddStep("hide during long note input", () => visualizer.Alpha = 0);
+        AddStep("hide notes before long note input", () => visualizer.ShowNotes.Value = cachedVisualizer.ShowNotes.Value = false);
+        AddStep("hide during long note input", () => visualizer.Alpha = cachedVisualizer.Alpha = 0);
         AddStep("hold long note", () =>
             ((BmsInputManager)((BmsDrawableRuleset)Player.DrawableRuleset).KeyBindingInputManager).KeyBindingContainer.TriggerPressed(BmsAction.Key2));
-        AddStep("show long note input", () => visualizer.Alpha = 1);
+        AddStep("show long note input", () => visualizer.Alpha = cachedVisualizer.Alpha = 1);
         AddAssert("hidden note still colours held input immediately", () => primitives().Any(drawable =>
             drawable.Kind == BmsReplayVisualizer.PlotElementKind.Input &&
             Math.Abs(drawable.Bounds.Y + 1.5f - visualizer.DrawHeight * 0.25f) < 0.001f &&
             drawable.Colour == (Colour4)BmsHitResultColours.ForHitResult(HitResult.Perfect)) &&
             primitives().All(drawable => drawable.Kind is BmsReplayVisualizer.PlotElementKind.Input or BmsReplayVisualizer.PlotElementKind.Judgement));
-        AddAssert("cached hidden-note hold coloured immediately", () => cachedRectangles().Any(rectangle =>
+        AddAssert("cached hidden-note hold coloured immediately", () => cachedRectangles(cachedVisualizer).Any(rectangle =>
             rectangle.Kind == BmsReplayVisualizer.TimelineKind.HeldInput && rectangle.BottomTime == 2000 &&
             rectangle.Colour == (Colour4)BmsHitResultColours.ForHitResult(HitResult.Perfect)) &&
-            cachedRectangles().All(rectangle => rectangle.Kind is BmsReplayVisualizer.TimelineKind.Input or
+            cachedRectangles(cachedVisualizer).All(rectangle => rectangle.Kind is BmsReplayVisualizer.TimelineKind.Input or
                 BmsReplayVisualizer.TimelineKind.HeldInput or BmsReplayVisualizer.TimelineKind.Fixed));
-        AddStep("show notes", () => visualizer.ShowNotes.Value = true);
+        AddStep("show notes", () => visualizer.ShowNotes.Value = cachedVisualizer.ShowNotes.Value = true);
         AddAssert("head coloured before tail", () => primitives().Any(drawable =>
             drawable.Outline && drawable.Bounds.Height > 20 && drawable.Colour == (Colour4)BmsHitResultColours.ForHitResult(HitResult.Perfect)));
-        AddAssert("cached head and connection match", () => cachedRectangles().Any(rectangle =>
+        AddAssert("cached head and connection match", () => cachedRectangles(cachedVisualizer).Any(rectangle =>
             rectangle.Kind == BmsReplayVisualizer.TimelineKind.LongNote && rectangle.BottomTime == 2000 && rectangle.TopTime == 3000 &&
             rectangle.Colour == (Colour4)BmsHitResultColours.ForHitResult(HitResult.Perfect)) &&
-            cachedRectangles().Any(rectangle => rectangle.Kind == BmsReplayVisualizer.TimelineKind.Connection && rectangle.TopTime == 2000));
+            cachedRectangles(cachedVisualizer).Any(rectangle => rectangle.Kind == BmsReplayVisualizer.TimelineKind.Connection && rectangle.TopTime == 2000));
         seek(2100);
         AddAssert("held input is a filled rectangle reaching current time", () => primitives().Any(drawable =>
             drawable.Kind == BmsReplayVisualizer.PlotElementKind.Input && !drawable.Outline && drawable.Bounds.Height > 10 &&
@@ -271,9 +281,9 @@ public partial class TestSceneBmsReplayVisualizer : BmsPlayerTestScene
         });
         AddStep("release long note", () =>
             ((BmsInputManager)((BmsDrawableRuleset)Player.DrawableRuleset).KeyBindingInputManager).KeyBindingContainer.TriggerReleased(BmsAction.Key2));
-        AddAssert("cached release replaces held rectangle across buckets", () => cachedRectangles().Any(rectangle =>
+        AddAssert("cached release replaces held rectangle across buckets", () => cachedRectangles(cachedVisualizer).Any(rectangle =>
             rectangle.Kind == BmsReplayVisualizer.TimelineKind.Input && rectangle.TopTime == 15000 && rectangle.BottomTime == 2000) &&
-            cachedRectangles().All(rectangle => rectangle.Kind != BmsReplayVisualizer.TimelineKind.HeldInput));
+            cachedRectangles(cachedVisualizer).All(rectangle => rectangle.Kind != BmsReplayVisualizer.TimelineKind.HeldInput));
     }
 
     private BmsReplayVisualizer.PlotRectangle[] primitives() => visualizer.Plot.Rectangles.ToArray();

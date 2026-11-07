@@ -124,7 +124,6 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
     public override void SetReplayScore(Score? replayScore)
     {
         base.SetReplayScore(replayScore);
-        configureReplayClock();
 
         updateJudgementAlgorithm();
         if (IsLoaded) restoreReplayHealth();
@@ -168,7 +167,6 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
     protected override void LoadComplete()
     {
         base.LoadComplete();
-        configureReplayClock();
         restoreReplayHealth();
         gameplayEvents.ReplaySeeked += synchroniseReplayState;
         if (gameplayClockContainer != null)
