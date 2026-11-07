@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace osu.Game.Rulesets.BmsRuleset.BmsParser;
 
 // Import needs note times without building gameplay scroll segments. Both paths share this
-// projection so coincident BPM/STOP events and lead-in offsets keep identical semantics.
+// projection so coincident BPM/STOP events keep identical semantics.
 internal readonly struct BmsTickTimeConverter(
     int tickResolution,
     IReadOnlyList<BmsBpmEvent> bpmEvents,

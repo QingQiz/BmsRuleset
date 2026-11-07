@@ -378,8 +378,13 @@ internal partial class BmsAudioDiagnosticGame : osu.Framework.Game
         foreach (var hitObject in parsed.HitObjects.Where(hitObject => !hitObject.IsMine))
             yield return new ScheduledSample(hitObject.StartTime, hitObject.SampleKey, hitObject.SampleVolume);
 
-        foreach (var evt in parsed.LongNoteTailSampleEvents)
-            yield return new ScheduledSample(evt.Time, evt.SampleKey, evt.Volume);
+        foreach (var note in parsed.HitObjects)
+        {
+            if (note.IsLongNote && note.TailSampleKey is { } tailSampleKey
+                                && parsed.SampleDefinitions.TryGetValue(tailSampleKey, out var samplePath)
+                                && !string.IsNullOrWhiteSpace(samplePath))
+                yield return new ScheduledSample(note.StartTime + note.Duration, tailSampleKey, note.TailSampleVolume);
+        }
     }
 
     private static string getRequiredArgument(IReadOnlyList<string> args, string name)

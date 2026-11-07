@@ -15,7 +15,7 @@ public class BmsVoiceCommandQueueTest
     {
         var queue = new BmsVoiceCommandQueue();
         Assert.That(queue.HasDueCommand(long.MaxValue), Is.False);
-        var future = new BmsVoiceCommand(BmsVoiceCommandType.SetVoiceGain, 100, 7, Value: 0.25f, VoiceId: 123);
+        var future = new BmsVoiceCommand(BmsVoiceCommandType.SetMasterGain, 100, 7, Value: 0.25f);
         queue.Enqueue(future);
         queue.Enqueue(command(0));
 

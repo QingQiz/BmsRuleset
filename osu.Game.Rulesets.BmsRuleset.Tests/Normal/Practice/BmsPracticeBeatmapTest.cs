@@ -64,13 +64,13 @@ public class BmsPracticeBeatmapTest
     }
 
     [Test]
-    public void ClosingMeasureBoundsUseBpmStopAndLeadInTiming()
+    public void ClosingMeasureBoundsUseBpmAndStopTiming()
     {
         var full = createBeatmap(new BmsNote { StartTime = 1900, Column = 1 });
         full.TimingMap = new BmsTimingMap(192, [new(0, 0, 192, 1)],
-            [new(0, 120, 0), new(96, 240, 1500)], [new(48, 500, 48, 120, 0)]).ShiftedBy(300);
+            [new(0, 120, 0), new(96, 240, 1500)], [new(48, 500, 48, 120, 0)]);
 
-        Assert.That(BmsPracticeBeatmap.GetTimeBounds(full).EndTime, Is.EqualTo(2300));
+        Assert.That(BmsPracticeBeatmap.GetTimeBounds(full).EndTime, Is.EqualTo(2000));
     }
 
     [TestCase(false)]

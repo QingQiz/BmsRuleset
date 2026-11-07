@@ -104,10 +104,6 @@ internal static partial class BmsChartParser
         collectHitObjects(state, totalColumns, measureStarts, timingMap, hitObjects);
         hitObjects.Sort(default(HitObjectComparer));
 
-        var longNoteTailSampleEvents = new List<BmsSampleEvent>(hitObjects.Count / 4);
-        collectLongNoteTailSampleEvents(hitObjects, sampleDefinitions, longNoteTailSampleEvents);
-        longNoteTailSampleEvents.Sort(default(SampleEventComparer));
-
         var textEvents = collectTextEvents(state, measureStarts, timingMap);
         var bga = collectBga(state, measureStarts, timingMap);
 
@@ -129,7 +125,6 @@ internal static partial class BmsChartParser
             totalColumns,
             sampleDefinitions,
             bgSampleEvents.ToArray(),
-            longNoteTailSampleEvents,
             hitObjects,
             state.BranchDecisions.ToArray(),
             textEvents,
@@ -670,31 +665,6 @@ internal static partial class BmsChartParser
         return new BmsTextEvents(mistake, events.ToArray());
     }
 
-    private static void collectLongNoteTailSampleEvents(
-        IEnumerable<BmsParsedHitObject> hitObjects,
-        IReadOnlyDictionary<ushort, string> sampleDefinitions,
-        List<BmsSampleEvent> output)
-    {
-        foreach (var hitObject in hitObjects)
-        {
-            if (!hitObject.IsLongNote || hitObject.EndTick <= hitObject.Tick)
-                continue;
-
-            // Only emit a tail sample event if the tail has its own sample key AND the
-            // sample path resolves (i.e. the key has a #WAV definition in the chart).
-            // Do NOT fallback to the head's SampleKey — if the terminating cell has
-            // no sample defined, the tail simply has no sound.
-            if (hitObject.TailSampleKey is not { } tailSampleKey
-                || !sampleDefinitions.TryGetValue(tailSampleKey, out var samplePath)
-                || string.IsNullOrWhiteSpace(samplePath))
-            {
-                continue;
-            }
-
-            output.Add(new BmsSampleEvent(hitObject.StartTime + hitObject.Duration, hitObject.EndTick, tailSampleKey, hitObject.TailSampleVolume));
-        }
-    }
-
     private static int calculateTickResolution(ParseState state)
     {
         var resolution = base_tick_resolution;
@@ -1197,7 +1167,6 @@ internal static partial class BmsChartParser
 
         return new BmsParsedHitObject(
             start.Tick,
-            endTick,
             startTime,
             Math.Max(0, endTime - startTime),
             start.Column,
@@ -1216,7 +1185,6 @@ internal static partial class BmsChartParser
         var startTime = timingMap.ProjectTickToTime(mine.Tick);
 
         return new BmsParsedHitObject(
-            mine.Tick,
             mine.Tick,
             startTime,
             0,
@@ -1552,17 +1520,6 @@ internal static partial class BmsChartParser
             if (cmp != 0) return cmp;
 
             return a.Column.CompareTo(b.Column);
-        }
-    }
-
-    private struct SampleEventComparer : IComparer<BmsSampleEvent>
-    {
-        public int Compare(BmsSampleEvent? a, BmsSampleEvent? b)
-        {
-            var cmp = a!.Time.CompareTo(b!.Time);
-            if (cmp != 0) return cmp;
-
-            return a.Tick.CompareTo(b.Tick);
         }
     }
 

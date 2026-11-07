@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Processing;
@@ -21,7 +20,7 @@ internal sealed class BmsPcmVoiceMixer
     // Short envelopes suppress discontinuities without delaying the requested start frame.
     private const float attack_fade_ms = 2;
 
-    // Same-domain retriggers crossfade briefly instead of hard-stopping the previous voice.
+    // Repeated samples crossfade briefly instead of hard-stopping the previous voice.
     private const float retrigger_fade_ms = 2;
 
     // Timeline replacement drains all old voices more conservatively because many may end at once.
@@ -48,7 +47,6 @@ internal sealed class BmsPcmVoiceMixer
     private int voiceCapacity;
     private VoiceSegment lastVoiceSegment;
     private VoiceSegment? firstRenderingSegment;
-    private HashSet<(long TargetFrame, BmsTerminationDomain Domain)>? laterBatchPlays;
 
     internal long RenderedFrames { get; private set; }
 
@@ -70,7 +68,7 @@ internal sealed class BmsPcmVoiceMixer
         if (plays.IsEmpty)
             return;
 
-        // Single key sounds need no coalescing or temporary batch; the queue publishes
+        // Single key sounds need no temporary batch; the queue publishes
         // its copied command atomically through the existing single-command path.
         if (plays.Length == 1)
         {
@@ -81,53 +79,14 @@ internal sealed class BmsPcmVoiceMixer
         }
 
         var batch = new BmsVoiceCommand[plays.Length];
-        var count = 0;
-
-        // Large chords otherwise compare every request with every later one. Keep the
-        // index on the producer and reuse peak capacity; the callback only sees commands.
-        var indexed = plays.Length >= 64;
-        if (indexed)
+        for (var i = 0; i < plays.Length; i++)
         {
-            laterBatchPlays ??= new HashSet<(long, BmsTerminationDomain)>();
-            laterBatchPlays.Clear();
-            for (var i = plays.Length - 1; i >= 0; i--)
-            {
-                var play = sanitise(plays[i]);
-                // Preserve comparison with later raw targets when this request was clamped.
-                var superseded = plays[i].TargetFrame < 0
-                    ? laterBatchPlays.Contains((play.TargetFrame, play.Domain))
-                    : !laterBatchPlays.Add((play.TargetFrame, play.Domain));
-                if (!superseded)
-                    batch[plays.Length - ++count] = new BmsVoiceCommand(BmsVoiceCommandType.Play, play.TargetFrame, play.Epoch, play);
-            }
-        }
-        else
-        {
-            for (var i = 0; i < plays.Length; i++)
-            {
-                var play = sanitise(plays[i]);
-                var superseded = false;
-
-                for (var later = i + 1; later < plays.Length; later++)
-                {
-                    if (plays[later].TargetFrame == play.TargetFrame && plays[later].Domain == play.Domain)
-                    {
-                        superseded = true;
-                        break;
-                    }
-                }
-
-                if (!superseded)
-                    batch[count++] = new BmsVoiceCommand(BmsVoiceCommandType.Play, play.TargetFrame, play.Epoch, play);
-            }
+            var play = sanitise(plays[i]);
+            batch[i] = new BmsVoiceCommand(BmsVoiceCommandType.Play, play.TargetFrame, play.Epoch, play);
         }
 
-        if (count == 0)
-            return;
-
-        reserveVoiceCapacity(count);
-
-        commands.Enqueue(batch.AsSpan(indexed ? plays.Length - count : 0, count));
+        reserveVoiceCapacity(plays.Length);
+        commands.Enqueue(batch);
     }
 
     internal void SubmitControl(BmsVoiceCommandType type, long targetFrame, int epoch, float value = 0)
@@ -245,17 +204,6 @@ internal sealed class BmsPcmVoiceMixer
                     drainAll(frame, epochReplacementFadeFrames);
                     break;
 
-                case BmsVoiceCommandType.StopVoice:
-                    if (command.Epoch == currentEpoch)
-                        stopVoice(command.VoiceId, frame);
-                    break;
-
-                case BmsVoiceCommandType.SetVoiceGain:
-                    if (command.Epoch == currentEpoch)
-                        setVoiceGain(command.VoiceId, sanitiseGain(command.Value));
-
-                    break;
-
                 default:
                     throw new ArgumentOutOfRangeException();
             }
@@ -269,7 +217,7 @@ internal sealed class BmsPcmVoiceMixer
             for (var i = 0; i < segment.ActiveCount; i++)
             {
                 ref var existing = ref segment.Voices[i];
-                if (existing.Domain != play.Domain)
+                if (existing.SampleKey != play.SampleKey)
                     continue;
 
                 beginFade(ref existing, frame, retriggerFadeFrames);
@@ -296,14 +244,9 @@ internal sealed class BmsPcmVoiceMixer
             return;
         }
 
-        var sliceStart = Math.Max(0, play.Domain.SliceStartFrame);
-        var sourceStart = Math.Max(sliceStart, play.SourceOffsetFrame);
+        var sourceStart = play.SourceOffsetFrame;
         var assetEnd = play.Asset.TotalFrameCount >= 0 ? play.Asset.TotalFrameCount : long.MaxValue;
-        var sliceEnd = play.Domain.SliceFrameCount < 0
-            ? assetEnd
-            : Math.Min(assetEnd, sliceStart + play.Domain.SliceFrameCount);
-
-        if (sourceStart >= sliceEnd)
+        if (sourceStart >= assetEnd)
         {
             releaseVoiceReservation();
             return;
@@ -328,11 +271,10 @@ internal sealed class BmsPcmVoiceMixer
         {
             State = BmsPcmVoiceState.Active,
             Asset = play.Asset,
-            Domain = play.Domain,
+            SampleKey = play.SampleKey,
             SourceFrame = sourceStart,
-            EndFrame = sliceEnd,
+            EndFrame = assetEnd,
             BaseGain = sanitiseGain(play.Gain),
-            VoiceId = play.VoiceId,
             StartFrame = frame,
             FadeStartGain = 1,
         };
@@ -385,30 +327,6 @@ internal sealed class BmsPcmVoiceMixer
             for (var i = 0; i < segment.ActiveCount; i++)
             {
                 beginFade(ref segment.Voices[i], frame, durationFrames);
-            }
-        }
-    }
-
-    private void stopVoice(long voiceId, long frame)
-    {
-        for (var segment = firstRenderingSegment; segment != null; segment = segment.NextRendering)
-        {
-            for (var i = 0; i < segment.ActiveCount; i++)
-            {
-                if (segment.Voices[i].VoiceId == voiceId)
-                    beginFade(ref segment.Voices[i], frame, retriggerFadeFrames);
-            }
-        }
-    }
-
-    private void setVoiceGain(long voiceId, float gain)
-    {
-        for (var segment = firstRenderingSegment; segment != null; segment = segment.NextRendering)
-        {
-            for (var i = 0; i < segment.ActiveCount; i++)
-            {
-                if (segment.Voices[i].VoiceId == voiceId)
-                    segment.Voices[i].BaseGain = gain;
             }
         }
     }
@@ -522,11 +440,10 @@ internal sealed class BmsPcmVoiceMixer
         public BmsPcmVoiceState State;
         public BmsPcmAsset? Asset;
         public BmsPcmAsset.ReadCursor ReadCursor;
-        public BmsTerminationDomain Domain;
+        public ushort SampleKey;
         public long SourceFrame;
         public long EndFrame;
         public float BaseGain;
-        public long VoiceId;
         public long StartFrame;
         public long FadeStartFrame;
         public long FadeEndFrame;

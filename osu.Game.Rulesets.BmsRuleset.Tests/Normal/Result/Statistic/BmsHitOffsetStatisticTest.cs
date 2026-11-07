@@ -104,6 +104,32 @@ public class BmsHitOffsetStatisticTest
     }
 
     [Test]
+    public void TestCourseHistogramRebinsOriginalOffsetsAcrossStages()
+    {
+        var beatmap = createBeatmap(BmsLayoutVariant.Bms5K);
+        var first = BmsResultStatisticsData.Create(new ScoreInfo
+        {
+            HitEvents = [new HitEvent(-12, 1, HitResult.Good, new BmsNote { Column = 1, StartTime = 1000 }, null, null)],
+        }, beatmap);
+        var second = BmsResultStatisticsData.Create(new ScoreInfo
+        {
+            HitEvents = [new HitEvent(187, 1, HitResult.Good, new BmsNote { Column = 1, StartTime = 1000 }, null, null)],
+        }, beatmap);
+
+        var course = BmsResultStatisticsData.CreateCourse([first, second]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(first.Offset.Overall.BinSize, Is.EqualTo(1));
+            Assert.That(second.Offset.Overall.BinSize, Is.EqualTo(4));
+            Assert.That(course.Offset.Overall.BinSize, Is.EqualTo(4));
+            Assert.That(course.Offset.Overall.BinsByResult[HitResult.Good][47], Is.EqualTo(1));
+            Assert.That(course.Offset.Overall.BinsByResult[HitResult.Good][97], Is.EqualTo(1));
+            Assert.That(course.Offset.Keys[1].Summary.Count, Is.EqualTo(2));
+        });
+    }
+
+    [Test]
     public void TestStatisticsAreGroupedByKey()
     {
         var statistics = BmsHitOffsetStatistic.CreateStatistics(

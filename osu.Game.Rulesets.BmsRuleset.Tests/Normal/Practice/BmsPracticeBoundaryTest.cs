@@ -41,10 +41,10 @@ public class BmsPracticeBoundaryTest
 
     [TestCase(130)]
     [TestCase(173)]
-    public void ShiftedGridBoundariesIncludeStartAndExcludeEnd(double bpm)
+    public void GridBoundariesIncludeStartAndExcludeEnd(double bpm)
     {
         var lines = new[] { $"#BPM {bpm}", "#BPM01 157", "#00108:01" }.Concat(Enumerable.Range(0, 20).Select(measure => $"#{measure:000}11:01010101010101010101010101010101")).ToArray();
-        var parsed = BmsChartParser.Parse(lines).ShiftedBy(2500);
+        var parsed = BmsChartParser.Parse(lines);
         var grid = BmsPracticeGrid.Create(parsed.TimingMap);
         foreach (var note in parsed.HitObjects)
         {

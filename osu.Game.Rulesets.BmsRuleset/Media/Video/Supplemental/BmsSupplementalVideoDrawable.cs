@@ -18,9 +18,9 @@ internal sealed partial class BmsSupplementalVideoDrawable : CompositeDrawable
     private readonly Sprite sprite;
     private IRenderer? renderer;
     private Texture? texture;
-    private BmsSupplementalVideoFrameSource? frameSource;
+    private readonly BmsSupplementalVideoFrameSource frameSource;
 
-    private BmsSupplementalVideoDrawable(Stream? stream, BmsSupplementalVideoFrameSource? frameSource, IClock playbackClock, double eventStartTime)
+    public BmsSupplementalVideoDrawable(BmsSupplementalVideoFrameSource frameSource, IClock playbackClock, double eventStartTime, Stream? stream = null)
     {
         this.stream = stream;
         this.frameSource = frameSource;
@@ -41,48 +41,13 @@ internal sealed partial class BmsSupplementalVideoDrawable : CompositeDrawable
         };
     }
 
-    // Lazy path: the stream is copied and the frame source is started in load(). Used when the video
-    // is created mid-gameplay (poor BGA, or a hit on a file the loading screen didn't warm).
-    public BmsSupplementalVideoDrawable(Stream stream, IClock playbackClock, double eventStartTime)
-        : this(stream, null, playbackClock, eventStartTime)
-    {
-    }
-
-    // Pre-warmed path: the frame source was already started during the loading screen, so load()
-    // skips the stream copy + FFmpeg init and only takes the renderer for texture uploads — no
-    // game-thread hitch at the BGA event's fire time.
-    public BmsSupplementalVideoDrawable(BmsSupplementalVideoFrameSource frameSource, IClock playbackClock, double eventStartTime)
-        : this(null, frameSource, playbackClock, eventStartTime)
-    {
-    }
-
     [BackgroundDependencyLoader]
     private void load(IRenderer renderer)
     {
         this.renderer = renderer;
 
-        // Pre-warmed by the loading screen: the frame source is already decoding, so we only need
-        // the renderer for texture uploads. The lazy path below is the fallback for videos created
-        // mid-gameplay (poor BGA, a hit on a file the loading screen didn't warm) where there was no
-        // chance to warm — it pays the stream copy + FFmpeg init on the game thread, but only then.
-        if (frameSource != null)
-        {
-            BmsLogger.Log("[BGA] Supplemental FFmpeg video path selected (pre-warmed)");
-            return;
-        }
-
-        var sourceStream = stream;
-        if (sourceStream == null)
-            return;
-
-        using var memory = new MemoryStream();
-        if (sourceStream.CanSeek)
-            sourceStream.Position = 0;
-
-        sourceStream.CopyTo(memory);
-        frameSource = new BmsSupplementalVideoFrameSource(memory.ToArray());
+        // Preloading may have started the handed-off decoder already.
         frameSource.Start();
-
         BmsLogger.Log("[BGA] Supplemental FFmpeg video path selected");
     }
 
@@ -90,7 +55,7 @@ internal sealed partial class BmsSupplementalVideoDrawable : CompositeDrawable
     {
         base.Update();
 
-        if (frameSource == null || renderer == null)
+        if (renderer == null)
             return;
 
         var playbackTime = Math.Max(0, (playbackClock.CurrentTime - eventStartTime) / 1000.0);
@@ -116,7 +81,7 @@ internal sealed partial class BmsSupplementalVideoDrawable : CompositeDrawable
 
     protected override void Dispose(bool isDisposing)
     {
-        frameSource?.Dispose();
+        frameSource.Dispose();
         stream?.Dispose();
         base.Dispose(isDisposing);
     }

@@ -35,11 +35,11 @@ public class BmsTimelineStatisticTest
             ],
         };
 
-        var data = BmsTimelineStatistic.CreateCourseData(
+        var data = BmsResultStatisticsData.CreateCourse(
         [
-            (playedScore, playedBeatmap),
-            (null!, unplayedBeatmap),
-        ]);
+            BmsResultStatisticsData.Create(playedScore, playedBeatmap),
+            BmsResultStatisticsData.Create(new ScoreInfo(), unplayedBeatmap),
+        ]).Timeline;
 
         Assert.Multiple(() =>
         {
@@ -62,11 +62,11 @@ public class BmsTimelineStatisticTest
             LayoutVariant = BmsLayoutVariant.Bme7K,
             HitObjects = { new BmsNote { StartTime = 3000, Column = 2 } },
         };
-        var data = BmsTimelineStatistic.CreateCourseData(
+        var data = BmsResultStatisticsData.CreateCourse(
         [
-            (new ScoreInfo { Passed = true }, firstBeatmap),
-            (new ScoreInfo { Passed = true }, secondBeatmap),
-        ]);
+            BmsResultStatisticsData.Create(new ScoreInfo { Passed = true }, firstBeatmap),
+            BmsResultStatisticsData.Create(new ScoreInfo { Passed = true }, secondBeatmap),
+        ]).Timeline;
 
         var columnWidths = BmsTimelineStatistic.CreateColumnWidths(data.Notes);
 

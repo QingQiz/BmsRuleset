@@ -21,16 +21,16 @@ public class BmsMeasureLineIndexTest
     private const BindingFlags instance = BindingFlags.Instance | BindingFlags.NonPublic;
 
     [Test]
-    public void LinesIncludeMeasureZeroAndFinalBoundaryWithLeadIn()
+    public void LinesIncludeMeasureZeroAndFinalBoundary()
     {
-        var map = BmsChartParser.Parse(["#BPM 120", "#00111:01"]).TimingMap.ShiftedBy(1234.5);
+        var map = BmsChartParser.Parse(["#BPM 120", "#00111:01"]).TimingMap;
         using var pair = new Pair(map);
         var infos = lineInfos(pair.Actual);
 
         Assert.Multiple(() =>
         {
             Assert.That(infos.Select(line => line.ScrollPosition), Is.EqualTo(new[] { 0d, 2000, 4000 }));
-            Assert.That(infos.Select(line => line.Time), Is.EqualTo(new[] { 1234.5, 3234.5, 5234.5 }));
+            Assert.That(infos.Select(line => line.Time), Is.EqualTo(new[] { 0d, 2000, 4000 }));
         });
     }
 
@@ -82,7 +82,7 @@ public class BmsMeasureLineIndexTest
         pair.Range(-1000, 4000);
         pair.Reset(null);
         pair.AssertSame();
-        pair.Reset(createMap(128).ShiftedBy(1234.5));
+        pair.Reset(createMap(128));
         pair.Range(-1000, 4000);
         pair.TimeRange(1234.5, 20000);
         pair.Range(-1000, 4000);

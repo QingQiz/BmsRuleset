@@ -41,7 +41,6 @@ internal static class BmsPracticeExtendedChartFixture
             return clone;
         })).ToArray();
         extended.BackgroundSampleEvents = cycles.SelectMany(cycle => source.BackgroundSampleEvents.Select(sample => sample with { Time = sample.Time + cycle * duration, Tick = sample.Tick + cycle * ticks })).ToArray();
-        extended.LongNoteTailSampleEvents = cycles.SelectMany(cycle => source.LongNoteTailSampleEvents.Select(sample => sample with { Time = sample.Time + cycle * duration, Tick = sample.Tick + cycle * ticks })).ToArray();
         extended.BeatmapInfo.Length = (int)(duration * repetitions);
         return extended;
     }

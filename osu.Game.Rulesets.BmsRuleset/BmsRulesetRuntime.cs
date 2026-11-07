@@ -82,10 +82,16 @@ internal static class BmsRulesetRuntime
         if (DifficultyTableStore != null || ConfigManager == null || CourseCatalog.Courses.Count > 0)
             return;
 
+        InitialiseDifficultyTableStore(host, realm, ConfigManager);
+    }
+
+    internal static void InitialiseDifficultyTableStore(GameHost host, RealmAccess? realm, BmsRulesetConfigManager config)
+    {
         var cacheDirectory = Path.Combine(host.Storage.GetFullPath(string.Empty), "difficulty-tables");
-        var collectionSyncManager = new CollectionSyncManager(ConfigManager);
-        var store = new DifficultyTableStore(ConfigManager, cacheDirectory, collectionSyncManager, realm);
-        store.DifficultyNameUpdater = new DifficultyNameUpdater(realm, store);
+        var collectionSyncManager = new CollectionSyncManager(config);
+        var store = new DifficultyTableStore(config, cacheDirectory, collectionSyncManager, realm);
+        if (realm != null)
+            store.DifficultyNameUpdater = new DifficultyNameUpdater(realm, store);
         DifficultyTableStore = store;
         store.LoadPersistedTables();
     }

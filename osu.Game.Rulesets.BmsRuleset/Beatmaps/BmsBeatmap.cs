@@ -33,8 +33,6 @@ public class BmsBeatmap : Beatmap<BmsHitObject>, IBmsBeatmap
 
     public IReadOnlyList<BmsSampleEvent> BackgroundSampleEvents { get; set; } = [];
 
-    public IReadOnlyList<BmsSampleEvent> LongNoteTailSampleEvents { get; set; } = [];
-
     public IReadOnlyList<BmsInvisibleNote> InvisibleNotes { get; set; } = [];
 
     internal IReadOnlyList<BmsInvisibleNote> PracticeInitialKeySounds { get; set; } = [];

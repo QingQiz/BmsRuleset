@@ -130,8 +130,10 @@ public partial class TestSceneBmsBgaVideoProbe : OsuTestScene
 
         AddStep("create MPEG fallback drawable", () =>
         {
-            var stream = File.OpenRead(bgaPath!);
-            Child = fallback = new BmsSupplementalVideoDrawable(stream, Clock, Clock.CurrentTime)
+            if (!BmsSupplementalVideoDecoder.TryCreate(File.ReadAllBytes(bgaPath!), out var decoder, out var error))
+                throw new InvalidOperationException(error);
+
+            Child = fallback = new BmsSupplementalVideoDrawable(new BmsSupplementalVideoFrameSource(decoder), Clock, Clock.CurrentTime)
             {
                 RelativeSizeAxes = Axes.Both,
                 FillMode = FillMode.Stretch,

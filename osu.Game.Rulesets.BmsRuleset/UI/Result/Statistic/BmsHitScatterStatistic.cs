@@ -46,7 +46,6 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResu
 
     private readonly IReadOnlyList<HitEvent>? hitEvents;
     private readonly IBeatmap? playableBeatmap;
-    private readonly IReadOnlyList<(IBeatmap Beatmap, IReadOnlyList<HitEvent> HitEvents)>? stages;
     private HitScatterStatistics statistics = null!;
     private FillFlowContainer content = null!;
     private bool expanded;
@@ -68,14 +67,6 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResu
 
         this.hitEvents = hitEvents;
         this.playableBeatmap = playableBeatmap;
-    }
-
-    internal BmsHitScatterStatistic(IReadOnlyList<(IBeatmap Beatmap, IReadOnlyList<HitEvent> HitEvents)> stages)
-    {
-        RelativeSizeAxes = Axes.X;
-        AutoSizeAxes = Axes.Y;
-
-        this.stages = stages;
     }
 
     internal static HitScatterStatistics CreateStatistics(IBeatmap playableBeatmap, IReadOnlyList<HitEvent> hitEvents, double minimumDuration = 0)
@@ -124,12 +115,6 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResu
         rebuild();
 
         return true;
-    }
-
-    internal static HitScatterStatistics CreateCourseStatistics(IReadOnlyList<(IBeatmap Beatmap, IReadOnlyList<HitEvent> HitEvents)> stages)
-    {
-        var stageStatistics = stages.Select(stage => CreateStatistics(stage.Beatmap, stage.HitEvents)).ToArray();
-        return CombineStatistics(stageStatistics);
     }
 
     internal static HitScatterStatistics CombineStatistics(IReadOnlyList<HitScatterStatistics> stageStatistics)
@@ -644,9 +629,7 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResu
     [BackgroundDependencyLoader]
     private void load()
     {
-        statistics ??= hitEvents != null
-            ? CreateStatistics(playableBeatmap!, hitEvents)
-            : CreateCourseStatistics(stages!);
+        statistics ??= CreateStatistics(playableBeatmap!, hitEvents!);
 
         InternalChild = content = new FillFlowContainer
         {

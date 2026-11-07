@@ -14,6 +14,7 @@ using osu.Framework.Timing;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Media.Video.Supplemental;
+using osu.Game.Rulesets.BmsRuleset.Media.FFmpeg;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 using osu.Game.Skinning;
@@ -584,7 +585,11 @@ public class BmsBgaDisplaySizingTest
         // The supplemental drawable is a CompositeDrawable whose child Sprite renders the texture.
         // Aspect-fit must be set on that child, not the parent — flipping the parent to Fit
         // would double-letterbox (the composite would letterbox, then the child again).
-        var drawable = new BmsSupplementalVideoDrawable(new MemoryStream(), new StopwatchClock(), 0);
+        if (!BmsSupplementalFFmpegFuncs.TryCreate(out _, out var error))
+            Assert.Ignore(error ?? "Supplemental FFmpeg native artifacts are unavailable.");
+        var bytes = File.ReadAllBytes(Path.Combine(TestContext.CurrentContext.TestDirectory, "bga_fixtures", "mpeg1.mpg"));
+        Assert.That(BmsSupplementalVideoDecoder.TryCreate(bytes, out var decoder, out error), Is.True, error);
+        using var drawable = new BmsSupplementalVideoDrawable(new BmsSupplementalVideoFrameSource(decoder!), new StopwatchClock(), 0);
 
         var spriteField = typeof(BmsSupplementalVideoDrawable).GetField("sprite", BindingFlags.NonPublic | BindingFlags.Instance);
         Assert.That(spriteField, Is.Not.Null);

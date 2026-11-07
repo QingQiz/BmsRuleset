@@ -171,15 +171,14 @@ public class BmsModLr2Test
         Assert.That(note.HitWindows.WindowFor(HitResult.Perfect), Is.EqualTo(26.25));
     }
 
-    [TestCase(2500)]
-    [TestCase(-500)]
-    public void PrecomputedExRankRatesSurviveLeadInShifts(double offset)
+    [Test]
+    public void PrecomputedExRankRatesKeepParsedTiming()
     {
         var parsed = BmsChartParser.Parse([
             "#BPM 120", "#RANK 4", "#WAV01 note.wav", "#EXRANK01 167", "#00011:01", "#001A0:01", "#00111:01",
-        ], judgementRateCalculator: new BmsModLr2().JudgementRateCalculator).ShiftedBy(offset);
+        ], judgementRateCalculator: new BmsModLr2().JudgementRateCalculator);
         var beatmap = createBeatmap(parsed);
-        Assert.That(beatmap.HitObjects.Select(note => note.StartTime), Is.EqualTo(new[] { offset, 2000 + offset }));
+        Assert.That(beatmap.HitObjects.Select(note => note.StartTime), Is.EqualTo(new[] { 0d, 2000 }));
         Assert.That(beatmap.HitObjects.Select(note => note.JudgementRate), Is.EqualTo(new[] { .75, 1.25 }));
         using var scope = BmsJudgementProfileProvider.UseWindowMods([new BmsModLr2()]);
         Assert.That(BmsJudgementProfileProvider.GetTable(beatmap.HitObjects[0], false).FrameworkWindowFor(HitResult.Perfect), Is.EqualTo(18));
@@ -277,7 +276,7 @@ public class BmsModLr2Test
         var column = new BmsJudgementEngine([note], beatmap.LayoutVariant, 1, output).GetColumn(1);
         Assert.That(column.HandleNotePress(new BmsPressContext(100, new BmsFrameContext(100, 1))).Kind, Is.EqualTo(PressOutcomeKind.EmptyPoor));
         var judged = new BmsJudgementCandidate(1000, 1000, 1, 0.75, false, IsJudged: true);
-        Assert.That(BmsJudgementSelector.SelectPress(beatmap.LayoutVariant, 1, [judged], 1050).Result, Is.EqualTo(HitResult.None));
+        Assert.That(BmsTestJudgementSelector.SelectPress(beatmap.LayoutVariant, 1, [judged], 1050).Result, Is.EqualTo(HitResult.None));
     }
 
     [Test]
@@ -285,7 +284,7 @@ public class BmsModLr2Test
     {
         using var scope = BmsJudgementProfileProvider.UseWindowMods([new BmsModLr2()]);
         BmsJudgementCandidate[] notes = [new(1000, 1000, 1, 0.75, false), new(1160, 1160, 1, 0.75, false)];
-        var selection = BmsJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, notes, 1150, algorithm);
+        var selection = BmsTestJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, notes, 1150, algorithm);
         Assert.That(selection.Candidate?.StartTime, Is.EqualTo(1160));
         Assert.That(selection.Result, Is.EqualTo(HitResult.Perfect));
     }

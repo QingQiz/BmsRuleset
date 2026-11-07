@@ -1628,12 +1628,10 @@ public class BmsBeatmapDecoderTest
         // Terminating value "03" has no #WAV definition.
         Assert.That((note as BmsLongNote)?.TailSampleKey ?? 0, Is.EqualTo(BmsChartParser.Enc("03")));
         Assert.That(getSamplePath(note, ((BmsLongNote)note).TailSampleKey), Is.Empty);
-        // No tail sample event either since the sample can't be resolved
-        Assert.That(converted.LongNoteTailSampleEvents, Is.Empty);
     }
 
     [Test]
-    public void TestLongNoteTailNoSampleEventForLnType2()
+    public void TestLongNoteTailHasNoSampleForLnType2()
     {
         var beatmap = decode("""
                              #BPM 120
@@ -1643,9 +1641,8 @@ public class BmsBeatmapDecoderTest
                              """);
         var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
 
-        // LNTYPE 2 terminates with "00" (control value, no sample) → no tail sample event.
+        // LNTYPE 2 terminates with "00", which closes the note without playing another sample.
         Assert.That(((BmsLongNote)converted.HitObjects.Single()).TailSampleKey, Is.Null);
-        Assert.That(converted.LongNoteTailSampleEvents, Is.Empty);
     }
 
     [Test]
@@ -1664,11 +1661,10 @@ public class BmsBeatmapDecoderTest
         Assert.That(converted.HitObjects[0] is BmsLongNote, Is.True);
         Assert.That(converted.HitObjects[0].SampleKey, Is.EqualTo(BmsChartParser.Enc("01")));
         Assert.That(((BmsLongNote)converted.HitObjects[0]).TailSampleKey, Is.Null);
-        Assert.That(converted.LongNoteTailSampleEvents, Has.Count.EqualTo(0));
     }
 
     [Test]
-    public void TestLongNoteTailSampleEventWithDistinctTailSample()
+    public void TestLongNoteTailUsesDistinctTailSample()
     {
         var beatmap = decode("""
                              #BPM 120
@@ -1680,8 +1676,9 @@ public class BmsBeatmapDecoderTest
         var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
 
         // Terminating cell has value "02" → tail sample key is "02", NOT head's "01".
-        Assert.That(converted.LongNoteTailSampleEvents, Has.Count.EqualTo(1));
-        Assert.That(converted.LongNoteTailSampleEvents[0].SampleKey, Is.EqualTo(BmsChartParser.Enc("02")));
+        var note = (BmsLongNote)converted.HitObjects.Single();
+        Assert.That(note.TailSampleKey, Is.EqualTo(BmsChartParser.Enc("02")));
+        Assert.That(getSamplePath(note, note.TailSampleKey), Is.EqualTo("tail.wav"));
     }
 
     [Test]
@@ -1799,7 +1796,7 @@ public class BmsBeatmapDecoderTest
             Assert.That(converted.TimingMap!.ProjectTickToTime(0), Is.Zero);
             Assert.That(converted.TimingMap.BpmEvents[0].Time, Is.Zero);
             Assert.That(converted.BackgroundSampleEvents.Single().Time, Is.Zero);
-            Assert.That(converted.LongNoteTailSampleEvents.Single().Time, Is.EqualTo(1000));
+            Assert.That(((BmsLongNote)converted.HitObjects.Single()).EndTime, Is.EqualTo(1000));
             Assert.That(converted.TextEvents.TextEvents.Single().Time, Is.Zero);
             Assert.That(converted.Bga.Events.Single().Time, Is.Zero);
             Assert.That(converted.Bga.OpacityEvents.Single().Time, Is.Zero);
@@ -2839,7 +2836,6 @@ public class BmsBeatmapDecoderTest
             Assert.That(longNote.SampleVolume, Is.EqualTo(25));
             Assert.That(longNote.TailSampleVolume, Is.EqualTo(25));
             Assert.That(parsed.BackgroundSampleEvents.Single().Volume, Is.EqualTo(25));
-            Assert.That(parsed.LongNoteTailSampleEvents.Single().Volume, Is.EqualTo(25));
         });
     }
 

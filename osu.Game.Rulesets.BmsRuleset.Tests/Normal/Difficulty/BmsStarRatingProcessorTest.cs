@@ -343,31 +343,6 @@ public class BmsStarRatingProcessorTest
     }
 
     [Test]
-    public void TestStarRatingProcessorDoesNotKeepDiagnosticArrays()
-    {
-        var noteTimings = createDenseNoteTimings();
-
-        var result = new BmsStarRatingProcessor().Compute(noteTimings, 8, 2);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(result.StarRating, Is.GreaterThan(0));
-            Assert.That(result.AllCorners, Is.Empty);
-            Assert.That(result.BaseCorners, Is.Empty);
-            Assert.That(result.ACorners, Is.Empty);
-            Assert.That(result.Jbar, Is.Empty);
-            Assert.That(result.Xbar, Is.Empty);
-            Assert.That(result.Pbar, Is.Empty);
-            Assert.That(result.Abar, Is.Empty);
-            Assert.That(result.Rbar, Is.Empty);
-            Assert.That(result.DensityC, Is.Empty);
-            Assert.That(result.ActiveColumnsKs, Is.Empty);
-            Assert.That(result.DifficultyD, Is.Empty);
-            Assert.That(result.AnchorValues, Is.Empty);
-        });
-    }
-
-    [Test]
     public void TestStarRatingProcessorHitLeniencyUsesExplicitJudgementRate()
     {
         const BmsLayoutVariant layout = BmsLayoutVariant.Bme7K;

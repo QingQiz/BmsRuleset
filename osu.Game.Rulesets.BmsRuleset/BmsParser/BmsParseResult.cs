@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Linq;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 
 namespace osu.Game.Rulesets.BmsRuleset.BmsParser;
@@ -16,7 +15,6 @@ public sealed record BmsParseResult(
     int TotalColumns,
     IReadOnlyDictionary<ushort, string> SampleDefinitions,
     IReadOnlyList<BmsSampleEvent> BackgroundSampleEvents,
-    IReadOnlyList<BmsSampleEvent> LongNoteTailSampleEvents,
     IReadOnlyList<BmsParsedHitObject> HitObjects,
     IReadOnlyList<BmsBranchDecision> BranchDecisions,
     BmsTextEvents TextEvents,
@@ -36,37 +34,12 @@ public sealed record BmsParseResult(
     double? DefaultExRank = null)
 {
     public IReadOnlyList<BmsParsedHitObject> InvisibleNotes { get; init; } = [];
-
-    internal BmsParseResult ShiftedBy(double offset)
-    {
-        if (offset == 0)
-            return this;
-
-        return this with
-        {
-            TimingMap = TimingMap.ShiftedBy(offset),
-            BackgroundSampleEvents = BackgroundSampleEvents.Select(e => e with { Time = e.Time + offset }).ToArray(),
-            LongNoteTailSampleEvents = LongNoteTailSampleEvents.Select(e => e with { Time = e.Time + offset }).ToArray(),
-            HitObjects = HitObjects.Select(h => h with { StartTime = h.StartTime + offset }).ToArray(),
-            InvisibleNotes = InvisibleNotes.Select(h => h with { StartTime = h.StartTime + offset }).ToArray(),
-            TextEvents = TextEvents with
-            {
-                TextEvents = TextEvents.TextEvents.Select(e => e with { Time = e.Time + offset }).ToArray(),
-            },
-            Bga = Bga with
-            {
-                Events = Bga.Events.Select(e => e with { Time = e.Time + offset }).ToArray(),
-                OpacityEvents = Bga.OpacityEvents.Select(e => e with { Time = e.Time + offset }).ToArray(),
-            },
-        };
-    }
 }
 
 public readonly record struct BmsBranchDecision(int MaxValue, int SelectedValue);
 
 public readonly record struct BmsParsedHitObject(
     long Tick,
-    long EndTick,
     double StartTime,
     double Duration,
     int Column,

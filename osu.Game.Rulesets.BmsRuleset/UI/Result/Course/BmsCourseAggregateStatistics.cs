@@ -1,7 +1,6 @@
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Course;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
@@ -43,7 +42,7 @@ internal partial class BmsCourseAggregateStatistics : BmsStatisticsPanel
             : [session.GaugeType];
         var gaugeStates = gaugeTypes.Select(type => new BmsGaugeStateSnapshot(type, 1, false)).ToArray();
         var profileFamily = BmsCourseSession.ResolveCourseGaugeProfileFamily(session.Course.Constraints);
-        var data = new (IBeatmap Beatmap, BmsResultStatisticsData Data)[stages.Length];
+        var data = new BmsResultStatisticsData[stages.Length];
         for (var i = 0; i < stages.Length; i++)
         {
             var stage = stages[i];
@@ -58,7 +57,7 @@ internal partial class BmsCourseAggregateStatistics : BmsStatisticsPanel
                 var beatmap = stage.WorkingBeatmap.GetPlayableBeatmap(stageScore.Ruleset, mods, cancellationToken);
                 // Legacy scores lack starting-health settings, so reconstruct each surviving tier from the preceding replay.
                 statistics = replay != null ? BmsResultStatisticsData.Load(stageScore, beatmap, replay.Replay, cancellationToken, gaugeStates, profileFamily) : null;
-                return (beatmap, statistics ?? BmsResultStatisticsData.Create(new ScoreInfo(), beatmap));
+                return statistics ?? BmsResultStatisticsData.Create(new ScoreInfo(), beatmap);
             }, cancellationToken).ConfigureAwait(false);
 
             if (statistics?.EndingGaugeStates.Count > 0)
@@ -67,7 +66,7 @@ internal partial class BmsCourseAggregateStatistics : BmsStatisticsPanel
 
         cancellationToken.ThrowIfCancellationRequested();
         if (stageIndex.HasValue)
-            return data[^1].Data;
+            return data[^1];
 
         return await Task.Run(() => BmsResultStatisticsData.CreateCourse(data), cancellationToken).ConfigureAwait(false);
     }

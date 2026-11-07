@@ -185,7 +185,6 @@ public class BmsTimingMapQueryTest
     {
         var map = createMap(count);
         assertQueries(map);
-        assertQueries(map.ShiftedBy(1234.5));
     }
 
     private static void assertQueries(BmsTimingMap map)

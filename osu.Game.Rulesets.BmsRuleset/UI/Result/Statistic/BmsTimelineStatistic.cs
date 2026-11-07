@@ -32,7 +32,6 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable, IBmsResult
     private static readonly Color4 scratch_colour = colours.Yellow;
     private readonly ScoreInfo? score;
     private readonly IBeatmap? playableBeatmap;
-    private readonly IReadOnlyList<(ScoreInfo? Score, IBeatmap Beatmap)>? stages;
     private TimelineData data = null!;
     private readonly List<Drawable> plots = [];
     private readonly List<Drawable> legends = [];
@@ -53,20 +52,10 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable, IBmsResult
         this.playableBeatmap = playableBeatmap;
     }
 
-    internal BmsTimelineStatistic(IReadOnlyList<(ScoreInfo? Score, IBeatmap Beatmap)> stages)
-    {
-        RelativeSizeAxes = Axes.X;
-        AutoSizeAxes = Axes.Y;
-
-        this.stages = stages;
-    }
-
     [BackgroundDependencyLoader]
     private void load()
     {
-        data ??= score != null
-            ? CreateData(score, playableBeatmap!)
-            : CreateCourseData(stages!);
+        data ??= CreateData(score!, playableBeatmap!);
 
         rebuild();
     }
@@ -120,11 +109,6 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable, IBmsResult
         return new TimelineData(notes, judgements, fastSlow, [], duration);
     }
 
-    internal static TimelineData CreateCourseData(IReadOnlyList<(ScoreInfo? Score, IBeatmap Beatmap)> stages)
-        => CreateCourseData(stages.Select(stage => stage.Score != null
-            ? CreateData(stage.Score, stage.Beatmap)
-            : createUnplayedData(stage.Beatmap)).ToArray());
-
     internal static TimelineData CreateCourseData(IReadOnlyList<TimelineData> stageData)
     {
         if (stageData.Count == 0)
@@ -149,18 +133,6 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable, IBmsResult
             combineSubplots(stageData.Select(stage => stage.FastSlow).ToArray()),
             boundaries,
             totalDuration);
-    }
-
-    private static TimelineData createUnplayedData(IBeatmap playableBeatmap)
-    {
-        var variant = playableBeatmap is BmsBeatmap bms ? bms.LayoutVariant : BmsLayoutVariant.Bms5K;
-        var duration = Math.Max(1, playableBeatmap.HitObjects.Select(h => h.GetEndTime()).DefaultIfEmpty(0).Max());
-
-        return new TimelineData(
-            createNotesSubplot(playableBeatmap, variant, duration),
-            createJudgementSubplot([], duration),
-            createFastSlowSubplot([], duration),
-            [], duration);
     }
 
     private static SubplotData combineSubplots(IReadOnlyList<SubplotData> stages)

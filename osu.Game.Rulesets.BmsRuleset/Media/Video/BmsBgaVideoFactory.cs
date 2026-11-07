@@ -15,27 +15,13 @@ internal static class BmsBgaVideoFactory
         new MissingBmsBgaVideoProvider(),
     ];
 
-    // Test-only: opens the file so the codec-probing provider can inspect real bytes. Production
-    // routing goes through Create(), which receives the stream the caller already opened.
-    public static string SelectProviderName(string path)
-    {
-        using var stream = File.OpenRead(path);
-        var request = new BmsBgaVideoRequest(path, stream, new ManualFramedClock(), 0);
-        return selectProvider(request).Name;
-    }
-
     public static Drawable? Create(string path, Stream stream, IFrameBasedClock clock, double eventStartTime)
     {
         var request = new BmsBgaVideoRequest(path, stream, clock, eventStartTime);
-        return selectProvider(request).Create(request);
-    }
-
-    private static IBmsBgaVideoProvider selectProvider(BmsBgaVideoRequest request)
-    {
         foreach (var provider in providers)
         {
-            if (provider.CanCreate(request))
-                return provider;
+            if (provider.TryCreate(request, out var drawable))
+                return drawable;
         }
 
         throw new InvalidOperationException("The missing-video provider must accept every request.");

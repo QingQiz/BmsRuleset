@@ -28,7 +28,7 @@ public class BmsJudgementSelectorTest
             typeof(BmsJudgementSelectorTest).GetMethod(nameof(countTableQuery), BindingFlags.NonPublic | BindingFlags.Static));
         var candidates = Enumerable.Range(0, 1000).Select(i => note(1000 + i * 0.0001)).Reverse().ToArray();
         tableQueries = 0;
-        var selection = BmsJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, candidates, 1000, algorithm);
+        var selection = BmsTestJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, candidates, 1000, algorithm);
         Assert.That(selection.Candidate?.StartTime, Is.EqualTo(1000));
         Assert.That(selection.Result, Is.EqualTo(HitResult.Perfect));
         Assert.That(tableQueries, Is.LessThan(10));
@@ -47,7 +47,7 @@ public class BmsJudgementSelectorTest
         var first = note(1000);
         var second = note(1100);
 
-        var selection = BmsJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [second, first], 1100, algorithm);
+        var selection = BmsTestJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [second, first], 1100, algorithm);
 
         Assert.That(selection.Candidate?.StartTime, Is.EqualTo(expectedTime));
         Assert.That(selection.Result, Is.EqualTo(expectedResult));
@@ -59,7 +59,7 @@ public class BmsJudgementSelectorTest
     [TestCase(BmsJudgementAlgorithm.Score, 1200)]
     public void TestOverlappingBadAndGreat(BmsJudgementAlgorithm algorithm, double expectedTime)
     {
-        var selection = BmsJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [note(1200), note(1000)], 1240, algorithm);
+        var selection = BmsTestJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [note(1200), note(1000)], 1240, algorithm);
 
         Assert.That(selection.Candidate?.StartTime, Is.EqualTo(expectedTime));
     }
@@ -71,7 +71,7 @@ public class BmsJudgementSelectorTest
     [TestCase(null, 1000)]
     public void TestOverlappingBadWindowsUseConfiguredOrDefaultAlgorithm(BmsJudgementAlgorithm? algorithm, double expectedTime)
     {
-        var selection = BmsJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [note(1450), note(1000)], 1250, algorithm);
+        var selection = BmsTestJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [note(1450), note(1000)], 1250, algorithm);
 
         Assert.That(selection.Candidate?.StartTime, Is.EqualTo(expectedTime));
         Assert.That(selection.Result, Is.EqualTo(HitResult.Ok));
@@ -88,7 +88,7 @@ public class BmsJudgementSelectorTest
         var first = note(1000 - lateOffset);
         var second = note(1000 + earlyOffset);
 
-        var selection = BmsJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [second, first], 1000, algorithm);
+        var selection = BmsTestJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [second, first], 1000, algorithm);
 
         Assert.That(selection.Candidate, Is.EqualTo(selectNext ? second : first));
     }
@@ -97,7 +97,7 @@ public class BmsJudgementSelectorTest
     [TestCase(1100.01, 1200)]
     public void TestDurationRetainsEarlierNoteOnTie(double inputTime, double expectedTime)
     {
-        var selection = BmsJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [note(1200), note(1000)], inputTime, BmsJudgementAlgorithm.Duration);
+        var selection = BmsTestJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [note(1200), note(1000)], inputTime, BmsJudgementAlgorithm.Duration);
 
         Assert.That(selection.Candidate?.StartTime, Is.EqualTo(expectedTime));
     }
@@ -108,12 +108,12 @@ public class BmsJudgementSelectorTest
     {
         var tight = note(1000 - offset) with { JudgementRate = 0.25 };
         var wide = note(1000 + offset);
-        var selection = BmsJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [tight, wide], 1000, algorithm);
+        var selection = BmsTestJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [tight, wide], 1000, algorithm);
         Assert.That(selection.Candidate, Is.EqualTo(wide));
 
         var firstWide = tight with { JudgementRate = 1 };
         var nextTight = wide with { JudgementRate = 0.25 };
-        selection = BmsJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [firstWide, nextTight], 1000, algorithm);
+        selection = BmsTestJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [firstWide, nextTight], 1000, algorithm);
         Assert.That(selection.Candidate, Is.EqualTo(firstWide));
     }
 
@@ -126,8 +126,8 @@ public class BmsJudgementSelectorTest
         var first = note(1000) with { Column = column };
         var second = note(1000 + goodWindow) with { Column = column, IsLongNote = true, EndTime = 2000 };
 
-        var atBoundary = BmsJudgementSelector.SelectPress(layout, column, [second, first], second.StartTime, BmsJudgementAlgorithm.Combo);
-        var afterBoundary = BmsJudgementSelector.SelectPress(layout, column, [second, first], second.StartTime + 0.01, BmsJudgementAlgorithm.Combo);
+        var atBoundary = BmsTestJudgementSelector.SelectPress(layout, column, [second, first], second.StartTime, BmsJudgementAlgorithm.Combo);
+        var afterBoundary = BmsTestJudgementSelector.SelectPress(layout, column, [second, first], second.StartTime + 0.01, BmsJudgementAlgorithm.Combo);
 
         Assert.That(atBoundary.Candidate, Is.EqualTo(first));
         Assert.That(afterBoundary.Candidate, Is.EqualTo(second));
@@ -143,8 +143,8 @@ public class BmsJudgementSelectorTest
             BmsJudgementAlgorithm[] algorithms = [BmsJudgementAlgorithm.Combo, BmsJudgementAlgorithm.Score];
             foreach (var algorithm in algorithms)
             {
-                var future = BmsJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [note(1000), note(1060)], 1050, algorithm);
-                var past = BmsJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [note(1000), note(1060)], 1060, algorithm);
+                var future = BmsTestJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [note(1000), note(1060)], 1050, algorithm);
+                var past = BmsTestJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [note(1000), note(1060)], 1060, algorithm);
 
                 Assert.That(future.Candidate?.StartTime, Is.EqualTo(1000), algorithm.ToString());
                 Assert.That(past.Candidate?.StartTime, Is.EqualTo(1060), algorithm.ToString());
@@ -161,7 +161,7 @@ public class BmsJudgementSelectorTest
     {
         var next = note(1000);
         var wrongColumn = note(600) with { Column = 2 };
-        var selection = BmsJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [note(1100), wrongColumn, next], 600, algorithm);
+        var selection = BmsTestJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [note(1100), wrongColumn, next], 600, algorithm);
 
         Assert.That(selection.Candidate, Is.EqualTo(next));
         Assert.That(selection.IsEmptyPoor, Is.True);
@@ -171,9 +171,9 @@ public class BmsJudgementSelectorTest
     [Test]
     public void TestEmptyAndOutOfWindowCandidates([Values] BmsJudgementAlgorithm algorithm)
     {
-        Assert.That(BmsJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [], 1000, algorithm).Candidate, Is.Null);
-        Assert.That(BmsJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [note(1000)], 499, algorithm).Candidate, Is.Null);
-        Assert.That(BmsJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [note(1000)], 1281, algorithm).Candidate, Is.Null);
+        Assert.That(BmsTestJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [], 1000, algorithm).Candidate, Is.Null);
+        Assert.That(BmsTestJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [note(1000)], 499, algorithm).Candidate, Is.Null);
+        Assert.That(BmsTestJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [note(1000)], 1281, algorithm).Candidate, Is.Null);
     }
 
     private static BmsJudgementCandidate note(double time) => new(time, time, 1, 1, false);
@@ -183,7 +183,7 @@ public class BmsJudgementSelectorTest
     {
         var candidate = new BmsJudgementCandidate(StartTime: 1000, EndTime: 1000, Column: 1, JudgementRate: rankRate(3), IsLongNote: false);
 
-        var selection = BmsJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [candidate], inputTime: 600);
+        var selection = BmsTestJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [candidate], inputTime: 600);
 
         Assert.That(selection.IsEmptyPoor, Is.True);
         Assert.That(selection.Candidate, Is.EqualTo(candidate));
@@ -196,7 +196,7 @@ public class BmsJudgementSelectorTest
         var next = new BmsJudgementCandidate(StartTime: 1000, EndTime: 1000, Column: 1, JudgementRate: rankRate(3), IsLongNote: false);
         var later = new BmsJudgementCandidate(StartTime: 1100, EndTime: 1100, Column: 1, JudgementRate: rankRate(3), IsLongNote: false);
 
-        var selection = BmsJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [later, next], inputTime: 600);
+        var selection = BmsTestJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [later, next], inputTime: 600);
 
         Assert.That(selection.IsEmptyPoor, Is.True);
         Assert.That(selection.Candidate, Is.EqualTo(next));
@@ -207,7 +207,7 @@ public class BmsJudgementSelectorTest
     {
         var candidate = new BmsJudgementCandidate(StartTime: 1000, EndTime: 1000, Column: 1, JudgementRate: rankRate(3), IsLongNote: false);
 
-        var selection = BmsJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [candidate], inputTime: 780);
+        var selection = BmsTestJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [candidate], inputTime: 780);
 
         Assert.That(selection.IsEmptyPoor, Is.False);
         Assert.That(selection.Candidate, Is.EqualTo(candidate));
@@ -219,7 +219,7 @@ public class BmsJudgementSelectorTest
     {
         var candidate = new BmsJudgementCandidate(StartTime: 1000, EndTime: 1000, Column: 1, JudgementRate: rankRate(3), IsLongNote: false);
 
-        var selection = BmsJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [candidate], inputTime: 499);
+        var selection = BmsTestJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [candidate], inputTime: 499);
 
         Assert.That(selection.IsEmptyPoor, Is.False);
         Assert.That(selection.Candidate, Is.Null);
@@ -234,7 +234,7 @@ public class BmsJudgementSelectorTest
 
         // inputTime=1240: first note (1000) is 240ms slow → BAD (outside GOOD -150 slow bound).
         // second note (1200) is 40ms slow → GREAT (inside GREAT -60 bound, better than first).
-        var selection = BmsJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [first, second], inputTime: 1240);
+        var selection = BmsTestJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [first, second], inputTime: 1240);
 
         Assert.That(selection.Candidate, Is.EqualTo(second));
         Assert.That(selection.Result, Is.EqualTo(HitResult.Great));
@@ -250,8 +250,8 @@ public class BmsJudgementSelectorTest
         var easy = new BmsJudgementCandidate(StartTime: 1000, EndTime: 1000, Column: 1, JudgementRate: rankRate(3), IsLongNote: false);
         var veryHard = new BmsJudgementCandidate(StartTime: 1000, EndTime: 1000, Column: 1, JudgementRate: rankRate(0), IsLongNote: false);
 
-        var easyResult = BmsJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [easy], inputTime: 1035);
-        var veryHardResult = BmsJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [veryHard], inputTime: 1035);
+        var easyResult = BmsTestJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [easy], inputTime: 1035);
+        var veryHardResult = BmsTestJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [veryHard], inputTime: 1035);
 
         Assert.That(easyResult.Result, Is.EqualTo(HitResult.Great));
         Assert.That(veryHardResult.Result, Is.EqualTo(HitResult.Good));

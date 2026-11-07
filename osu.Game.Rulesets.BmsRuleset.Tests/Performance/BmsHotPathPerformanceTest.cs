@@ -68,7 +68,7 @@ public class BmsHotPathPerformanceTest
         asset.Complete(2048L * 4096);
         var mixer = new BmsPcmVoiceMixer();
         mixer.SubmitPlayBatch(Enumerable.Range(0, 64)
-            .Select(i => new BmsVoicePlay(asset, new BmsTerminationDomain((ushort)i), 0, SourceOffsetFrame: i * 8192)).ToArray());
+            .Select(i => new BmsVoicePlay(asset, (ushort)i, 0, SourceOffsetFrame: i * 8192)).ToArray());
         var output = new float[88200];
         return new Measurement(() => mixer.Render(output), () =>
         {

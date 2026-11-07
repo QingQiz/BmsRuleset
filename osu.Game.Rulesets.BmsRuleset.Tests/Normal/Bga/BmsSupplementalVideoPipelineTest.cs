@@ -8,6 +8,7 @@ using System.Threading;
 using NUnit.Framework;
 using osu.Framework.Timing;
 using osu.Game.Rulesets.BmsRuleset.Media.FFmpeg;
+using osu.Game.Rulesets.BmsRuleset.Media.Video;
 using osu.Game.Rulesets.BmsRuleset.Media.Video.Supplemental;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Bga;
@@ -36,6 +37,12 @@ public class BmsSupplementalVideoPipelineTest
     {
         if (!BmsSupplementalFFmpegFuncs.TryCreate(out _, out var error))
             Assert.Ignore(error ?? "Supplemental FFmpeg native artifacts are unavailable.");
+    }
+
+    private static BmsSupplementalVideoFrameSource createFrameSource(byte[] bytes)
+    {
+        Assert.That(BmsSupplementalVideoDecoder.TryCreate(bytes, out var decoder, out var error), Is.True, error);
+        return new BmsSupplementalVideoFrameSource(decoder!);
     }
 
     private static bool waitUntil(Func<bool> condition, TimeSpan timeout)
@@ -71,19 +78,52 @@ public class BmsSupplementalVideoPipelineTest
         waitUntil(() => BmsVideoTestAccess.GetQueuedFrameCount(source) >= minimumCount, timeout);
 
     [Test]
-    public void TestDrawableReadsSeekableStreamFromBeginning()
+    public void TestProviderTransfersOpenedDecoderWithoutReadingStreamAgain()
     {
         requireSupplementalNativeArtifacts();
 
         var bytes = File.ReadAllBytes(locateTestSongFile("103_outlaw_ogg", "bga.mpg"));
-        using var stream = new MemoryStream(bytes);
+        using var stream = new CountingCopyStream(bytes);
         stream.Position = stream.Length;
 
-        using var drawable = new BmsSupplementalVideoDrawable(stream, new ManualClock(), 0);
+        var request = new BmsBgaVideoRequest("bga.mpg", stream, new ManualFramedClock(), 0);
+        Assert.That(new SupplementalBmsBgaVideoProvider().TryCreate(request, out var created), Is.True);
+        using var drawable = (BmsSupplementalVideoDrawable)created!;
+        Assert.That(stream.Position, Is.EqualTo(stream.Length));
         typeof(BmsSupplementalVideoDrawable).GetMethod("load", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(drawable, [null]);
 
         var source = BmsVideoTestAccess.GetFrameSource(drawable)!;
         Assert.That(waitUntil(() => BmsVideoTestAccess.GetQueuedFrameCount(source) > 0, TimeSpan.FromSeconds(3)), Is.True);
+        Assert.That(stream.CopyCount, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void TestOpenedDecoderIsReleasedWhenSourceNeverStarts()
+    {
+        requireSupplementalNativeArtifacts();
+        var bytes = File.ReadAllBytes(Path.Combine(TestContext.CurrentContext.TestDirectory, "bga_fixtures", "mpeg1.mpg"));
+        Assert.That(BmsSupplementalVideoDecoder.TryCreate(bytes, out var decoder, out var error), Is.True, error);
+        var source = new BmsSupplementalVideoFrameSource(decoder!);
+
+        source.Dispose();
+
+        Assert.That(typeof(BmsSupplementalVideoDecoder).GetField("disposed", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(decoder), Is.True);
+        Assert.DoesNotThrow(source.Dispose);
+    }
+
+    [Test]
+    public void TestRejectedCodecLeavesStreamPositionForTheNextProvider()
+    {
+        requireSupplementalNativeArtifacts();
+        using var stream = new MemoryStream([1, 2, 3, 4]);
+        stream.Position = 2;
+
+        var accepted = new SupplementalBmsBgaVideoProvider().TryCreate(
+            new BmsBgaVideoRequest("invalid.avi", stream, new ManualFramedClock(), 0), out var drawable);
+
+        Assert.That(accepted, Is.False);
+        Assert.That(drawable, Is.Null);
+        Assert.That(stream.Position, Is.EqualTo(2));
     }
 
     [Test]
@@ -92,7 +132,7 @@ public class BmsSupplementalVideoPipelineTest
         requireSupplementalNativeArtifacts();
 
         var bytes = File.ReadAllBytes(locateTestSongFile("103_outlaw_ogg", "bga.mpg"));
-        using var source = new BmsSupplementalVideoFrameSource(bytes);
+        using var source = createFrameSource(bytes);
 
         source.Start();
 
@@ -129,7 +169,7 @@ public class BmsSupplementalVideoPipelineTest
         requireSupplementalNativeArtifacts();
 
         var bytes = File.ReadAllBytes(locateTestSongFile("Aleph-0 (by LeaF)", "_bga.mpg"));
-        using var source = new BmsSupplementalVideoFrameSource(bytes);
+        using var source = createFrameSource(bytes);
 
         source.Start();
         source.SetTargetTime(0);
@@ -145,7 +185,7 @@ public class BmsSupplementalVideoPipelineTest
         requireSupplementalNativeArtifacts();
 
         var bytes = File.ReadAllBytes(locateTestSongFile("103_outlaw_ogg", "bga.mpg"));
-        using var source = new BmsSupplementalVideoFrameSource(bytes);
+        using var source = createFrameSource(bytes);
 
         source.Start();
         source.SetTargetTime(0.5);
@@ -161,7 +201,7 @@ public class BmsSupplementalVideoPipelineTest
         requireSupplementalNativeArtifacts();
 
         var bytes = File.ReadAllBytes(Path.Combine(TestContext.CurrentContext.TestDirectory, "bga_fixtures", "mpeg1.mpg"));
-        var source = new BmsSupplementalVideoFrameSource(bytes);
+        var source = createFrameSource(bytes);
 
         source.Start();
         Assert.That(waitForQueuedFrames(source, 1, TimeSpan.FromSeconds(3)), Is.True);
@@ -178,7 +218,7 @@ public class BmsSupplementalVideoPipelineTest
         requireSupplementalNativeArtifacts();
 
         var bytes = File.ReadAllBytes(locateTestSongFile("103_outlaw_ogg", "bga.mpg"));
-        using var source = new BmsSupplementalVideoFrameSource(bytes);
+        using var source = createFrameSource(bytes);
 
         source.Start();
         source.SetTargetTime(0);
@@ -195,7 +235,7 @@ public class BmsSupplementalVideoPipelineTest
         requireSupplementalNativeArtifacts();
 
         var bytes = File.ReadAllBytes(locateTestSongFile("103_outlaw_ogg", "bga.mpg"));
-        using var source = new BmsSupplementalVideoFrameSource(bytes);
+        using var source = createFrameSource(bytes);
 
         source.SetTargetTime(5.0);
         source.Start();
@@ -211,7 +251,7 @@ public class BmsSupplementalVideoPipelineTest
         requireSupplementalNativeArtifacts();
 
         var bytes = File.ReadAllBytes(locateTestSongFile("103_outlaw_ogg", "bga.mpg"));
-        using var source = new BmsSupplementalVideoFrameSource(bytes);
+        using var source = createFrameSource(bytes);
 
         source.Start();
         source.SetTargetTime(2.0);
@@ -232,5 +272,16 @@ public class BmsSupplementalVideoPipelineTest
         // OS (not just the ones that skipped ILRepack).
         var referencedAssemblyNames = typeof(BmsRuleset).Assembly.GetReferencedAssemblies().Select(assembly => assembly.Name).ToArray();
         Assert.That(referencedAssemblyNames, Does.Not.Contain("PLMpegSharp"));
+    }
+
+    private sealed class CountingCopyStream(byte[] bytes) : MemoryStream(bytes)
+    {
+        internal int CopyCount { get; private set; }
+
+        public override void CopyTo(Stream destination, int bufferSize)
+        {
+            CopyCount++;
+            base.CopyTo(destination, bufferSize);
+        }
     }
 }

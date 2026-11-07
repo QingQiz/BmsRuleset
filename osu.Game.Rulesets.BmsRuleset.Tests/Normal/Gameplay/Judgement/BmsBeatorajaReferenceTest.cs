@@ -102,7 +102,7 @@ public class BmsBeatorajaReferenceTest
         [Values(499.999, 500, 500.001)] double pressTime)
     {
         var candidate = new BmsJudgementCandidate(1000, 1000, 1, BmsJudgementProfileProvider.RateForRank(layout, 2), false);
-        Assert.That(BmsJudgementSelector.SelectPress(layout, 1, [candidate], pressTime).Result, Is.EqualTo(pressTime > 500 ? HitResult.Miss : HitResult.None),
+        Assert.That(BmsTestJudgementSelector.SelectPress(layout, 1, [candidate], pressTime).Result, Is.EqualTo(pressTime > 500 ? HitResult.Miss : HitResult.None),
             "JudgeManager exits the search at dmtime >= mjudgeend (500000us). The row itself has an inclusive boundary.");
     }
 

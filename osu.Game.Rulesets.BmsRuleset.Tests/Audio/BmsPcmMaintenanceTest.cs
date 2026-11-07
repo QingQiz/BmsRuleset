@@ -152,14 +152,14 @@ public class BmsPcmMaintenanceTest
         for (ushort key = 0; key < firstBatch.Length; key++)
         {
             controller.QueueLivePlay(key, 10 + key);
-            firstBatch[key] = new BmsVoicePlay(leases[key].Asset, new BmsTerminationDomain(key), 0, (10 + key) / 100f);
+            firstBatch[key] = new BmsVoicePlay(leases[key].Asset, key, 0, (10 + key) / 100f);
         }
         controller.SubmitLivePlayBatch();
         reference.SubmitPlayBatch(firstBatch);
 
         controller.QueueLivePlay(8, 40);
         controller.SubmitLivePlayBatch();
-        reference.SubmitPlayBatch([new BmsVoicePlay(leases[8].Asset, new BmsTerminationDomain(8), 0, 0.4f)]);
+        reference.SubmitPlayBatch([new BmsVoicePlay(leases[8].Asset, 8, 0, 0.4f)]);
         controller.QueuePlay(9, 100, 1000);
         controller.SubmitLivePlayBatch();
         controller.SubmitLivePlayBatch();

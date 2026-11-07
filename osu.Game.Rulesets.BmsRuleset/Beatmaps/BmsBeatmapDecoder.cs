@@ -74,7 +74,7 @@ public class BmsBeatmapDecoder(Func<int, int>? randomValueSelector = null, BmsRe
         return hitObject;
     }
 
-    internal static void PopulateTiming(Beatmap output, IEnumerable<BmsBpmEvent> timingEvents)
+    internal static void PopulateTiming(IBeatmap output, IEnumerable<BmsBpmEvent> timingEvents)
     {
         output.ControlPointInfo.Clear();
 

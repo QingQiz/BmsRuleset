@@ -35,7 +35,6 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable, IBmsResult
 
     private readonly ScoreInfo? score;
     private readonly IBeatmap? playableBeatmap;
-    private readonly IReadOnlyList<(ScoreInfo? Score, IBeatmap Beatmap)>? stages;
     private IReadOnlyList<GaugeSeries>? series;
     private IReadOnlyList<float> stageBoundaries = [];
     private Drawable? graph;
@@ -58,29 +57,10 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable, IBmsResult
         this.playableBeatmap = playableBeatmap;
     }
 
-    internal BmsGaugeHistoryGraph(IReadOnlyList<(ScoreInfo? Score, IBeatmap Beatmap)> stages)
-    {
-        RelativeSizeAxes = Axes.X;
-        AutoSizeAxes = Axes.Y;
-
-        this.stages = stages;
-    }
-
     [BackgroundDependencyLoader]
     private void load()
     {
-        if (series == null)
-        {
-            if (score != null && playableBeatmap != null)
-            {
-                series = CreateSeries(score, playableBeatmap);
-            }
-            else if (stages != null)
-            {
-                series = CreateCourseSeries(stages);
-                stageBoundaries = CreateCourseStageBoundaries(stages);
-            }
-        }
+        series ??= CreateSeries(score!, playableBeatmap!);
 
         rebuild();
     }
@@ -148,16 +128,6 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable, IBmsResult
         return gaugeTypes.Select(type => createSeries(type, hitEvents, total, noteCount, duration, type == finalGaugeType, profileFamily)).ToArray();
     }
 
-    internal static IReadOnlyList<GaugeSeries> CreateCourseSeries(IReadOnlyList<(ScoreInfo? Score, IBeatmap Beatmap)> stages)
-    {
-        if (stages.Count == 0)
-            return [];
-
-        var stageSeries = stages.Select(stage => stage.Score != null ? CreateSeries(stage.Score, stage.Beatmap) : []).ToArray();
-        var durations = stages.Select(courseStageDuration).ToArray();
-        return CreateCourseSeries(stageSeries, durations);
-    }
-
     internal static IReadOnlyList<GaugeSeries> CreateCourseSeries(
         IReadOnlyList<IReadOnlyList<GaugeSeries>> stageSeries, IReadOnlyList<double> durations)
     {
@@ -209,9 +179,6 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable, IBmsResult
         }).ToArray();
     }
 
-    internal static IReadOnlyList<float> CreateCourseStageBoundaries(IReadOnlyList<(ScoreInfo? Score, IBeatmap Beatmap)> stages)
-        => CreateCourseStageBoundaries(stages.Select(courseStageDuration).ToArray());
-
     internal static IReadOnlyList<float> CreateCourseStageBoundaries(IReadOnlyList<double> durations)
     {
         if (durations.Count < 2)
@@ -228,17 +195,6 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable, IBmsResult
         }
 
         return boundaries;
-    }
-
-    private static double courseStageDuration((ScoreInfo? Score, IBeatmap Beatmap) stage)
-    {
-        if (stage.Score == null)
-            return graphDuration(stage.Beatmap, 0);
-
-        var hitEvents = stage.Score.HitEvents;
-        var lastEventTime = hitEvents.Select(e => e.HitObject.GetEndTime()).DefaultIfEmpty(0).Max();
-
-        return graphDuration(stage.Beatmap, lastEventTime);
     }
 
     private static IReadOnlyList<GaugeSeries> createSeries(

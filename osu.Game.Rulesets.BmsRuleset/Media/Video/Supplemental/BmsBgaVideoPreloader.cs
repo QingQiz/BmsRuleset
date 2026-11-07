@@ -7,9 +7,9 @@ using osu.Framework.Timing;
 namespace osu.Game.Rulesets.BmsRuleset.Media.Video.Supplemental;
 
 // Pre-warms BmsSupplementalVideoFrameSource instances during the loading screen so gameplay entry
-// doesn't pay the FFmpeg init + first-frame latency on the game thread. The codec probe and the
-// worker's avformat/avcodec open run on the loader thread here; createVideo() later just hands the
-// already-decoding source to a drawable — no hitch at the BGA event's fire time.
+// doesn't pay the FFmpeg init + first-frame latency on the game thread. The decoder opens
+// once on the loader thread here; createVideo() later just hands the already-decoding source
+// to a drawable — no hitch at the BGA event's fire time.
 internal sealed class BmsBgaVideoPreloader : IDisposable
 {
     private readonly Dictionary<string, BmsSupplementalVideoFrameSource> warm = new(StringComparer.OrdinalIgnoreCase);
@@ -28,12 +28,10 @@ internal sealed class BmsBgaVideoPreloader : IDisposable
 
         // Mirror the supplemental provider's probe: only warm files the supplemental backend can
         // actually decode, so files routed to the framework/missing path are left for the factory.
-        if (!BmsSupplementalVideoDecoder.TryCreate(bytes, out var probe, out _))
+        if (!BmsSupplementalVideoDecoder.TryCreate(bytes, out var decoder, out _))
             return;
 
-        probe.Dispose();
-
-        var source = new BmsSupplementalVideoFrameSource(bytes);
+        var source = new BmsSupplementalVideoFrameSource(decoder);
         source.Start();
         warm[path] = source;
     }

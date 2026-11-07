@@ -54,7 +54,7 @@ public class BmsBeatorajaParityTest
     public void ConsumedNoteCanCauseEmptyPoorExceptInPms(BmsLayoutVariant layout, bool expected)
     {
         var candidate = new BmsJudgementCandidate(1000, 1000, 1, 0.75, false, IsJudged: true);
-        var selection = BmsJudgementSelector.SelectPress(layout, 1, [candidate], 1050);
+        var selection = BmsTestJudgementSelector.SelectPress(layout, 1, [candidate], 1050);
         Assert.That(selection.IsEmptyPoor, Is.EqualTo(expected));
     }
 
@@ -62,8 +62,8 @@ public class BmsBeatorajaParityTest
     public void PmsMistakeBlocksRepeatedBadButAllowsSuccessfulRehit()
     {
         var candidate = new BmsJudgementCandidate(1000, 1000, 1, 0.7, false, HasMistake: true);
-        Assert.That(BmsJudgementSelector.SelectPress(BmsLayoutVariant.Pms9K, 1, [candidate], 850).Result, Is.EqualTo(HitResult.None));
-        Assert.That(BmsJudgementSelector.SelectPress(BmsLayoutVariant.Pms9K, 1, [candidate], 1000).Result, Is.EqualTo(HitResult.Perfect));
+        Assert.That(BmsTestJudgementSelector.SelectPress(BmsLayoutVariant.Pms9K, 1, [candidate], 850).Result, Is.EqualTo(HitResult.None));
+        Assert.That(BmsTestJudgementSelector.SelectPress(BmsLayoutVariant.Pms9K, 1, [candidate], 1000).Result, Is.EqualTo(HitResult.Perfect));
     }
 
     [Test]

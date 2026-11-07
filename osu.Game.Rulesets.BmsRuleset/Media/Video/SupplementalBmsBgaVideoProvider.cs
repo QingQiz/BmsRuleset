@@ -11,7 +11,7 @@ internal sealed class SupplementalBmsBgaVideoProvider : IBmsBgaVideoProvider
 {
     // Pure MPEG program/elementary streams. The framework's bundled FFmpeg ships no mpegps/
     // mpegvideo demuxer, so these containers are owned exclusively by the supplemental path —
-    // framework declines them via FrameworkBmsBgaVideoProvider.CanCreate = !IsLegacyMpegContainer.
+    // framework declines these extensions.
     private static readonly HashSet<string> legacy_mpeg_container_extensions = new(StringComparer.OrdinalIgnoreCase)
     {
         ".mpg",
@@ -35,29 +35,14 @@ internal sealed class SupplementalBmsBgaVideoProvider : IBmsBgaVideoProvider
         ".avi",
     };
 
-    public string Name => "supplemental-ffmpeg";
-
     public static bool IsLegacyMpegContainerExtension(string extension) => legacy_mpeg_container_extensions.Contains(extension);
 
-    public bool CanCreate(BmsBgaVideoRequest request)
-        => BmsSupplementalFFmpegFuncs.IsAvailable
-           && probeable_extensions.Contains(Path.GetExtension(request.Path))
-           && probeClaimsSupplementalCodec(request);
-
-    public Drawable Create(BmsBgaVideoRequest request) => new BmsSupplementalVideoDrawable(request.Stream, request.Clock, request.EventStartTime)
+    public bool TryCreate(BmsBgaVideoRequest request, out Drawable? drawable)
     {
-        Anchor = Anchor.Centre,
-        Origin = Anchor.Centre,
-        RelativeSizeAxes = Axes.Both,
-        FillMode = FillMode.Stretch,
-    };
+        drawable = null;
+        if (!BmsSupplementalFFmpegFuncs.IsAvailable || !probeable_extensions.Contains(Path.GetExtension(request.Path)))
+            return false;
 
-    // Route by codec, not extension: attempt a full supplemental decoder init on the stream bytes
-    // and claim the file only if it succeeds. Reusing the decoder keeps the supported-codec set
-    // auto-synced with the native build (profile.txt) — no second list to drift out of sync. The
-    // stream position is saved/restored so the next provider (or Create's decoder) still sees 0.
-    private bool probeClaimsSupplementalCodec(BmsBgaVideoRequest request)
-    {
         var stream = request.Stream;
         if (!stream.CanSeek)
             return false;
@@ -75,7 +60,9 @@ internal sealed class SupplementalBmsBgaVideoProvider : IBmsBgaVideoProvider
             if (!BmsSupplementalVideoDecoder.TryCreate(memory.ToArray(), out var decoder, out _))
                 return false;
 
-            decoder.Dispose();
+            // The codec check already opened the decoder; transfer it rather than opening the same bytes again.
+            var source = new BmsSupplementalVideoFrameSource(decoder);
+            drawable = new BmsSupplementalVideoDrawable(source, request.Clock, request.EventStartTime, stream);
             return true;
         }
         finally

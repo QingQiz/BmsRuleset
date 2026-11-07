@@ -1,6 +1,5 @@
 using System.Linq;
 using NUnit.Framework;
-using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
@@ -163,8 +162,8 @@ public class BmsGaugeHistoryGraphTest
 
         var series = BmsResultStatisticsData.CreateCourse(
         [
-            (createBeatmap(), BmsResultStatisticsData.Create(firstScore, createBeatmap(), gauges: firstHistory)),
-            (createBeatmap(), BmsResultStatisticsData.Create(secondScore, createBeatmap(), gauges: secondHistory)),
+            BmsResultStatisticsData.Create(firstScore, createBeatmap(), gauges: firstHistory),
+            BmsResultStatisticsData.Create(secondScore, createBeatmap(), gauges: secondHistory),
         ]).Gauges;
 
         Assert.Multiple(() =>
@@ -189,11 +188,11 @@ public class BmsGaugeHistoryGraphTest
             HitEvents = [new HitEvent(0, 1, HitResult.Perfect, new BmsNote { StartTime = 1000 }, null, null)],
         };
 
-        var series = BmsGaugeHistoryGraph.CreateCourseSeries(
+        var series = BmsResultStatisticsData.CreateCourse(
         [
-            (firstScore, createBeatmap()),
-            (secondScore, createBeatmap()),
-        ]).Single();
+            BmsResultStatisticsData.Create(firstScore, createBeatmap()),
+            BmsResultStatisticsData.Create(secondScore, createBeatmap()),
+        ]).Gauges.Single();
 
         Assert.That(series.Segments, Has.Count.EqualTo(2));
         Assert.That(series.Segments[1][0].Health, Is.EqualTo(series.Segments[0][^1].Health));
@@ -212,14 +211,13 @@ public class BmsGaugeHistoryGraphTest
             Mods = [new BmsModHardGauge()],
             HitEvents = [new HitEvent(0, 1, HitResult.Perfect, new BmsNote { StartTime = 3000 }, null, null)],
         };
-        (ScoreInfo Score, IBeatmap Beatmap)[] stages =
+        var data = BmsResultStatisticsData.CreateCourse(
         [
-            (firstScore, createBeatmap(1000)),
-            (secondScore, createBeatmap(3000)),
-        ];
-
-        var series = BmsGaugeHistoryGraph.CreateCourseSeries(stages).Single();
-        var boundaries = BmsGaugeHistoryGraph.CreateCourseStageBoundaries(stages);
+            BmsResultStatisticsData.Create(firstScore, createBeatmap(1000)),
+            BmsResultStatisticsData.Create(secondScore, createBeatmap(3000)),
+        ]);
+        var series = data.Gauges.Single();
+        var boundaries = data.StageBoundaries;
 
         Assert.Multiple(() =>
         {

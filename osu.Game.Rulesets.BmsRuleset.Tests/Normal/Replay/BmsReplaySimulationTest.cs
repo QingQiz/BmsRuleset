@@ -231,9 +231,11 @@ public class BmsReplaySimulationTest
         var source = new ScoreInfo { Passed = true };
         var stage = BmsResultStatisticsData.Load(source, beatmap, createReplay(new BmsReplayFrame(1010, BmsAction.Key1)), default)!;
         var unplayed = createBeatmap();
-        unplayed.HitObjects.Add(new BmsNote { Beatmap = unplayed, Column = 2, StartTime = 3000 });
+        unplayed.LayoutVariant = BmsLayoutVariant.Pms9KDouble;
+        unplayed.TotalColumns = 18;
+        unplayed.HitObjects.Add(new BmsNote { Beatmap = unplayed, Column = 17, StartTime = 3000 });
         var course = BmsResultStatisticsData.CreateCourse(
-            [(beatmap, stage), (unplayed, BmsResultStatisticsData.Create(new ScoreInfo(), unplayed))]);
+            [stage, BmsResultStatisticsData.Create(new ScoreInfo(), unplayed)]);
 
         Assert.That(course.HitEvents.Single().TimeOffset, Is.EqualTo(10));
         Assert.That(course.StageBoundaries.Single(), Is.EqualTo(1010f / 4010).Within(0.001));
@@ -241,6 +243,8 @@ public class BmsReplaySimulationTest
         Assert.That(course.Timeline.Notes.Categories.Sum(category => category.Buckets.Sum()), Is.EqualTo(2));
         Assert.That(course.Timeline.Judgements.Categories.Sum(category => category.Buckets.Sum()), Is.EqualTo(1));
         Assert.That(course.Scatter.Overall.Points, Has.Count.EqualTo(1));
+        Assert.That(course.Scatter.Keys, Has.Count.EqualTo(stage.Scatter.Keys.Count));
+        Assert.That(course.Offset.Keys, Has.Count.EqualTo(stage.Offset.Keys.Count));
         Assert.That(source.HitEvents, Is.Empty);
     }
 

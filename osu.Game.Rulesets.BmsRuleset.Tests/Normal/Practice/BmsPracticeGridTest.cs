@@ -62,11 +62,10 @@ public class BmsPracticeGridTest
     }
 
     [Test]
-    public void SnapUsesMusicalDistanceAcrossBpmChangesAndLeadIn()
+    public void SnapUsesMusicalDistanceAcrossBpmChanges()
     {
-        var original = new BmsTimingMap(192, [new(0, 0, 192, 1)],
+        var map = new BmsTimingMap(192, [new(0, 0, 192, 1)],
             [new(0, 60, 0), new(20, 480, 416.666666666667)], []);
-        var map = original.ShiftedBy(2500);
 
         // Tick 20 is closer to tick 0 than tick 48, despite being much closer to tick 48 in milliseconds.
         Assert.That(BmsPracticeGrid.Snap(map, map.ProjectTickToTime(20), 4), Is.EqualTo(map.ProjectTickToTime(0)));
@@ -90,7 +89,7 @@ public class BmsPracticeGridTest
     public void VariableDivisionsKeepBpmAndStopProjection(int beatDivisor)
     {
         var map = new BmsTimingMap(192, [new(0, 0, 192, 1)],
-            [new(0, 120, 0), new(96, 240, 1500)], [new(48, 500, 48, 120, 0)]).ShiftedBy(300);
+            [new(0, 120, 0), new(96, 240, 1500)], [new(48, 500, 48, 120, 0)]);
         var lines = BmsPracticeGrid.Create(map, beatDivisor);
 
         foreach (var line in lines)
@@ -168,18 +167,17 @@ public class BmsPracticeGridTest
     }
 
     [Test]
-    public void BpmChangesAndLeadInUseAuthoritativeTickProjection()
+    public void BpmChangesUseAuthoritativeTickProjection()
     {
-        var original = new BmsTimingMap(192, [new(0, 0, 192, 1)],
+        var map = new BmsTimingMap(192, [new(0, 0, 192, 1)],
             [new(0, 120, 0), new(96, 240, 1000)], []);
-        var map = original.ShiftedBy(250);
         var lines = BmsPracticeGrid.Create(map);
 
-        Assert.That(lines[0].Time, Is.EqualTo(250));
-        Assert.That(lines[7].Time, Is.EqualTo(1125));
-        Assert.That(lines[8].Time, Is.EqualTo(1250));
-        Assert.That(lines[9].Time, Is.EqualTo(1312.5));
-        Assert.That(lines[^1].Time, Is.EqualTo(1750));
+        Assert.That(lines[0].Time, Is.Zero);
+        Assert.That(lines[7].Time, Is.EqualTo(875));
+        Assert.That(lines[8].Time, Is.EqualTo(1000));
+        Assert.That(lines[9].Time, Is.EqualTo(1062.5));
+        Assert.That(lines[^1].Time, Is.EqualTo(1500));
         foreach (var line in lines.Take(16))
             Assert.That(line.Time, Is.EqualTo(map.ProjectTickToTime(line.Subdivision * 12L)));
     }

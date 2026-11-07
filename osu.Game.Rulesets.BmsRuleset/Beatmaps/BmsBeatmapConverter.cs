@@ -46,14 +46,8 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
 
     protected override Beatmap<BmsHitObject> ConvertBeatmap(IBeatmap original, CancellationToken cancellationToken)
     {
-        if (tryMaterialiseDecodedBeatmap(original, out var materialised))
-            original = materialised;
-
         var converted = convertToBmsBeatmap(original, cancellationToken);
         var hasBmsData = original is IBmsBeatmap;
-        if (original is IBmsBeatmap bmsSource)
-            converted.CopyBmsDataFrom(bmsSource);
-
         converted.TimingMap ??= createFallbackTimingMap(converted);
         converted.TickResolution = converted.TimingMap.TickResolution;
 
@@ -201,6 +195,13 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
             BeatmapVersion = original.BeatmapVersion,
         };
 
+        if (original is BmsDecodedBeatmap { RawLines.Length: > 0 } decoded)
+        {
+            materialiseDecodedBeatmap(decoded, converted, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            return converted;
+        }
+
         var foreignConverter = BmsForeignBeatmapConverterRegistry.FindConverter(original);
 
         if (foreignConverter != null)
@@ -216,18 +217,16 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
             }
         }
 
+        if (original is IBmsBeatmap bmsSource)
+            converted.CopyBmsDataFrom(bmsSource);
+
         converted.HitObjects = converted.HitObjects.OrderBy(h => h.StartTime).ToList();
         cancellationToken.ThrowIfCancellationRequested();
         return converted;
     }
 
-    private bool tryMaterialiseDecodedBeatmap(IBeatmap original, out IBeatmap materialised)
+    private void materialiseDecodedBeatmap(BmsDecodedBeatmap decoded, BmsBeatmap converted, CancellationToken cancellationToken)
     {
-        materialised = original;
-
-        if (original is not BmsDecodedBeatmap { RawLines.Length: > 0 } decoded)
-            return false;
-
         var selector = BranchRandomValueSelector;
 
         if (!string.IsNullOrWhiteSpace(BranchReplayDecisions))
@@ -235,35 +234,14 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
 
         var parseResult = BmsChartParser.Parse(decoded.RawLines, decoded.BeatmapInfo.Path, selector,
             ReferenceBpmMode ?? BmsRulesetRuntime.CurrentReferenceBpmMode, JudgementRateCalculator);
-        var beatmap = new BmsDecodedBeatmap
-        {
-            BeatmapInfo = decoded.BeatmapInfo.Clone(),
-            ControlPointInfo = new ControlPointInfo(),
-            Breaks = decoded.Breaks,
-            AudioLeadIn = decoded.AudioLeadIn,
-            StackLeniency = decoded.StackLeniency,
-            SpecialStyle = decoded.SpecialStyle,
-            LetterboxInBreaks = decoded.LetterboxInBreaks,
-            WidescreenStoryboard = decoded.WidescreenStoryboard,
-            EpilepsyWarning = decoded.EpilepsyWarning,
-            SamplesMatchPlaybackRate = decoded.SamplesMatchPlaybackRate,
-            DistanceSpacing = decoded.DistanceSpacing,
-            GridSize = decoded.GridSize,
-            TimelineZoom = decoded.TimelineZoom,
-            Countdown = decoded.Countdown,
-            CountdownOffset = decoded.CountdownOffset,
-            Bookmarks = decoded.Bookmarks,
-            BeatmapVersion = decoded.BeatmapVersion,
-            RawLines = decoded.RawLines,
-        };
-
-        beatmap.CopyFrom(parseResult);
-        BmsBeatmapDecoder.PopulateTiming(beatmap, parseResult.TimingMap.BpmEvents);
+        converted.CopyFrom(parseResult);
+        converted.ControlPointInfo = new ControlPointInfo();
+        BmsBeatmapDecoder.PopulateTiming(converted, parseResult.TimingMap.BpmEvents);
 
         foreach (var parsedObject in parseResult.HitObjects)
-            beatmap.HitObjects.Add(BmsBeatmapDecoder.CreateHitObject(parsedObject, beatmap));
-
-        materialised = beatmap;
-        return true;
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            converted.HitObjects.Add(BmsBeatmapDecoder.CreateHitObject(parsedObject, converted));
+        }
     }
 }

@@ -202,8 +202,7 @@ internal sealed unsafe class BmsSupplementalFFmpegFuncs
                 return false;
 
             var assembly = Assembly.GetExecutingAssembly();
-            return assembly.GetManifestResourceInfo(current_platform.resource) != null
-                   || assembly.GetManifestResourceInfo($"{current_platform.resource}.br") != null;
+            return assembly.GetManifestResourceInfo($"{current_platform.resource}.br") != null;
         }
     }
 
@@ -239,11 +238,6 @@ internal sealed unsafe class BmsSupplementalFFmpegFuncs
         error = null;
 
         var assembly = Assembly.GetExecutingAssembly();
-        using var rawStream = assembly.GetManifestResourceStream(name);
-
-        if (rawStream != null)
-            return readFully(rawStream, current_platform.artifact, out error);
-
         using var compressedStream = assembly.GetManifestResourceStream($"{name}.br");
 
         if (compressedStream == null)
@@ -265,30 +259,6 @@ internal sealed unsafe class BmsSupplementalFFmpegFuncs
             error = $"Supplemental FFmpeg native backend '{current_platform.artifact}' compressed resource could not be decompressed: {ex.Message}";
             return null;
         }
-    }
-
-    private static byte[]? readFully(Stream stream, string artifactName, out string? error)
-    {
-        error = null;
-        var bytes = new byte[stream.Length];
-        var totalRead = 0;
-
-        while (totalRead < bytes.Length)
-        {
-            var read = stream.Read(bytes, totalRead, bytes.Length - totalRead);
-            if (read <= 0)
-                break;
-
-            totalRead += read;
-        }
-
-        if (totalRead != bytes.Length)
-        {
-            error = $"Supplemental FFmpeg native backend '{artifactName}' resource was truncated.";
-            return null;
-        }
-
-        return bytes;
     }
 
     // Drop the embedded DLL into a per-content-hash temp path so repeated runs reuse it without

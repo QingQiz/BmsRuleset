@@ -4,13 +4,10 @@ namespace osu.Game.Rulesets.BmsRuleset.Media.Video;
 
 internal sealed class MissingBmsBgaVideoProvider : IBmsBgaVideoProvider
 {
-    public string Name => "missing";
-
-    public bool CanCreate(BmsBgaVideoRequest request) => true;
-
-    public Drawable? Create(BmsBgaVideoRequest request)
+    public bool TryCreate(BmsBgaVideoRequest request, out Drawable? drawable)
     {
         BmsLogger.Log($"[BGA] No video provider accepted '{request.Path}'.");
-        return null;
+        drawable = null;
+        return true;
     }
 }

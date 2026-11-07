@@ -38,13 +38,6 @@ public class BmsParserPerformanceTest
         measure(() => BmsChartParser.Parse(BmsChartParser.ReadAllLines(bytes), path, _ => 1), BmsParserPerformanceRegressionTest.Fingerprint);
     }
 
-    [Test]
-    public void ShiftTimingMap()
-    {
-        var map = BmsParserPerformanceRegressionTest.CreateTimingMap(4096);
-        measure(() => map.ShiftedBy(1000), r => JsonSerializer.Serialize(r));
-    }
-
     private static void measure<T>(Func<T> run, Func<T, string> fingerprint)
     {
         var elapsed = new double[7];

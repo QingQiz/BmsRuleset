@@ -60,11 +60,12 @@ internal sealed record BmsResultStatisticsData(
         };
     }
 
-    internal static BmsResultStatisticsData CreateCourse(IReadOnlyList<(IBeatmap Beatmap, BmsResultStatisticsData Data)> stages)
+    internal static BmsResultStatisticsData CreateCourse(IReadOnlyList<BmsResultStatisticsData> stages)
     {
-        var played = stages.Where(stage => stage.Data.HitEvents.Count > 0).Select(stage => (stage.Beatmap, stage.Data.HitEvents)).ToArray();
-        return combine(stages.Select(stage => stage.Data).ToArray(),
-            BmsHitScatterStatistic.CreateCourseStatistics(played), BmsHitOffsetStatistic.CreateCourseStatistics(played));
+        var played = stages.Where(stage => stage.HitEvents.Count > 0).ToArray();
+        return combine(stages,
+            BmsHitScatterStatistic.CombineStatistics(played.Select(stage => stage.Scatter).ToArray()),
+            BmsHitOffsetStatistic.CombineStatistics(played.Select(stage => (stage.Offset, stage.HitEvents)).ToArray()));
     }
 
     internal static BmsResultStatisticsData Combine(IReadOnlyList<BmsResultStatisticsData> attempts)

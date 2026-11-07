@@ -60,11 +60,10 @@ public sealed class BmsTimingMap
 
     private readonly TimingPoint[] points;
 
-    // ── Tick→time infrastructure (only used during parsing, not gameplay) ──
+    // ── Tick→time infrastructure ──
 
     private readonly BmsTickTimeConverter tickTimeConverter;
     private int cursor;
-    private readonly double timeOffset;
 
     // ── Construction ──────────────────────────────────────────────────────────
 
@@ -97,49 +96,12 @@ public sealed class BmsTimingMap
                                                   IEnumerable<BmsScrollEvent> scrollEvents, IEnumerable<BmsSpeedEvent> speedEvents, double baseBpm) =>
         new(tickResolution, measures, bpmEvents, stopEvents, scrollEvents, speedEvents, baseBpm, true);
 
-    private BmsTimingMap(BmsTimingMap original, double offset)
-    {
-        TickResolution = original.TickResolution;
-        ScrollReferenceBpm = original.ScrollReferenceBpm;
-        timeOffset = offset;
-        // Lead-in only changes absolute times. The ordered tick-domain data and scroll coordinates
-        // are immutable, so sharing them avoids sorting and constructing the same segments twice.
-        measures = original.measures;
-        stopEvents = original.stopEvents;
-        scrollEvents = original.scrollEvents;
-        speedEvents = original.speedEvents;
-        bpmEvents = new BmsBpmEvent[original.bpmEvents.Length];
-        for (var i = 0; i < bpmEvents.Length; i++)
-            bpmEvents[i] = original.bpmEvents[i] with { Time = original.bpmEvents[i].Time + offset };
-        points = new TimingPoint[original.points.Length];
-        for (var i = 0; i < points.Length; i++)
-        {
-            var point = original.points[i];
-            points[i] = new TimingPoint(point.Time + offset, point.NextTime + offset, point.ScrollPos,
-                point.Bpm, point.ScrollFactor, point.SpeedFactor, point.ScrollDir, point.IsStop);
-        }
-
-        tickTimeConverter = new BmsTickTimeConverter(TickResolution, bpmEvents, stopEvents);
-    }
-
     // Backward-compatible overload for tests and fallback paths that don't have scroll/speed events.
     public BmsTimingMap(int tickResolution, IEnumerable<BmsMeasureInfo> measures,
                         IEnumerable<BmsBpmEvent> bpmEvents, IEnumerable<BmsStopEvent> stopEvents,
                         double baseBpm = 0)
         : this(tickResolution, measures, bpmEvents, stopEvents, [], [], baseBpm)
     {
-    }
-
-    internal BmsTimingMap ShiftedBy(double offset)
-    {
-        if (offset == 0)
-            return this;
-
-        // Lead-in is applied once to a freshly parsed map; shifting an already-offset map would make its absolute times ambiguous.
-        if (timeOffset != 0)
-            throw new InvalidOperationException("A BMS timing map cannot be shifted more than once.");
-
-        return new BmsTimingMap(this, offset);
     }
 
     // ── Time-based queries ────────────────────────────────────────────────────
@@ -268,7 +230,7 @@ public sealed class BmsTimingMap
 
         var currentTick = 0L;
         var scrollTick = 0.0;
-        var currentTime = timeOffset;
+        var currentTime = 0d;
         var firstBpm = bpmEvents.FirstOrDefault(e => e.Tick == 0 && e.Bpm != 0).Bpm;
         var currentBpm = Math.Abs(firstBpm);
         var currentDir = firstBpm < 0 ? -1 : 1;

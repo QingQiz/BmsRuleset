@@ -19,7 +19,6 @@ using osu.Game.Rulesets.BmsRuleset.Gameplay.DifficultyTable;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osuTK;
-using DifficultyNameUpdater = osu.Game.Rulesets.BmsRuleset.Gameplay.DifficultyTable.DifficultyNameUpdater;
 using DT = osu.Game.Rulesets.BmsRuleset.Gameplay.DifficultyTable.DifficultyTable;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Settings.Components;
@@ -124,17 +123,7 @@ internal partial class DifficultyTableSettings : FillFlowContainer
     private void initialiseStore()
     {
         if (BmsRulesetRuntime.DifficultyTableStore == null && host != null)
-        {
-            var cacheDir = Path.Combine(host.Storage.GetFullPath(string.Empty), "difficulty-tables");
-            collectionSyncManager = new CollectionSyncManager(configManager);
-            var store = new DifficultyTableStore(configManager, cacheDir, collectionSyncManager, realm);
-            BmsRulesetRuntime.DifficultyTableStore = store;
-
-            if (realm != null)
-                store.DifficultyNameUpdater = new DifficultyNameUpdater(realm, store);
-
-            store.LoadPersistedTables();
-        }
+            BmsRulesetRuntime.InitialiseDifficultyTableStore(host, realm, configManager);
 
         difficultyTableStore = BmsRulesetRuntime.DifficultyTableStore;
         collectionSyncManager = difficultyTableStore?.CollectionSyncManager;

@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace osu.Game.Rulesets.BmsRuleset.Media.Video.Supplemental;
 
-internal sealed class BmsSupplementalVideoFrameSource(byte[] data) : IDisposable
+internal sealed class BmsSupplementalVideoFrameSource(BmsSupplementalVideoDecoder decoder) : IDisposable
 {
     private const double decode_ahead_seconds = 0.10;
     private const double stale_before_target_seconds = 0.20;
@@ -60,12 +60,6 @@ internal sealed class BmsSupplementalVideoFrameSource(byte[] data) : IDisposable
 
     private void runWorker()
     {
-        if (!BmsSupplementalVideoDecoder.TryCreate(data, out var decoder, out var error))
-        {
-            fault(error);
-            return;
-        }
-
         using (decoder)
         {
             double lastFrameTime = 0;
@@ -80,7 +74,7 @@ internal sealed class BmsSupplementalVideoFrameSource(byte[] data) : IDisposable
                     continue;
                 }
 
-                if (!decoder.TryDecodeNextFrame(out var decoded, out error))
+                if (!decoder.TryDecodeNextFrame(out var decoded, out var error))
                 {
                     if (!string.IsNullOrWhiteSpace(error))
                         fault(error);
@@ -124,7 +118,10 @@ internal sealed class BmsSupplementalVideoFrameSource(byte[] data) : IDisposable
         {
             // The decoder reads from memory, so cancellation is observed after the in-flight frame.
             // Do not release its wait handle or source bytes while that frame is still being decoded.
-            worker?.GetAwaiter().GetResult();
+            if (worker == null)
+                decoder.Dispose();
+            else
+                worker.GetAwaiter().GetResult();
         }
         catch (Exception exception)
         {

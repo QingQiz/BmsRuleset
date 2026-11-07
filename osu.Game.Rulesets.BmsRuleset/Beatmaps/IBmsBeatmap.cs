@@ -32,8 +32,6 @@ public interface IBmsBeatmap
 
     IReadOnlyList<BmsSampleEvent> BackgroundSampleEvents { get; set; }
 
-    IReadOnlyList<BmsSampleEvent> LongNoteTailSampleEvents { get; set; }
-
     IReadOnlyList<BmsInvisibleNote> InvisibleNotes { get; set; }
 
     IReadOnlyList<BmsBranchDecision> BranchDecisions { get; set; }
@@ -60,6 +58,36 @@ internal static class BmsBeatmapExtensions
         .Sum(note => note is BmsLongNote && beatmap is BmsBeatmap
             { LockedLongNoteMode: BmsLongNoteMode.ChargeNote or BmsLongNoteMode.HellChargeNote } ? 2 : 1);
 
+    public static void CopyFrom(this IBmsBeatmap target, BmsParseResult parseResult)
+    {
+        target.TickResolution = parseResult.TickResolution;
+        target.TimingMap = parseResult.TimingMap;
+        target.TotalColumns = parseResult.TotalColumns;
+        target.LayoutVariant = parseResult.LayoutVariant;
+        target.Rank = parseResult.Rank;
+        target.ExRank = parseResult.DefaultExRank;
+        target.Total = parseResult.Total;
+        target.SampleDefinitions = parseResult.SampleDefinitions;
+        target.BackgroundSampleEvents = parseResult.BackgroundSampleEvents;
+        target.InvisibleNotes = parseResult.InvisibleNotes.Select(n => new BmsInvisibleNote
+        {
+            Beatmap = target,
+            StartTime = n.StartTime,
+            Column = n.Column,
+            SourceChannel = n.SourceChannel,
+            SampleKey = n.SampleKey,
+            SampleVolume = n.SampleVolume,
+        }).ToArray();
+        target.BranchDecisions = parseResult.BranchDecisions;
+        target.TextEvents = parseResult.TextEvents;
+        target.Bga = parseResult.Bga;
+        target.LockedLongNoteMode = parseResult.LockedLongNoteMode;
+        target.PreviewFile = parseResult.PreviewFile;
+        target.StageFile = parseResult.StageFile;
+        target.BackBmp = parseResult.BackBmp;
+        target.Banner = parseResult.Banner;
+    }
+
     public static void CopyBmsDataFrom(this IBmsBeatmap target, IBmsBeatmap source)
     {
         target.TickResolution = source.TickResolution;
@@ -71,7 +99,6 @@ internal static class BmsBeatmapExtensions
         target.TimingMap = source.TimingMap;
         target.SampleDefinitions = source.SampleDefinitions;
         target.BackgroundSampleEvents = source.BackgroundSampleEvents;
-        target.LongNoteTailSampleEvents = source.LongNoteTailSampleEvents;
         target.InvisibleNotes = source.InvisibleNotes.Select(n => n.CreateKeySoundState(target)).ToArray();
         target.BranchDecisions = source.BranchDecisions;
         target.TextEvents = source.TextEvents;

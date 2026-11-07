@@ -20,7 +20,7 @@ internal static class BmsPcmExpandedCapacityWorkload
         for (var start = 0; start < peakVoices; start += batch.Length)
         {
             for (var voice = 0; voice < batch.Length; voice++)
-                batch[voice] = new BmsVoicePlay(pulse, new BmsTerminationDomain((ushort)(start + voice)), 0);
+                batch[voice] = new BmsVoicePlay(pulse, (ushort)(start + voice), 0);
             mixer.SubmitPlayBatch(batch);
         }
 
@@ -42,7 +42,7 @@ internal static class BmsPcmExpandedCapacityWorkload
     {
         var plays = new BmsVoicePlay[voices];
         for (var voice = 0; voice < voices; voice++)
-            plays[voice] = new BmsVoicePlay(asset, new BmsTerminationDomain((ushort)voice), mixer.RenderedFrames,
+            plays[voice] = new BmsVoicePlay(asset, (ushort)voice, mixer.RenderedFrames,
                 SourceOffsetFrame: voice * 7);
         mixer.SubmitPlayBatch(plays);
     }

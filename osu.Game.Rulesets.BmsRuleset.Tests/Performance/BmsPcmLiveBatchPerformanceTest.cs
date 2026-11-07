@@ -20,7 +20,7 @@ public class BmsPcmLiveBatchPerformanceTest
     {
         var asset = BmsPcmTestHelpers.CreateAsset([new BmsPcmChunk(0, 1, [0.1f, 0.1f])]);
         var mixer = new BmsPcmVoiceMixer();
-        BmsVoicePlay[] plays = [new(asset, new BmsTerminationDomain(1), 0)];
+        BmsVoicePlay[] plays = [new(asset, 1, 0)];
         var output = new float[2];
         var samples = new List<Sample>();
         using var process = Process.GetCurrentProcess();

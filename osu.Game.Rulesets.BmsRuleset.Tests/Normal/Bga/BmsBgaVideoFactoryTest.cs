@@ -2,6 +2,9 @@ using System.IO;
 using NUnit.Framework;
 using osu.Game.Rulesets.BmsRuleset.Media.FFmpeg;
 using osu.Game.Rulesets.BmsRuleset.Media.Video;
+using osu.Game.Rulesets.BmsRuleset.Media.Video.Supplemental;
+using osu.Framework.Timing;
+using FrameworkVideo = osu.Framework.Graphics.Video.Video;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Bga;
 
@@ -17,13 +20,26 @@ public class BmsBgaVideoFactoryTest
     private static string fixturePath(string name) =>
         Path.Combine(TestContext.CurrentContext.TestDirectory, "bga_fixtures", name);
 
+    private static string selectProviderName(string path)
+    {
+        using var stream = File.OpenRead(path);
+        using var drawable = BmsBgaVideoFactory.Create(path, stream, new ManualFramedClock(), 0);
+        return drawable switch
+        {
+            BmsSupplementalVideoDrawable => "supplemental-ffmpeg",
+            FrameworkVideo => "framework",
+            null => "missing",
+            _ => throw new System.InvalidOperationException("Unexpected BGA video drawable."),
+        };
+    }
+
     [TestCase("mpeg1.mpg", Description = "Legacy MPEG-1 — supplemental owns (framework lacks the decoder)")]
     public void TestLegacyMpegRoutesToSupplemental(string fixture)
     {
         if (!BmsSupplementalFFmpegFuncs.IsAvailable)
             Assert.Ignore("Supplemental FFmpeg backend is not embedded in this build.");
 
-        Assert.That(BmsBgaVideoFactory.SelectProviderName(fixturePath(fixture)), Is.EqualTo("supplemental-ffmpeg"));
+        Assert.That(selectProviderName(fixturePath(fixture)), Is.EqualTo("supplemental-ffmpeg"));
     }
 
     [TestCase("wmv1.wmv", Description = "WMV family the framework can't decode — claimed by codec probe, not extension")]
@@ -32,7 +48,7 @@ public class BmsBgaVideoFactoryTest
         if (!BmsSupplementalFFmpegFuncs.IsAvailable)
             Assert.Ignore("Supplemental FFmpeg backend is not embedded in this build.");
 
-        Assert.That(BmsBgaVideoFactory.SelectProviderName(fixturePath(fixture)), Is.EqualTo("supplemental-ffmpeg"));
+        Assert.That(selectProviderName(fixturePath(fixture)), Is.EqualTo("supplemental-ffmpeg"));
     }
 
     [TestCase("cinepak.avi", Description = ".avi is codec-ambiguous — cinepak goes to supplemental, not framework")]
@@ -41,7 +57,7 @@ public class BmsBgaVideoFactoryTest
         if (!BmsSupplementalFFmpegFuncs.IsAvailable)
             Assert.Ignore("Supplemental FFmpeg backend is not embedded in this build.");
 
-        Assert.That(BmsBgaVideoFactory.SelectProviderName(fixturePath(fixture)), Is.EqualTo("supplemental-ffmpeg"));
+        Assert.That(selectProviderName(fixturePath(fixture)), Is.EqualTo("supplemental-ffmpeg"));
     }
 
     [Test(Description = "wmv2: framework ships a decoder, so the supplemental probe must decline it")]
@@ -50,7 +66,7 @@ public class BmsBgaVideoFactoryTest
         if (!BmsSupplementalFFmpegFuncs.IsAvailable)
             Assert.Ignore("Supplemental FFmpeg backend is not embedded in this build.");
 
-        Assert.That(BmsBgaVideoFactory.SelectProviderName(fixturePath("wmv2.wmv")), Is.EqualTo("framework"));
+        Assert.That(selectProviderName(fixturePath("wmv2.wmv")), Is.EqualTo("framework"));
     }
 
     [TestCase("h264.mp4", Description = "Modern container the supplemental build can't demux — framework handles")]
@@ -59,7 +75,7 @@ public class BmsBgaVideoFactoryTest
     {
         // No IsAvailable gate: supplemental declines these by extension pre-filter (mp4) or by
         // probe (mpeg4 in avi) whether or not the backend is embedded, so framework always wins.
-        Assert.That(BmsBgaVideoFactory.SelectProviderName(fixturePath(fixture)), Is.EqualTo("framework"));
+        Assert.That(selectProviderName(fixturePath(fixture)), Is.EqualTo("framework"));
     }
 
     [Test(Description = "Without the native backend, supplemental declines and .mpg falls to missing (framework can't decode pure MPEG either)")]
@@ -68,6 +84,6 @@ public class BmsBgaVideoFactoryTest
         if (BmsSupplementalFFmpegFuncs.IsAvailable)
             Assert.Ignore("Supplemental FFmpeg backend is embedded in this build.");
 
-        Assert.That(BmsBgaVideoFactory.SelectProviderName(fixturePath("mpeg1.mpg")), Is.EqualTo("missing"));
+        Assert.That(selectProviderName(fixturePath("mpeg1.mpg")), Is.EqualTo("missing"));
     }
 }

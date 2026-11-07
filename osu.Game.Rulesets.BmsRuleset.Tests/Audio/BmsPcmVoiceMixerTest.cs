@@ -22,7 +22,7 @@ public class BmsPcmVoiceMixerTest
         Assert.That(getOccupiedVoiceSlotCount(mixer), Is.Zero);
         assertRenderingIndex(0);
 
-        mixer.SubmitPlayBatch([new BmsVoicePlay(createConstantAsset(1000, .01f), new BmsTerminationDomain(1), 1)]);
+        mixer.SubmitPlayBatch([new BmsVoicePlay(createConstantAsset(1000, .01f), 1, 1)]);
         var output = new float[2];
         mixer.Render(output);
         assertRenderingIndex(1);
@@ -114,8 +114,8 @@ public class BmsPcmVoiceMixerTest
             var asset = BmsPcmTestHelpers.CreateAsset([new BmsPcmChunk(0, frames, samples)]);
             var result = new BmsVoicePlay[512];
             for (var i = 0; i < result.Length; i++)
-                result[i] = new BmsVoicePlay(asset, new BmsTerminationDomain((ushort)(group * 512 + i + 1)),
-                    targetFrame, (i % 11 + 1) / 997f, i % 7, epoch, group * 512 + i + 1);
+                result[i] = new BmsVoicePlay(asset, (ushort)(group * 512 + i + 1),
+                    targetFrame, (i % 11 + 1) / 997f, i % 7, epoch);
             return result;
         }
     }
@@ -125,14 +125,14 @@ public class BmsPcmVoiceMixerTest
     {
         var asset = createConstantAsset(1000, 0.1f);
         var mixer = createMixer();
-        mixer.SubmitPlayBatch([new BmsVoicePlay(asset, new BmsTerminationDomain(1), 0)]);
+        mixer.SubmitPlayBatch([new BmsVoicePlay(asset, 1, 0)]);
         mixer.SubmitControl(BmsVoiceCommandType.SetMasterGain, 127, 0, 0.25f);
         mixer.SubmitControl(BmsVoiceCommandType.Pause, 191, 0);
         mixer.SubmitControl(BmsVoiceCommandType.Resume, 257, 0);
         var output = BmsPcmTestHelpers.RenderFrames(mixer, 400, 31);
 
         var reference = createMixer();
-        reference.SubmitPlayBatch([new BmsVoicePlay(asset, new BmsTerminationDomain(1), 0)]);
+        reference.SubmitPlayBatch([new BmsVoicePlay(asset, 1, 0)]);
         var expected = new List<float>();
         expected.AddRange(BmsPcmTestHelpers.RenderFrames(reference, 127));
         reference.SubmitControl(BmsVoiceCommandType.SetMasterGain, 127, 0, 0.25f);
@@ -172,24 +172,24 @@ public class BmsPcmVoiceMixerTest
         {
             var mixer = new BmsPcmVoiceMixer();
             mixer.SubmitPlayBatch([
-                new BmsVoicePlay(asset, new BmsTerminationDomain(1), 0),
-                new BmsVoicePlay(asset, new BmsTerminationDomain(2), 0, SourceOffsetFrame: 71),
-                new BmsVoicePlay(asset, new BmsTerminationDomain(1), 100, SourceOffsetFrame: 217),
+                new BmsVoicePlay(asset, 1, 0),
+                new BmsVoicePlay(asset, 2, 0, SourceOffsetFrame: 71),
+                new BmsVoicePlay(asset, 1, 100, SourceOffsetFrame: 217),
             ]);
             return BmsPcmTestHelpers.RenderFrames(mixer, 1100, blockSize);
         }
     }
 
     [Test]
-    public void SameDomainRetriggerFadesOldVoiceWithoutDelayingNewVoice()
+    public void SameSampleRetriggerFadesOldVoiceWithoutDelayingNewVoice()
     {
         var asset = createConstantAsset(500, 1);
         var mixer = createMixer();
-        var domain = new BmsTerminationDomain(1);
+        var sampleKey = (ushort)1;
         BmsVoicePlay[] plays =
         [
-            new(asset, domain, 0, 0.2f),
-            new(asset, domain, 100, 0.2f),
+            new(asset, sampleKey, 0, 0.2f),
+            new(asset, sampleKey, 100, 0.2f),
         ];
 
         mixer.SubmitPlayBatch(plays);
@@ -205,14 +205,14 @@ public class BmsPcmVoiceMixerTest
     }
 
     [Test]
-    public void DifferentDomainsInChordStartOnSameFrame()
+    public void DifferentSamplesInChordStartOnSameFrame()
     {
         var asset = createConstantAsset(500, 1);
         var mixer = createMixer();
         BmsVoicePlay[] plays =
         [
-            new(asset, new BmsTerminationDomain(1), 64, 0.2f),
-            new(asset, new BmsTerminationDomain(2), 64, 0.3f),
+            new(asset, 1, 64, 0.2f),
+            new(asset, 2, 64, 0.3f),
         ];
 
         mixer.SubmitPlayBatch(plays);
@@ -310,7 +310,7 @@ public class BmsPcmVoiceMixerTest
             Assert.That(getOccupiedVoiceSlotCount(mixer), Is.Zero);
         });
 
-        mixer.SubmitPlayBatch([new BmsVoicePlay(asset, new BmsTerminationDomain(1), mixer.RenderedFrames)]);
+        mixer.SubmitPlayBatch([new BmsVoicePlay(asset, 1, mixer.RenderedFrames)]);
         var output = BmsPcmTestHelpers.RenderFrames(mixer, 1);
 
         Assert.Multiple(() =>
@@ -326,10 +326,10 @@ public class BmsPcmVoiceMixerTest
         var asset = createConstantAsset(100, 0.1f);
         var mixer = createMixer();
         mixer.SubmitControl(BmsVoiceCommandType.ReplaceEpoch, 0, 1);
-        mixer.SubmitPlayBatch([new BmsVoicePlay(asset, new BmsTerminationDomain(1), 0, Epoch: 0)]);
+        mixer.SubmitPlayBatch([new BmsVoicePlay(asset, 1, 0, Epoch: 0)]);
 
         BmsPcmTestHelpers.RenderFrames(mixer, 1);
-        mixer.SubmitPlayBatch([new BmsVoicePlay(asset, new BmsTerminationDomain(1), 0, Epoch: 1)]);
+        mixer.SubmitPlayBatch([new BmsVoicePlay(asset, 1, 0, Epoch: 1)]);
         var output = BmsPcmTestHelpers.RenderFrames(mixer, 1);
 
         Assert.Multiple(() =>
@@ -340,52 +340,17 @@ public class BmsPcmVoiceMixerTest
     }
 
     [Test]
-    public void LastSameFrameDomainRequestWins()
-    {
-        var asset = createConstantAsset(500, 1);
-        var mixer = createMixer();
-        var domain = new BmsTerminationDomain(1);
-        BmsVoicePlay[] plays =
-        [
-            new(asset, domain, 0, 0.1f),
-            new(asset, domain, 0, 0.3f),
-        ];
-
-        mixer.SubmitPlayBatch(plays);
-        var output = BmsPcmTestHelpers.RenderFrames(mixer, 88);
-
-        Assert.That(output[^2], Is.EqualTo(0.3f).Within(0.00001f));
-    }
-
-    [Test]
-    public void BatchCoalescingPreservesDomainsFramesAndLastRequest([Values(16, 63, 64, 65, 256)] int count)
+    public void BatchSubmissionPreservesSamplesFramesAndOffsets([Values(16, 63, 64, 65, 256)] int count)
     {
         var asset = createAlternatingAsset(500, 0.1f);
         var mixer = createMixer();
         var reference = createMixer();
-        var plays = new List<BmsVoicePlay>();
-        var expected = new List<BmsVoicePlay>();
-        for (var i = 0; i < count - 6; i++)
-        {
-            var play = new BmsVoicePlay(asset, new BmsTerminationDomain((ushort)(10 + i)), 0, 0.01f);
-            plays.Add(play);
-            expected.Add(play);
-        }
+        var plays = new BmsVoicePlay[count];
+        for (var i = 0; i < count; i++)
+            plays[i] = new BmsVoicePlay(asset, (ushort)(i + 1), i % 3 * 20, 0.01f, i % 13);
 
-        var domain = new BmsTerminationDomain(1);
-        var last = new BmsVoicePlay(asset, domain, 0, 0.3f, SourceOffsetFrame: 7);
-        var pitched = new BmsVoicePlay(asset, domain with { Pitch = 1 }, 0, 0.2f);
-        var sliced = new BmsVoicePlay(asset, domain with { SliceStartFrame = 1, SliceFrameCount = 200 }, 0, 0.1f);
-        var later = new BmsVoicePlay(asset, domain, 20, 0.4f);
-        plays.AddRange([
-            new BmsVoicePlay(asset, domain, -1, 0.9f),
-            new BmsVoicePlay(asset, domain, 0, 0.8f),
-            last, pitched, sliced, later,
-        ]);
-        expected.AddRange([last, pitched, sliced, later]);
-
-        mixer.SubmitPlayBatch(plays.ToArray());
-        foreach (var play in expected)
+        mixer.SubmitPlayBatch(plays);
+        foreach (var play in plays)
             reference.SubmitPlayBatch([play]);
 
         Assert.That(BmsPcmTestHelpers.RenderFrames(mixer, 600, 17),
@@ -416,8 +381,8 @@ public class BmsPcmVoiceMixerTest
     {
         var asset = createConstantAsset(500, 0.1f);
         var plays = createPlays(asset, 64);
-        plays[^2] = new BmsVoicePlay(asset, new BmsTerminationDomain(1), -1, 0.2f);
-        plays[^1] = new BmsVoicePlay(asset, new BmsTerminationDomain(1), -2, 0.3f);
+        plays[^2] = new BmsVoicePlay(asset, 1, -1, 0.2f);
+        plays[^1] = new BmsVoicePlay(asset, 1, -2, 0.3f);
         var mixer = createMixer();
         var reference = createMixer();
         mixer.SubmitPlayBatch(plays);
@@ -431,7 +396,7 @@ public class BmsPcmVoiceMixerTest
     {
         var asset = createConstantAsset(1, 0.1f);
         var mixer = createMixer();
-        BmsVoicePlay[] plays = [new(asset, new BmsTerminationDomain(1), 0)];
+        BmsVoicePlay[] plays = [new(asset, 1, 0)];
         var output = new float[2];
         for (var i = 0; i < 100; i++)
         {
@@ -457,13 +422,13 @@ public class BmsPcmVoiceMixerTest
     {
         var asset = createConstantAsset(500, 0.1f);
         var mixer = createMixer();
-        Assert.Throws<ArgumentNullException>(() => mixer.SubmitPlayBatch([new BmsVoicePlay(null!, new BmsTerminationDomain(1), 0)]));
+        Assert.Throws<ArgumentNullException>(() => mixer.SubmitPlayBatch([new BmsVoicePlay(null!, 1, 0)]));
         Assert.That(BmsPcmTestHelpers.RenderFrames(mixer, 1), Has.All.Zero);
-        mixer.SubmitPlayBatch([new BmsVoicePlay(asset, new BmsTerminationDomain(1), 1)]);
+        mixer.SubmitPlayBatch([new BmsVoicePlay(asset, 1, 1)]);
 
         var reference = createMixer();
         BmsPcmTestHelpers.RenderFrames(reference, 1);
-        reference.SubmitPlayBatch([new BmsVoicePlay(asset, new BmsTerminationDomain(1), 1)]);
+        reference.SubmitPlayBatch([new BmsVoicePlay(asset, 1, 1)]);
         Assert.That(BmsPcmTestHelpers.RenderFrames(mixer, 500), Is.EqualTo(BmsPcmTestHelpers.RenderFrames(reference, 500)));
     }
 
@@ -472,7 +437,7 @@ public class BmsPcmVoiceMixerTest
     {
         var asset = createConstantAsset(frames, 0.1f);
         var mixer = createMixer();
-        mixer.SubmitPlayBatch([new BmsVoicePlay(asset, new BmsTerminationDomain(1), 13)]);
+        mixer.SubmitPlayBatch([new BmsVoicePlay(asset, 1, 13)]);
         var output = BmsPcmTestHelpers.RenderFrames(mixer, frames + 20, 17);
         for (var i = 0; i < frames + 20; i++)
         {
@@ -492,8 +457,8 @@ public class BmsPcmVoiceMixerTest
         const int asset_frames = 500;
         var asset = createConstantAsset(asset_frames, 0.1f);
         var mixer = createMixer();
-        var domain = new BmsTerminationDomain(1);
-        mixer.SubmitPlayBatch([new BmsVoicePlay(asset, domain, 0), new BmsVoicePlay(asset, domain, retriggerFrame)]);
+        var sampleKey = (ushort)1;
+        mixer.SubmitPlayBatch([new BmsVoicePlay(asset, sampleKey, 0), new BmsVoicePlay(asset, sampleKey, retriggerFrame)]);
         var output = BmsPcmTestHelpers.RenderFrames(mixer, asset_frames + retriggerFrame + 10, 31);
         var gainAtRetrigger = envelope(retriggerFrame);
         for (var frame = 0; frame < output.Length / 2; frame++)
@@ -521,9 +486,9 @@ public class BmsPcmVoiceMixerTest
         var largeBlockMixer = createMixer();
         BmsVoicePlay[] plays =
         [
-            new(asset, new BmsTerminationDomain(1), 0),
-            new(asset, new BmsTerminationDomain(2), 37),
-            new(asset, new BmsTerminationDomain(1), 181),
+            new(asset, 1, 0),
+            new(asset, 2, 37),
+            new(asset, 1, 181),
         ];
 
         oneFrameMixer.SubmitPlayBatch(plays);
@@ -540,7 +505,7 @@ public class BmsPcmVoiceMixerTest
     {
         var asset = createConstantAsset(500, 2);
         var mixer = createMixer();
-        mixer.SubmitPlayBatch([new BmsVoicePlay(asset, new BmsTerminationDomain(1), 0)]);
+        mixer.SubmitPlayBatch([new BmsVoicePlay(asset, 1, 0)]);
 
         var output = BmsPcmTestHelpers.RenderFrames(mixer, 100);
 
@@ -552,7 +517,7 @@ public class BmsPcmVoiceMixerTest
     {
         var asset = createConstantAsset(10000, 0.1f);
         var mixer = createMixer();
-        mixer.SubmitPlayBatch([new BmsVoicePlay(asset, new BmsTerminationDomain(1), 0)]);
+        mixer.SubmitPlayBatch([new BmsVoicePlay(asset, 1, 0)]);
         var output = new float[256 * 2];
 
         mixer.Render(output);
@@ -628,13 +593,13 @@ public class BmsPcmVoiceMixerTest
         BmsPcmVoiceMixer prepareMixer()
         {
             var prepared = createMixer();
-            prepared.SubmitPlayBatch([new BmsVoicePlay(asset, new BmsTerminationDomain(1), 7)]);
+            prepared.SubmitPlayBatch([new BmsVoicePlay(asset, 1, 7)]);
             prepared.SubmitControl(BmsVoiceCommandType.Pause, 127, 0);
             prepared.SubmitControl(BmsVoiceCommandType.Resume, 191, 0);
             prepared.SubmitControl(BmsVoiceCommandType.SetMasterGain, 299, 0, 0);
             prepared.SubmitControl(BmsVoiceCommandType.ReplaceEpoch, 400, 1);
             prepared.SubmitControl(BmsVoiceCommandType.SetMasterGain, 401, 1, 1);
-            prepared.SubmitPlayBatch([new BmsVoicePlay(asset, new BmsTerminationDomain(1), 401, Epoch: 1)]);
+            prepared.SubmitPlayBatch([new BmsVoicePlay(asset, 1, 401, Epoch: 1)]);
             return prepared;
         }
     }
@@ -643,7 +608,7 @@ public class BmsPcmVoiceMixerTest
     public void EmptyAndIncompleteOutputLeaveStateAndBufferUntouched()
     {
         var mixer = createMixer();
-        mixer.SubmitPlayBatch([new BmsVoicePlay(createConstantAsset(500, 0.1f), new BmsTerminationDomain(1), 0)]);
+        mixer.SubmitPlayBatch([new BmsVoicePlay(createConstantAsset(500, 0.1f), 1, 0)]);
         mixer.Render([]);
         float[] incomplete = [17, 19, 23];
         Assert.Throws<ArgumentException>(() => mixer.Render(incomplete));
@@ -691,7 +656,7 @@ public class BmsPcmVoiceMixerTest
         }
         var asset = BmsPcmTestHelpers.CreateAsset([new BmsPcmChunk(0, frames, samples)]);
         var mixer = createMixer();
-        mixer.SubmitPlayBatch([new BmsVoicePlay(asset, new BmsTerminationDomain(1), 0)]);
+        mixer.SubmitPlayBatch([new BmsVoicePlay(asset, 1, 0)]);
         var output = BmsPcmTestHelpers.RenderFrames(mixer, frames, blockFrames);
         var referenceGain = 1f;
         for (var frame = 0; frame < frames; frame++)
@@ -729,7 +694,7 @@ public class BmsPcmVoiceMixerTest
     }
 
     [Test]
-    public void SameDomainSineRetriggerHasNoDiscontinuityArtifact()
+    public void SameSampleSineRetriggerHasNoDiscontinuityArtifact()
     {
         const int frames = 44100;
         var samples = new float[frames * 2];
@@ -743,11 +708,11 @@ public class BmsPcmVoiceMixerTest
 
         var asset = BmsPcmTestHelpers.CreateAsset([new BmsPcmChunk(0, frames, samples)]);
         var mixer = createMixer();
-        var domain = new BmsTerminationDomain(1);
+        var sampleKey = (ushort)1;
         mixer.SubmitPlayBatch([
-            new BmsVoicePlay(asset, domain, 0),
-            new BmsVoicePlay(asset, domain, 1000),
-            new BmsVoicePlay(asset, domain, 2000),
+            new BmsVoicePlay(asset, sampleKey, 0),
+            new BmsVoicePlay(asset, sampleKey, 1000),
+            new BmsVoicePlay(asset, sampleKey, 2000),
         ]);
 
         var output = BmsPcmTestHelpers.RenderFrames(mixer, 4000, 113);
@@ -780,7 +745,7 @@ public class BmsPcmVoiceMixerTest
         var plays = new BmsVoicePlay[count];
 
         for (var i = 0; i < count; i++)
-            plays[i] = new BmsVoicePlay(asset, new BmsTerminationDomain((ushort)(i + 1)), 0);
+            plays[i] = new BmsVoicePlay(asset, (ushort)(i + 1), 0);
 
         return plays;
     }

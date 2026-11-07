@@ -33,7 +33,6 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable, IBmsResul
 
     private readonly IReadOnlyList<HitEvent>? hitEvents;
     private readonly IBeatmap? playableBeatmap;
-    private readonly IReadOnlyList<(IBeatmap Beatmap, IReadOnlyList<HitEvent> HitEvents)>? stages;
     private HitOffsetStatistics statistics = null!;
 
     private FillFlowContainer content = null!;
@@ -57,22 +56,12 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable, IBmsResul
         this.playableBeatmap = playableBeatmap;
     }
 
-    internal BmsHitOffsetStatistic(IReadOnlyList<(IBeatmap Beatmap, IReadOnlyList<HitEvent> HitEvents)> stages)
-    {
-        RelativeSizeAxes = Axes.X;
-        AutoSizeAxes = Axes.Y;
-
-        this.stages = stages;
-    }
-
     public override bool HandlePositionalInput => true;
 
     [BackgroundDependencyLoader]
     private void load()
     {
-        statistics ??= hitEvents != null
-            ? CreateStatistics(playableBeatmap!, hitEvents)
-            : CreateCourseStatistics(stages!);
+        statistics ??= CreateStatistics(playableBeatmap!, hitEvents!);
 
         InternalChild = content = new FillFlowContainer
         {
@@ -114,9 +103,6 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable, IBmsResul
 
         return new HitOffsetStatistics(createSummary(displayedHitEvents.Select(e => (e.TimeOffset, e.Result))), keyGroups);
     }
-
-    internal static HitOffsetStatistics CreateCourseStatistics(IReadOnlyList<(IBeatmap Beatmap, IReadOnlyList<HitEvent> HitEvents)> stages)
-        => CombineStatistics(stages.Select(stage => (CreateStatistics(stage.Beatmap, stage.HitEvents), stage.HitEvents)).ToArray());
 
     private static string labelFor(int column, BmsLayoutVariant variant, ref int keyIndex)
     {

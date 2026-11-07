@@ -1,7 +1,4 @@
 using System;
-using System.Buffers;
-using System.Collections.Generic;
-using System.Linq;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.Scoring;
@@ -10,51 +7,6 @@ namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 
 public static class BmsJudgementSelector
 {
-    private static readonly CandidateComparer candidate_comparer = new();
-
-    public static BmsJudgementSelection SelectPress(
-        BmsLayoutVariant layout,
-        int column,
-        IEnumerable<BmsJudgementCandidate> candidates,
-        double inputTime,
-        BmsJudgementAlgorithm? algorithm = BmsJudgementAlgorithm.Combo)
-    {
-        var initialCapacity = candidates.TryGetNonEnumeratedCount(out var candidateCount)
-            ? Math.Max(1, candidateCount)
-            : 16;
-        var sortedCandidates = ArrayPool<BmsJudgementCandidate>.Shared.Rent(initialCapacity);
-        var count = 0;
-
-        try
-        {
-            foreach (var candidate in candidates)
-            {
-                if (count == sortedCandidates.Length)
-                {
-                    var expanded = ArrayPool<BmsJudgementCandidate>.Shared.Rent(sortedCandidates.Length * 2);
-                    Array.Copy(sortedCandidates, expanded, count);
-                    ArrayPool<BmsJudgementCandidate>.Shared.Return(sortedCandidates);
-                    sortedCandidates = expanded;
-                }
-
-                sortedCandidates[count++] = candidate;
-            }
-
-            Array.Sort(sortedCandidates, 0, count, candidate_comparer);
-            var search = new PressSearch(layout, column, inputTime, algorithm);
-            for (var i = 0; i < count; i++)
-            {
-                if (!search.Consider(sortedCandidates[i], i)) break;
-            }
-
-            return search.Selection;
-        }
-        finally
-        {
-            ArrayPool<BmsJudgementCandidate>.Shared.Return(sortedCandidates);
-        }
-    }
-
     // Gameplay already owns ordered notes. Feed them directly, retaining the selected slot
     // instead of copying, sorting and finding the chosen note a second time.
     internal struct PressSearch(BmsLayoutVariant layout, int column, double inputTime, BmsJudgementAlgorithm? algorithm)
@@ -66,6 +18,7 @@ public static class BmsJudgementSelector
         private int selectedSlot;
         private int emptyPoorSlot;
         private readonly BmsJudgementBehaviour behaviour = BmsJudgementProfileProvider.GetBehaviour(layout);
+        private BmsJudgementAlgorithm? algorithm = algorithm;
 
         internal readonly BmsJudgementSelection Selection => selected != null
             ? new BmsJudgementSelection(selected, selectedResult, false)
@@ -154,14 +107,5 @@ public static class BmsJudgementSelector
         bool isPastWindow(HitResult threshold) =>
             current.StartTime - inputTime < -currentTable.SlowWindowFor(threshold)
             && next.StartTime - inputTime <= nextTable.FastWindowFor(threshold);
-    }
-
-    private sealed class CandidateComparer : IComparer<BmsJudgementCandidate>
-    {
-        public int Compare(BmsJudgementCandidate x, BmsJudgementCandidate y)
-        {
-            var startTimeComparison = x.StartTime.CompareTo(y.StartTime);
-            return startTimeComparison != 0 ? startTimeComparison : x.Column.CompareTo(y.Column);
-        }
     }
 }

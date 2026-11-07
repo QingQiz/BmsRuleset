@@ -201,8 +201,8 @@ internal sealed class BmsPcmPlaybackController : IDisposable
 
         ensureLease(sampleKey);
         var play = new PendingLivePlay(sampleKey, volume, Math.Max(0, offset));
-        // All live events in a game frame share one mixer target. The mixer already keeps only
-        // the last trigger per definition; coalesce before allocating its command batch.
+        // All live events in a game frame share one mixer target. Keep only the last
+        // trigger per sample definition before allocating the command batch.
         if (livePlayIndices.TryGetValue(sampleKey, out var index))
             livePlays[index] = play;
         else
@@ -439,7 +439,7 @@ internal sealed class BmsPcmPlaybackController : IDisposable
     private BmsVoicePlay createPlay(BmsPcmAsset asset, ushort sampleKey, int volume, long targetFrame, long sourceOffset) =>
         new(
             asset,
-            new BmsTerminationDomain(sampleKey),
+            sampleKey,
             targetFrame,
             sanitiseVolume(volume),
             sourceOffset,

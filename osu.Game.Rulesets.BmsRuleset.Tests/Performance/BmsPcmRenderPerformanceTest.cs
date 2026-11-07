@@ -44,7 +44,7 @@ public partial class BmsPcmRenderPerformanceTest
             asset.Publish(new BmsPcmChunk(frame, 4096, pcm));
         asset.Complete(asset.PublishedFrameCount);
         var plays = Enumerable.Range(0, voices).Select(i =>
-            new BmsVoicePlay(asset, new BmsTerminationDomain((ushort)i), 0, SourceOffsetFrame: i * 7)).ToArray();
+            new BmsVoicePlay(asset, (ushort)i, 0, SourceOffsetFrame: i * 7)).ToArray();
         var output = new float[frames * 2];
         var samples = new List<Sample>();
         using var process = Process.GetCurrentProcess();
@@ -129,7 +129,7 @@ public partial class BmsPcmRenderPerformanceTest
                 start += count;
             }
             asset.Complete(asset_frames);
-            plays[voice] = new BmsVoicePlay(asset, new BmsTerminationDomain((ushort)voice), 0);
+            plays[voice] = new BmsVoicePlay(asset, (ushort)voice, 0);
         }
         var output = new float[frames * 2];
         var samples = new List<Sample>();
@@ -198,7 +198,7 @@ public partial class BmsPcmRenderPerformanceTest
         asset.Publish(new BmsPcmChunk(0, slice_frames, pcm));
         asset.Complete(slice_frames);
         var plays = Enumerable.Range(0, voices).Select(i =>
-            new BmsVoicePlay(asset, new BmsTerminationDomain((ushort)i), 0)).ToArray();
+            new BmsVoicePlay(asset, (ushort)i, 0)).ToArray();
         var output = new float[frames * 2];
         var samples = new List<Sample>();
         using var process = Process.GetCurrentProcess();

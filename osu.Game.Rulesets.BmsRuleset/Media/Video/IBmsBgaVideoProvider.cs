@@ -12,9 +12,5 @@ internal sealed record BmsBgaVideoRequest(
 
 internal interface IBmsBgaVideoProvider
 {
-    string Name { get; }
-
-    bool CanCreate(BmsBgaVideoRequest request);
-
-    Drawable? Create(BmsBgaVideoRequest request);
+    bool TryCreate(BmsBgaVideoRequest request, out Drawable? drawable);
 }
