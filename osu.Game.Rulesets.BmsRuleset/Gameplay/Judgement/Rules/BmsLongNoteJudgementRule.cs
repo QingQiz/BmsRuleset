@@ -12,6 +12,18 @@ internal sealed class BmsLongNoteJudgementRule
         if (press.Frame.IsRewinding || hold.HeadJudged || hold.Started || result == HitResult.None || execution.GetMainResult(hold.Note).HasResult)
             return false;
 
+        if (result == HitResult.Ok && BmsJudgementProfileProvider.GetBehaviour(hold.Note.Beatmap.LayoutVariant).LongNoteBadIsImmediate)
+        {
+            hold.HeadJudged = hold.TailJudged = true;
+            hold.HeadResult = hold.TailResult = result;
+            hold.HeadOffset = press.Frame.SimulationTime - hold.Note.StartTime;
+            hold.TailTime = press.Frame.SimulationTime;
+            execution.ApplyMainResult(hold.Note, result,
+                [hold.Endpoint(BmsLongNoteEndpointKind.Head, press.Frame.SimulationTime, press.Frame.GameplayRate, result)], press.Frame);
+            execution.PublishState(hold.Note, state.State, press.Frame);
+            return true;
+        }
+
         hold.HeadJudged = true;
         hold.Started = result != HitResult.Meh;
         hold.HeadResult = result;
@@ -66,7 +78,9 @@ internal sealed class BmsLongNoteJudgementRule
 
         if (!hold.Started)
         {
-            if (!hold.HeadWindow.IsPastPassivePoorOffset(frame.SimulationTime - hold.Note.StartTime))
+            if (frame.SimulationTime - hold.Note.StartTime <= hold.HeadPoorOffset
+                && !(hold.HeadWindow.LongNoteHeadPoorOffset.HasValue
+                     && frame.SimulationTime > hold.Note.EndTime))
                 return;
 
             hold.HeadJudged = true;

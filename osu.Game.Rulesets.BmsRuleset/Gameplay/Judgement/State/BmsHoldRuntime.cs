@@ -30,13 +30,19 @@ internal struct BmsHoldRuntime
 
     internal readonly bool IsScratch => BmsLayout.IsScratchColumn(Note.Column, Note.Beatmap.LayoutVariant);
 
-    internal readonly double ReleaseMargin => BmsJudgementProfileProvider.IsPms(Note.Beatmap.LayoutVariant) ? 200 : 0;
+    internal readonly double ReleaseMargin => BmsJudgementProfileProvider.GetBehaviour(Note.Beatmap.LayoutVariant).LongNoteReleaseMargin;
+
+    internal readonly double HeadPoorOffset => HeadWindow.LongNoteHeadPoorOffset ?? HeadWindow.SlowWindowFor(HitResult.Ok);
 
     internal readonly bool Holding => Started && !TailJudged;
 
     internal readonly double NextEventTime(BmsLongNoteMode mode)
     {
-        if (!HeadJudged) return BmsJudgementWindowTable.TimeAfter(Note.StartTime, HeadWindow.SlowWindowFor(HitResult.Ok));
+        if (!HeadJudged)
+            return BmsJudgementWindowTable.TimeAfter(Note.StartTime,
+                mode == BmsLongNoteMode.LongNote && HeadWindow.LongNoteHeadPoorOffset is { } deadline
+                    ? Math.Min(deadline, Note.Duration)
+                    : HeadWindow.SlowWindowFor(HitResult.Ok));
 
         var next = double.PositiveInfinity;
         if (!TailJudged)
@@ -58,8 +64,8 @@ internal struct BmsHoldRuntime
 
     internal void RefreshWindows()
     {
-        HeadWindow = BmsJudgementProfileProvider.GetTable(Note.Beatmap.LayoutVariant, Note.Column, Note.EffectiveJudgementRate, false);
-        TailWindow = BmsJudgementProfileProvider.GetTable(Note.Beatmap.LayoutVariant, Note.Column, Note.EffectiveJudgementRate, true);
+        HeadWindow = BmsJudgementProfileProvider.GetTable(Note, false);
+        TailWindow = BmsJudgementProfileProvider.GetTable(Note, true);
     }
 
     internal readonly BmsLongNoteEndpointResult Endpoint(BmsLongNoteEndpointKind kind, double time, double rate, HitResult result, double? applicationTime = null)

@@ -54,7 +54,7 @@ internal partial class BmsCourseAggregateStatistics : BmsStatisticsPanel
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var mods = stageScore.Mods;
-                using var windows = BmsJudgementProfileProvider.UseWindowMods(mods.OfType<IApplicableToJudgementWindow>().ToArray());
+                using var windows = BmsJudgementProfileProvider.UseWindowMods(mods.OfType<IApplicableToJudgement>().ToArray());
                 var beatmap = stage.WorkingBeatmap.GetPlayableBeatmap(stageScore.Ruleset, mods, cancellationToken);
                 // Legacy scores lack starting-health settings, so reconstruct each surviving tier from the preceding replay.
                 statistics = replay != null ? BmsResultStatisticsData.Load(stageScore, beatmap, replay.Replay, cancellationToken, gaugeStates, profileFamily) : null;

@@ -16,7 +16,7 @@ public class BmsJudgementProfilePerformanceTest
     public void RepeatedProfileQueries(string modifier)
     {
         const int count = 200000;
-        IApplicableToJudgementWindow[] mods = modifier switch
+        IApplicableToJudgement[] mods = modifier switch
         {
             "nb" => [new BmsModNoBad()], "ng" => [new BmsModNoGood()], "ne" => [new BmsModNoGreat()], _ => [],
         };

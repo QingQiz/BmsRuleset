@@ -14,6 +14,17 @@ public sealed class BmsJudgementWindowTable
 
     public BmsJudgementWindow? EPoorWindow { get; }
 
+    /// <summary>
+    /// LR2 misses an unhit LN head at the late GOOD boundary rather than BAD. Keep that deadline
+    /// separate so removing GOOD via NG/NE does not move it. Measured in milliseconds after the
+    /// head; null uses the normal BAD deadline. LN judgement also caps it at the note's end time.
+    /// </summary>
+    public double? LongNoteHeadPoorOffset { get; init; }
+
+    // Removing a result window must not move an independently defined LN head deadline.
+    public BmsJudgementWindowTable WithRows(IEnumerable<BmsJudgementWindow> rows)
+        => new(rows) { LongNoteHeadPoorOffset = LongNoteHeadPoorOffset };
+
     public BmsJudgementWindowTable(IEnumerable<BmsJudgementWindow> rows)
     {
         var allRows = rows as BmsJudgementWindow[] ?? rows.ToArray();

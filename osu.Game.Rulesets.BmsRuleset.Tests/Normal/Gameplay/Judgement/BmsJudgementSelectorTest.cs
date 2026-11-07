@@ -136,7 +136,7 @@ public class BmsJudgementSelectorTest
     [Test]
     public void TestAlgorithmsUseModifiedWindows()
     {
-        IReadOnlyList<IApplicableToJudgementWindow> mods = [new BmsModNoGreat()];
+        IReadOnlyList<IApplicableToJudgement> mods = [new BmsModNoGreat()];
         BmsJudgementProfileProvider.SetActiveWindowMods(mods);
         try
         {

@@ -425,7 +425,7 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
             if (beatmapManager != null && replay.HasReceivedAllFrames && replay.Frames.Count > 0)
             {
                 var mods = scoreWithReplay.ScoreInfo.Mods;
-                using var windows = BmsJudgementProfileProvider.UseWindowMods(mods.OfType<IApplicableToJudgementWindow>().ToArray());
+                using var windows = BmsJudgementProfileProvider.UseWindowMods(mods.OfType<IApplicableToJudgement>().ToArray());
                 var beatmap = beatmapManager.GetWorkingBeatmap(personalBest.BeatmapInfo).GetPlayableBeatmap(personalBest.Ruleset, mods);
                 if (beatmap is BmsBeatmap bmsBeatmap)
                     judgementEvents = BmsReplaySimulation.Run(bmsBeatmap, replay, scoreWithReplay.ScoreInfo).Judgements;

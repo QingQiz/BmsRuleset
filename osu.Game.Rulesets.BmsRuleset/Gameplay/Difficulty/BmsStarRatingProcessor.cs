@@ -207,19 +207,25 @@ public class BmsStarRatingProcessor
         }
     }
 
-    public BmsStarRatingResult Compute(IReadOnlyList<BmsNoteTiming> noteTimings, int totalColumns, int rank, double clockRate = 1.0, BmsLayoutVariant? layout = null, double? judgementRate = null, CancellationToken cancellationToken = default)
-        => compute(noteTimings, totalColumns, rank, clockRate, layout ?? BmsLayout.VariantFromTotalColumns(totalColumns), judgementRate, cancellationToken);
+    public BmsStarRatingResult Compute(IReadOnlyList<BmsNoteTiming> noteTimings, int totalColumns, int rank, double clockRate = 1.0, BmsLayoutVariant? layout = null, double? judgementRate = null, CancellationToken cancellationToken = default,
+                                       double? hitLeniency = null)
+        => compute(noteTimings, totalColumns, rank, clockRate, layout ?? BmsLayout.VariantFromTotalColumns(totalColumns), judgementRate, cancellationToken, hitLeniency);
 
-    public double ComputeStarRating(IReadOnlyList<BmsNoteTiming> noteTimings, int totalColumns, int rank, double clockRate = 1.0, BmsLayoutVariant? layout = null, double? judgementRate = null, CancellationToken cancellationToken = default)
-        => compute(noteTimings, totalColumns, rank, clockRate, layout ?? BmsLayout.VariantFromTotalColumns(totalColumns), judgementRate, cancellationToken).StarRating;
+    public double ComputeStarRating(IReadOnlyList<BmsNoteTiming> noteTimings, int totalColumns, int rank, double clockRate = 1.0, BmsLayoutVariant? layout = null, double? judgementRate = null,
+                                    CancellationToken cancellationToken = default, double? hitLeniency = null)
+        => compute(noteTimings, totalColumns, rank, clockRate, layout ?? BmsLayout.VariantFromTotalColumns(totalColumns), judgementRate, cancellationToken, hitLeniency).StarRating;
 
-    private BmsStarRatingResult compute(IReadOnlyList<BmsNoteTiming> noteTimings, int totalColumns, int rank, double clockRate, BmsLayoutVariant layout, double? judgementRate, CancellationToken cancellationToken)
+    private BmsStarRatingResult compute(IReadOnlyList<BmsNoteTiming> noteTimings, int totalColumns, int rank, double clockRate, BmsLayoutVariant layout, double? judgementRate, CancellationToken cancellationToken,
+                                        double? hitLeniency)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (hitLeniency is { } tolerance && (!double.IsFinite(tolerance) || tolerance < 0))
+            throw new ArgumentOutOfRangeException(nameof(hitLeniency), @"Timing tolerance must be finite and non-negative.");
+
         this.cancellationToken = cancellationToken;
         try
         {
-            return computeCore(noteTimings, totalColumns, rank, clockRate, layout, judgementRate);
+            return computeCore(noteTimings, totalColumns, rank, clockRate, layout, judgementRate, hitLeniency);
         }
         finally
         {
@@ -228,14 +234,20 @@ public class BmsStarRatingProcessor
         }
     }
 
-    private BmsStarRatingResult computeCore(IReadOnlyList<BmsNoteTiming> noteTimings, int totalColumns, int rank, double clockRate, BmsLayoutVariant layout, double? judgementRate)
+    private BmsStarRatingResult computeCore(IReadOnlyList<BmsNoteTiming> noteTimings, int totalColumns, int rank, double clockRate, BmsLayoutVariant layout, double? judgementRate,
+                                            double? hitLeniency)
     {
         // === Basic Setup and Parsing ===
         if (totalColumns > 64)
             throw new ArgumentOutOfRangeException(nameof(totalColumns), totalColumns, @"Bitmask active-column tracking supports at most 64 columns.");
 
         TotalColumns = totalColumns;
-        preprocessFile(noteTimings, rank, clockRate, layout, judgementRate);
+        preprocessFile(noteTimings, rank, clockRate, layout, judgementRate, hitLeniency);
+        // Compatibility rounding can produce exact-zero windows. This model has no finite rating for them;
+        // leave them unrated rather than inventing a positive timing tolerance or propagating NaN.
+        if (HitLeniencyX == 0)
+            return Result = new BmsStarRatingResult();
+
         cancellationToken.ThrowIfCancellationRequested();
         getCorners();
         cancellationToken.ThrowIfCancellationRequested();
@@ -616,9 +628,9 @@ public class BmsStarRatingProcessor
         public int Compare((double time, double change) x, (double time, double change) y) => x.time.CompareTo(y.time);
     }
 
-    private void preprocessFile(IReadOnlyList<BmsNoteTiming> noteTimings, int rank, double clockRate, BmsLayoutVariant layout, double? judgementRate)
+    private void preprocessFile(IReadOnlyList<BmsNoteTiming> noteTimings, int rank, double clockRate, BmsLayoutVariant layout, double? judgementRate, double? hitLeniency)
     {
-        HitLeniencyX = judgementRate.HasValue ? BmsHitLeniency.FromJudgementRate(judgementRate.Value, layout) : BmsHitLeniency.FromRank(rank, layout);
+        HitLeniencyX = hitLeniency ?? (judgementRate.HasValue ? BmsHitLeniency.FromJudgementRate(judgementRate.Value, layout) : BmsHitLeniency.FromRank(rank, layout));
 
         var sortedNotes = new List<(int column, double head, double tail, int order)>(noteTimings.Count);
         for (var i = 0; i < noteTimings.Count; i++)

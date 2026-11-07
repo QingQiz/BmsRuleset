@@ -20,6 +20,7 @@ Action<float, float>[] glyphs =
     drawNoMine,
     drawBranchReplay,
     drawNoBad,
+    drawLR2,
 ];
 
 width = glyphs.Length * glyph_size;
@@ -126,6 +127,57 @@ void drawBranchReplay(float cx, float cy)
 }
 
 void drawNoBad(float cx, float cy) => drawJudgementArc(cx, cy, removeGreat: false, removeGood: false, removeBad: true);
+
+void drawLR2(float cx, float cy)
+{
+    // Frozen outlines retain consistent letterforms without requiring fonts on the build machine.
+    (float X, float Y)[][] contours =
+    [
+        [(18.1f, 44), (11.02f, 44), (11.02f, 10.01f), (18.1f, 10.01f)],
+        [
+            (39.06f, 27.43f), (37.67f, 26.91f), (36.07f, 26.75f), (34.97f, 26.84f), (33.99f, 27.17f),
+            (33.18f, 27.69f), (32.47f, 28.44f), (31.49f, 30.45f), (31.17f, 33.05f), (31.17f, 44),
+            (24.08f, 44), (24.08f, 21.06f), (31.17f, 21.06f), (31.17f, 25.32f), (31.23f, 25.32f),
+            (32.24f, 23.27f), (33.6f, 21.81f), (35.29f, 20.93f), (37.31f, 20.64f), (38.32f, 20.7f), (39.06f, 20.93f),
+        ],
+        [
+            (47.65f, 39.79f), (57.56f, 39.79f), (57.56f, 44), (42.01f, 44), (42.01f, 42.28f),
+            (42.17f, 40.60f), (42.59f, 39.07f), (44.10f, 36.58f), (46.13f, 34.60f), (48.20f, 33.04f),
+            (49.97f, 31.70f), (51.28f, 30.38f), (52.08f, 29.07f), (52.34f, 27.64f), (52.13f, 26.33f),
+            (51.49f, 25.42f), (50.44f, 24.85f), (48.92f, 24.64f), (47.41f, 24.82f), (45.97f, 25.24f),
+            (44.54f, 26.01f), (43.14f, 27.01f), (43.14f, 22.59f), (46.39f, 21.11f), (50, 20.64f),
+            (51.69f, 20.77f), (53.18f, 21.11f), (54.48f, 21.66f), (55.58f, 22.37f), (57.05f, 24.45f),
+            (57.56f, 27.14f), (57.09f, 29.96f), (55.74f, 32.20f), (53.84f, 34.05f), (51.62f, 35.70f),
+            (50.13f, 36.75f), (48.83f, 37.81f), (47.99f, 38.84f),
+        ],
+    ];
+
+    const int samples = 4;
+    for (var y = 0; y < glyph_size; y++)
+    for (var x = 0; x < glyph_size; x++)
+    {
+        var covered = 0;
+        for (var sy = 0; sy < samples; sy++)
+        for (var sx = 0; sx < samples; sx++)
+        {
+            var px = x + (sx + 0.5f) / samples;
+            var py = y + (sy + 0.5f) / samples;
+            var inside = false;
+            foreach (var contour in contours)
+            {
+                for (var i = 0; i < contour.Length; i++)
+                {
+                    var a = contour[i];
+                    var b = contour[(i + 1) % contour.Length];
+                    if ((a.Y > py) != (b.Y > py) && px < (b.X - a.X) * (py - a.Y) / (b.Y - a.Y) + a.X)
+                        inside = !inside;
+                }
+            }
+            if (inside) covered++;
+        }
+        blend((int)(cx - glyph_size / 2f) + x, (int)(cy - glyph_size / 2f) + y, covered / (float)(samples * samples));
+    }
+}
 
 void drawJudgementArc(float cx, float cy, bool removeGreat, bool removeGood, bool removeBad = false)
 {

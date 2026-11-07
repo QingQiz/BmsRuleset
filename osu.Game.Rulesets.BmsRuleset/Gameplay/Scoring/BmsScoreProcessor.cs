@@ -45,6 +45,8 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
 
     internal bool IsRebuildingReplay { get; set; }
 
+    public bool? EmptyPoorBreaksCombo { get; set; }
+
     internal void ResetReplayState()
     {
         // The framework deliberately locks failed ranks until a new play is created.
@@ -59,6 +61,7 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
 
     public override void ApplyBeatmap(IBeatmap beatmap)
     {
+        using var windows = BmsJudgementProfileProvider.UseWindowMods(Mods.Value.OfType<IApplicableToJudgement>().ToArray());
         layout = (beatmap as BmsBeatmap)?.LayoutVariant ?? BmsLayoutVariant.Bme7K;
         base.ApplyBeatmap(beatmap);
 
@@ -68,8 +71,10 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
         {
             // Latest possible judgement time = max object end time + worst-case slow window.
             var maxEndTime = beatmap.HitObjects.Max(h => h.GetEndTime());
-            var slowWindow = beatmap.HitObjects[0].HitWindows?.WindowFor(HitResult.Ok)
-                             ?? BmsHitWindows.FALLBACK_BAD_WINDOW;
+            var slowWindow = beatmap.HitObjects.OfType<BmsHitObject>()
+                .Where(note => note.Beatmap != null)
+                .Select(note => BmsJudgementProfileProvider.GetTable(note, false).SlowWindowFor(HitResult.Ok))
+                .DefaultIfEmpty(BmsHitWindows.FALLBACK_BAD_WINDOW).Max();
 
             latestEndTime = maxEndTime + slowWindow;
         }
@@ -131,7 +136,7 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
     {
         ScoreResultCounts[result] = ScoreResultCounts.GetValueOrDefault(result) + 1;
         StatisticsVersion++;
-        var comboChange = result == HitResult.Ok || BmsJudgementProfileProvider.EmptyPoorBreaksCombo(layout) ? -Combo.Value : 0;
+        var comboChange = result == HitResult.Ok || (EmptyPoorBreaksCombo ?? BmsJudgementProfileProvider.EmptyPoorBreaksCombo(layout)) ? -Combo.Value : 0;
         Combo.Value += comboChange;
         var source = new BmsJudgementSource(eventTime, column,
             result == HitResult.Ok ? BmsJudgementSourceKind.NonConsumingBad : BmsJudgementSourceKind.EmptyPoor);

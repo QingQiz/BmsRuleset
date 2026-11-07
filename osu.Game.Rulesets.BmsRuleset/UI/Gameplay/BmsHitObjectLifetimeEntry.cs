@@ -243,7 +243,7 @@ internal sealed class BmsHitObjectLifetimeEntry(
     {
         if (hitObject is BmsLandmine or BmsInvisibleNote) return 0;
 
-        var table = BmsJudgementProfileProvider.GetTable(hitObject.Beatmap.LayoutVariant, hitObject.Column, hitObject.EffectiveJudgementRate, tail: false);
+        var table = BmsJudgementProfileProvider.GetTable(hitObject, tail: false);
         return Math.Max(table.FastWindowFor(HitResult.Ok), table.FastWindowFor(HitResult.Miss));
     }
 
@@ -381,11 +381,11 @@ internal sealed class BmsHitObjectLifetimeEntry(
 
         if (hitObject is BmsLongNote)
         {
-            var tailTable = BmsJudgementProfileProvider.GetTable(hitObject.Beatmap.LayoutVariant, hitObject.Column, hitObject.EffectiveJudgementRate, tail: true);
+            var tailTable = BmsJudgementProfileProvider.GetTable(hitObject, tail: true);
             return tailTable.SlowWindowFor(HitResult.Ok) + passive_poor_lifetime_margin;
         }
 
-        var table = BmsJudgementProfileProvider.GetTable(hitObject.Beatmap.LayoutVariant, hitObject.Column, hitObject.EffectiveJudgementRate, tail: false);
+        var table = BmsJudgementProfileProvider.GetTable(hitObject, tail: false);
         return table.SlowWindowFor(HitResult.Ok) + passive_poor_lifetime_margin;
     }
 

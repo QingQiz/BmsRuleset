@@ -8,6 +8,7 @@ using NUnit.Framework;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Course;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Randomisation;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.LongNoteMode;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;

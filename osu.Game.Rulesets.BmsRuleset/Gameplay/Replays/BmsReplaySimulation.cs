@@ -36,13 +36,15 @@ internal static class BmsReplaySimulation
             throw new ArgumentException(@"A complete BMS input replay with finite timestamps is required.", nameof(replay));
 
         var mods = source.Mods.Select(mod => mod.DeepClone()).ToArray();
-        using var windows = BmsJudgementProfileProvider.UseWindowMods(mods.OfType<IApplicableToJudgementWindow>().ToArray());
+        using var windows = BmsJudgementProfileProvider.UseWindowMods(mods.OfType<IApplicableToJudgement>().ToArray());
         var manualClock = new ManualClock();
         var clock = new FramedClock(manualClock);
         using var score = new BmsScoreProcessor { Clock = clock };
-        using var health = new BmsHealthProcessor { Clock = clock };
+        using var health = new BmsHealthProcessor { Clock = clock, Mods = mods };
         score.Mods.Value = mods;
         score.ApplyBeatmap(beatmap);
+        foreach (var mod in mods.OfType<IApplicableToScoreProcessor>())
+            mod.ApplyToScoreProcessor(score);
         health.ApplyBeatmap(beatmap);
         if (courseGaugeStates != null)
         {
@@ -53,14 +55,14 @@ internal static class BmsReplaySimulation
         else if (mods.OfType<BmsModAutoGauge>().FirstOrDefault() is { } autoGauge)
             autoGauge.ApplyToHealthProcessor(health);
         else
-            foreach (var mod in mods.OfType<IApplicableToHealthProcessor>())
+            foreach (var mod in mods.OfType<BmsModGauge>())
                 mod.ApplyToHealthProcessor(health);
 
         var gauges = new List<BmsGaugeHistoryEvent>();
         if (courseGaugeStates?.Count > 0 || (courseGaugeStates == null &&
-            (mods.OfType<BmsModAutoGauge>().FirstOrDefault() is { } seededAutoGauge
-                ? seededAutoGauge.ClassHealth.Value.HasValue || seededAutoGauge.ExClassHealth.Value.HasValue || seededAutoGauge.ExHardClassHealth.Value.HasValue
-                : mods.OfType<BmsModGauge>().Any(mod => mod.InitialHealth.Value.HasValue))))
+                                             (mods.OfType<BmsModAutoGauge>().FirstOrDefault() is { } seededAutoGauge
+                                                 ? seededAutoGauge.ClassHealth.Value.HasValue || seededAutoGauge.ExClassHealth.Value.HasValue || seededAutoGauge.ExHardClassHealth.Value.HasValue
+                                                 : mods.OfType<BmsModGauge>().Any(mod => mod.InitialHealth.Value.HasValue))))
             recordGauge(0);
 
         var objects = beatmap.HitObjects.Where(note => note is BmsNote or BmsLongNote or BmsLandmine).OrderBy(note => note.StartTime).ToArray();
@@ -97,7 +99,7 @@ internal static class BmsReplaySimulation
         var pressed = new HashSet<BmsAction>();
         var nextInput = 0;
         var time = fromTime ?? Math.Min(targetTime, Math.Min(0, Math.Min(frames.Select(frame => frame.Time).DefaultIfEmpty(0).Min(),
-            beatmap.HitObjects.Select(note => note.StartTime - 500).DefaultIfEmpty(0).Min())));
+            beatmap.HitObjects.Select(note => note.StartTime - BmsJudgementProfileProvider.GetBehaviour(beatmap.LayoutVariant).SearchWindow).DefaultIfEmpty(0).Min())));
         if (fromTime != null)
         {
             // The existing engine already consumed every input at the starting timestamp.
@@ -107,6 +109,7 @@ internal static class BmsReplaySimulation
             if (nextInput > 0)
                 pressed.UnionWith(frames[nextInput - 1].Actions);
         }
+
         var previousTime = time;
 
         while (true)
@@ -141,6 +144,7 @@ internal static class BmsReplaySimulation
                 engine.CompleteLongNotesAtEnd(frame);
             if (time == targetTime)
                 return;
+
             previousTime = time;
             var nextTime = nextInput < frames.Length ? frames[nextInput].Time : double.PositiveInfinity;
             nextTime = Math.Min(nextTime, engine.NextEventTime);
@@ -154,7 +158,7 @@ internal static class BmsReplaySimulation
         }
     }
 
-    private sealed class SimulationOutput(BmsScoreProcessor score, BmsHealthProcessor health, Action<double> recordGauge) : IBmsJudgementOutput
+    internal sealed class SimulationOutput(BmsScoreProcessor score, BmsHealthProcessor health, Action<double> recordGauge) : IBmsJudgementOutput
     {
         private readonly Dictionary<BmsHitObject, BmsJudgementResult> results = new(ReferenceEqualityComparer.Instance);
         private Action<BmsHitObject> stateCheckpoint = null!;

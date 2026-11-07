@@ -4,6 +4,7 @@ using System.Linq;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Randomisation;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.LongNoteMode;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
@@ -380,13 +381,22 @@ internal sealed class BmsCourseSession
                     break;
 
                 case "cn":
+                    forbidden.Add(typeof(BmsModLr2));
                     forbidden.Add(typeof(BmsModLongNote));
                     forbidden.Add(typeof(BmsModHellChargeNote));
                     break;
 
                 case "hcn":
+                    forbidden.Add(typeof(BmsModLr2));
                     forbidden.Add(typeof(BmsModLongNote));
                     forbidden.Add(typeof(BmsModChargeNote));
+                    break;
+
+                case "gauge_5k":
+                case "gauge_7k":
+                case "gauge_9k":
+                case "gauge_24k":
+                    forbidden.Add(typeof(BmsModLr2));
                     break;
             }
         }
@@ -396,6 +406,7 @@ internal sealed class BmsCourseSession
 
     internal void ConfigureHealthProcessor(BmsHealthProcessor healthProcessor)
     {
+        healthProcessor.Mods = Mods;
         healthProcessor.ConfigureGaugeContext(isCourseGaugeMode: true, familyOverride: gaugeProfileFamilyOverride);
 
         var usesAutoGauge = Mods.Any(mod => mod is BmsModAutoGauge);

@@ -38,8 +38,7 @@ internal sealed class BmsNoteJudgementRule
 
 internal readonly struct BmsNoteJudgementWindows(BmsHitObject note)
 {
-    internal readonly double PassivePoorOffset = BmsJudgementProfileProvider.GetTable(
-        note.Beatmap.LayoutVariant, note.Column, note.EffectiveJudgementRate, tail: false).SlowWindowFor(HitResult.Ok);
+    internal readonly double PassivePoorOffset = BmsJudgementProfileProvider.GetTable(note, tail: false).SlowWindowFor(HitResult.Ok);
 
     internal double NextPassiveJudgementTime(BmsHitObject target) => target.StartTime + PassivePoorOffset;
 }

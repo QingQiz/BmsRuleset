@@ -72,7 +72,7 @@ internal partial class BmsStatisticsPanel : VisibilityContainer
         return await Task.Run(() =>
         {
             var mods = replay.ScoreInfo.Mods;
-            using var windows = BmsJudgementProfileProvider.UseWindowMods(mods.OfType<IApplicableToJudgementWindow>().ToArray());
+            using var windows = BmsJudgementProfileProvider.UseWindowMods(mods.OfType<IApplicableToJudgement>().ToArray());
             var playableBeatmap = workingBeatmap.GetPlayableBeatmap(score.Ruleset, mods, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             return BmsResultStatisticsData.Load(replay.ScoreInfo, playableBeatmap, replay.Replay, cancellationToken);

@@ -41,10 +41,10 @@ public class BmsModNoBadTest
     public void TestCombinationWithConstraintsIsOrderIndependent(bool noGreat)
     {
         var original = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, 1, 2, false);
-        IApplicableToJudgementWindow constraint = noGreat ? new BmsModNoGreat() : new BmsModNoGood();
+        IApplicableToJudgement constraint = noGreat ? new BmsModNoGreat() : new BmsModNoGood();
         var noBad = new BmsModNoBad();
-        var first = noBad.ApplyToJudgementWindow(constraint.ApplyToJudgementWindow(original));
-        var second = constraint.ApplyToJudgementWindow(noBad.ApplyToJudgementWindow(original));
+        var first = noBad.ApplyToJudgementWindow(constraint.ApplyToJudgementWindow(original, default));
+        var second = constraint.ApplyToJudgementWindow(noBad.ApplyToJudgementWindow(original), default);
 
         Assert.That(first.HitWindows, Is.EqualTo(second.HitWindows));
         Assert.That(first.ResultForOffset(60), Is.EqualTo(HitResult.None));

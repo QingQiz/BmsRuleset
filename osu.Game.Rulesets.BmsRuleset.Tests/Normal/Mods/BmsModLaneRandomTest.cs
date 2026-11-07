@@ -3,7 +3,7 @@ using NUnit.Framework;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Randomisation;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Mods;
 
@@ -153,6 +153,7 @@ public class BmsModLaneRandomTest
     {
         var mod = new BmsModLaneRandom();
         Assert.That(mod.Acronym, Is.EqualTo("LR"));
+        Assert.That(new BmsRuleset().CreateModFromAcronym("LR"), Is.TypeOf<BmsModLaneRandom>());
     }
 
     [Test]

@@ -11,7 +11,7 @@ using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 
-public class BmsModNoGood : Mod, IApplicableToJudgementWindow
+public class BmsModNoGood : Mod, IApplicableToJudgement
 {
     private readonly ConditionalWeakTable<BmsJudgementWindowTable, BmsJudgementWindowTable> windowTables = new();
 
@@ -27,7 +27,7 @@ public class BmsModNoGood : Mod, IApplicableToJudgementWindow
 
     public override Type[] IncompatibleMods => [typeof(BmsModNoGreat)];
 
-    public BmsJudgementWindowTable ApplyToJudgementWindow(BmsJudgementWindowTable table)
+    public BmsJudgementWindowTable ApplyToJudgementWindow(BmsJudgementWindowTable table, in BmsJudgementWindowContext context = default)
         => windowTables.GetValue(table, static source => createWindow(source));
 
     private static BmsJudgementWindowTable createWindow(BmsJudgementWindowTable table)
@@ -37,7 +37,7 @@ public class BmsModNoGood : Mod, IApplicableToJudgementWindow
             : row);
 
         return table.EPoorWindow is { } ep
-            ? new BmsJudgementWindowTable(rows.Append(ep))
-            : new BmsJudgementWindowTable(rows);
+            ? table.WithRows(rows.Append(ep))
+            : table.WithRows(rows);
     }
 }

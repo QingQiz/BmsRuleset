@@ -65,6 +65,7 @@ public static class BmsJudgementSelector
         private BmsJudgementCandidate? emptyPoorCandidate;
         private int selectedSlot;
         private int emptyPoorSlot;
+        private readonly BmsJudgementBehaviour behaviour = BmsJudgementProfileProvider.GetBehaviour(layout);
 
         internal readonly BmsJudgementSelection Selection => selected != null
             ? new BmsJudgementSelection(selected, selectedResult, false)
@@ -79,16 +80,19 @@ public static class BmsJudgementSelector
 
             var offset = inputTime - candidate.StartTime;
             // beatoraja stops its candidate search before the inclusive E-POOR table edge.
-            if (offset <= -500)
+            if (offset <= -behaviour.SearchWindow)
                 return false;
 
+            algorithm = behaviour.Algorithm ?? algorithm;
             if (selected is { } current && algorithm == BmsJudgementAlgorithm.Duration
                                         && candidate.StartTime >= inputTime && Math.Abs(current.StartTime - inputTime) <= -offset)
                 return false;
 
-            var table = BmsJudgementProfileProvider.GetTable(layout, candidate.Column, candidate.JudgementRate, tail: false);
+            var table = BmsJudgementProfileProvider.GetTable(layout, candidate.Column, candidate.JudgementRate, false);
             var result = candidate.IsJudged ? HitResult.None : table.ResultForOffset(offset);
-            if (BmsJudgementProfileProvider.IsPms(layout)
+            if (candidate.IsLongNote && table.LongNoteHeadPoorOffset is { } deadline && offset > deadline)
+                result = HitResult.None;
+            if (behaviour.NonConsumingBad
                 && (candidate.IsJudged || (candidate.HasMistake && result is not (HitResult.Perfect or HitResult.Great or HitResult.Good))))
                 return true;
 

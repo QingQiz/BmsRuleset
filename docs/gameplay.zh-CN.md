@@ -185,7 +185,7 @@ beatoraja 将谱面辅助（**ASSIST**，深紫）与 Assist Easy 血条（**L-A
 | Mod                      | 说明                                       | 选项                     |
 |--------------------------|------------------------------------------|------------------------|
 | Autoplay                 | 自动播放                                     |     |
-| 自动皿 (AS)               | 自动执行皿的按下、保持和释放，包括 CN/HCN 尾部反向操作       |     |
+| 自动皿 (AS)                 | 自动执行皿的按下、保持和释放，包括 CN/HCN 尾部反向操作       |     |
 | Double Time / Half Time  |                                          | 速度；调整音高             |
 | Mirror                   | 镜像键位布局                                   |     |
 | 反键 (IN)                  | 将每条轨道中除最后一个音符外的音符转换为长按音符                 | 随机 LN 长度；随机种子          |
@@ -206,6 +206,7 @@ beatoraja 将谱面辅助（**ASSIST**，深紫）与 Assist Easy 血条（**L-A
 | No Good (NG)             | 移除 GOOD 判定窗口                             |     |
 | No Great (NE)            | 移除 GREAT 和 GOOD 判定窗口                     |     |
 | No Bad (NB)              | 移除 BAD 判定窗口                            |     |
+| LR2 (R2)                 | 使用 LR2 判定和血量规则，并强制经典 LN 长条模式 |     |
 | Long Note (L1)           | LN：从头部保持至尾部，综合结算一次判定 |     |
 | Charge Note (L2)         | CN：头尾分别判定                     |     |
 | Hell Charge Note (L3)    | HCN：头尾分别判定，主体期间积累回复与扣血 |     |

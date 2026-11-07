@@ -559,4 +559,10 @@
   <data name="practice_next_attempt" xml:space="preserve">
     <value>Start next attempt</value>
   </data>
+  <data name="mod_lr2_name" xml:space="preserve">
+    <value>LR2</value>
+  </data>
+  <data name="mod_lr2" xml:space="preserve">
+    <value>Play with LR2 judgement, long-note and gauge rules.</value>
+  </data>
 </root>

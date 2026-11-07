@@ -15,7 +15,7 @@ using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.Mods;
 
-namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
+namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Randomisation;
 
 public enum BmsNoteRandomMode
 {

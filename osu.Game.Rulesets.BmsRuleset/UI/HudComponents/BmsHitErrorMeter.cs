@@ -106,7 +106,9 @@ public partial class BmsHitErrorMeter : HitErrorMeter
                             ?? BmsJudgementProfileProvider.RateForRank(layout, beatmap?.Rank ?? 2);
         domain = CreateDomain(layout, judgementRate);
 
-        headWindows = BmsJudgementProfileProvider.GetTable(layout, 1, judgementRate, tail: false);
+        headWindows = beatmap?.HitObjects.FirstOrDefault(h => h is not BmsLandmine) is { } firstNote
+            ? BmsJudgementProfileProvider.GetTable(layout, 1, firstNote.EffectiveJudgementRate, false)
+            : BmsJudgementProfileProvider.GetTable(layout, 1, beatmap?.Rank ?? 2, tail: false);
 
         // Use legacy's time-to-width scale by default while respecting dimensions saved in user skins.
         if (Width == 0)

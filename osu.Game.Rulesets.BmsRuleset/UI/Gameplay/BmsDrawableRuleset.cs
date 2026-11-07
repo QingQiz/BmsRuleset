@@ -146,6 +146,7 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
         if (ReplayScore != null && healthProcessor is BmsHealthProcessor health)
         {
             var mods = ReplayScore.ScoreInfo.Mods;
+            health.Mods = mods;
             if (mods.OfType<BmsModAutoGauge>().FirstOrDefault() is { } autoGauge)
                 autoGauge.ApplyToHealthProcessor(health);
             else
@@ -154,11 +155,11 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
         }
     }
 
-    private IReadOnlyList<IApplicableToJudgementWindow> windowMods = [];
+    private IReadOnlyList<IApplicableToJudgement> windowMods = [];
 
     protected override Playfield CreatePlayfield()
     {
-        windowMods = Mods.OfType<IApplicableToJudgementWindow>().ToArray();
+        windowMods = Mods.OfType<IApplicableToJudgement>().ToArray();
         BmsJudgementProfileProvider.SetActiveWindowMods(windowMods);
 
         return new BmsPlayfield((BmsBeatmap)Beatmap);
@@ -229,6 +230,8 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
     private void load()
     {
         var beatmap = (BmsBeatmap)Beatmap;
+        if (healthProcessor is BmsHealthProcessor health)
+            health.Mods = Mods;
 
         updateJudgementAlgorithm();
 

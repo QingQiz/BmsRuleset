@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 using osu.Game.Rulesets.Scoring;
@@ -22,37 +24,64 @@ public static class BmsJudgementProfileProvider
     [ThreadStatic]
     private static WindowTableCache lastWindowTables;
 
-    private static IReadOnlyList<IApplicableToJudgementWindow> activeWindowMods = [];
+    private static readonly WindowModConfiguration no_window_mods = new([]);
+    private static WindowModConfiguration activeWindowMods = no_window_mods;
 
     [ThreadStatic]
-    private static IReadOnlyList<IApplicableToJudgementWindow>? simulationWindowMods;
+    private static WindowModConfiguration? simulationWindowMods;
 
-    internal static IDisposable UseWindowMods(IReadOnlyList<IApplicableToJudgementWindow> mods)
+    internal static IDisposable UseWindowMods(IReadOnlyList<IApplicableToJudgement> mods)
     {
         var previous = simulationWindowMods;
-        simulationWindowMods = mods;
+        simulationWindowMods = mods.Count == 0 ? no_window_mods : new WindowModConfiguration(mods);
         return new WindowModScope(previous);
     }
 
-    private sealed class WindowModScope(IReadOnlyList<IApplicableToJudgementWindow>? previous) : IDisposable
+    private sealed class WindowModScope(WindowModConfiguration? previous) : IDisposable
     {
         public void Dispose() => simulationWindowMods = previous;
     }
 
-    internal static void SetActiveWindowMods(IReadOnlyList<IApplicableToJudgementWindow> mods)
-        => activeWindowMods = mods;
+    internal static void SetActiveWindowMods(IReadOnlyList<IApplicableToJudgement> mods)
+        => activeWindowMods = mods.Count == 0 ? no_window_mods : new WindowModConfiguration(mods);
 
-    internal static void ClearActiveWindowMods(IReadOnlyList<IApplicableToJudgementWindow> mods)
+    internal static void ClearActiveWindowMods(IReadOnlyList<IApplicableToJudgement> mods)
     {
-        if (ReferenceEquals(activeWindowMods, mods))
-            activeWindowMods = [];
+        if (ReferenceEquals(activeWindowMods.Mods, mods))
+            activeWindowMods = no_window_mods;
     }
 
     public static BmsJudgementWindowTable GetTable(BmsLayoutVariant layout, int column, int rank, bool tail)
-        => getTable(layout, column, RateForRank(layout, rank), tail);
+        => getTable(new BmsJudgementWindowContext(layout, ResolveJudgementRate(layout, rank, null), tail), column);
 
     public static BmsJudgementWindowTable GetTable(BmsLayoutVariant layout, int column, double judgementRate, bool tail)
-        => getTable(layout, column, judgementRate, tail);
+        => getTable(new BmsJudgementWindowContext(layout, judgementRate, tail), column);
+
+    public static BmsJudgementWindowTable GetTable(BmsHitObject note, bool tail)
+        => getTable(new BmsJudgementWindowContext(note.Beatmap.LayoutVariant, note.EffectiveJudgementRate, tail), note.Column);
+
+    public static BmsJudgementWindowTable GetTable(in BmsJudgementWindowContext context, int column)
+        => getTable(context, column);
+
+    [ThreadStatic]
+    private static (BmsLayoutVariant Layout, IReadOnlyList<IApplicableToJudgement>? Mods, BmsJudgementBehaviour? Behaviour) lastBehaviour;
+
+    public static BmsJudgementBehaviour GetBehaviour(BmsLayoutVariant layout)
+    {
+        var mods = (simulationWindowMods ?? activeWindowMods).Mods;
+        if (lastBehaviour.Behaviour != null && lastBehaviour.Layout == layout && ReferenceEquals(lastBehaviour.Mods, mods))
+            return lastBehaviour.Behaviour;
+
+        var behaviour = new BmsJudgementBehaviour
+        {
+            NonConsumingBad = IsPms(layout),
+            LongNoteReleaseMargin = IsPms(layout) ? 200 : 0,
+        };
+        foreach (var mod in mods)
+            behaviour = mod.ApplyToJudgement(behaviour);
+        lastBehaviour = (layout, mods, behaviour);
+        return behaviour;
+    }
 
     public static double RateForRank(int rank) => rank_rates[Math.Clamp(rank, 0, 4)];
 
@@ -62,23 +91,32 @@ public static class BmsJudgementProfileProvider
         // BMSPlayerRule first converts DEFEXRANK to an integer percentage.
         => exRank > 0 ? Math.Truncate(Math.Truncate(exRank) * Math.Round(RateForRank(layout, 2) * 100) / 100) / 100 : RateForRank(layout, 2);
 
-    private static BmsJudgementWindowTable getTable(BmsLayoutVariant layout, int column, double judgementRate, bool tail)
+    public static double RateForDifficulty(BmsLayoutVariant layout, int rank, double? exRank)
+        => exRank is { } value ? RateForExRank(layout, value) : RateForRank(layout, rank);
+
+    public static double ResolveJudgementRate(BmsLayoutVariant layout, int rank, double? exRank)
+        => (simulationWindowMods ?? activeWindowMods).RateCalculator(layout, rank, exRank);
+
+    private static BmsJudgementWindowTable getTable(BmsJudgementWindowContext context, int column)
     {
+        var (layout, judgementRate, tail) = context;
         var key = new ProfileKey(layout, judgementRate);
-        var mods = simulationWindowMods ?? activeWindowMods;
+        var configuration = simulationWindowMods ?? activeWindowMods;
+        var mods = configuration.Mods;
         if (!lastWindowTables.IsCurrent(key, mods))
         {
             if (lastProfile.Profile == null || lastProfile.Key != key)
                 lastProfile = (key, profiles.GetOrAdd(key, static k => createProfile(k.Layout, k.Rate)));
 
             var profile = lastProfile.Profile;
+            var orderedMods = configuration.OrderedMods;
             lastWindowTables = new WindowTableCache(
                 key,
                 mods,
-                applyWindowMods(profile.Normal, mods),
-                applyWindowMods(profile.Scratch, mods),
-                applyWindowMods(profile.LongNoteTail, mods),
-                applyWindowMods(profile.LongScratchTail, mods));
+                applyWindowMods(profile.Normal, orderedMods, context with { Tail = false }),
+                applyWindowMods(profile.Scratch, orderedMods, context with { Tail = false }),
+                applyWindowMods(profile.LongNoteTail, orderedMods, context with { Tail = true }),
+                applyWindowMods(profile.LongScratchTail, orderedMods, context with { Tail = true }));
         }
 
         var scratch = BmsLayout.IsScratchColumn(column, layout);
@@ -89,10 +127,10 @@ public static class BmsJudgementProfileProvider
                 : lastWindowTables.Normal;
     }
 
-    private static BmsJudgementWindowTable applyWindowMods(BmsJudgementWindowTable table, IReadOnlyList<IApplicableToJudgementWindow> mods)
+    private static BmsJudgementWindowTable applyWindowMods(BmsJudgementWindowTable table, IReadOnlyList<IApplicableToJudgement> mods, BmsJudgementWindowContext context)
     {
         for (var i = 0; i < mods.Count; i++)
-            table = mods[i].ApplyToJudgementWindow(table);
+            table = mods[i].ApplyToJudgementWindow(table, context);
 
         return table;
     }
@@ -116,15 +154,28 @@ public static class BmsJudgementProfileProvider
 
     private readonly record struct ProfileKey(BmsLayoutVariant Layout, double Rate);
 
+    private sealed class WindowModConfiguration(IReadOnlyList<IApplicableToJudgement> mods)
+    {
+        public readonly IReadOnlyList<IApplicableToJudgement> Mods = mods;
+
+        public readonly Func<BmsLayoutVariant, int, double?, double> RateCalculator =
+            mods.Select(mod => mod.JudgementRateCalculator).LastOrDefault(calculator => calculator != null) ?? RateForDifficulty;
+
+        // Base replacements precede result constraints, independent of the selected order.
+        public readonly IReadOnlyList<IApplicableToJudgement> OrderedMods = mods.Count > 1 && mods.Any(mod => mod.ReplacesBaseWindows)
+            ? mods.OrderByDescending(mod => mod.ReplacesBaseWindows).ToArray()
+            : mods;
+    }
+
     private readonly record struct WindowTableCache(
         ProfileKey Key,
-        IReadOnlyList<IApplicableToJudgementWindow>? Mods,
+        IReadOnlyList<IApplicableToJudgement>? Mods,
         BmsJudgementWindowTable Normal,
         BmsJudgementWindowTable Scratch,
         BmsJudgementWindowTable LongNoteTail,
         BmsJudgementWindowTable LongScratchTail)
     {
-        internal bool IsCurrent(ProfileKey key, IReadOnlyList<IApplicableToJudgementWindow> mods)
+        internal bool IsCurrent(ProfileKey key, IReadOnlyList<IApplicableToJudgement> mods)
             => Key == key && ReferenceEquals(Mods, mods);
     }
 

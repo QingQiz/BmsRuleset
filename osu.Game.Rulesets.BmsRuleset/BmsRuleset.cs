@@ -18,6 +18,7 @@ using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Difficulty;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Randomisation;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.LongNoteMode;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
@@ -189,6 +190,7 @@ public partial class BmsRuleset : Ruleset
         ],
         ModType.Fun =>
         [
+            new BmsModLr2(),
             new BmsModLongNote(),
             new BmsModChargeNote(),
             new BmsModHellChargeNote(),
@@ -225,6 +227,12 @@ public partial class BmsRuleset : Ruleset
 
     public override IEnumerable<RulesetBeatmapAttribute> GetBeatmapAttributesForDisplay(IBeatmapInfo beatmapInfo, IReadOnlyCollection<Mod> mods)
     {
+        using var windows = BmsJudgementProfileProvider.UseWindowMods(mods.OfType<IApplicableToJudgement>().ToArray());
+        return getBeatmapAttributesForDisplay(beatmapInfo, mods).ToArray();
+    }
+
+    private IEnumerable<RulesetBeatmapAttribute> getBeatmapAttributesForDisplay(IBeatmapInfo beatmapInfo, IReadOnlyCollection<Mod> mods)
+    {
         var foreignConverter = BmsForeignBeatmapConverterRegistry.FindConverter(beatmapInfo);
         var original = foreignConverter?.GetConvertedDifficultyInfo(beatmapInfo)
                        ?? BmsDifficultyInfo.FromOsuDifficulty(beatmapInfo.Difficulty);
@@ -235,7 +243,7 @@ public partial class BmsRuleset : Ruleset
 
         if (adjusted.ExRank is { } exRank)
         {
-            var rate = BmsJudgementProfileProvider.RateForExRank(layout, exRank);
+            var rate = BmsJudgementProfileProvider.ResolveJudgementRate(layout, adjusted.Rank, exRank);
             yield return new RulesetBeatmapAttribute("EXRANK", "EX", (float)original.ExRank.GetValueOrDefault(exRank), (float)exRank, exrank_display_max)
             {
                 Description = BmsStrings.ExRankDescription(exRank),
@@ -244,7 +252,7 @@ public partial class BmsRuleset : Ruleset
         }
         else
         {
-            var rate = BmsJudgementProfileProvider.RateForRank(layout, adjusted.Rank);
+            var rate = BmsJudgementProfileProvider.ResolveJudgementRate(layout, adjusted.Rank, null);
             yield return new RulesetBeatmapAttribute("RANK", "RK", original.Rank, adjusted.Rank, 4)
             {
                 Description = BmsStrings.RankDescription(adjusted.Rank),
@@ -254,12 +262,12 @@ public partial class BmsRuleset : Ruleset
 
         if (original.LockedLongNoteMode != BmsLongNoteMode.Undefined)
         {
-            yield return new RulesetBeatmapAttribute("LNMODE", "LM", (float)original.LockedLongNoteMode, (float)original.LockedLongNoteMode, 3)
+            yield return new RulesetBeatmapAttribute("LNMODE", "LM", (float)original.LockedLongNoteMode, (float)adjusted.LockedLongNoteMode, 3)
             {
-                Description = BmsStrings.LockedLongNoteMode(formatLongNoteMode(original.LockedLongNoteMode)),
+                Description = BmsStrings.LockedLongNoteMode(formatLongNoteMode(adjusted.LockedLongNoteMode)),
                 AdditionalMetrics =
                 [
-                    new(BmsStrings.LockedMode, formatLongNoteMode(original.LockedLongNoteMode), colours.Gray4),
+                    new(BmsStrings.LockedMode, formatLongNoteMode(adjusted.LockedLongNoteMode), colours.Gray4),
                 ],
             };
         }
@@ -297,16 +305,26 @@ public partial class BmsRuleset : Ruleset
 
     public override Drawable CreateIcon() => new BmsRulesetIcon();
 
+    private static (BmsGaugeType Type, BmsGaugeCalculator Calculator) createDisplayGaugeCalculator(
+        IBeatmapInfo beatmapInfo, BmsDifficultyInfo difficulty, IReadOnlyCollection<Mod> mods, BmsLayoutVariant layout)
+    {
+        var gaugeType = mods.OfType<BmsModGauge>().FirstOrDefault()?.GaugeType ?? BmsGaugeType.Normal;
+        var family = BmsGaugeProfileFamilyProvider.FromLayout(layout);
+        var profile = BmsGaugeProfileFactory.Create(gaugeType, family);
+        foreach (var mod in mods.OfType<IApplicableToGaugeProfile>())
+            profile = mod.ApplyToGaugeProfile(gaugeType, profile);
+        return (gaugeType, new BmsGaugeCalculator(profile, difficulty.Total, Math.Max(1, beatmapInfo.TotalObjectCount), family));
+    }
+
     private static LocalisableString createTotalDescription(
         IBeatmapInfo beatmapInfo,
         BmsDifficultyInfo difficulty,
         IReadOnlyCollection<Mod> mods,
         BmsLayoutVariant layout)
     {
-        var gaugeType = mods.OfType<BmsModGauge>().FirstOrDefault()?.GaugeType ?? BmsGaugeType.Normal;
-        var profile = BmsGaugeProfileFactory.Create(gaugeType, BmsGaugeProfileFamilyProvider.FromLayout(layout));
-        var noteCount = Math.Max(1, beatmapInfo.TotalObjectCount);
-        var calculator = new BmsGaugeCalculator(profile, difficulty.Total, noteCount, BmsGaugeProfileFamilyProvider.FromLayout(layout));
+        var (gaugeType, calculator) = createDisplayGaugeCalculator(beatmapInfo, difficulty, mods, layout);
+        var profile = calculator.Profile;
+        var noteCount = calculator.NoteCount;
 
         var gaugeName = formatGaugeName(gaugeType);
         var total = formatTotal(difficulty, calculator);
@@ -395,11 +413,8 @@ public partial class BmsRuleset : Ruleset
         IReadOnlyCollection<Mod> mods,
         BmsLayoutVariant layout)
     {
-        var gaugeType = mods.OfType<BmsModGauge>().FirstOrDefault()?.GaugeType ?? BmsGaugeType.Normal;
-        var profile = BmsGaugeProfileFactory.Create(gaugeType, BmsGaugeProfileFamilyProvider.FromLayout(layout));
-        var noteCount = Math.Max(1, beatmapInfo.TotalObjectCount);
-        var calculator = new BmsGaugeCalculator(profile, difficulty.Total, noteCount, BmsGaugeProfileFamilyProvider.FromLayout(layout));
-        var referenceHealth = profile.InitialHealth;
+        var (_, calculator) = createDisplayGaugeCalculator(beatmapInfo, difficulty, mods, layout);
+        var referenceHealth = calculator.Profile.InitialHealth;
 
         return
         [

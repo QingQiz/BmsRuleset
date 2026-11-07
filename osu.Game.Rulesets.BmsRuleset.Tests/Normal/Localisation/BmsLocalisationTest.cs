@@ -176,6 +176,14 @@ public class BmsLocalisationTest
         });
     }
 
+    [TestCase("en", "Play with LR2 judgement, long-note and gauge rules.")]
+    [TestCase("zh", "使用 LR2 的判定、长条和血量规则游玩。")]
+    public void TestLR2DescriptionUsesLocalisation(string locale, string expected)
+    {
+        config.SetValue(FrameworkSetting.Locale, locale);
+        Assert.That(localisation.GetLocalisedString(new BmsModLr2().Description), Is.EqualTo(expected));
+    }
+
     private static IReadOnlyDictionary<string, string> getResourceValues(string resourceName)
     {
         var manager = new ResourceManager(resourceName, typeof(BmsStrings).Assembly);

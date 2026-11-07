@@ -6,10 +6,12 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 using osu.Game.Rulesets.Difficulty;
 using osu.Game.Rulesets.Difficulty.Preprocessing;
 using osu.Game.Rulesets.Difficulty.Skills;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Rulesets.Scoring;
 using osu.Game.Utils;
 
 namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Difficulty;
@@ -22,6 +24,9 @@ public class BmsDifficultyCalculator(IRulesetInfo ruleset, IWorkingBeatmap beatm
 
     protected override DifficultyAttributes CreateDifficultyAttributes(IBeatmap beatmap, Mod[] mods, Skill[] skills)
     {
+        // Result constraints such as NE must not remove the rating model's base GREAT tolerance.
+        using var windows = BmsJudgementProfileProvider.UseWindowMods(mods.OfType<IApplicableToJudgement>()
+            .Where(mod => mod.ReplacesBaseWindows).ToArray());
         CalculationCancellationToken.ThrowIfCancellationRequested();
         var clockRate = ModUtils.CalculateRateWithMods(mods);
         var bmsBeatmap = beatmap as BmsBeatmap;
@@ -43,16 +48,15 @@ public class BmsDifficultyCalculator(IRulesetInfo ruleset, IWorkingBeatmap beatm
 
         if (noteTimings.Count > 0)
         {
-            if (noteTimings.Count > 0)
-            {
-                var layout = bmsBeatmap?.LayoutVariant ?? BmsLayout.VariantFromTotalColumns(totalColumns);
-                var exRank = bmsBeatmap != null ? bmsBeatmap.ExRank : storedDifficulty.ExRank;
-                var judgementRate = exRank is { } exRankValue
-                    ? BmsJudgementProfileProvider.RateForExRank(layout, exRankValue)
-                    : BmsJudgementProfileProvider.RateForRank(layout, rank);
-                var result = StarRatingProcessor.Compute(noteTimings, totalColumns, rank, clockRate, layout, judgementRate, CalculationCancellationToken);
-                sr = result.StarRating;
-            }
+            var layout = bmsBeatmap?.LayoutVariant ?? BmsLayout.VariantFromTotalColumns(totalColumns);
+            var exRank = bmsBeatmap != null ? bmsBeatmap.ExRank : storedDifficulty.ExRank;
+            var judgementRate = BmsJudgementProfileProvider.ResolveJudgementRate(layout, rank, exRank);
+            var context = new BmsJudgementWindowContext(layout, judgementRate, false);
+            var column = BmsLayout.IsScratchColumn(0, layout) ? 1 : 0;
+            var greatWindow = BmsJudgementProfileProvider.GetTable(context, column).FrameworkWindowFor(HitResult.Great);
+            var result = StarRatingProcessor.Compute(noteTimings, totalColumns, rank, clockRate, layout,
+                cancellationToken: CalculationCancellationToken, hitLeniency: BmsHitLeniency.FromGreatWindow(greatWindow));
+            sr = result.StarRating;
         }
 
         return new DifficultyAttributes(mods, sr)

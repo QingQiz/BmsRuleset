@@ -6,8 +6,10 @@ using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.Judgements;
+using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
@@ -62,6 +64,49 @@ public partial class BmsHealthProcessor : HealthProcessor
     private IBeatmap? beatmap;
     private bool initialized;
     private BmsGaugeProfileFamily layoutProfileFamily = BmsGaugeProfileFamily.SevenKeys;
+    private IApplicableToGaugeProfile[] profileMods = [];
+
+    public IReadOnlyList<Mod> Mods
+    {
+        get;
+        set
+        {
+            if (ReferenceEquals(field, value))
+                return;
+
+            syncActiveStateFromHealth();
+            field = value;
+            profileMods = value.OfType<IApplicableToGaugeProfile>().ToArray();
+            initialized = false;
+            foreach (var state in gaugeStates)
+            {
+                var defaultInitialHealth = initialGaugeStates == null && !state.HasExplicitInitialHealth
+                                                                      && state.CurrentHp == state.Profile.InitialHealth;
+                state.Profile = createProfile(state.GaugeType);
+                if (defaultInitialHealth)
+                    state.CurrentHp = state.Profile.InitialHealth;
+                state.Calculator = null;
+                state.IsHpFailed |= state.Profile.IsFailed(state.CurrentHp);
+            }
+
+            if (gaugeStates.Count > 0)
+                resolveActiveState();
+            else
+            {
+                GaugeProfile = createProfile(GaugeType);
+                DisplayProfile.Value = GaugeProfile.Display;
+                Health.MaxValue = GaugeProfile.MaxHealth;
+            }
+        }
+    } = [];
+
+    private BmsGaugeProfile createProfile(BmsGaugeType type)
+    {
+        var profile = BmsGaugeProfileFactory.Create(type, effectiveProfileFamily);
+        foreach (var mod in profileMods)
+            profile = mod.ApplyToGaugeProfile(type, profile);
+        return profile;
+    }
 
     public override void ApplyBeatmap(IBeatmap beatmap)
     {
@@ -94,7 +139,7 @@ public partial class BmsHealthProcessor : HealthProcessor
             var delta = state.Calculator!.GetDeltaFor(result, state.CurrentHp);
             state.CurrentHp = state.Calculator.ApplyDelta(state.CurrentHp, delta);
 
-            if (state.CurrentHp <= 0)
+            if (state.Profile.IsFailed(state.CurrentHp))
                 state.IsHpFailed = true;
         }
 
@@ -132,7 +177,7 @@ public partial class BmsHealthProcessor : HealthProcessor
             var delta = state.Calculator!.GetDeltaFor(type, state.CurrentHp) * scale;
             state.CurrentHp = state.Calculator.ApplyDelta(state.CurrentHp, delta);
 
-            if (state.CurrentHp <= 0)
+            if (state.Profile.IsFailed(state.CurrentHp))
                 state.IsHpFailed = true;
         }
 
@@ -191,14 +236,15 @@ public partial class BmsHealthProcessor : HealthProcessor
             if (gaugeStates.Any(s => s.GaugeType == type))
                 continue;
 
-            var profile = BmsGaugeProfileFactory.Create(type, effectiveProfileFamily);
+            var profile = createProfile(type);
             var initialState = initialStates?.FirstOrDefault(state => state.GaugeType == type);
             newStates.Add(new GaugeState
             {
                 GaugeType = type,
                 Profile = profile,
                 CurrentHp = Math.Clamp(initialState?.Health ?? profile.InitialHealth, 0, profile.MaxHealth),
-                IsHpFailed = initialState?.Failed == true || initialState?.Health <= 0,
+                HasExplicitInitialHealth = initialState != null,
+                IsHpFailed = initialState?.Failed == true || profile.IsFailed(initialState?.Health ?? profile.InitialHealth),
             });
         }
 
@@ -228,7 +274,8 @@ public partial class BmsHealthProcessor : HealthProcessor
                 continue;
 
             state.CurrentHp = Math.Clamp(restored.Health, 0, state.Profile.MaxHealth);
-            state.IsHpFailed = restored.Failed || state.CurrentHp <= 0;
+            state.HasExplicitInitialHealth = true;
+            state.IsHpFailed = restored.Failed || state.Profile.IsFailed(state.CurrentHp);
         }
 
         activeGaugeIndex = 0;
@@ -271,6 +318,7 @@ public partial class BmsHealthProcessor : HealthProcessor
         foreach (var state in gaugeStates)
         {
             state.CurrentHp = state.Profile.InitialHealth;
+            state.HasExplicitInitialHealth = false;
             state.IsHpFailed = false;
         }
 
@@ -324,7 +372,7 @@ public partial class BmsHealthProcessor : HealthProcessor
                 if (state.IsHpFailed) continue;
 
                 state.CurrentHp = state.Calculator!.ApplyDelta(state.CurrentHp, -damageFraction);
-                if (state.CurrentHp <= 0)
+                if (state.Profile.IsFailed(state.CurrentHp))
                     state.IsHpFailed = true;
             }
 
@@ -341,7 +389,7 @@ public partial class BmsHealthProcessor : HealthProcessor
             var delta = state.Calculator!.GetDeltaFor(result.Type, state.CurrentHp);
             state.CurrentHp = state.Calculator.ApplyDelta(state.CurrentHp, delta);
 
-            if (state.CurrentHp <= 0)
+            if (state.Profile.IsFailed(state.CurrentHp))
                 state.IsHpFailed = true;
         }
 
@@ -393,13 +441,11 @@ public partial class BmsHealthProcessor : HealthProcessor
             total = bmsBeatmap.Total;
 
         var fullNoteCount = beatmap is BmsBeatmap { PracticeFullNoteCount: { } fullCount } ? Math.Max(1, fullCount) : noteCount;
-        if (total <= 0)
-            total = BmsGaugeCalculator.CalculateDefaultTotal(fullNoteCount, effectiveProfileFamily);
-
         foreach (var state in gaugeStates)
         {
+            var effectiveTotal = BmsGaugeCalculator.ResolveTotal(state.Profile, total, fullNoteCount, effectiveProfileFamily);
             // Mixed Auto Gauge chains need the full chart context for survival algorithms and proportional TOTAL for recovery gauges.
-            var calculatorTotal = state.Profile.Algorithm == BmsGaugeAlgorithm.Total ? total * noteCount / fullNoteCount : total;
+            var calculatorTotal = state.Profile.Algorithm == BmsGaugeAlgorithm.Total ? effectiveTotal * noteCount / fullNoteCount : effectiveTotal;
             var calculatorNoteCount = state.Profile.Algorithm == BmsGaugeAlgorithm.Total ? noteCount : fullNoteCount;
             state.Calculator = new BmsGaugeCalculator(state.Profile, calculatorTotal, calculatorNoteCount, effectiveProfileFamily);
         }
@@ -414,9 +460,10 @@ public partial class BmsHealthProcessor : HealthProcessor
 
         foreach (var state in gaugeStates)
         {
-            state.Profile = BmsGaugeProfileFactory.Create(state.GaugeType, effectiveProfileFamily);
+            state.Profile = createProfile(state.GaugeType);
             state.Calculator = null;
             state.CurrentHp = state.Profile.InitialHealth;
+            state.HasExplicitInitialHealth = false;
             state.IsHpFailed = false;
         }
 
@@ -463,6 +510,7 @@ public partial class BmsHealthProcessor : HealthProcessor
         public BmsGaugeProfile Profile = null!;
         public BmsGaugeCalculator? Calculator;
         public double CurrentHp;
+        public bool HasExplicitInitialHealth;
         public bool IsHpFailed;
     }
 }

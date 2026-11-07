@@ -12,7 +12,7 @@
 ## Code Style
 
 - use `var` for local variables when possible
-- use collection expressions when possible (e.g. `string[] vowels = ["a", "e", "i", "o", "u"]`)
+- avoid unnecessary testing and over-defensive coding
 
 ## Localisation
 

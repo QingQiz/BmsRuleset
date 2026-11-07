@@ -22,9 +22,7 @@ public class BmsGaugeCalculator
         Profile = profile;
         NoteCount = Math.Max(1, noteCount);
 
-        Total = total > 0
-            ? total
-            : CalculateDefaultTotal(NoteCount, profileFamily);
+        Total = ResolveTotal(profile, total, NoteCount, profileFamily);
 
         var perNoteMaxPercent = Math.Max(Math.Min(0.15, (2 * Total - 320) / NoteCount), 0);
         limitIncrementScale = perNoteMaxPercent / 0.15;
@@ -38,6 +36,9 @@ public class BmsGaugeCalculator
             ? Math.Max(300.0, 7.605 * (noteCount + 100) / (0.01 * noteCount + 6.5))
             : Math.Max(260.0, 7.605 * noteCount / (0.01 * noteCount + 6.5));
     }
+
+    internal static double ResolveTotal(BmsGaugeProfile profile, double total, int noteCount, BmsGaugeProfileFamily family)
+        => total > 0 ? total : profile.DefaultTotal?.Invoke(noteCount) ?? CalculateDefaultTotal(noteCount, family);
 
     public double GetDeltaFor(HitResult result, double currentHealth)
     {
@@ -53,13 +54,18 @@ public class BmsGaugeCalculator
         };
 
         if (delta < 0 && Profile.Algorithm == BmsGaugeAlgorithm.ModifyDamage)
-            delta *= calculateDamageScale();
+            delta *= Profile.DamageScale?.Invoke(Total, NoteCount) ?? calculateDamageScale();
 
         return applyGuts(delta, currentHealth);
     }
 
     public double ApplyDelta(double currentHealth, double delta)
-        => currentHealth <= 0 ? 0 : Math.Clamp(currentHealth + delta, Profile.MinHealth, Profile.MaxHealth);
+    {
+        if (Profile.IsFailed(currentHealth)) return 0;
+
+        var health = Math.Clamp(currentHealth + delta, Profile.MinHealth, Profile.MaxHealth);
+        return Profile.IsFailed(health) ? 0 : health;
+    }
 
     private double gain(double value)
     {

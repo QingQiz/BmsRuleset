@@ -56,7 +56,7 @@ public class BmsReplaySimulationCorpusTest
             using var reader = new LineBufferedReader(stream);
             var decoded = Decoder.GetDecoder<Beatmap>(reader).Decode(reader);
             var mods = source.Mods;
-            using var windows = BmsJudgementProfileProvider.UseWindowMods(mods.OfType<IApplicableToJudgementWindow>().ToArray());
+            using var windows = BmsJudgementProfileProvider.UseWindowMods(mods.OfType<IApplicableToJudgement>().ToArray());
             var playable = (BmsBeatmap)new TestWorkingBeatmap(decoded).GetPlayableBeatmap(new BmsRuleset().RulesetInfo, mods);
             var simulated = BmsReplaySimulation.Run(playable, archived.Replay, source);
             var compact = BmsTestReplayArchive.RoundTrip(archived);

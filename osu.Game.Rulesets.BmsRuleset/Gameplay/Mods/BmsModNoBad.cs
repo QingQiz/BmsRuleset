@@ -10,7 +10,7 @@ using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 
-public class BmsModNoBad : Mod, IApplicableToJudgementWindow, IApplicableToScoreSelection
+public class BmsModNoBad : Mod, IApplicableToJudgement, IApplicableToScoreSelection
 {
     // This stateless transform can share its result across notes without retaining transient input tables.
     private readonly ConditionalWeakTable<BmsJudgementWindowTable, BmsJudgementWindowTable> windowTables = new();
@@ -27,13 +27,13 @@ public class BmsModNoBad : Mod, IApplicableToJudgementWindow, IApplicableToScore
 
     public IScoreSelectionRule ScoreSelectionRule => BmsModTypeScoreSelectionRule<BmsModNoBad>.REDUCTION;
 
-    public BmsJudgementWindowTable ApplyToJudgementWindow(BmsJudgementWindowTable table)
+    public BmsJudgementWindowTable ApplyToJudgementWindow(BmsJudgementWindowTable table, in BmsJudgementWindowContext context = default)
         => windowTables.GetValue(table, static source => createWindow(source));
 
     private static BmsJudgementWindowTable createWindow(BmsJudgementWindowTable table)
     {
         // An inverted interval removes BAD hits while retaining its passive POOR deadline.
         var rows = table.HitWindows.Select(row => row.Result == HitResult.Ok ? row with { FastDTime = double.NegativeInfinity } : row);
-        return new BmsJudgementWindowTable(table.EPoorWindow is { } ep ? rows.Append(ep) : rows);
+        return table.WithRows(table.EPoorWindow is { } ep ? rows.Append(ep) : rows);
     }
 }

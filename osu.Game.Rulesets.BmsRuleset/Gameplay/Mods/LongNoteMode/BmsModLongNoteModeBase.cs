@@ -18,7 +18,7 @@ public abstract class BmsModLongNoteModeBase : Mod, IApplicableAfterBeatmapConve
             typeof(BmsModLongNote),
             typeof(BmsModChargeNote),
             typeof(BmsModHellChargeNote),
-        }.Where(t => t != GetType()).ToArray();
+        }.Where(t => t != GetType()).Concat(TargetMode == BmsLongNoteMode.LongNote ? [] : [typeof(BmsModLr2)]).ToArray();
 
     protected abstract BmsLongNoteMode TargetMode { get; }
 

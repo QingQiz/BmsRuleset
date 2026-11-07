@@ -179,7 +179,7 @@ public static class BmsStrings
 
     public static LocalisableString ResultPercentage(double value) => get("result_percentage", value);
 
-    public static LocalisableString ResultJudgement(osu.Game.Rulesets.Scoring.HitResult result) => get($"result_judgement_{result.ToString().ToLowerInvariant()}");
+    public static LocalisableString ResultJudgement(Scoring.HitResult result) => get($"result_judgement_{result.ToString().ToLowerInvariant()}");
 
     public static LocalisableString LeaderboardPosition(int position) => get("leaderboard_position", position);
 
@@ -829,6 +829,10 @@ public static class BmsStrings
     public static LocalisableString ModBackgroundKeysound => get("mod_background_keysound");
 
     public static LocalisableString ModBranchReplay => get("mod_branch_replay");
+
+    public static LocalisableString ModLr2Name => get("mod_lr2_name");
+
+    public static LocalisableString ModLr2 => get("mod_lr2");
 
     public static LocalisableString ModConstant => get("mod_constant");
 

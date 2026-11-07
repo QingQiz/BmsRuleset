@@ -37,27 +37,51 @@ public class BmsJudgementProfileCacheTest
     [TestCase(2)]
     public void RepeatedModTablesReuseStorageAcrossNotesButFollowInputChanges(int kind)
     {
-        IApplicableToJudgementWindow mod = kind switch { 0 => new BmsModNoBad(), 1 => new BmsModNoGood(), _ => new BmsModNoGreat() };
+        IApplicableToJudgement mod = kind switch { 0 => new BmsModNoBad(), 1 => new BmsModNoGood(), _ => new BmsModNoGreat() };
         var original = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, 1, .75, false);
         var tail = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, 1, .75, true);
-        var first = mod.ApplyToJudgementWindow(original);
-        var other = mod.ApplyToJudgementWindow(tail);
+        var first = mod.ApplyToJudgementWindow(original, default);
+        var other = mod.ApplyToJudgementWindow(tail, default);
         Assert.That(other, Is.Not.SameAs(first));
         Assert.That(first.SlowWindowFor(HitResult.Ok), Is.EqualTo(original.SlowWindowFor(HitResult.Ok)));
         Assert.That(other.SlowWindowFor(HitResult.Ok), Is.EqualTo(tail.SlowWindowFor(HitResult.Ok)));
-        for (var i = 0; i < 32; i++) mod.ApplyToJudgementWindow(original);
+        for (var i = 0; i < 32; i++) mod.ApplyToJudgementWindow(original, default);
         var allocated = GC.GetAllocatedBytesForCurrentThread();
-        for (var i = 0; i < 256; i++) mod.ApplyToJudgementWindow(original);
+        for (var i = 0; i < 256; i++) mod.ApplyToJudgementWindow(original, default);
         allocated = GC.GetAllocatedBytesForCurrentThread() - allocated;
         Assert.That(allocated, Is.Zero);
-        Assert.That(mod.ApplyToJudgementWindow(original), Is.SameAs(first));
+        Assert.That(mod.ApplyToJudgementWindow(original, default), Is.SameAs(first));
+    }
+
+    [Test]
+    public void AlternatingRatesWithWindowModsDoNotAllocateAfterWarmup([Values] bool lr2)
+    {
+        IApplicableToJudgement[] mods = lr2
+            ? [new BmsModNoBad(), new BmsModLr2(), new BmsModNoGood()]
+            : [new BmsModNoBad(), new BmsModNoGood()];
+        using var scope = BmsJudgementProfileProvider.UseWindowMods(mods);
+
+        for (var i = 0; i < 32; i++)
+        {
+            BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, 1, .5, false);
+            BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, 1, .75, true);
+        }
+
+        var allocated = GC.GetAllocatedBytesForCurrentThread();
+        for (var i = 0; i < 256; i++)
+        {
+            BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, 1, .5, false);
+            BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, 1, .75, true);
+        }
+
+        Assert.That(GC.GetAllocatedBytesForCurrentThread() - allocated, Is.Zero);
     }
 
     [Test]
     public void WarmProfileStillUsesCurrentModListAndClearsOnlyItsOwner()
     {
-        IApplicableToJudgementWindow[] noBad = [new BmsModNoBad()];
-        IApplicableToJudgementWindow[] noGood = [new BmsModNoGood()];
+        IApplicableToJudgement[] noBad = [new BmsModNoBad()];
+        IApplicableToJudgement[] noGood = [new BmsModNoGood()];
         BmsJudgementWindowTable table() => BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, 1, .75, false);
         var original = table();
         try

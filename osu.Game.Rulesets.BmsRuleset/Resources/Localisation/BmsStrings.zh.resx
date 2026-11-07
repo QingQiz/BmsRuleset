@@ -559,4 +559,10 @@
   <data name="practice_next_attempt" xml:space="preserve">
     <value>开始下一轮</value>
   </data>
+  <data name="mod_lr2_name" xml:space="preserve">
+    <value>LR2</value>
+  </data>
+  <data name="mod_lr2" xml:space="preserve">
+    <value>使用 LR2 的判定、长条和血量规则游玩。</value>
+  </data>
 </root>

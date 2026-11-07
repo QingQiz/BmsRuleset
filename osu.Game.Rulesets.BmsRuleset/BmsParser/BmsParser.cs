@@ -50,8 +50,10 @@ internal static partial class BmsChartParser
         IEnumerable<string> lines,
         string? path = null,
         Func<int, int>? randomValueSelector = null,
-        BmsReferenceBpmMode referenceBpmMode = BmsReferenceBpmMode.StartBpm)
+        BmsReferenceBpmMode referenceBpmMode = BmsReferenceBpmMode.StartBpm,
+        Func<BmsLayoutVariant, int, double?, double>? judgementRateCalculator = null)
     {
+        judgementRateCalculator ??= BmsJudgementProfileProvider.RateForDifficulty;
         var state = new ParseState();
 
         // A single foreach loop replaces iterator layers for control-flow resolution and parsing,
@@ -85,6 +87,7 @@ internal static partial class BmsChartParser
         var totalColumns = BmsLayout.GetTotalColumns(layoutVariant);
 
         var scrollReferenceBpm = resolveScrollReferenceBpm(state, timingEvents, measureStarts, totalColumns, referenceBpmMode);
+        var judgementRateEvents = collectJudgementRateEvents(state, measureStarts, layoutVariant, judgementRateCalculator);
 
         var timingMap = BmsTimingMap.FromSortedEvents(
             tickResolution,
@@ -107,8 +110,6 @@ internal static partial class BmsChartParser
 
         var textEvents = collectTextEvents(state, measureStarts, timingMap);
         var bga = collectBga(state, measureStarts, timingMap);
-
-        var judgementRateEvents = collectJudgementRateEvents(state, measureStarts, layoutVariant);
 
         var bgSampleEvents = new List<BmsSampleEvent>(state.ChannelLines.Count / 10);
         collectBackgroundSampleEvents(state, measureStarts, timingMap, bgSampleEvents);
@@ -1013,11 +1014,12 @@ internal static partial class BmsChartParser
     }
 
     private static List<BmsJudgementRateEvent> collectJudgementRateEvents(
-        ParseState state, IReadOnlyDictionary<int, long> measureStarts, BmsLayoutVariant layoutVariant)
+        ParseState state, IReadOnlyDictionary<int, long> measureStarts, BmsLayoutVariant layoutVariant,
+        Func<BmsLayoutVariant, int, double?, double> judgementRateCalculator)
     {
         var events = new List<BmsJudgementRateEvent>
         {
-            new(long.MinValue, initialJudgementRate(state, layoutVariant), -1),
+            new(long.MinValue, judgementRateCalculator(layoutVariant, state.Rank, state.DefaultExRank), -1),
         };
 
         foreach (var line in state.ChannelLines)
@@ -1028,18 +1030,13 @@ internal static partial class BmsChartParser
             foreach (var cell in expandCells(line, measureStarts, false, state.UseBase62))
             {
                 if (state.ExRankDefinitions.TryGetValue(cell.Value, out var exRank))
-                    events.Add(new BmsJudgementRateEvent(cell.Tick, BmsJudgementProfileProvider.RateForExRank(layoutVariant, exRank), cell.Sequence));
+                    events.Add(new BmsJudgementRateEvent(cell.Tick, judgementRateCalculator(layoutVariant, state.Rank, exRank), cell.Sequence));
             }
         }
 
         events.Sort(default(JudgementRateEventComparer));
         return events;
     }
-
-    private static double initialJudgementRate(ParseState state, BmsLayoutVariant layoutVariant) =>
-        state.DefaultExRank is { } exRank
-            ? BmsJudgementProfileProvider.RateForExRank(layoutVariant, exRank)
-            : BmsJudgementProfileProvider.RateForRank(layoutVariant, state.Rank);
 
     private static void applyJudgementRates(List<BmsParsedHitObject> hitObjects, IReadOnlyList<BmsJudgementRateEvent> judgementRateEvents)
     {

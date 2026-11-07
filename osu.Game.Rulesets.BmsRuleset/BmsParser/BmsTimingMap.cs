@@ -93,8 +93,8 @@ public sealed class BmsTimingMap
     }
 
     internal static BmsTimingMap FromSortedEvents(int tickResolution, IEnumerable<BmsMeasureInfo> measures,
-        IEnumerable<BmsBpmEvent> bpmEvents, IEnumerable<BmsStopEvent> stopEvents,
-        IEnumerable<BmsScrollEvent> scrollEvents, IEnumerable<BmsSpeedEvent> speedEvents, double baseBpm) =>
+                                                  IEnumerable<BmsBpmEvent> bpmEvents, IEnumerable<BmsStopEvent> stopEvents,
+                                                  IEnumerable<BmsScrollEvent> scrollEvents, IEnumerable<BmsSpeedEvent> speedEvents, double baseBpm) =>
         new(tickResolution, measures, bpmEvents, stopEvents, scrollEvents, speedEvents, baseBpm, true);
 
     private BmsTimingMap(BmsTimingMap original, double offset)
@@ -118,6 +118,7 @@ public sealed class BmsTimingMap
             points[i] = new TimingPoint(point.Time + offset, point.NextTime + offset, point.ScrollPos,
                 point.Bpm, point.ScrollFactor, point.SpeedFactor, point.ScrollDir, point.IsStop);
         }
+
         tickTimeConverter = new BmsTickTimeConverter(TickResolution, bpmEvents, stopEvents);
     }
 

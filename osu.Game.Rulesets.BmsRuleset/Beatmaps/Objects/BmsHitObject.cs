@@ -21,9 +21,7 @@ public class BmsHitObject : HitObject
     public double JudgementRate { get; set; } = double.NaN;
 
     public double EffectiveJudgementRate => double.IsNaN(JudgementRate)
-        ? Beatmap.ExRank is { } exRank
-            ? BmsJudgementProfileProvider.RateForExRank(Beatmap.LayoutVariant, exRank)
-            : BmsJudgementProfileProvider.RateForRank(Beatmap.LayoutVariant, Beatmap.Rank)
+        ? BmsJudgementProfileProvider.RateForDifficulty(Beatmap.LayoutVariant, Beatmap.Rank, Beatmap.ExRank)
         : JudgementRate;
 
     /// <summary>
@@ -68,7 +66,7 @@ public class BmsHitObject : HitObject
 
     public override Judgement CreateJudgement() => new BmsJudgement(this);
 
-    protected override BmsHitWindows CreateHitWindows() => new(Beatmap.Rank, Beatmap.LayoutVariant, Column, EffectiveJudgementRate);
+    protected override BmsHitWindows CreateHitWindows() => new(this);
 
     protected virtual void CopyTo(BmsHitObject target)
     {

@@ -140,16 +140,8 @@ internal sealed class BmsGameplayAudioController
     }
 
     private static double getFastJudgementWindow(BmsHitObject hitObject) =>
-        BmsJudgementProfileProvider.GetTable(
-            hitObject.Beatmap.LayoutVariant,
-            hitObject.Column,
-            hitObject.EffectiveJudgementRate,
-            tail: false).FastWindowFor(HitResult.Ok);
+        BmsJudgementProfileProvider.GetTable(hitObject, tail: false).FastWindowFor(HitResult.Ok);
 
     private static double getSlowJudgementWindow(BmsHitObject hitObject) =>
-        BmsJudgementProfileProvider.GetTable(
-            hitObject.Beatmap.LayoutVariant,
-            hitObject.Column,
-            hitObject.EffectiveJudgementRate,
-            tail: false).SlowWindowFor(HitResult.Ok);
+        BmsJudgementProfileProvider.GetTable(hitObject, tail: false).SlowWindowFor(HitResult.Ok);
 }

@@ -89,6 +89,5 @@ internal readonly record struct BmsLongNotePresentation(
         => state.LongNoteStarted && !state.TailJudged && time >= note.StartTime && time <= note.EndTime;
 
     private static double chargeLifetimeEnd(BmsLongNote note)
-        => note.EndTime + BmsJudgementProfileProvider.GetTable(note.Beatmap.LayoutVariant, note.Column,
-            note.EffectiveJudgementRate, tail: false).SlowWindowFor(HitResult.Ok) + 100;
+        => note.EndTime + BmsJudgementProfileProvider.GetTable(note, tail: false).SlowWindowFor(HitResult.Ok) + 100;
 }

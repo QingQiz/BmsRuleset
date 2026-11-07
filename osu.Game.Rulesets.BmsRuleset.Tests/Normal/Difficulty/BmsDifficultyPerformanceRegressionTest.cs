@@ -122,7 +122,7 @@ public class BmsDifficultyPerformanceRegressionTest
         type.GetProperty(nameof(BmsStarRatingProcessor.TotalColumns))!.SetValue(processor, 8);
         BmsNoteTiming[] notes = [new(0, 0, 0), new(1, 0, 0), new(2, 500, 500), new(3, 1000, 1000), new(4, 1000, 1000)];
         type.GetMethod("preprocessFile", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .Invoke(processor, [notes, 2, 1.0, BmsLayoutVariant.Bme7K, null]);
+            .Invoke(processor, [notes, 2, 1.0, BmsLayoutVariant.Bme7K, null, null]);
         double[] corners = [0, 1, 499, 500, 501, 999, 1000, 1001, 1500, 1501];
         type.GetField("baseCorners", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(processor, corners);
         var workspaceType = type.GetNestedType("ComputeWorkspace", BindingFlags.NonPublic)!;

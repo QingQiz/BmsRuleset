@@ -229,6 +229,7 @@ matching the selected mods.
 | No Good (NG)             | Removes the GOOD judgement window                               |         |
 | No Great (NE)            | Removes the GREAT and GOOD judgement windows                    |         |
 | No Bad (NB)              | Removes the BAD judgement window                           |         |
+| LR2 (R2)                 | Uses LR2 judgement and gauge rules, with classic LN holds       |         |
 | Long Note (L1)           | LN: hold from head to tail for one combined judgement           |         |
 | Charge Note (L2)         | CN: judges head and tail separately                            |         |
 | Hell Charge Note (L3)    | HCN: separate head/tail judgements, plus body recovery and damage |         |

@@ -8,6 +8,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps.Conversion;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.Objects;
 
 namespace osu.Game.Rulesets.BmsRuleset.Beatmaps;
@@ -28,6 +29,8 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
 
     public BmsReferenceBpmMode? ReferenceBpmMode { get; init; }
 
+    public Func<BmsLayoutVariant, int, double?, double> JudgementRateCalculator { get; set; } = BmsJudgementProfileProvider.RateForDifficulty;
+
     public override bool CanConvert()
     {
         if (Beatmap is IBmsBeatmap or BmsDecodedBeatmap { RawLines.Length: > 0 })
@@ -47,7 +50,9 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
             original = materialised;
 
         var converted = convertToBmsBeatmap(original, cancellationToken);
-        var hasBmsData = tryCopyBmsData(converted, original);
+        var hasBmsData = original is IBmsBeatmap;
+        if (original is IBmsBeatmap bmsSource)
+            converted.CopyBmsDataFrom(bmsSource);
 
         converted.TimingMap ??= createFallbackTimingMap(converted);
         converted.TickResolution = converted.TimingMap.TickResolution;
@@ -74,18 +79,14 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
         if (!hasBmsData)
             remapColumns(converted);
 
-        stampJudgementContextOnHitObjects(converted);
+        foreach (var note in converted.HitObjects)
+        {
+            note.Beatmap = converted;
+            if (double.IsNaN(note.JudgementRate))
+                note.JudgementRate = JudgementRateCalculator(converted.LayoutVariant, converted.Rank, converted.ExRank);
+        }
 
         return converted;
-    }
-
-    protected override IEnumerable<BmsHitObject> ConvertHitObject(HitObject original, IBeatmap beatmap, CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-
-        if (original is BmsHitObject bmsObject)
-            // Converted objects are modifiable, while the source can also back previews and later attempts.
-            yield return bmsObject.CloneForConversion();
     }
 
     private static int inferTotalColumns(IBeatmap original, IReadOnlyList<BmsHitObject> hitObjects)
@@ -157,12 +158,6 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
             []);
     }
 
-    private static void stampJudgementContextOnHitObjects(BmsBeatmap beatmap)
-    {
-        foreach (var hitObject in beatmap.HitObjects)
-            hitObject.Beatmap = beatmap;
-    }
-
     /// <summary>
     ///     Precomputes <see cref="BmsHitObject.ScrollPositionAtStartTime"/> and
     ///     <see cref="BmsLongNote.ScrollPositionAtEndTime"/> for every hitobject.
@@ -209,29 +204,21 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
         var foreignConverter = BmsForeignBeatmapConverterRegistry.FindConverter(original);
 
         if (foreignConverter != null)
-        {
             foreignConverter.Convert(original, converted, cancellationToken);
-            converted.HitObjects = converted.HitObjects.OrderBy(h => h.StartTime).ToList();
-        }
         else
         {
-            converted.HitObjects = original.HitObjects
-                .SelectMany(h => ConvertHitObject(h, original, cancellationToken))
-                .OrderBy(h => h.StartTime)
-                .ToList();
+            foreach (var note in original.HitObjects.OfType<BmsHitObject>())
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                // The source can also back previews and later attempts, so only modify clones.
+                var clone = note.CloneForConversion();
+                converted.HitObjects.Add(clone);
+            }
         }
 
+        converted.HitObjects = converted.HitObjects.OrderBy(h => h.StartTime).ToList();
         cancellationToken.ThrowIfCancellationRequested();
         return converted;
-    }
-
-    private static bool tryCopyBmsData(BmsBeatmap converted, IBeatmap source)
-    {
-        if (source is not IBmsBeatmap bmsSource)
-            return false;
-
-        converted.CopyBmsDataFrom(bmsSource);
-        return true;
     }
 
     private bool tryMaterialiseDecodedBeatmap(IBeatmap original, out IBeatmap materialised)
@@ -247,7 +234,7 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
             selector = BmsChartParser.CreateReplayDecisionSelector(BmsChartParser.DeserialiseBranchDecisions(BranchReplayDecisions));
 
         var parseResult = BmsChartParser.Parse(decoded.RawLines, decoded.BeatmapInfo.Path, selector,
-            ReferenceBpmMode ?? BmsRulesetRuntime.CurrentReferenceBpmMode);
+            ReferenceBpmMode ?? BmsRulesetRuntime.CurrentReferenceBpmMode, JudgementRateCalculator);
         var beatmap = new BmsDecodedBeatmap
         {
             BeatmapInfo = decoded.BeatmapInfo.Clone(),
