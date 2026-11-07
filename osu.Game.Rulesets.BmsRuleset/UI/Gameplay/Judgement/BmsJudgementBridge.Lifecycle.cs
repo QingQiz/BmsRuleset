@@ -48,7 +48,5 @@ internal sealed partial class BmsJudgementBridge
             Bind(drawable);
             container.InvalidateCoreOrder();
         }
-
-        context.RefreshNoteConfiguration(note);
     }
 }

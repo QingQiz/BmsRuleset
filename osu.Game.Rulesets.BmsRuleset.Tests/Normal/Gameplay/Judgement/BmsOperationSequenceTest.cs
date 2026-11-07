@@ -145,48 +145,6 @@ public class BmsOperationSequenceTest
         Assert.That(Math.BitDecrement(time) + 280, Is.EqualTo(280));
     }
 
-    [Test]
-    public void TimingAndWindowChangesReplaceThePendingHeadDeadline(
-        [Values(null, BmsLongNoteMode.LongNote, BmsLongNoteMode.ChargeNote, BmsLongNoteMode.HellChargeNote)] BmsLongNoteMode? mode)
-    {
-        var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, LockedLongNoteMode = mode ?? BmsLongNoteMode.LongNote };
-        BmsHitObject note = mode == null ? new BmsNote() : new BmsLongNote { Duration = 1000 };
-        note.Beatmap = beatmap;
-        note.Column = 1;
-        note.StartTime = 1000;
-        var output = new BmsRecordingJudgementOutput();
-        var engine = new BmsJudgementEngine([note], beatmap.LayoutVariant, 1, output);
-        var oldDeadline = engine.NextEventTime;
-        note.StartTime = 2000;
-        engine.GetColumn(1).RefreshNoteTiming(note);
-        engine.ProcessFrame(new BmsFrameContext(oldDeadline, 1), oldDeadline);
-        Assert.That(output.GetMainResult(note).HasResult, Is.False);
-        if (note is BmsLongNote hold) Assert.That(engine.GetColumn(1).GetLongNoteState(hold).HeadJudged, Is.False);
-
-        note.JudgementRate = .25;
-        engine.GetColumn(1).RefreshNoteConfiguration(note);
-        var expected = BmsJudgementWindowTable.TimeAfter(2000,
-            BmsJudgementProfileProvider.GetTable(beatmap.LayoutVariant, 1, .25, false).SlowWindowFor(HitResult.Ok));
-        Assert.That(engine.NextEventTime, Is.EqualTo(expected));
-        engine.ProcessFrame(new BmsFrameContext(expected, 1), expected - oldDeadline);
-        Assert.That(note is BmsLongNote longNote ? engine.GetColumn(1).GetLongNoteState(longNote).HeadJudged : output.GetMainResult(note).HasResult, Is.True);
-    }
-
-    [Test]
-    public void TimingChangesReplaceThePendingMineDeadline()
-    {
-        var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K };
-        var mine = new BmsLandmine { Beatmap = beatmap, Column = 1, StartTime = 1000 };
-        var engine = new BmsJudgementEngine([mine], beatmap.LayoutVariant, 1, new BmsRecordingJudgementOutput());
-        mine.StartTime = 2000;
-        engine.GetColumn(1).RefreshNoteTiming(mine);
-        Assert.That(engine.NextEventTime, Is.EqualTo(2000));
-        engine.ProcessFrame(new BmsFrameContext(1000, 1), 1000);
-        Assert.That(engine.GetColumn(1).GetLandmineState(mine).HandledTime, Is.Null);
-        engine.ProcessFrame(new BmsFrameContext(2000, 1), 1000);
-        Assert.That(engine.GetColumn(1).GetLandmineState(mine).HandledTime, Is.EqualTo(2000));
-    }
-
     private static (List<Event> Events, BmsGaugeStateSnapshot[] Gauges, bool Failed) run(BmsLongNoteMode mode, BmsLayoutVariant layout, double interval)
     {
         var beatmap = new BmsBeatmap { LayoutVariant = layout, Rank = 2, LockedLongNoteMode = mode };

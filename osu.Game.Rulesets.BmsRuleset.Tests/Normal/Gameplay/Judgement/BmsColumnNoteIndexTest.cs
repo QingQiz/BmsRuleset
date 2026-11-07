@@ -14,20 +14,18 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
 public class BmsColumnNoteIndexTest
 {
     [Test]
-    public void MovingAJudgedNoteKeepsItInHistoricalEmptyPoorSelection()
+    public void JudgedHeadsRemainEligibleForHistoricalEmptyPoorSelection()
     {
         var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, Rank = 2 };
-        var notes = Enumerable.Range(1, 3).Select(i => new BmsNote { Beatmap = beatmap, Column = 1, StartTime = i * 1000 }).ToArray();
+        var notes = new[] { 500d, 1000, 2000 }.Select(time => new BmsNote { Beatmap = beatmap, Column = 1, StartTime = time }).ToArray();
         var column = new BmsJudgementEngine(notes, beatmap.LayoutVariant, 1, new BmsRecordingJudgementOutput()).GetColumn(1);
-        var moved = notes[2];
+        var judged = notes[0];
 
-        column.TryPressRegisteredNote(moved, HitResult.Perfect, new BmsPressContext(3000, new BmsFrameContext(3000, 1)));
+        column.TryPressRegisteredNote(judged, HitResult.Perfect, new BmsPressContext(500, new BmsFrameContext(500, 1)));
 
-        moved.StartTime = 500;
-        column.RefreshNoteTiming(moved);
-        var outcome = column.HandleNotePress(new BmsPressContext(600, new BmsFrameContext(3001, 1)));
+        var outcome = column.HandleNotePress(new BmsPressContext(600, new BmsFrameContext(600, 1)));
         Assert.That(outcome, Is.EqualTo(PressOutcome.ForEmptyPoor(500, 1)));
-        Assert.That(column.GetNoteCandidates(), Is.EqualTo(notes.Take(2)));
+        Assert.That(column.GetNoteCandidates(), Is.EqualTo(notes.Skip(1)));
     }
 
     [Test]
@@ -71,7 +69,7 @@ public class BmsColumnNoteIndexTest
     [TestCase(64)]
     [TestCase(65)]
     [TestCase(129)]
-    public void TimingChangesAndRebuildsRestorePendingHeadsAcrossIndexWords(int count)
+    public void NewEngineRestoresPendingHeadsAcrossIndexWords(int count)
     {
         var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, Rank = 3 };
         var notes = Enumerable.Range(0, count).Select(i => new BmsNote { Beatmap = beatmap, Column = 1, StartTime = 1000 + i * 10 }).ToArray();
@@ -87,10 +85,11 @@ public class BmsColumnNoteIndexTest
             column.TryPressRegisteredNote(note, HitResult.Perfect, new BmsPressContext(note.StartTime, new BmsFrameContext(note.StartTime, 1)));
         Assert.That(column.FirstPendingNote, Is.SameAs(notes[count / 2 + 1]));
 
-        notes[^1].StartTime = 900;
-        column.RefreshNoteTiming(notes[^1]);
-        column.HandleNotePress(new BmsPressContext(900, new BmsFrameContext(900, 1)), BmsJudgementAlgorithm.Duration);
-        Assert.That(output.GetMainResult(notes[^1]).Type, Is.EqualTo(HitResult.Perfect));
-        Assert.That(column.FirstPendingNote, Is.SameAs(notes[count / 2 + 1]));
+        foreach (var note in notes.Skip(count / 2 + 1))
+        {
+            column.HandleNotePress(new BmsPressContext(note.StartTime, new BmsFrameContext(note.StartTime, 1)), BmsJudgementAlgorithm.Duration);
+            Assert.That(output.GetMainResult(note).Type, Is.EqualTo(HitResult.Perfect));
+        }
+        Assert.That(column.FirstPendingNote, Is.Null);
     }
 }

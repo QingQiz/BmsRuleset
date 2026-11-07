@@ -110,15 +110,6 @@ internal sealed class BmsHoldRegistry
     internal double NextBodyTime(int slot, bool holding)
         => hellCharge!.NextBodyTime(bindings[bindingIndices[slot]].StateIndex, holding);
 
-    internal void Configure(int slot)
-    {
-        var binding = bindings[bindingIndices[slot]];
-        if (mode(binding.Note) != binding.Operations.Mode)
-            throw new InvalidOperationException("Changing a registered long-note mode requires a new gameplay engine.");
-
-        binding.Operations.Configure(binding.StateIndex);
-    }
-
     private readonly record struct Binding(BmsLongNote Note, HoldOperations Operations, int StateIndex);
 
     // Every hold supports these operations. Ordinary notes never acquire an empty hold capability.
@@ -145,8 +136,6 @@ internal sealed class BmsHoldRegistry
         internal abstract void Finish(int index, in BmsFrameContext frame, double elapsed, bool holding);
 
         internal abstract bool CompleteAtEnd(int index, in BmsFrameContext frame);
-
-        internal abstract void Configure(int index);
     }
 
     private sealed class LongNoteOperations(BmsLongNoteJudgementRule rule, BmsJudgementExecutionContext execution) : HoldOperations(execution)
@@ -177,8 +166,6 @@ internal sealed class BmsHoldRegistry
         internal override void Finish(int index, in BmsFrameContext frame, double elapsed, bool holding) => rule.Finish(states[index], Execution, frame, elapsed, holding);
 
         internal override bool CompleteAtEnd(int index, in BmsFrameContext frame) => rule.CompleteAtEnd(states[index], Execution, frame);
-
-        internal override void Configure(int index) => states[index].Hold.RefreshWindows();
     }
 
     private sealed class ChargeOperations(BmsChargeNoteJudgementRule rule, BmsJudgementExecutionContext execution) : HoldOperations(execution)
@@ -209,8 +196,6 @@ internal sealed class BmsHoldRegistry
         internal override void Finish(int index, in BmsFrameContext frame, double elapsed, bool holding) => rule.Finish(states[index], Execution, frame, elapsed, holding);
 
         internal override bool CompleteAtEnd(int index, in BmsFrameContext frame) => rule.CompleteAtEnd(states[index], Execution, frame);
-
-        internal override void Configure(int index) => states[index].Hold.RefreshWindows();
     }
 
     private sealed class HellChargeOperations(BmsHellChargeNoteJudgementRule rule, BmsJudgementExecutionContext execution) : HoldOperations(execution)
@@ -241,8 +226,6 @@ internal sealed class BmsHoldRegistry
         internal override void Finish(int index, in BmsFrameContext frame, double elapsed, bool holding) => rule.Finish(states[index], Execution, frame, elapsed, holding);
 
         internal override bool CompleteAtEnd(int index, in BmsFrameContext frame) => rule.CompleteAtEnd(states[index], Execution, frame);
-
-        internal override void Configure(int index) => states[index].Hold.RefreshWindows();
 
         internal void UpdateBody(int index, in BmsFrameContext frame, double elapsed, bool holding)
             => rule.UpdateBody(states[index], Execution, frame, elapsed, holding);

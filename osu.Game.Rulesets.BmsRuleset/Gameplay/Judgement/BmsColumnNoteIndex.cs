@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 
@@ -12,12 +11,11 @@ namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 internal sealed class BmsColumnNoteIndex
 {
     private readonly IReadOnlyDictionary<BmsHitObject, int> noteSlots;
+
+    // Slots follow the final chart order; only judgement state changes during play.
     private readonly BmsNoteRegistration[] registrations;
     private readonly BmsHoldRegistry holds;
     private readonly IBmsJudgementOutput output;
-    private readonly double[] headTimes;
-    private readonly int[] headSlots;
-    private readonly int[] headPositions;
     private readonly ulong[] pendingHeads;
     private int firstPendingHead;
     private readonly List<int> pendingTails = [];
@@ -34,20 +32,11 @@ internal sealed class BmsColumnNoteIndex
         this.registrations = registrations;
         this.holds = holds;
         this.output = output;
-        headTimes = new double[registrations.Length];
-        headSlots = new int[registrations.Length];
-        headPositions = new int[registrations.Length];
         pendingHeads = new ulong[(registrations.Length + 63) / 64];
-        for (var i = 0; i < registrations.Length; i++)
-        {
-            headTimes[i] = registrations[i].Object.StartTime;
-            headSlots[i] = headPositions[i] = i;
-        }
-
         Rebuild();
     }
 
-    internal BmsHitObject? FirstPendingHead => firstPendingHead < headSlots.Length ? registrations[headSlots[firstPendingHead]].Object : null;
+    internal BmsHitObject? FirstPendingHead => firstPendingHead < registrations.Length ? registrations[firstPendingHead].Object : null;
 
     internal BmsHitObject? FirstPendingNote
     {
@@ -71,16 +60,16 @@ internal sealed class BmsColumnNoteIndex
     // both forward and nearest searches skip those stretches without querying each result.
     internal int FindPendingHead(int position, bool forward)
     {
-        if (headSlots.Length == 0 || (forward && position >= headSlots.Length) || (!forward && position < 0))
-            return forward ? headSlots.Length : -1;
+        if (registrations.Length == 0 || (forward && position >= registrations.Length) || (!forward && position < 0))
+            return forward ? registrations.Length : -1;
 
-        position = Math.Clamp(position, 0, headSlots.Length - 1);
+        position = Math.Clamp(position, 0, registrations.Length - 1);
         var word = position / 64;
         var bits = pendingHeads[word] & (forward ? ulong.MaxValue << (position % 64) : ulong.MaxValue >> (63 - position % 64));
         while (bits == 0)
         {
             word += forward ? 1 : -1;
-            if (word < 0 || word >= pendingHeads.Length) return forward ? headSlots.Length : -1;
+            if (word < 0 || word >= pendingHeads.Length) return forward ? registrations.Length : -1;
 
             bits = pendingHeads[word];
         }
@@ -96,34 +85,21 @@ internal sealed class BmsColumnNoteIndex
         }
     }
 
-    internal bool RefreshTiming(BmsHitObject note)
-    {
-        var slot = noteSlots[note];
-        if (headTimes[slot] == note.StartTime) return false;
-
-        headTimes[slot] = note.StartTime;
-        headSlots.OrderBy(index => headTimes[index]).ToArray().CopyTo(headSlots, 0);
-        for (var i = 0; i < headSlots.Length; i++) headPositions[headSlots[i]] = i;
-        Rebuild();
-        return true;
-    }
-
     internal void Refresh(BmsHitObject note)
     {
         if (!noteSlots.TryGetValue(note, out var slot)) return;
 
         var state = note is BmsLongNote ? holds.GetState(slot) : default;
-        var position = headPositions[slot];
-        var mask = 1UL << (position % 64);
+        var mask = 1UL << (slot % 64);
         if (note is BmsLongNote ? !state.HeadJudged : !output.GetMainResult(note).HasResult)
         {
-            pendingHeads[position / 64] |= mask;
-            firstPendingHead = Math.Min(firstPendingHead, position);
+            pendingHeads[slot / 64] |= mask;
+            firstPendingHead = Math.Min(firstPendingHead, slot);
         }
         else
         {
-            pendingHeads[position / 64] &= ~mask;
-            if (position == firstPendingHead) firstPendingHead = FindPendingHead(position + 1, true);
+            pendingHeads[slot / 64] &= ~mask;
+            if (slot == firstPendingHead) firstPendingHead = FindPendingHead(slot + 1, true);
         }
 
         if (note is not BmsLongNote) return;
@@ -135,7 +111,7 @@ internal sealed class BmsColumnNoteIndex
     internal void Rebuild()
     {
         Array.Clear(pendingHeads);
-        firstPendingHead = headSlots.Length;
+        firstPendingHead = registrations.Length;
         pendingTails.Clear();
         activeBodies.Clear();
         foreach (var registration in registrations) Refresh(registration.Object);

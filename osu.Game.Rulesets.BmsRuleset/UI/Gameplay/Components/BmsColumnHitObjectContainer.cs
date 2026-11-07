@@ -1,8 +1,6 @@
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Judgement;
 using System;
-using System.Collections.Generic;
-using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
@@ -26,7 +24,6 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
     private double latestLifetimeStart = double.PositiveInfinity;
 
     private bool coreOrderDirty = true;
-    private readonly Dictionary<DrawableBmsHitObject, Action<ValueChangedEvent<double>>> coreStartTimes = [];
 
     internal BmsColumnJudgementRuntime Judgements { get; set; } = null!;
 
@@ -72,8 +69,6 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
     protected override void RemoveDrawable(HitObjectLifetimeEntry entry, DrawableHitObject drawable)
     {
         InvalidateCoreOrder();
-        if (drawable is DrawableBmsHitObject old && coreStartTimes.Remove(old, out var startTimeChanged))
-            old.StartTimeBindable.ValueChanged -= startTimeChanged;
         base.RemoveDrawable(entry, drawable);
         if (drawable is DrawableBmsHitObject removed)
             JudgementBridge.UnbindRemovedNote(removed);
@@ -215,31 +210,13 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
             // lifecycle traversal so mixed columns never prepare a doomed prefix.
             if (note.HitObject is BmsLongNote)
                 spriteBatchHasMultiplePieces = true;
-            if (note.HitObject is BmsNote or BmsLongNote && !coreStartTimes.ContainsKey(note))
-                observeStartTime(note);
         }
 
         coreOrderDirty = false;
     }
 
-    private void observeStartTime(DrawableBmsHitObject note)
-    {
-        // Keep the capture at the binding boundary; rebuilding order must not allocate for existing bindings.
-        Action<ValueChangedEvent<double>> changed = _ =>
-        {
-            Judgements.RefreshNoteTiming(note.HitObject);
-            note.Invalidate(Invalidation.DrawNode);
-            mineTimesDirty = true;
-            InvalidateCoreOrder();
-        };
-        note.StartTimeBindable.ValueChanged += changed;
-        coreStartTimes.Add(note, changed);
-    }
-
     protected override void Dispose(bool isDisposing)
     {
-        foreach (var (note, changed) in coreStartTimes) note.StartTimeBindable.ValueChanged -= changed;
-        coreStartTimes.Clear();
         foreach (var (drawable, observation) in visualObservations)
             drawable.ClearVisualTimeObserver(observation.Generation);
         visualObservations.Clear();

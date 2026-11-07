@@ -144,34 +144,6 @@ internal sealed class BmsColumnJudgementRuntime
 
     internal IEnumerable<BmsHitObject> GetNoteCandidates() => Notes.GetNoteCandidates();
 
-    internal void RefreshNoteTiming(BmsHitObject note)
-    {
-        if (noteSlots.ContainsKey(note))
-        {
-            if (!Notes.RefreshTiming(note)) return;
-
-            // Configuration changes keep the existing relative order of equal-time chart objects.
-            columnNotes.OrderBy(n => n.StartTime).ToArray().CopyTo(columnNotes, 0);
-        }
-
-        refreshAutomaticEvent(note);
-    }
-
-    internal void RefreshNoteConfiguration(BmsHitObject note)
-    {
-        if (!noteSlots.TryGetValue(note, out var slot))
-        {
-            refreshAutomaticEvent(note);
-            return;
-        }
-
-        if (note is BmsLongNote) holds.Configure(slot);
-        else NoteWindows[slot] = new BmsNoteJudgementWindows(note);
-        RefreshNoteTiming(note);
-        Notes.Refresh(note);
-        refreshAutomaticEvent(note);
-    }
-
     internal bool TryPressRegisteredNote(BmsHitObject note, HitResult result, in BmsPressContext press)
     {
         var registration = NoteRegistrations[noteSlots[note]];

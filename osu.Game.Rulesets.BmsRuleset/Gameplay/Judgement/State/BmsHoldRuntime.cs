@@ -9,8 +9,8 @@ namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.State;
 internal struct BmsHoldRuntime
 {
     internal readonly BmsLongNote Note;
-    internal BmsJudgementWindowTable HeadWindow = null!;
-    internal BmsJudgementWindowTable TailWindow = null!;
+    internal readonly BmsJudgementWindowTable HeadWindow;
+    internal readonly BmsJudgementWindowTable TailWindow;
     internal bool HeadJudged;
     internal bool Started;
     internal bool TailJudged;
@@ -25,7 +25,8 @@ internal struct BmsHoldRuntime
     internal BmsHoldRuntime(BmsLongNote note)
     {
         Note = note;
-        RefreshWindows();
+        HeadWindow = BmsJudgementProfileProvider.GetTable(note, false);
+        TailWindow = BmsJudgementProfileProvider.GetTable(note, true);
     }
 
     internal readonly bool IsScratch => BmsLayout.IsScratchColumn(Note.Column, Note.Beatmap.LayoutVariant);
@@ -61,12 +62,6 @@ internal struct BmsHoldRuntime
     internal readonly BmsLongNoteState Snapshot(bool activeBody = false)
         => new(HeadJudged, Started, TailJudged, HeadResult, HeadJudged ? Note.StartTime + HeadOffset : null,
             TailResult, TailTime, PendingRelease, activeBody, EarlyReleaseOutsideWindow);
-
-    internal void RefreshWindows()
-    {
-        HeadWindow = BmsJudgementProfileProvider.GetTable(Note, false);
-        TailWindow = BmsJudgementProfileProvider.GetTable(Note, true);
-    }
 
     internal readonly BmsLongNoteEndpointResult Endpoint(BmsLongNoteEndpointKind kind, double time, double rate, HitResult result, double? applicationTime = null)
         => new(Note, kind, time, rate, result, applicationTime ?? time);

@@ -65,9 +65,7 @@ public partial class TestSceneBmsJudgementIndexes
                 Assert.That(Player.Results.Count, Is.EqualTo(results));
                 Assert.That(Player.HealthProcessor.Health.Value, Is.EqualTo(health));
 
-                // A runtime timing change must be read on the next layout, without an added cache.
-                var changed = notes[0];
-                changed.HitObject.StartTime += 137;
+                // Advancing playback must update geometry without changing judgement state.
                 scroll.Update(3500);
                 update();
                 container.UpdateSubTree();

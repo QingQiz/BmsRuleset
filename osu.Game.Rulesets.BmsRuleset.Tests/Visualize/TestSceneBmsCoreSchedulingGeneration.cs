@@ -327,28 +327,6 @@ public partial class TestSceneBmsCoreSchedulingGeneration : BmsPlayerTestScene
         }));
     }
 
-    [Test]
-    public void NativeRemoveAndReaddOwnExactlyOneSortingSubscription()
-    {
-        load(false, false);
-        AddStep("remove and re-add the native entry", () => withClock((_, _) =>
-        {
-            var container = (BmsColumnHitObjectContainer)Playfield.Stage.Columns[1].HitObjectContainer;
-            var entry = container.AliveEntries.Keys.First(e => e.HitObject.StartTime == 3400);
-            var subscriptions = (System.Collections.IDictionary)typeof(BmsColumnHitObjectContainer).GetField("coreStartTimes", instance)!.GetValue(container)!;
-            var original = subscriptions.Count;
-            for (var iteration = 0; iteration < 3; iteration++)
-            {
-                Assert.That(container.Remove(entry), Is.True);
-                Assert.That(subscriptions.Count, Is.EqualTo(original - 1));
-                container.Add(entry);
-                container.UpdateSubTree();
-                Assert.That(subscriptions.Count, Is.EqualTo(original));
-            }
-            TestContext.WriteLine("P3A07_SORT_SUBSCRIPTIONS " + original);
-        }));
-    }
-
     [TestCase(false)]
     [TestCase(true)]
     public void RealResultCallbackCannotSkipTheNextObjectOrExecuteItsStaleBinding(bool reapplyNext)
