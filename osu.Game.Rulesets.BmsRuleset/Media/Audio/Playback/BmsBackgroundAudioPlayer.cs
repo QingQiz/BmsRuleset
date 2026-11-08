@@ -4,6 +4,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Game.Audio;
+using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 using osu.Game.Rulesets.UI;
 using osu.Game.Screens.Play;
@@ -14,13 +15,11 @@ namespace osu.Game.Rulesets.BmsRuleset.Media.Audio.Playback;
 ///     Submits BMS background sample events to the shared PCM voice mixer.
 /// </summary>
 public partial class BmsBackgroundAudioPlayer(
-    IReadOnlyList<BmsBackgroundAudioPlayer.BgmEvent> sortedEvents,
+    IReadOnlyList<BmsSampleEvent> sortedEvents,
     Bindable<bool> sourcePaused)
     : Component
 {
-    public readonly record struct BgmEvent(double Time, ushort SampleKey, int Volume = 100);
-
-    internal readonly record struct SeekedBgm(BgmEvent Event, double Offset);
+    internal readonly record struct SeekedBgm(BmsSampleEvent Event, double Offset);
 
     private const double allowable_late_start = 100;
 
@@ -172,7 +171,7 @@ public partial class BmsBackgroundAudioPlayer(
     }
 
     internal static IReadOnlyList<SeekedBgm> SelectEventsForSeek(
-        IReadOnlyList<BgmEvent> events,
+        IReadOnlyList<BmsSampleEvent> events,
         int nextEventIndex,
         double currentTime,
         double maxLength,

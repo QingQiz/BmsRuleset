@@ -3,6 +3,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Graphics.Audio;
 using osu.Framework.Testing;
+using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Playback;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Preview;
 
@@ -33,11 +34,11 @@ public partial class BmsAudioVolumeRoutingTest : TestScene
     [Test]
     public void SeekKeepsOnlyLatestEventPerKey()
     {
-        BmsBackgroundAudioPlayer.BgmEvent[] events =
+        BmsSampleEvent[] events =
         [
-            new(0, 1),
-            new(1000, 1),
-            new(1200, 2),
+            new(0, 1, 100),
+            new(1000, 1, 100),
+            new(1200, 2, 100),
         ];
 
         var selected = BmsBackgroundAudioPlayer.SelectEventsForSeek(events, events.Length, 1500, 2000, _ => 2000);

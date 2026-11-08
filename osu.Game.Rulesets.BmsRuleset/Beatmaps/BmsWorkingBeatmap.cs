@@ -9,10 +9,8 @@ using osu.Framework.Audio.Track;
 using osu.Framework.Graphics.Textures;
 using osu.Game.Beatmaps;
 using osu.Game.Models;
-using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Playback;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Preview;
-using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.IO.ResourceStore;
 using osu.Game.Skinning;
 using osu.Game.Storyboards;
@@ -34,7 +32,7 @@ public class BmsWorkingBeatmap : WorkingBeatmap
     private readonly TextureStore? externalTextureStore;
     private readonly RealmNamedFileUsage? externalBackgroundMarker;
 
-    private readonly object externalBackgroundResolutionLock = new();
+    private readonly Lock externalBackgroundResolutionLock = new();
     private volatile bool externalBackgroundResolved;
     private List<string> resolvedBackgroundPaths = [];
     private List<string> resolvedPanelBackgroundPaths = [];
@@ -134,40 +132,6 @@ public class BmsWorkingBeatmap : WorkingBeatmap
         return null; // fall back to TrackVirtual by WorkingBeatmap.LoadTrack
     }
 
-    private static IReadOnlyList<BmsPreviewSampleEvent> createPreviewEvents(
-        IBeatmap beatmap,
-        IBmsBeatmap bmsBeatmap,
-        CancellationToken cancellationToken = default)
-    {
-        var allEvents = new List<BmsPreviewSampleEvent>(
-            bmsBeatmap.BackgroundSampleEvents.Count
-            + beatmap.HitObjects.Count);
-
-        foreach (var evt in bmsBeatmap.BackgroundSampleEvents)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            allEvents.Add(new BmsPreviewSampleEvent(evt, true));
-        }
-
-        // Song preview needs playable keysounds alongside #01 BGM because gameplay normally
-        // routes those two sources through separate players.
-        foreach (var obj in beatmap.HitObjects)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            if (obj is not BmsHitObject hit || hit is BmsLandmine)
-                continue;
-
-            if (hit.SampleKey is { } sampleKey)
-                allEvents.Add(new BmsPreviewSampleEvent(new BmsSampleEvent(hit.StartTime, sampleKey, hit.SampleVolume), false));
-            if (hit is BmsLongNote { TailSampleKey: { } tailSampleKey } ln)
-                allEvents.Add(new BmsPreviewSampleEvent(new BmsSampleEvent(hit.StartTime + ln.Duration, tailSampleKey, ln.TailSampleVolume), false));
-        }
-
-        allEvents.Sort(static (a, b) => a.Event.Time.CompareTo(b.Event.Time));
-        return allEvents;
-    }
-
     private BmsEventPreviewTrack createPreviewTrack(IBeatmap beatmap, IBmsBeatmap bmsBeatmap)
     {
         List<Func<CancellationToken, BmsEventPreviewTimeline>> timelineSources = [];
@@ -179,8 +143,7 @@ public class BmsWorkingBeatmap : WorkingBeatmap
         }
 
         timelineSources.Add(cancellationToken => BmsEventPreviewTimeline.Create(
-            token => createPreviewEvents(beatmap, bmsBeatmap, token),
-            bmsBeatmap.SampleDefinitions,
+            beatmap, bmsBeatmap,
             cancellationToken));
 
         return new BmsEventPreviewTrack(timelineSources, Metadata.Source, audioManager);

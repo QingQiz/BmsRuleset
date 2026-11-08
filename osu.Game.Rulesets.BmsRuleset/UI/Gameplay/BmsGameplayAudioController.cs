@@ -36,7 +36,6 @@ internal sealed class BmsGameplayAudioController
         var events = beatmap.BackgroundSampleEvents
             .OrderBy(evt => evt.Time)
             .Where(evt => beatmap.SampleDefinitions.ContainsKey(evt.SampleKey))
-            .Select(evt => new BmsBackgroundAudioPlayer.BgmEvent(evt.Time, evt.SampleKey, evt.Volume))
             .ToList();
 
         return new BmsBackgroundAudioPlayer(events, BackgroundAudioPaused);

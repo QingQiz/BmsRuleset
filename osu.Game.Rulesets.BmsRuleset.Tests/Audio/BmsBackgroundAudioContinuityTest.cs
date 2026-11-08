@@ -6,6 +6,7 @@ using NUnit.Framework;
 using osu.Framework.Audio;
 using osu.Framework.Bindables;
 using osu.Framework.Timing;
+using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Mixing.Pcm;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Playback;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
@@ -95,7 +96,7 @@ public class BmsBackgroundAudioContinuityTest
     [Test]
     public void LateBackgroundEventDoesNotCutAnUnrelatedKeysound()
     {
-        createBackground([new BmsBackgroundAudioPlayer.BgmEvent(100, 1)]);
+        createBackground([new BmsSampleEvent(100, 1, 100)]);
         advanceTo(0);
         controller.Play(0, 100, 0);
         assertSounding();
@@ -107,7 +108,7 @@ public class BmsBackgroundAudioContinuityTest
     [Test]
     public void CatchUpResumesBackgroundEventsThatOccurredWhileBlocked()
     {
-        createBackground([new BmsBackgroundAudioPlayer.BgmEvent(100, 1)]);
+        createBackground([new BmsSampleEvent(100, 1, 100)]);
         advanceTo(0);
         clock.CatchingUp.Value = disabled.Value = true;
         advanceTo(200);
@@ -168,7 +169,7 @@ public class BmsBackgroundAudioContinuityTest
         leases[1].Dispose();
         var samples = Enumerable.Range(0, 88200).SelectMany(i => new[] { i / 88200f, i / 88200f }).ToArray();
         leases[1] = new BmsPcmAssetLease(BmsPcmTestHelpers.CreateAsset([new BmsPcmChunk(0, 88200, samples)]), Task.CompletedTask, () => { });
-        createBackground([new BmsBackgroundAudioPlayer.BgmEvent(0, 1)]);
+        createBackground([new BmsSampleEvent(0, 1, 100)]);
         advanceTo(0);
         BmsPcmTestHelpers.RenderFrames(mixer, 4410);
         clock.CatchingUp.Value = disabled.Value = true;
@@ -219,7 +220,7 @@ public class BmsBackgroundAudioContinuityTest
     [Test]
     public void RunningRewindResumesAudioWhenSourceAdvancesPastOriginalTarget()
     {
-        createBackground([new BmsBackgroundAudioPlayer.BgmEvent(0, 1)]);
+        createBackground([new BmsSampleEvent(0, 1, 100)]);
         advanceTo(1500);
         assertSounding();
         background.NotifySeek(500);
@@ -238,7 +239,7 @@ public class BmsBackgroundAudioContinuityTest
         Assert.That(mixer.ActiveVoiceCount, Is.EqualTo(2), "Background and new replay keys resume without another seek.");
     }
 
-    private void createBackground(BmsBackgroundAudioPlayer.BgmEvent[] events)
+    private void createBackground(BmsSampleEvent[] events)
     {
         background = new BmsBackgroundAudioPlayer(events, paused) { Clock = clock };
         typeof(BmsBackgroundAudioPlayer).GetProperty("samplePlayback", private_instance)!.SetValue(background, playback);
