@@ -31,23 +31,27 @@ public static class BmsPracticeBeatmap
     }
 
     public static int SelectedCount(BmsBeatmap beatmap, BmsPracticeSettings settings)
-        => beatmap.HitObjects.Count(note => note is not BmsLandmine and not BmsInvisibleNote && settings.Contains(note.StartTime));
+    {
+        var millisecondPrecision = beatmap.BeatmapInfo.Ruleset.OnlineID == 3;
+        return beatmap.HitObjects.Count(note => note is not BmsLandmine and not BmsInvisibleNote && settings.Contains(note.StartTime, millisecondPrecision));
+    }
 
     public static BmsBeatmap Create(BmsBeatmap fullBeatmap, BmsPracticeSettings settings)
     {
         if (!settings.IsValidFor(fullBeatmap))
             throw new ArgumentOutOfRangeException(nameof(settings));
 
+        var millisecondPrecision = fullBeatmap.BeatmapInfo.Ruleset.OnlineID == 3;
         var practice = (BmsBeatmap)fullBeatmap.Clone();
         practice.BeatmapInfo = fullBeatmap.BeatmapInfo.Clone();
         practice.Difficulty = fullBeatmap.Difficulty.Clone();
         practice.PracticeFullNoteCount = fullBeatmap.CountScoringNotes();
         practice.PracticeEndTime = settings.EndTime;
-        practice.HitObjects = fullBeatmap.HitObjects.Where(note => settings.Contains(note.StartTime))
+        practice.HitObjects = fullBeatmap.HitObjects.Where(note => settings.Contains(note.StartTime, millisecondPrecision))
             .Select(note => cloneObject(note, practice)).ToList();
 
         var background = fullBeatmap.BackgroundSampleEvents.ToList();
-        foreach (var note in fullBeatmap.HitObjects.Where(note => !settings.Contains(note.StartTime) && note is not BmsLandmine and not BmsInvisibleNote))
+        foreach (var note in fullBeatmap.HitObjects.Where(note => !settings.Contains(note.StartTime, millisecondPrecision) && note is not BmsLandmine and not BmsInvisibleNote))
         {
             if (note.SampleKey is { } sample)
                 background.Add(new BmsSampleEvent(note.StartTime, sample, note.SampleVolume));
@@ -56,12 +60,12 @@ public static class BmsPracticeBeatmap
         }
 
         practice.BackgroundSampleEvents = background.OrderBy(sample => sample.Time).ToArray();
-        practice.InvisibleNotes = fullBeatmap.InvisibleNotes.Where(note => settings.Contains(note.StartTime))
+        practice.InvisibleNotes = fullBeatmap.InvisibleNotes.Where(note => settings.Contains(note.StartTime, millisecondPrecision))
             .Select(note => note.CreateKeySoundState(practice)).ToArray();
 
         // This audio-only state never enters HitObjects or the visible invisible-note layer.
         practice.PracticeInitialKeySounds = fullBeatmap.HitObjects.Where(note => note is not BmsLongNote and not BmsLandmine)
-            .Concat(fullBeatmap.InvisibleNotes).Where(note => note.StartTime < settings.StartTime && !settings.Contains(note.StartTime) && note.SampleKey.HasValue)
+            .Concat(fullBeatmap.InvisibleNotes).Where(note => note.StartTime < settings.StartTime && !settings.Contains(note.StartTime, millisecondPrecision) && note.SampleKey.HasValue)
             .OrderBy(note => note.StartTime).ThenBy(note => note is BmsInvisibleNote ? 0 : 1)
             .GroupBy(note => note.Column).Select(column => column.Last().CreateKeySoundState(practice)).ToArray();
 

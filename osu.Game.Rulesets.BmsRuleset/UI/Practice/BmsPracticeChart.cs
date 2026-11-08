@@ -96,8 +96,15 @@ public partial class BmsPracticeChart : CompositeDrawable, IHasTooltip
             return BmsStrings.PracticeDensityWindow(window.StartTime, window.EndTime, window.NotesPerSecond);
         }
     }
-    public double SelectedEnd => Math.Max(settings.EndTime, beatmap?.HitObjects.Where(h => settings.Contains(h.StartTime))
-        .Select(h => h.GetEndTime()).DefaultIfEmpty(settings.EndTime).Max() ?? settings.EndTime);
+    public double SelectedEnd
+    {
+        get
+        {
+            var millisecondPrecision = beatmap?.BeatmapInfo.Ruleset.OnlineID == 3;
+            return Math.Max(settings.EndTime, beatmap?.HitObjects.Where(h => settings.Contains(h.StartTime, millisecondPrecision))
+                .Select(h => h.GetEndTime()).DefaultIfEmpty(settings.EndTime).Max() ?? settings.EndTime);
+        }
+    }
 
     public BmsPracticeChart()
     {
@@ -264,12 +271,13 @@ public partial class BmsPracticeChart : CompositeDrawable, IHasTooltip
             }
         }
 
+        var millisecondPrecision = beatmap.BeatmapInfo.Ruleset.OnlineID == 3;
         foreach (var note in beatmap.HitObjects)
         {
             var end = note.GetEndTime();
             if (end < Viewport.Start || note.StartTime > Viewport.End)
                 continue;
-            var selected = settings.Contains(note.StartTime);
+            var selected = settings.Contains(note.StartTime, millisecondPrecision);
             var colour = note is BmsLandmine ? Colour4.FromHex("F2798C") : noteColour(note.Column);
             colour = colour.Opacity(selected ? 1 : 0.25f);
             var x = time_gutter + visualColumn(note.Column) * laneWidth;

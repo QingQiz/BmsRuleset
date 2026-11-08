@@ -18,7 +18,15 @@ public sealed record BmsPracticeSettings
 
     // Grid projection and note offsets can round the same musical position differently.
     // Resolve that noise consistently at both boundaries while keeping the end exclusive.
-    public bool Contains(double time) => time >= StartTime - boundary_epsilon && time < EndTime - boundary_epsilon;
+    public bool Contains(double time, bool millisecondPrecision = false)
+    {
+        // Integer timestamps can lose the grid's fractional millisecond.
+        // Compare them in the same millisecond cells while preserving fractional authoring.
+        if (millisecondPrecision && time == Math.Truncate(time))
+            return time >= Math.Floor(StartTime + boundary_epsilon) && time < Math.Floor(EndTime + boundary_epsilon);
+
+        return time >= StartTime - boundary_epsilon && time < EndTime - boundary_epsilon;
+    }
 
     [JsonIgnore]
     public bool IsValid => double.IsFinite(StartTime) && double.IsFinite(EndTime)
