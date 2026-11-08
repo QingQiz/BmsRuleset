@@ -269,8 +269,26 @@ public partial class TestSceneBmsPracticeChart : OsuManualInputManagerTestScene
         });
         AddAssert("measure numbers label the grid", () => chart.ChildrenOfType<OsuSpriteText>().Any(text => text.Text.ToString() == BmsStrings.PracticeMeasure(2).ToString()));
         AddAssert("sixteenth-note line projected at 125ms", () => chart.ChildrenOfType<BmsReplayVisualizer.PlotLayer>().Single().Rectangles.Any(rectangle =>
-            rectangle.Bounds.Height == 1 && Math.Abs(rectangle.Bounds.Width - (chart.TimelineRight - chart.TimelineLeft)) < 0.01 && Math.Abs(rectangle.Bounds.Y - positionAt(125)) < 0.1));
+            rectangle.Bounds.Height == 1 && Math.Abs(rectangle.Bounds.Width - (chart.TimelineRight - chart.TimelineLeft)) < 0.01
+            && Math.Abs(rectangle.Bounds.Centre.Y - positionAt(125)) < 0.1));
         AddAssert("seconds do not label the grid", () => chart.ChildrenOfType<OsuSpriteText>().All(text => text.Text.ToString() != BmsStrings.PracticeTime(1000).ToString()));
+        AddStep("align both boundaries to measure starts", () =>
+        {
+            settings = settings with { StartTime = 2000, EndTime = 4000 };
+            chart.SetSelection(settings);
+        });
+        AddAssert("measure strokes overlap both range boundary strokes", () =>
+        {
+            var rectangles = chart.ChildrenOfType<BmsReplayVisualizer.PlotLayer>().Single().Rectangles;
+            return new[] { settings.StartTime, settings.EndTime }.All(time =>
+            {
+                var measure = rectangles.Single(rectangle => rectangle.Bounds.X == chart.TimelineLeft && rectangle.Bounds.Height == 2
+                    && Math.Abs(rectangle.Bounds.Centre.Y - positionAt(time)) < 0.01);
+                var boundary = rectangles.Single(rectangle => rectangle.Bounds.X == chart.TimelineLeft - 10 && rectangle.Bounds.Height == 2
+                    && Math.Abs(rectangle.Bounds.Centre.Y - positionAt(time)) < 0.01);
+                return measure.Bounds.Top == boundary.Bounds.Top && measure.Bounds.Bottom == boundary.Bounds.Bottom;
+            });
+        });
     }
 
     [Test]

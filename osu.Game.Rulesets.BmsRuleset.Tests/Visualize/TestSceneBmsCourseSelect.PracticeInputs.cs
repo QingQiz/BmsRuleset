@@ -79,7 +79,7 @@ public partial class TestSceneBmsCourseSelect
         AddStep("select exact musical grid boundaries", () =>
         {
             var full = BmsPracticeSession.GetFullBeatmap(songSelect.Beatmap.Value, setup.SelectedMods);
-            var grid = BmsPracticeGrid.Create(full.TimingMap);
+            var grid = BmsPracticeGrid.Create(full.TimingMap).Lines;
             exactStart = grid.Single(line => line.Measure == 0 && line.Subdivision == 1).Time;
             exactEnd = grid.Single(line => line.Measure == 2 && line.Subdivision == 3).Time;
             measureStart = grid.Single(line => line.Measure == 1 && line.IsMeasureLine).Time;

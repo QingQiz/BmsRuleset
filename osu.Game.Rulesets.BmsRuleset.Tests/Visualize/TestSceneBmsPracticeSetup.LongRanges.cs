@@ -106,7 +106,7 @@ public partial class TestSceneBmsPracticeSetup
         AddStep("drag start into the song", () => InputManager.MoveMouseTo(realChartPosition(chart, fullStart + fullDuration * 0.17)));
         AddStep("release the start line", () => InputManager.ReleaseButton(MouseButton.Left));
         AddAssert("long-range start snaps to the sixteenth grid", () => setup.Settings.StartTime > fullStart
-            && BmsPracticeGrid.Create(fullBeatmap.TimingMap, 16).Any(line => Math.Abs(line.Time - setup.Settings.StartTime) < 0.000001));
+            && BmsPracticeGrid.Create(fullBeatmap.TimingMap, 16).Lines.Any(line => Math.Abs(line.Time - setup.Settings.StartTime) < 0.000001));
         AddAssert("start drag leaves the full-chart end intact", () => setup.Settings.EndTime, () => Is.EqualTo(fullEnd));
         AddStep("open long-range snap choices", () => clickRealChartControl(snap.ChildrenOfType<DropdownHeader>().Single()));
         AddUntilStep("measure alignment is available", () => snap.ChildrenOfType<Menu.DrawableMenuItem>()
@@ -123,7 +123,7 @@ public partial class TestSceneBmsPracticeSetup
         AddStep("drag end into the song", () => InputManager.MoveMouseTo(realChartPosition(chart, fullStart + fullDuration * 0.83)));
         AddStep("release the end line", () => InputManager.ReleaseButton(MouseButton.Left));
         AddAssert("long-range end snaps to a measure", () => setup.Settings.EndTime < fullEnd
-            && BmsPracticeGrid.Create(fullBeatmap.TimingMap, 0).Any(line => line.IsMeasureLine && Math.Abs(line.Time - setup.Settings.EndTime) < 0.000001));
+            && BmsPracticeGrid.Create(fullBeatmap.TimingMap, 0).Lines.Any(line => line.IsMeasureLine && Math.Abs(line.Time - setup.Settings.EndTime) < 0.000001));
         AddAssert("end drag keeps the exact start", () => setup.Settings.StartTime, () => Is.EqualTo(selection.StartTime));
         AddAssert("chosen interval remains longer than sixty seconds", () => setup.Settings.EndTime - setup.Settings.StartTime, () => Is.GreaterThan(60000));
         AddAssert("long interval contains a dense real pattern", () => BmsPracticeBeatmap.SelectedCount(fullBeatmap, setup.Settings), () => Is.GreaterThan(200));

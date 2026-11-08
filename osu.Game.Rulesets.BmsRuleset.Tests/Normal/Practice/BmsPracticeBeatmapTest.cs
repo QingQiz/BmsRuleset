@@ -42,7 +42,7 @@ public class BmsPracticeBeatmapTest
         var settings = BmsPracticeSettings.CreateDefault(full);
         Assert.That(settings.EndTime, Is.EqualTo(3500));
         Assert.That(settings.IsValidFor(full), Is.True);
-        Assert.That(BmsPracticeGrid.Snap(full.TimingMap, settings.EndTime, 0), Is.EqualTo(settings.EndTime));
+        Assert.That(BmsPracticeGrid.Create(full.TimingMap, 0).Snap(settings.EndTime), Is.EqualTo(settings.EndTime));
         Assert.That(BmsPracticeBeatmap.Create(full, settings).HitObjects, Has.Count.EqualTo(1));
     }
 
@@ -60,7 +60,7 @@ public class BmsPracticeBeatmapTest
         var settings = BmsPracticeSettings.CreateDefault(full);
         Assert.That(settings.EndTime, Is.EqualTo(3000));
         Assert.That(settings.Contains(last.StartTime), Is.True);
-        Assert.That(BmsPracticeGrid.Snap(full.TimingMap, settings.EndTime, 0), Is.EqualTo(settings.EndTime));
+        Assert.That(BmsPracticeGrid.Create(full.TimingMap, 0).Snap(settings.EndTime), Is.EqualTo(settings.EndTime));
     }
 
     [Test]

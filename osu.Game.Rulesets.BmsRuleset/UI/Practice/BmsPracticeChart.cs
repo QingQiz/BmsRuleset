@@ -41,8 +41,7 @@ public partial class BmsPracticeChart : CompositeDrawable, IHasTooltip
     private readonly Dictionary<BmsHitObject, double> followingNoteIntervals = [];
     private BmsBeatmap? beatmap;
     private BmsPracticeSettings settings = new();
-    private double[] snapTimes = [];
-    private BmsPracticeGridLine[] gridLines = [];
+    private BmsPracticeGrid grid = BmsPracticeGrid.Create(null);
     private BmsPracticeDensity? density;
     private (int Row, BmsPracticeDensityWindow Window)[] densityRows = [];
     private int densityRowCount;
@@ -149,12 +148,11 @@ public partial class BmsPracticeChart : CompositeDrawable, IHasTooltip
 
     private void updateGrid()
     {
-        gridLines = BmsPracticeGrid.Create(beatmap?.TimingMap, snapDivisor);
-        snapTimes = gridLines.Select(line => line.Time).Distinct().Order().ToArray();
+        grid = BmsPracticeGrid.Create(beatmap?.TimingMap, snapDivisor);
         dirty = true;
     }
 
-    public double SnapTime(double time) => Math.Clamp(BmsPracticeGrid.Snap(beatmap?.TimingMap, time, snapDivisor), Viewport.Minimum, Viewport.Maximum);
+    public double SnapTime(double time) => Math.Clamp(grid.Snap(time), Viewport.Minimum, Viewport.Maximum);
 
     public void SetSelection(BmsPracticeSettings range)
     {
@@ -247,15 +245,16 @@ public partial class BmsPracticeChart : CompositeDrawable, IHasTooltip
         rectangle(time_gutter, selectionTop, chartRight - time_gutter, selectionBottom - selectionTop, accent.Opacity(0.10f));
         var boundaryLabels = boundaryLabelPositions();
         var lastLabelY = float.NegativeInfinity;
-        for (var i = 0; i < gridLines.Length; i++)
+        for (var i = 0; i < grid.Lines.Length; i++)
         {
-            var line = gridLines[i];
+            var line = grid.Lines[i];
             if (line.Time < Viewport.Start || line.Time > Viewport.End) continue;
             var y = yAt(line.Time);
-            var spacing = i + 1 < gridLines.Length ? Math.Abs(yAt(gridLines[i + 1].Time) - y) : 10;
+            var spacing = i + 1 < grid.Lines.Length ? Math.Abs(yAt(grid.Lines[i + 1].Time) - y) : 10;
             var beatLine = line.Subdivision % Math.Max(1, snapDivisor / 4) == 0;
             if (!line.IsMeasureLine && spacing < (beatLine ? 1.5f : 4)) continue;
-            rectangle(time_gutter, y, chartRight - time_gutter, line.IsMeasureLine ? 2 : 1,
+            var lineHeight = line.IsMeasureLine ? 2 : 1;
+            rectangle(time_gutter, y - lineHeight / 2f, chartRight - time_gutter, lineHeight,
                 Colour4.White.Opacity(line.IsMeasureLine ? 0.35f : beatLine ? 0.15f : 0.07f));
             if (line.IsMeasureLine && Math.Abs(y - lastLabelY) >= 18
                 && !overlapsBoundaryLabel(y - 8, 13, boundaryLabels.Start) && !overlapsBoundaryLabel(y - 8, 13, boundaryLabels.End))
@@ -538,15 +537,15 @@ public partial class BmsPracticeChart : CompositeDrawable, IHasTooltip
     {
         var startTime = Math.Clamp(settings.StartTime, Viewport.Minimum, Viewport.Maximum - 0.001);
         var endTime = Math.Clamp(settings.EndTime, startTime + 0.001, Viewport.Maximum);
-        if (snap && snapTimes.Length > 0)
+        if (snap && grid.SnapTimes.Length > 0)
         {
             // Crossing a boundary stops at the final eligible grid point, rather than creating an off-grid 1ms gap.
-            var first = Array.BinarySearch(snapTimes, start ? Viewport.Minimum : startTime);
+            var first = Array.BinarySearch(grid.SnapTimes, start ? Viewport.Minimum : startTime);
             first = first < 0 ? ~first : first + (start ? 0 : 1);
-            var last = Array.BinarySearch(snapTimes, start ? endTime : Viewport.Maximum);
+            var last = Array.BinarySearch(grid.SnapTimes, start ? endTime : Viewport.Maximum);
             last = last < 0 ? ~last - 1 : last - (start ? 1 : 0);
             if (first > last) return;
-            time = Math.Clamp(time, snapTimes[first], snapTimes[last]);
+            time = Math.Clamp(time, grid.SnapTimes[first], grid.SnapTimes[last]);
         }
         settings = settings with
         {
@@ -568,13 +567,13 @@ public partial class BmsPracticeChart : CompositeDrawable, IHasTooltip
         {
             var current = start ? settings.StartTime : settings.EndTime;
             var later = e.Key == Key.Up;
-            if (!e.AltPressed && snapTimes.Length > 0)
+            if (!e.AltPressed && grid.SnapTimes.Length > 0)
             {
-                var index = Array.BinarySearch(snapTimes, current);
+                var index = Array.BinarySearch(grid.SnapTimes, current);
                 index = index < 0 ? ~index + (later ? 0 : -1) : index + (later ? 1 : -1);
-                index = Math.Clamp(index, 0, snapTimes.Length - 1);
-                var targetIndex = Math.Clamp(index + (later ? 1 : -1) * (e.ShiftPressed ? 3 : 0), 0, snapTimes.Length - 1);
-                setBoundary(snapTimes[targetIndex], start, true);
+                index = Math.Clamp(index, 0, grid.SnapTimes.Length - 1);
+                var targetIndex = Math.Clamp(index + (later ? 1 : -1) * (e.ShiftPressed ? 3 : 0), 0, grid.SnapTimes.Length - 1);
+                setBoundary(grid.SnapTimes[targetIndex], start, true);
             }
             else
                 setBoundary(current + (e.ShiftPressed ? 1 : 10) * (later ? 1 : -1), start);

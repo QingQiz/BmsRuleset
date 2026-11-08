@@ -71,9 +71,9 @@ public partial class BmsPracticeChart
             }
 
             drawOverviewRange(left, miniature_width, start, end);
-            if (OverviewColumns > 1 && gridLines.Length > 0)
+            if (OverviewColumns > 1 && grid.Lines.Length > 0)
             {
-                var measure = gridLines.LastOrDefault(line => line.IsMeasureLine && line.Time <= start);
+                var measure = grid.Lines.LastOrDefault(line => line.IsMeasureLine && line.Time <= start);
                 label(BmsStrings.PracticeMeasure(measure.Measure + 1), left, DrawHeight - edge_margin + 3, palette.Light2, 11);
             }
         }

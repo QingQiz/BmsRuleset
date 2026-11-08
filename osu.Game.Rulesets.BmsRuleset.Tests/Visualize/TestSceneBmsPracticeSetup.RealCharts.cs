@@ -122,7 +122,7 @@ public partial class TestSceneBmsPracticeSetup
         AddStep("drag start upwards", () => InputManager.MoveMouseTo(realChartPosition(setup.SelectionChart, target)));
         AddStep("release start boundary", () => InputManager.ReleaseButton(MouseButton.Left));
         AddAssert("start moved to a real sixteenth-note grid line", () => setup.Settings.StartTime > selection.StartTime
-            && BmsPracticeGrid.Create(fullBeatmap.TimingMap, 16).Any(line => Math.Abs(line.Time - setup.Settings.StartTime) < 0.000001));
+            && BmsPracticeGrid.Create(fullBeatmap.TimingMap, 16).Lines.Any(line => Math.Abs(line.Time - setup.Settings.StartTime) < 0.000001));
         AddAssert("moving start preserves end", () => setup.Settings.EndTime, () => Is.EqualTo(unchangedBoundary));
 
         AddStep("open snap choices", () => clickRealChartControl(snap.ChildrenOfType<DropdownHeader>().Single()));
@@ -141,7 +141,7 @@ public partial class TestSceneBmsPracticeSetup
         AddStep("drag end downwards", () => InputManager.MoveMouseTo(realChartPosition(setup.SelectionChart, target)));
         AddStep("release end boundary", () => InputManager.ReleaseButton(MouseButton.Left));
         AddAssert("end moved to a real measure line", () => setup.Settings.EndTime < selection.EndTime
-            && BmsPracticeGrid.Create(fullBeatmap.TimingMap, 0).Any(line => line.IsMeasureLine && Math.Abs(line.Time - setup.Settings.EndTime) < 0.000001));
+            && BmsPracticeGrid.Create(fullBeatmap.TimingMap, 0).Lines.Any(line => line.IsMeasureLine && Math.Abs(line.Time - setup.Settings.EndTime) < 0.000001));
         AddAssert("moving end preserves start", () => setup.Settings.StartTime, () => Is.EqualTo(unchangedBoundary));
 
         AddStep("remember range and resize", () =>

@@ -45,7 +45,7 @@ public class BmsPracticeBoundaryTest
     {
         var lines = new[] { $"#BPM {bpm}", "#BPM01 157", "#00108:01" }.Concat(Enumerable.Range(0, 20).Select(measure => $"#{measure:000}11:01010101010101010101010101010101")).ToArray();
         var parsed = BmsChartParser.Parse(lines);
-        var grid = BmsPracticeGrid.Create(parsed.TimingMap);
+        var grid = BmsPracticeGrid.Create(parsed.TimingMap).Lines;
         foreach (var note in parsed.HitObjects)
         {
             var boundary = grid.MinBy(line => Math.Abs(line.Time - note.StartTime)).Time;
@@ -63,7 +63,7 @@ public class BmsPracticeBoundaryTest
         {
             BranchRandomValueSelector = _ => 1,
         }.Convert();
-        var grid = BmsPracticeGrid.Create(beatmap.TimingMap).Select(line => line.Time).Distinct().Order().ToArray();
+        var grid = BmsPracticeGrid.Create(beatmap.TimingMap).Lines.Select(line => line.Time).Distinct().Order().ToArray();
         var checkedNotes = 0;
         foreach (var note in beatmap.HitObjects)
         {

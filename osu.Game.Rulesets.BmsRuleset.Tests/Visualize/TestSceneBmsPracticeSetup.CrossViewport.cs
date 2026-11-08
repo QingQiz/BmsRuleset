@@ -48,7 +48,7 @@ public partial class TestSceneBmsPracticeSetup
             }.Convert();
             BmsTestBeatmaps.SetupBeatmapInfo(beatmap, new BmsRuleset().RulesetInfo);
             beatmap.Metadata.Source = Path.GetDirectoryName(path)!;
-            gridTimes = BmsPracticeGrid.Create(beatmap.TimingMap, 16).Select(line => line.Time).Distinct().Order().ToArray();
+            gridTimes = BmsPracticeGrid.Create(beatmap.TimingMap, 16).Lines.Select(line => line.Time).Distinct().Order().ToArray();
             Ruleset.Value = new BmsRuleset().RulesetInfo;
             Child = new Container
             {
