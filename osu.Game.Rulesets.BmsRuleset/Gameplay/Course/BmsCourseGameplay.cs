@@ -114,11 +114,8 @@ internal partial class BmsCoursePlayer : SoloPlayer
     }
 
     [BackgroundDependencyLoader]
-    private void loadCourseGaugeContext()
+    private void loadCourseConstraints()
     {
-        if (GameplayState.HealthProcessor is BmsHealthProcessor healthProcessor)
-            session.ConfigureHealthProcessor(healthProcessor);
-
         if (session.HasNoSpeedConstraint && DrawableRuleset.Playfield is BmsPlayfield playfield)
             playfield.ScrollController.LockScrollSpeedMultiplier();
     }

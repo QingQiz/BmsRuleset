@@ -7,7 +7,6 @@ using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Randomisation;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.LongNoteMode;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
@@ -402,28 +401,6 @@ internal sealed class BmsCourseSession
         }
 
         return forbidden;
-    }
-
-    internal void ConfigureHealthProcessor(BmsHealthProcessor healthProcessor)
-    {
-        healthProcessor.Mods = Mods;
-        healthProcessor.ConfigureGaugeContext(isCourseGaugeMode: true, familyOverride: gaugeProfileFamilyOverride);
-
-        var usesAutoGauge = Mods.Any(mod => mod is BmsModAutoGauge);
-        var initialStates = CurrentGaugeStates.Where(state => !state.Failed).ToArray();
-        var gaugeTypes = usesAutoGauge && CurrentGaugeStates.Count > 0
-            ? initialStates.Select(state => state.GaugeType).ToArray()
-            : usesAutoGauge
-                ? BmsModAutoGauge.COURSE_AUTO_GAUGE_CHAIN
-                : [GaugeType];
-
-        // The processor may already contain the regular AG chain if its load completed before
-        // the course player. Replace it so course gameplay never retains regular gauge states.
-        healthProcessor.SetGaugeTypes(
-            gaugeTypes,
-            replaceExisting: true,
-            profileFamilyOverride: gaugeProfileFamilyOverride,
-            initialStates: initialStates);
     }
 
     private void updateGaugeSettings()

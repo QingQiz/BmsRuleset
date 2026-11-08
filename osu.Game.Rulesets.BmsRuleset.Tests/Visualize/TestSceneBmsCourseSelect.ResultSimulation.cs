@@ -17,6 +17,7 @@ using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.IO.Import;
 using osu.Game.Rulesets.BmsRuleset.UI.Result.Course;
 using osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
+using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 
@@ -78,7 +79,9 @@ public partial class TestSceneBmsCourseSelect
                 using var health = new BmsHealthProcessor();
                 var beatmap = beatmaps.GetWorkingBeatmap(charts[stage]).Beatmap;
                 health.ApplyBeatmap(beatmap);
-                session.ConfigureHealthProcessor(health);
+                health.Mods = session.Mods;
+                foreach (var mod in session.Mods.OfType<IApplicableToHealthProcessor>())
+                    mod.ApplyToHealthProcessor(health);
                 openings[stage] = health.CurrentGaugeStates.ToArray();
                 foreach (var note in beatmap.HitObjects)
                     health.RegisterNonConsumingJudgement(HitResult.Meh);

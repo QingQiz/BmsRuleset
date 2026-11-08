@@ -15,6 +15,7 @@ using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.IO.Import;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.Result.Course;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect;
 using osu.Game.Rulesets.Mods;
@@ -75,7 +76,7 @@ public partial class TestSceneBmsCourseSelect
             BmsRulesetRuntime.CourseCatalog.Replace(
             [
                 new BmsCourseDefinition(courseId, "Table", "Dan",
-                    charts.Select(chart => new BmsCourseStage(chart.DifficultyName, "1", BeatmapHash: chart.Hash)).ToArray(), ["gauge_lr2"]),
+                    charts.Select(chart => new BmsCourseStage(chart.DifficultyName, "1", BeatmapHash: chart.Hash)).ToArray(), ["gauge_lr2", "no_speed"]),
             ]);
         });
         AddStep("open song select", () => Stack.Push(songSelect = new BmsSoloSongSelect()));
@@ -100,6 +101,10 @@ public partial class TestSceneBmsCourseSelect
                 Assert.That(player.GameplayState.Beatmap.BeatmapInfo.Hash, Is.EqualTo(charts[stageIndex].Hash));
                 Assert.That(health.CurrentGaugeStates, Is.EqualTo(expected));
                 Assert.That(health.ConfiguredProfileFamily, Is.EqualTo(BmsGaugeProfileFamily.Lr2));
+                var scroll = player.ChildrenOfType<BmsPlayfield>().Single().ScrollController;
+                var speed = scroll.ScrollSpeed;
+                scroll.AdjustScrollSpeed(1);
+                Assert.That(scroll.ScrollSpeed, Is.EqualTo(speed), "Course no_speed must remain locked after gauge initialization changes.");
                 openings[stageIndex] = expected;
                 // Skip the empty lead-in; real note misses must drive completion and the results transition.
                 player.ChildrenOfType<GameplayClockContainer>().Single().Seek(19500);
@@ -187,7 +192,8 @@ public partial class TestSceneBmsCourseSelect
                 {
                     BeatmapInfo = stageBeatmap,
                     LayoutVariant = layouts[stageIndex],
-                    TotalColumns = layouts[stageIndex] == BmsLayoutVariant.Pms9K ? 9 : 8,
+                    TotalColumns = BmsLayout.GetTotalColumns(layouts[stageIndex]),
+                    TimingMap = BmsChartParser.Parse([]).TimingMap,
                     HitObjects = [new BmsNote { StartTime = 30000, Column = 1 }, new BmsNote { StartTime = 60000, Column = 1 }],
                 };
                 BmsTestBeatmaps.SetupBeatmapInfo(beatmap, stageBeatmap.Ruleset);

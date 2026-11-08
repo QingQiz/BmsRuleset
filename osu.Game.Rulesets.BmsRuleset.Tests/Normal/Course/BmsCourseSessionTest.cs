@@ -150,31 +150,6 @@ public class BmsCourseSessionTest
     }
 
     [Test]
-    public void TestCourseAutoGaugeDoesNotRestoreFailedGaugesWhenModIsAppliedAfterSessionConfiguration()
-    {
-        var session = createSession(mods: [new BmsModAutoGauge()], gaugeType: BmsGaugeType.ExHardClass);
-        session.BeginCurrentStage();
-        session.CompleteCurrentStage(createScore(true),
-        [
-            new BmsGaugeStateSnapshot(BmsGaugeType.ExHardClass, 0, true),
-            new BmsGaugeStateSnapshot(BmsGaugeType.ExClass, 0.42, false),
-            new BmsGaugeStateSnapshot(BmsGaugeType.Class, 0.81, false),
-        ]);
-        session.RequestAdvance();
-        session.Advance();
-
-        var healthProcessor = new BmsHealthProcessor();
-        session.ConfigureHealthProcessor(healthProcessor);
-        new BmsModAutoGauge().ApplyToHealthProcessor(healthProcessor);
-
-        Assert.That(healthProcessor.CurrentGaugeStates.Select(state => state.GaugeType), Is.EqualTo(
-        [
-            BmsGaugeType.ExClass,
-            BmsGaugeType.Class,
-        ]));
-    }
-
-    [Test]
     public void TestCourseAutoGaugeOmitsFailedGaugesFromNextStage()
     {
         var session = createSession(mods: [new BmsModAutoGauge()], gaugeType: BmsGaugeType.ExHardClass);
@@ -189,7 +164,8 @@ public class BmsCourseSessionTest
         session.Advance();
 
         var healthProcessor = new BmsHealthProcessor();
-        session.ConfigureHealthProcessor(healthProcessor);
+        foreach (var mod in session.Mods.OfType<IApplicableToHealthProcessor>())
+            mod.ApplyToHealthProcessor(healthProcessor);
 
         Assert.That(healthProcessor.CurrentGaugeStates.Select(state => state.GaugeType), Is.EqualTo(
         [
@@ -205,7 +181,8 @@ public class BmsCourseSessionTest
         new BmsModAutoGauge().ApplyToHealthProcessor(healthProcessor);
         var session = createSession(mods: [new BmsModAutoGauge()], gaugeType: BmsGaugeType.ExHardClass);
 
-        session.ConfigureHealthProcessor(healthProcessor);
+        foreach (var mod in session.Mods.OfType<IApplicableToHealthProcessor>())
+            mod.ApplyToHealthProcessor(healthProcessor);
 
         Assert.Multiple(() =>
         {
@@ -252,20 +229,18 @@ public class BmsCourseSessionTest
     }
 
     [Test]
-    public void TestCourseGaugeConfigurationInitializesWithCarriedHealth()
+    public void TestCourseGaugeModInitializesWithCarriedHealth()
     {
         var healthProcessor = new BmsHealthProcessor();
-        var session = createSession();
+        var session = createSession(mods: [new BmsModClassGauge()]);
         var observedHealth = new List<double>();
         healthProcessor.Health.ValueChanged += change => observedHealth.Add(change.NewValue);
 
         session.BeginCurrentStage();
         session.CompleteCurrentStage(createScore(true), gaugeStates(0.42));
-        session.ConfigureHealthProcessor(healthProcessor);
-
-        Assert.That(healthProcessor.Health.Value, Is.EqualTo(0.42).Within(0.001));
-
-        new BmsModClassGauge().ApplyToHealthProcessor(healthProcessor);
+        session.RequestAdvance();
+        session.Advance();
+        session.Mods.OfType<BmsModClassGauge>().Single().ApplyToHealthProcessor(healthProcessor);
 
         Assert.Multiple(() =>
         {

@@ -26,8 +26,7 @@ public class BmsCourseHealthInheritanceTest
     public void SingleGaugeCarriesHealthAcrossThreeStages(
         [Values(BmsGaugeType.Class, BmsGaugeType.ExClass, BmsGaugeType.ExHardClass)] BmsGaugeType type,
         [Values(null, BmsGaugeProfileFamily.FiveKeys, BmsGaugeProfileFamily.SevenKeys, BmsGaugeProfileFamily.Pms,
-            BmsGaugeProfileFamily.Keyboard, BmsGaugeProfileFamily.Lr2)] BmsGaugeProfileFamily? family,
-        [Values] bool modsFirst)
+            BmsGaugeProfileFamily.Keyboard, BmsGaugeProfileFamily.Lr2)] BmsGaugeProfileFamily? family)
     {
         var session = createSession(type, family, false);
         BmsGaugeStateSnapshot[] expected = [new(type, 1, false)];
@@ -40,9 +39,7 @@ public class BmsCourseHealthInheritanceTest
             var mods = persistMods(session.Mods);
             var observed = new List<double>();
             health.Health.ValueChanged += change => observed.Add(change.NewValue);
-            if (modsFirst) applyMods(mods, health);
-            session.ConfigureHealthProcessor(health);
-            if (!modsFirst) applyMods(mods, health);
+            applyMods(mods, health);
 
             assertStartingState(health, expected, family, stage);
             Assert.That(observed, Has.All.EqualTo(expected[0].Health), "Loading must not temporarily refill a carried gauge.");
@@ -74,8 +71,7 @@ public class BmsCourseHealthInheritanceTest
     [Test]
     public void AutoGaugeCarriesEachSurvivingTierAcrossThreeStages(
         [Values(null, BmsGaugeProfileFamily.FiveKeys, BmsGaugeProfileFamily.SevenKeys, BmsGaugeProfileFamily.Pms,
-            BmsGaugeProfileFamily.Keyboard, BmsGaugeProfileFamily.Lr2)] BmsGaugeProfileFamily? family,
-        [Values] bool modsFirst)
+            BmsGaugeProfileFamily.Keyboard, BmsGaugeProfileFamily.Lr2)] BmsGaugeProfileFamily? family)
     {
         var session = createSession(BmsGaugeType.ExHardClass, family, true);
         var expected = BmsModAutoGauge.COURSE_AUTO_GAUGE_CHAIN.Select(type => new BmsGaugeStateSnapshot(type, 1, false)).ToArray();
@@ -86,9 +82,7 @@ public class BmsCourseHealthInheritanceTest
             session.BeginCurrentStage();
             using var health = createHealth(stage);
             var mods = persistMods(session.Mods);
-            if (modsFirst) applyMods(mods, health);
-            session.ConfigureHealthProcessor(health);
-            if (!modsFirst) applyMods(mods, health);
+            applyMods(mods, health);
             assertStartingState(health, expected, family, stage);
 
             var score = archive(mods);
@@ -138,7 +132,6 @@ public class BmsCourseHealthInheritanceTest
 
         using var health = createHealth(1);
         applyMods(persistMods(session.Mods), health);
-        session.ConfigureHealthProcessor(health);
         Assert.That(health.Health.Value, Is.EqualTo(remaining));
         Assert.That(health.HasPassedAtEnd(), Is.True);
         health.RegisterNonConsumingJudgement(HitResult.Ok);
@@ -198,7 +191,6 @@ public class BmsCourseHealthInheritanceTest
         session.BeginCurrentStage();
         using var health = createHealth(1);
         applyMods(persistMods(session.Mods), health);
-        session.ConfigureHealthProcessor(health);
         BmsGaugeStateSnapshot[] expected = [new(BmsGaugeType.Class, 0.001, false)];
         Assert.That(health.CurrentGaugeStates, Is.EqualTo(expected));
         health.RegisterNonConsumingJudgement(HitResult.Ok);
@@ -247,6 +239,7 @@ public class BmsCourseHealthInheritanceTest
 
     private static void applyMods(IReadOnlyList<Mod> mods, BmsHealthProcessor health)
     {
+        health.Mods = mods;
         foreach (var mod in mods.OfType<IApplicableToHealthProcessor>())
             mod.ApplyToHealthProcessor(health);
     }
