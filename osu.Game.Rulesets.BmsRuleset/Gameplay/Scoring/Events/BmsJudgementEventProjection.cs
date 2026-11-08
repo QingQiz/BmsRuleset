@@ -9,6 +9,9 @@ namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
 public static class BmsJudgementEventProjection
 {
     public static List<HitEvent> CreateScoringHitEvents(IEnumerable<BmsJudgementEvent> judgementEvents)
+        => CreateScoringHitEvents(judgementEvents, 0);
+
+    internal static List<HitEvent> CreateScoringHitEvents(IEnumerable<BmsJudgementEvent> judgementEvents, double timeOrigin)
     {
         var events = judgementEvents.Where(e => !e.SuppressPenalty).ToArray();
 
@@ -17,8 +20,9 @@ public static class BmsJudgementEventProjection
 
         foreach (var judgementEvent in events)
         {
-            var observation = judgementEvent.TimingObservations[^1];
-            var hitObject = createScoringHitObject(judgementEvent.Source, observation);
+            var source = judgementEvent.Source with { StartTime = judgementEvent.Source.StartTime - timeOrigin };
+            var observation = relativeObservation(judgementEvent.TimingObservations[^1], timeOrigin);
+            var hitObject = createScoringHitObject(source, observation);
 
             // E-POOR stays anchored to the press for timeline ordering, while its timing error is
             // measured against the upcoming note that caused the non-consuming miss row.
@@ -40,10 +44,15 @@ public static class BmsJudgementEventProjection
     }
 
     public static List<HitEvent> CreateTimingHitEvents(IEnumerable<BmsJudgementEvent> judgementEvents)
+        => CreateTimingHitEvents(judgementEvents, 0);
+
+    internal static List<HitEvent> CreateTimingHitEvents(IEnumerable<BmsJudgementEvent> judgementEvents, double timeOrigin)
     {
         var observations = judgementEvents
             .Where(e => !e.SuppressPenalty)
-            .SelectMany(judgementEvent => judgementEvent.TimingObservations.Select(observation => (judgementEvent.Source, Observation: observation)))
+            .SelectMany(judgementEvent => judgementEvent.TimingObservations.Select(observation =>
+                (Source: judgementEvent.Source with { StartTime = judgementEvent.Source.StartTime - timeOrigin },
+                    Observation: relativeObservation(observation, timeOrigin))))
             .OrderBy(item => item.Observation.ActualTime)
             .ToArray();
 
@@ -59,6 +68,12 @@ public static class BmsJudgementEventProjection
 
         return hitEvents;
     }
+
+    private static BmsTimingObservation relativeObservation(BmsTimingObservation observation, double timeOrigin) => observation with
+    {
+        ExpectedTime = observation.ExpectedTime - timeOrigin,
+        ActualTime = observation.ActualTime - timeOrigin,
+    };
 
     internal static HitEvent CreateTimingHitEvent(BmsJudgementSource source, BmsTimingObservation observation, HitObject? lastHitObject)
         => CreateTimingHitEvent(source, observation, createObservationHitObject(source, observation), lastHitObject);

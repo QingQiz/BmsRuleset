@@ -52,15 +52,8 @@ internal sealed record BmsPracticeAttemptResult(
             note.StartTime = source.StartTime - settings.StartTime;
             return note;
         }).ToList();
-        var relativeJudgements = judgements.Select(judgement => new BmsJudgementEvent(
-            judgement.Source with { StartTime = judgement.Source.StartTime - settings.StartTime }, judgement.Result,
-            judgement.TimingObservations.Select(observation => observation with
-            {
-                ExpectedTime = observation.ExpectedTime - settings.StartTime,
-                ActualTime = observation.ActualTime - settings.StartTime,
-            }), judgement.SuppressPenalty)).ToArray();
-        var timing = BmsJudgementEventProjection.CreateTimingHitEvents(relativeJudgements);
-        var scoring = BmsJudgementEventProjection.CreateScoringHitEvents(relativeJudgements);
+        var timing = BmsJudgementEventProjection.CreateTimingHitEvents(judgements, settings.StartTime);
+        var scoring = BmsJudgementEventProjection.CreateScoringHitEvents(judgements, settings.StartTime);
         var duration = Math.Max(settings.EndTime - settings.StartTime,
             view.HitObjects.Select(note => note.GetEndTime()).DefaultIfEmpty(0).Max());
         var relativeGauges = gaugeHistory.Select(entry => entry with { Time = Math.Clamp(entry.Time - settings.StartTime, 0, duration) }).ToArray();
