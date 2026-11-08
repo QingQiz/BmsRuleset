@@ -10,6 +10,7 @@ using osu.Framework.Timing;
 using osu.Game.Rulesets.BmsRuleset.Media.FFmpeg;
 using osu.Game.Rulesets.BmsRuleset.Media.Video;
 using osu.Game.Rulesets.BmsRuleset.Media.Video.Supplemental;
+using FrameworkVideo = osu.Framework.Graphics.Video.Video;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Bga;
 
@@ -78,7 +79,7 @@ public class BmsSupplementalVideoPipelineTest
         waitUntil(() => BmsVideoTestAccess.GetQueuedFrameCount(source) >= minimumCount, timeout);
 
     [Test]
-    public void TestProviderTransfersOpenedDecoderWithoutReadingStreamAgain()
+    public void TestFactoryTransfersOpenedDecoderWithoutReadingStreamAgain()
     {
         requireSupplementalNativeArtifacts();
 
@@ -86,9 +87,9 @@ public class BmsSupplementalVideoPipelineTest
         using var stream = new CountingCopyStream(bytes);
         stream.Position = stream.Length;
 
-        var request = new BmsBgaVideoRequest("bga.mpg", stream, new ManualFramedClock(), 0);
-        Assert.That(new SupplementalBmsBgaVideoProvider().TryCreate(request, out var created), Is.True);
-        using var drawable = (BmsSupplementalVideoDrawable)created!;
+        using var created = BmsBgaVideoFactory.Create("bga.mpg", stream, new ManualFramedClock(), 0);
+        Assert.That(created, Is.TypeOf<BmsSupplementalVideoDrawable>());
+        var drawable = (BmsSupplementalVideoDrawable)created!;
         Assert.That(stream.Position, Is.EqualTo(stream.Length));
         typeof(BmsSupplementalVideoDrawable).GetMethod("load", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(drawable, [null]);
 
@@ -111,19 +112,22 @@ public class BmsSupplementalVideoPipelineTest
         Assert.DoesNotThrow(source.Dispose);
     }
 
-    [Test]
-    public void TestRejectedCodecLeavesStreamPositionForTheNextProvider()
+    [TestCase("invalid.avi", true)]
+    [TestCase("invalid.mpg", false)]
+    public void TestRejectedCodecRestoresStreamBeforeFallback(string path, bool useFramework)
     {
         requireSupplementalNativeArtifacts();
         using var stream = new MemoryStream([1, 2, 3, 4]);
         stream.Position = 2;
 
-        var accepted = new SupplementalBmsBgaVideoProvider().TryCreate(
-            new BmsBgaVideoRequest("invalid.avi", stream, new ManualFramedClock(), 0), out var drawable);
+        using var drawable = BmsBgaVideoFactory.Create(path, stream, new ManualFramedClock(), 0);
 
-        Assert.That(accepted, Is.False);
-        Assert.That(drawable, Is.Null);
+        if (useFramework)
+            Assert.That(drawable, Is.TypeOf<FrameworkVideo>());
+        else
+            Assert.That(drawable, Is.Null);
         Assert.That(stream.Position, Is.EqualTo(2));
+        Assert.That(stream.ReadByte(), Is.EqualTo(3));
     }
 
     [Test]
@@ -193,6 +197,43 @@ public class BmsSupplementalVideoPipelineTest
         Assert.That(waitForFrame(source, TimeSpan.FromSeconds(3), out var frame), Is.True);
         Assert.That(frame, Is.Not.Null);
         frame!.Dispose();
+    }
+
+    [Test]
+    public void TestFrameSourceCompletesAtEndOfStreamAndKeepsLastFrame()
+    {
+        requireSupplementalNativeArtifacts();
+
+        var bytes = File.ReadAllBytes(Path.Combine(TestContext.CurrentContext.TestDirectory, "bga_fixtures", "mpeg1.mpg"));
+        Assert.That(BmsSupplementalVideoDecoder.TryCreate(bytes, out var decoder, out var error), Is.True, error);
+        var lastFrameTime = 0.0;
+        using (var activeDecoder = decoder!)
+        {
+            while (activeDecoder.TryDecodeNextFrame(out var frame, out error))
+            {
+                lastFrameTime = frame.Time;
+                frame.Dispose();
+            }
+
+            Assert.That(error, Is.Null);
+        }
+
+        using var source = createFrameSource(bytes);
+        source.SetTargetTime(lastFrameTime + 0.05);
+        source.Start();
+
+        Assert.That(waitUntil(() => BmsVideoTestAccess.IsWorkerCompleted(source), TimeSpan.FromSeconds(3)), Is.True);
+        Assert.That(source.TryTakeLatestFrame(out var lastFrame), Is.True);
+        using (var retainedFrame = lastFrame!)
+        {
+            Assert.That(retainedFrame.Time, Is.EqualTo(lastFrameTime));
+            using var upload = retainedFrame.CreateUpload();
+            Assert.That(upload.Data.Length, Is.EqualTo(retainedFrame.Width * retainedFrame.Height));
+        }
+
+        source.SetTargetTime(lastFrameTime + 1);
+        source.Start();
+        Assert.That(source.TryTakeLatestFrame(out _), Is.False);
     }
 
     [Test]

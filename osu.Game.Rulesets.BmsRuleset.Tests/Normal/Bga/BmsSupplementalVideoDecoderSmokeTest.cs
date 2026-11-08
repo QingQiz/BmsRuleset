@@ -76,6 +76,7 @@ public class BmsSupplementalVideoDecoderSmokeTest
         using var activeDecoder = decoder!;
         var frameCount = 0;
         var previousTime = double.NegativeInfinity;
+        Assert.That(activeDecoder.IsFullyDrained, Is.False);
 
         while (activeDecoder.TryDecodeNextFrame(out var frame, out error))
         {
@@ -93,6 +94,7 @@ public class BmsSupplementalVideoDecoderSmokeTest
 
         Assert.That(error, Is.Null);
         Assert.That(frameCount, Is.EqualTo(13));
+        Assert.That(activeDecoder.IsFullyDrained, Is.True);
         Assert.That(activeDecoder.TryDecodeNextFrame(out var exhaustedFrame, out error), Is.False);
         Assert.That(exhaustedFrame, Is.Null);
         Assert.That(error, Is.Null);

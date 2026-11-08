@@ -76,8 +76,14 @@ internal sealed class BmsSupplementalVideoFrameSource(BmsSupplementalVideoDecode
 
                 if (!decoder.TryDecodeNextFrame(out var decoded, out var error))
                 {
-                    if (!string.IsNullOrWhiteSpace(error))
-                        fault(error);
+                    if (error != null)
+                    {
+                        BmsLogger.Log($"[BGA] Supplemental video path faulted: {error}");
+                        break;
+                    }
+
+                    if (decoder.IsFullyDrained)
+                        break;
 
                     wakeSignal.WaitOne(8);
                     continue;
@@ -100,11 +106,6 @@ internal sealed class BmsSupplementalVideoFrameSource(BmsSupplementalVideoDecode
     }
 
     private double readTargetTime() => Interlocked.Read(ref targetTimeMilliseconds) / 1000.0;
-
-    private void fault(string? message)
-    {
-        BmsLogger.Log($"[BGA] Supplemental video path faulted: {message ?? "Supplemental video decoder failed."}");
-    }
 
     public void Dispose()
     {

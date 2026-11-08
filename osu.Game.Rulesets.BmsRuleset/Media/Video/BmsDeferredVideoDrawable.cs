@@ -42,7 +42,7 @@ internal sealed partial class BmsDeferredVideoDrawable : CompositeDrawable
         }
         finally
         {
-            // Provider-created drawables own their stream. A rejected request does not.
+            // The created drawable owns its stream; otherwise this loader must release it.
             if (!streamTransferred)
                 stream.Dispose();
         }

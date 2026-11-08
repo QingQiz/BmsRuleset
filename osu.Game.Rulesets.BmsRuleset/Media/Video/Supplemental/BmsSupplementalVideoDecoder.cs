@@ -34,9 +34,10 @@ internal sealed unsafe class BmsSupplementalVideoDecoder : IDisposable
     private bool disposed;
     private bool reachedInputEof;
     private bool sentDrainPacket;
-    private bool decoderFullyDrained;
     private double timeBaseInSeconds;
     private long streamStartTime;
+
+    public bool IsFullyDrained { get; private set; }
 
     private BmsSupplementalVideoDecoder(BmsSupplementalFFmpegFuncs ffmpeg, byte[] data, ArrayPool<Rgba32>? framePool = null)
     {
@@ -147,7 +148,7 @@ internal sealed unsafe class BmsSupplementalVideoDecoder : IDisposable
 
         ObjectDisposedException.ThrowIf(disposed, this);
 
-        if (decoderFullyDrained)
+        if (IsFullyDrained)
             return false;
 
         try
@@ -198,10 +199,6 @@ internal sealed unsafe class BmsSupplementalVideoDecoder : IDisposable
                         // FFmpeg can ask us to back off before accepting the packet, so the packet must stay intact for a retry.
                         if (tryReceiveDecodedFrame(decodedFrame, rgbaFrame, out frame, out error))
                             return true;
-
-                        if (error != null)
-                        {
-                        }
 
                         return false;
                     }
@@ -324,17 +321,10 @@ internal sealed unsafe class BmsSupplementalVideoDecoder : IDisposable
                 return false;
             }
 
-            sentDrainPacket = true;
+            sentDrainPacket = sendPacketResult != -BmsSupplementalFFmpegFuncs.EAGAIN;
         }
 
-        if (tryReceiveDecodedFrame(decodedFrame, rgbaFrame, out frame, out error))
-            return true;
-
-        if (error != null)
-            return false;
-
-        decoderFullyDrained = true;
-        return false;
+        return tryReceiveDecodedFrame(decodedFrame, rgbaFrame, out frame, out error);
     }
 
     private bool tryReceiveDecodedFrame(AVFrame* decodedFrame, AVFrame* rgbaFrame, [NotNullWhen(true)] out BmsSupplementalVideoFrame? frame, out string? error)
@@ -345,7 +335,13 @@ internal sealed unsafe class BmsSupplementalVideoDecoder : IDisposable
         while (true)
         {
             var receiveFrameResult = ffmpeg.avcodec_receive_frame(codecContext, decodedFrame);
-            if (receiveFrameResult == -BmsSupplementalFFmpegFuncs.EAGAIN || receiveFrameResult == BmsSupplementalFFmpegFuncs.AVERROR_EOF)
+            if (receiveFrameResult == BmsSupplementalFFmpegFuncs.AVERROR_EOF)
+            {
+                IsFullyDrained = true;
+                return false;
+            }
+
+            if (receiveFrameResult == -BmsSupplementalFFmpegFuncs.EAGAIN)
                 return false;
 
             if (receiveFrameResult < 0)

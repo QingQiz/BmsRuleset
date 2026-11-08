@@ -633,6 +633,25 @@ public class BmsBeatmapDecoderTest
     }
 
     [Test]
+    public void TestBgaCoincidentTimesKeepPlaybackSourceOrder()
+    {
+        var beatmap = (IBmsBeatmap)decode("""
+                                          #BPM 0.0000000001
+                                          #BPM01 100000000000000000000
+                                          #00108:01
+                                          #00104:0002
+                                          #00104:0100
+                                          #0010B:0080
+                                          #0010B:FF00
+                                          """);
+
+        Assert.That(beatmap.Bga.Events.Select(evt => evt.Time).Distinct().Count(), Is.EqualTo(1));
+        Assert.That(beatmap.Bga.Events.Select(evt => evt.DefinitionKey), Is.EqualTo(new ushort[] { 2, 1 }));
+        Assert.That(beatmap.Bga.OpacityEvents.Select(evt => evt.Time).Distinct().Count(), Is.EqualTo(1));
+        Assert.That(beatmap.Bga.OpacityEvents.Select(evt => evt.Opacity), Is.EqualTo(new[] { 128 / 255f, 1f }));
+    }
+
+    [Test]
     public void TestBgaOpacityChannelsAreParsedSeparatelyFromBitmapEvents()
     {
         var beatmap = (IBmsBeatmap)decode("""

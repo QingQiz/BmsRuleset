@@ -26,7 +26,7 @@ internal sealed class BmsBgaVideoPreloader : IDisposable
         if (warm.ContainsKey(path))
             return;
 
-        // Mirror the supplemental provider's probe: only warm files the supplemental backend can
+        // Mirror the factory's codec probe: only warm files the supplemental backend can
         // actually decode, so files routed to the framework/missing path are left for the factory.
         if (!BmsSupplementalVideoDecoder.TryCreate(bytes, out var decoder, out _))
             return;

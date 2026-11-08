@@ -11,7 +11,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Bga;
 [TestFixture]
 public class BmsBgaVideoFactoryTest
 {
-    // Routing is codec-driven, not extension-driven: the supplemental provider probes each
+    // Routing is codec-driven, not extension-driven: the supplemental backend probes each
     // file's video codec via the FFmpeg backend and claims only files whose codec the backend
     // ships a decoder for. wmv2 stays with the framework (it has a wmv2 decoder; the supplemental
     // build intentionally omits it), and .avi is split by codec (cinepak → supplemental, mpeg4 →
@@ -20,7 +20,7 @@ public class BmsBgaVideoFactoryTest
     private static string fixturePath(string name) =>
         Path.Combine(TestContext.CurrentContext.TestDirectory, "bga_fixtures", name);
 
-    private static string selectProviderName(string path)
+    private static string selectBackendName(string path)
     {
         using var stream = File.OpenRead(path);
         using var drawable = BmsBgaVideoFactory.Create(path, stream, new ManualFramedClock(), 0);
@@ -39,7 +39,7 @@ public class BmsBgaVideoFactoryTest
         if (!BmsSupplementalFFmpegFuncs.IsAvailable)
             Assert.Ignore("Supplemental FFmpeg backend is not embedded in this build.");
 
-        Assert.That(selectProviderName(fixturePath(fixture)), Is.EqualTo("supplemental-ffmpeg"));
+        Assert.That(selectBackendName(fixturePath(fixture)), Is.EqualTo("supplemental-ffmpeg"));
     }
 
     [TestCase("wmv1.wmv", Description = "WMV family the framework can't decode — claimed by codec probe, not extension")]
@@ -48,7 +48,7 @@ public class BmsBgaVideoFactoryTest
         if (!BmsSupplementalFFmpegFuncs.IsAvailable)
             Assert.Ignore("Supplemental FFmpeg backend is not embedded in this build.");
 
-        Assert.That(selectProviderName(fixturePath(fixture)), Is.EqualTo("supplemental-ffmpeg"));
+        Assert.That(selectBackendName(fixturePath(fixture)), Is.EqualTo("supplemental-ffmpeg"));
     }
 
     [TestCase("cinepak.avi", Description = ".avi is codec-ambiguous — cinepak goes to supplemental, not framework")]
@@ -57,7 +57,7 @@ public class BmsBgaVideoFactoryTest
         if (!BmsSupplementalFFmpegFuncs.IsAvailable)
             Assert.Ignore("Supplemental FFmpeg backend is not embedded in this build.");
 
-        Assert.That(selectProviderName(fixturePath(fixture)), Is.EqualTo("supplemental-ffmpeg"));
+        Assert.That(selectBackendName(fixturePath(fixture)), Is.EqualTo("supplemental-ffmpeg"));
     }
 
     [Test(Description = "wmv2: framework ships a decoder, so the supplemental probe must decline it")]
@@ -66,7 +66,7 @@ public class BmsBgaVideoFactoryTest
         if (!BmsSupplementalFFmpegFuncs.IsAvailable)
             Assert.Ignore("Supplemental FFmpeg backend is not embedded in this build.");
 
-        Assert.That(selectProviderName(fixturePath("wmv2.wmv")), Is.EqualTo("framework"));
+        Assert.That(selectBackendName(fixturePath("wmv2.wmv")), Is.EqualTo("framework"));
     }
 
     [TestCase("h264.mp4", Description = "Modern container the supplemental build can't demux — framework handles")]
@@ -75,7 +75,7 @@ public class BmsBgaVideoFactoryTest
     {
         // No IsAvailable gate: supplemental declines these by extension pre-filter (mp4) or by
         // probe (mpeg4 in avi) whether or not the backend is embedded, so framework always wins.
-        Assert.That(selectProviderName(fixturePath(fixture)), Is.EqualTo("framework"));
+        Assert.That(selectBackendName(fixturePath(fixture)), Is.EqualTo("framework"));
     }
 
     [Test(Description = "Without the native backend, supplemental declines and .mpg falls to missing (framework can't decode pure MPEG either)")]
@@ -84,6 +84,6 @@ public class BmsBgaVideoFactoryTest
         if (BmsSupplementalFFmpegFuncs.IsAvailable)
             Assert.Ignore("Supplemental FFmpeg backend is embedded in this build.");
 
-        Assert.That(selectProviderName(fixturePath("mpeg1.mpg")), Is.EqualTo("missing"));
+        Assert.That(selectBackendName(fixturePath("mpeg1.mpg")), Is.EqualTo("missing"));
     }
 }

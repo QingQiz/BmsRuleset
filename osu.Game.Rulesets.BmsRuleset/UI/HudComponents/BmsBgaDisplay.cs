@@ -78,8 +78,8 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
     private BmsBgaResourceStore? resources;
     private TextureStore? textures;
     private BmsBgaVideoPreloader? videoPreloader;
-    private BmsBgaEvent[] events = [];
-    private BmsBgaOpacityEvent[] opacityEvents = [];
+    private IReadOnlyList<BmsBgaEvent> events = [];
+    private IReadOnlyList<BmsBgaOpacityEvent> opacityEvents = [];
     private int nextEventIndex;
     private int nextOpacityEventIndex;
     private double lastTime = double.NegativeInfinity;
@@ -175,8 +175,8 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
         // normal frame-sized advances retain the ordered path below.
         // Sorted events let the first item beyond the budget prove a backlog without two binary searches per frame.
         if (time < lastTime
-            || (events.Length - nextEventIndex > maximum_incremental_events && events[nextEventIndex + maximum_incremental_events].Time <= time)
-            || (opacityEvents.Length - nextOpacityEventIndex > maximum_incremental_events && opacityEvents[nextOpacityEventIndex + maximum_incremental_events].Time <= time))
+            || (events.Count - nextEventIndex > maximum_incremental_events && events[nextEventIndex + maximum_incremental_events].Time <= time)
+            || (opacityEvents.Count - nextOpacityEventIndex > maximum_incremental_events && opacityEvents[nextOpacityEventIndex + maximum_incremental_events].Time <= time))
             rebuildStateAt(time);
 
         lastTime = time;
@@ -187,14 +187,14 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
             applyLayerVisibility();
         }
 
-        while (nextOpacityEventIndex < opacityEvents.Length && opacityEvents[nextOpacityEventIndex].Time <= time)
+        while (nextOpacityEventIndex < opacityEvents.Count && opacityEvents[nextOpacityEventIndex].Time <= time)
         {
             var evt = opacityEvents[nextOpacityEventIndex++];
             activeOpacityEvents[evt.Layer] = evt;
             applyLayerOpacity(evt.Layer);
         }
 
-        while (nextEventIndex < events.Length && events[nextEventIndex].Time <= time)
+        while (nextEventIndex < events.Count && events[nextEventIndex].Time <= time)
         {
             var evt = events[nextEventIndex++];
             activeEvents[evt.Layer] = evt;
@@ -230,10 +230,10 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
         applyLayerVisibility();
     }
 
-    private static int upperBound(BmsBgaEvent[] source, double time)
+    private static int upperBound(IReadOnlyList<BmsBgaEvent> source, double time)
     {
         var low = 0;
-        var high = source.Length;
+        var high = source.Count;
 
         while (low < high)
         {
@@ -247,10 +247,10 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
         return low;
     }
 
-    private static int upperBound(BmsBgaOpacityEvent[] source, double time)
+    private static int upperBound(IReadOnlyList<BmsBgaOpacityEvent> source, double time)
     {
         var low = 0;
-        var high = source.Length;
+        var high = source.Count;
 
         while (low < high)
         {
@@ -294,8 +294,8 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
         }
 
         bga = bmsBeatmap.Bga;
-        events = bga.Events.OrderBy(e => e.Time).ThenBy(e => e.Sequence).ToArray();
-        opacityEvents = bga.OpacityEvents.OrderBy(e => e.Time).ThenBy(e => e.Sequence).ToArray();
+        events = bga.Events;
+        opacityEvents = bga.OpacityEvents;
 
         if (bga.BitmapDefinitions.Count == 0)
         {

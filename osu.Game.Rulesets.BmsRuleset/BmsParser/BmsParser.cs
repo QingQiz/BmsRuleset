@@ -616,25 +616,26 @@ internal static partial class BmsChartParser
                 opacityEvents.Add(new BmsBgaOpacityEvent(timingMap.ProjectTickToTime(cell.Tick), cell.Tick, opacityLayer, parseHexByte(cell.Value) / 255f, cell.Sequence));
         }
 
+        // Displays consume this order directly; coincident times follow source order.
         events.Sort(static (a, b) =>
         {
             var cmp = a.Time.CompareTo(b.Time);
             if (cmp != 0) return cmp;
 
-            cmp = a.Tick.CompareTo(b.Tick);
+            cmp = a.Sequence.CompareTo(b.Sequence);
             if (cmp != 0) return cmp;
 
-            return a.Sequence.CompareTo(b.Sequence);
+            return a.Tick.CompareTo(b.Tick);
         });
         opacityEvents.Sort(static (a, b) =>
         {
             var cmp = a.Time.CompareTo(b.Time);
             if (cmp != 0) return cmp;
 
-            cmp = a.Tick.CompareTo(b.Tick);
+            cmp = a.Sequence.CompareTo(b.Sequence);
             if (cmp != 0) return cmp;
 
-            return a.Sequence.CompareTo(b.Sequence);
+            return a.Tick.CompareTo(b.Tick);
         });
 
         return new BmsBgaTimeline(
