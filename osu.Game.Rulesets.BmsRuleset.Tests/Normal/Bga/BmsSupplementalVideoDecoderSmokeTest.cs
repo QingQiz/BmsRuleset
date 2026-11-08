@@ -1,6 +1,7 @@
 #nullable enable annotations
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using NUnit.Framework;
@@ -63,6 +64,38 @@ public class BmsSupplementalVideoDecoderSmokeTest
         Assert.That(BmsSupplementalVideoDecoder.TryCreate([1, 2, 3, 4], out var decoder, out var error), Is.False);
         Assert.That(decoder, Is.Null);
         Assert.That(error, Is.Not.Empty);
+    }
+
+    [Test]
+    public void TestLocalVideoCompatibilityCorpus()
+    {
+        var manifest = Environment.GetEnvironmentVariable("BMS_BGA_CORPUS");
+        if (string.IsNullOrEmpty(manifest))
+            Assert.Ignore("Set BMS_BGA_CORPUS to a text file listing local video paths.");
+
+        requireNativeArtifacts();
+        var failures = new List<string>();
+        var count = 0;
+        foreach (var path in File.ReadLines(manifest!))
+        {
+            count++;
+            if (!BmsSupplementalVideoDecoder.TryCreate(File.ReadAllBytes(path), out var decoder, out var error))
+            {
+                failures.Add($"{path}: {error}");
+                continue;
+            }
+
+            using (decoder)
+            {
+                if (!decoder.TryDecodeNextFrame(out var frame, out error))
+                    failures.Add($"{path}: {error ?? "No decoded frame."}");
+                frame?.Dispose();
+            }
+        }
+
+        TestContext.Progress.WriteLine($"Decoded first frames from {count - failures.Count}/{count} local videos.");
+        Assert.That(count, Is.GreaterThan(0));
+        Assert.That(failures, Is.Empty);
     }
 
     [Test]

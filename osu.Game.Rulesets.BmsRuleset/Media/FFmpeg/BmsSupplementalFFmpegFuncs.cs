@@ -82,9 +82,7 @@ internal sealed unsafe class BmsSupplementalFFmpegFuncs
 
     // The native backend is one shared object per OS/arch, each embedded as a manifest resource
     // (the LogicalName in the .csproj must match). The loader picks the matching pair at runtime
-    // and declines — routing the file through the rest of the provider chain (framework, then
-    // missing-video) — on platforms without an embedded artifact, so a build that omits a
-    // platform simply doesn't support the supplemental backend there rather than crashing.
+    // and declines to the framework video decoder on platforms without an embedded artifact.
     private static readonly (string resource, string artifact) current_platform =
         OperatingSystem.IsWindows() ? ("bms-ffmpeg.win-x64.dll", "bms-ffmpeg.dll")
         : OperatingSystem.IsLinux() ? ("bms-ffmpeg.linux-x64.so", "bms-ffmpeg.so")
@@ -193,7 +191,7 @@ internal sealed unsafe class BmsSupplementalFFmpegFuncs
         sws_freeContext = getExport<SwsFreeContextDelegate>(ffmpeg, "sws_freeContext");
     }
 
-    // Cheap probe used by the provider to route videos without doing a native load on every lookup.
+    // Check packaging without doing a native load on every video lookup.
     public static bool IsAvailable
     {
         get

@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using osu.Framework.Graphics;
 using osu.Framework.Timing;
@@ -11,39 +10,12 @@ namespace osu.Game.Rulesets.BmsRuleset.Media.Video;
 
 internal static class BmsBgaVideoFactory
 {
-    // The framework lacks the demuxers for pure MPEG program/elementary streams.
-    private static readonly HashSet<string> legacy_mpeg_container_extensions = new(StringComparer.OrdinalIgnoreCase)
+    public static Drawable Create(Stream stream, IFrameBasedClock clock, double eventStartTime)
     {
-        ".mpg",
-        ".mpeg",
-        ".m1v",
-        ".m2v",
-    };
-
-    // WMV/ASF/AVI overlap with the framework; probing the codec gives the supplemental
-    // backend only the files it can decode, leaving the rest for the framework.
-    private static readonly HashSet<string> probeable_extensions = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ".mpg",
-        ".mpeg",
-        ".m1v",
-        ".m2v",
-        ".wmv",
-        ".asf",
-        ".avi",
-    };
-
-    public static Drawable? Create(string path, Stream stream, IFrameBasedClock clock, double eventStartTime)
-    {
-        var extension = Path.GetExtension(path);
-        if (tryCreateSupplemental(extension, stream, clock, eventStartTime) is { } supplemental)
+        // Packs often use a video suffix that does not match the container. Match the
+        // preloader's content probe so replaying a consumed warm source uses the same decoder.
+        if (tryCreateSupplemental(stream, clock, eventStartTime) is { } supplemental)
             return supplemental;
-
-        if (legacy_mpeg_container_extensions.Contains(extension))
-        {
-            BmsLogger.Log($"[BGA] No video backend accepted '{path}'.");
-            return null;
-        }
 
         return new FrameworkVideo(stream, startAtCurrentTime: false)
         {
@@ -57,9 +29,9 @@ internal static class BmsBgaVideoFactory
         };
     }
 
-    private static BmsSupplementalVideoDrawable? tryCreateSupplemental(string extension, Stream stream, IFrameBasedClock clock, double eventStartTime)
+    private static BmsSupplementalVideoDrawable? tryCreateSupplemental(Stream stream, IFrameBasedClock clock, double eventStartTime)
     {
-        if (!BmsSupplementalFFmpegFuncs.IsAvailable || !probeable_extensions.Contains(extension) || !stream.CanSeek)
+        if (!BmsSupplementalFFmpegFuncs.IsAvailable || !stream.CanSeek)
             return null;
 
         var position = stream.Position;

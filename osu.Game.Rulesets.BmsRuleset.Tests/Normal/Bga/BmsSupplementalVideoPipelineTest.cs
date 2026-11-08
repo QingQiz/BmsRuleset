@@ -87,7 +87,7 @@ public class BmsSupplementalVideoPipelineTest
         using var stream = new CountingCopyStream(bytes);
         stream.Position = stream.Length;
 
-        using var created = BmsBgaVideoFactory.Create("bga.mpg", stream, new ManualFramedClock(), 0);
+        using var created = BmsBgaVideoFactory.Create(stream, new ManualFramedClock(), 0);
         Assert.That(created, Is.TypeOf<BmsSupplementalVideoDrawable>());
         var drawable = (BmsSupplementalVideoDrawable)created!;
         Assert.That(stream.Position, Is.EqualTo(stream.Length));
@@ -112,20 +112,16 @@ public class BmsSupplementalVideoPipelineTest
         Assert.DoesNotThrow(source.Dispose);
     }
 
-    [TestCase("invalid.avi", true)]
-    [TestCase("invalid.mpg", false)]
-    public void TestRejectedCodecRestoresStreamBeforeFallback(string path, bool useFramework)
+    [Test]
+    public void TestRejectedCodecRestoresStreamBeforeFallback()
     {
         requireSupplementalNativeArtifacts();
         using var stream = new MemoryStream([1, 2, 3, 4]);
         stream.Position = 2;
 
-        using var drawable = BmsBgaVideoFactory.Create(path, stream, new ManualFramedClock(), 0);
+        using var drawable = BmsBgaVideoFactory.Create(stream, new ManualFramedClock(), 0);
 
-        if (useFramework)
-            Assert.That(drawable, Is.TypeOf<FrameworkVideo>());
-        else
-            Assert.That(drawable, Is.Null);
+        Assert.That(drawable, Is.TypeOf<FrameworkVideo>());
         Assert.That(stream.Position, Is.EqualTo(2));
         Assert.That(stream.ReadByte(), Is.EqualTo(3));
     }

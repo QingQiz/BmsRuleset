@@ -484,6 +484,12 @@ internal sealed unsafe class BmsSupplementalVideoDecoder : IDisposable
 
     private AVCodec* findDecoder(AVCodecID codecId)
     {
+        // Framework hardware decoding already handles H.264 in AVI/ASF/MP4. Keep only
+        // MPEG containers and elementary streams here, where its demuxers are missing.
+        if (codecId == AVCodecID.AV_CODEC_ID_H264
+            && Marshal.PtrToStringAnsi((IntPtr)formatContext->iformat->name) is not ("mpeg" or "h264"))
+            return null;
+
         void* iterator = null;
 
         while (true)

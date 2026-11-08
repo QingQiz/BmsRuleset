@@ -9,6 +9,7 @@ pushd "$(dirname "$0")" > /dev/null
 SCRIPT_PATH=$(pwd)
 popd > /dev/null
 source "$SCRIPT_PATH/common.sh"
+cd "$SCRIPT_PATH"
 
 # win-x64 only — the loader's IsAvailable gate declines every other target.
 cross_prefix='x86_64-w64-mingw32-'

@@ -11,6 +11,7 @@ pushd "$(dirname "$0")" > /dev/null
 SCRIPT_PATH=$(pwd)
 popd > /dev/null
 source "$SCRIPT_PATH/common.sh"
+cd "$SCRIPT_PATH"
 
 # osx/x86_64 only — the loader's IsAvailable gate declines every other target.
 # osxcross installs wrappers as <target>/bin/x86_64-apple-darwinNN-clang; the

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using System.Threading.Tasks;
@@ -12,9 +13,11 @@ using osu.Framework.Graphics.Textures;
 using osu.Framework.IO.Stores;
 using osu.Framework.Timing;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
+using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Media.Video.Supplemental;
 using osu.Game.Rulesets.BmsRuleset.Media.FFmpeg;
+using osu.Game.Rulesets.BmsRuleset.Media.Video;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 using osu.Game.Skinning;
@@ -344,6 +347,44 @@ public class BmsBgaDisplaySizingTest
             using var stream = invokeGetStream(store, "movie.dat");
 
             Assert.That(stream.ReadByte(), Is.EqualTo(3));
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [TestCase("m1v", null)]
+    [TestCase("m2v", null)]
+    [TestCase("m4v", null)]
+    [TestCase("wma", null)]
+    [TestCase("M1V", null)]
+    [TestCase("mpg", "placeholder.png")]
+    [TestCase("avi", "placeholder.bmp")]
+    [TestCase("wmv", "placeholder.jpg")]
+    public void TestBgaContentSelectsVideoOrImageLoading(string extension, string fixture)
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"{nameof(BmsBgaDisplaySizingTest)}-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+
+        try
+        {
+            var path = $"movie.{extension}";
+            File.WriteAllBytes(Path.Combine(directory, path), fixture == null
+                ? [1]
+                : File.ReadAllBytes(Path.Combine(TestContext.CurrentContext.TestDirectory, "bga_fixtures", fixture)));
+            using var resources = new BmsBgaDisplay.BmsBgaResourceStore(directory, null);
+            using var display = new BmsBgaDisplay();
+            using var textures = new TextureStore(new DummyRenderer(), new TextureLoaderStore(resources));
+            var fields = BindingFlags.NonPublic | BindingFlags.Instance;
+            typeof(BmsBgaDisplay).GetField("resources", fields)!.SetValue(display, resources);
+            typeof(BmsBgaDisplay).GetField("textures", fields)!.SetValue(display, textures);
+            typeof(BmsBgaDisplay).GetField("bga", fields)!.SetValue(display,
+                new BmsBgaTimeline(new Dictionary<ushort, string> { [1] = path }, new Dictionary<ushort, BmsBgaDefinition>(), [], [], BmsPoorBgaMode.Replace));
+
+            var create = typeof(BmsBgaDisplay).GetMethod("createDrawable", fields)!;
+            using var drawable = (Drawable)create.Invoke(display, [new BmsBgaEvent(0, 0, 1, BmsBgaLayer.Base, 0)])!;
+            Assert.That(drawable, Is.TypeOf(fixture == null ? typeof(BmsDeferredVideoDrawable) : typeof(Sprite)));
         }
         finally
         {

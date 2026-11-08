@@ -47,6 +47,10 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
         ".mpeg",
         ".mpg",
         ".wmv",
+        ".m1v",
+        ".m2v",
+        ".m4v",
+        ".wma",
     ];
 
     private static readonly string[] image_resource_extensions =
@@ -691,7 +695,7 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
 
         // Opening and probing a video can involve file IO and codec initialisation. Defer both to
         // the drawable loading pathway because this method is reached from Update().
-        return new BmsDeferredVideoDrawable(path, () => resourceStore.GetStream(path), clock, eventStartTime)
+        return new BmsDeferredVideoDrawable(() => resourceStore.GetStream(path), clock, eventStartTime)
         {
             Anchor = Anchor.Centre,
             Origin = Anchor.Centre,
@@ -700,7 +704,18 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
         };
     }
 
-    private static bool isVideo(string path) => video_extensions.Contains(Path.GetExtension(path));
+    private bool isVideo(string path)
+    {
+        if (!video_extensions.Contains(Path.GetExtension(path)))
+            return false;
+
+        // Some packs replace the movie with a PNG/BMP/JPEG placeholder but keep its video suffix.
+        // Resource bytes are already cached, so these files can use the normal image loader.
+        var bytes = resources?.Get(path);
+        return bytes == null || !(bytes.AsSpan().StartsWith((ReadOnlySpan<byte>)[137, 80, 78, 71, 13, 10, 26, 10])
+                                  || bytes.AsSpan().StartsWith("BM"u8)
+                                  || bytes.AsSpan().StartsWith((ReadOnlySpan<byte>)[255, 216, 255]));
+    }
 
     private void onNewJudgement(JudgementResult result)
     {
