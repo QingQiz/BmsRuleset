@@ -159,9 +159,9 @@ public class BmsWorkingBeatmap : WorkingBeatmap
                 continue;
 
             if (hit.SampleKey is { } sampleKey)
-                allEvents.Add(new BmsPreviewSampleEvent(new BmsSampleEvent(hit.StartTime, 0, sampleKey, hit.SampleVolume), false));
+                allEvents.Add(new BmsPreviewSampleEvent(new BmsSampleEvent(hit.StartTime, sampleKey, hit.SampleVolume), false));
             if (hit is BmsLongNote { TailSampleKey: { } tailSampleKey } ln)
-                allEvents.Add(new BmsPreviewSampleEvent(new BmsSampleEvent(hit.StartTime + ln.Duration, 0, tailSampleKey, ln.TailSampleVolume), false));
+                allEvents.Add(new BmsPreviewSampleEvent(new BmsSampleEvent(hit.StartTime + ln.Duration, tailSampleKey, ln.TailSampleVolume), false));
         }
 
         allEvents.Sort(static (a, b) => a.Event.Time.CompareTo(b.Event.Time));

@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -98,7 +99,17 @@ public static partial class BmsTestBeatmaps
         beatmap.HitObjects.Add(new BmsLandmine { StartTime = FIRST_NOTE_TIME + 9500, Column = 0, LandmineDamagePercent = 2.5 });
         beatmap.HitObjects.Add(new BmsLandmine { StartTime = FIRST_NOTE_TIME + 11000, Column = 7, LandmineDamagePercent = 2.5 });
 
+        beatmap.TimingMap = createTimingMap(beatmap.HitObjects.Max(note => note.GetEndTime()), 130);
         return beatmap;
+    }
+
+    private static BmsTimingMap createTimingMap(double endTime, double bpm)
+    {
+        const int tick_resolution = 192;
+        var measureCount = (int)Math.Floor(Math.Max(0, endTime) / (240000 / bpm)) + 2;
+        return new BmsTimingMap(tick_resolution,
+            Enumerable.Range(0, measureCount).Select(index => new BmsMeasureInfo(index, (long)index * tick_resolution, tick_resolution, 1)),
+            [new BmsBpmEvent(0, bpm, 0)], [], [], []);
     }
 
     /// <summary>
@@ -135,5 +146,6 @@ public static partial class BmsTestBeatmaps
         beatmap.BeatmapInfo.Difficulty.DrainRate = drainRate;
         beatmap.BeatmapInfo.BPM = bpm;
         beatmap.BeatmapInfo.Length = (int)(beatmap.HitObjects.Max(h => h.GetEndTime()) + endPadding);
+        beatmap.TimingMap ??= createTimingMap(beatmap.BeatmapInfo.Length, bpm);
     }
 }

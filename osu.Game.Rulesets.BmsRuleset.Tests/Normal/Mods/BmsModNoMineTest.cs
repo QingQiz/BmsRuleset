@@ -22,12 +22,13 @@ public class BmsModNoMineTest
         {
             TotalColumns = 16,
             LayoutVariant = BmsLayoutVariant.Bme7KDouble,
+            TimingMap = BmsChartParser.Parse([]).TimingMap,
             HitObjects =
             [
                 new BmsNote { StartTime = 1000, Column = 0, SampleKey = 1 },
                 new BmsLongNote { StartTime = 2000, Column = 9, Duration = 500, SampleKey = 2, TailSampleKey = 3 },
             ],
-            BackgroundSampleEvents = [new BmsSampleEvent(500, 0, 4, 80)],
+            BackgroundSampleEvents = [new BmsSampleEvent(500, 4, 80)],
         };
 
         for (var column = 0; column < beatmap.TotalColumns; column++)

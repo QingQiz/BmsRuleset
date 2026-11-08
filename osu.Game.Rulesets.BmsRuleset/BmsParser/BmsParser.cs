@@ -119,7 +119,6 @@ internal static partial class BmsChartParser
             state.PlayLevel,
             state.Rank,
             state.Total,
-            tickResolution,
             timingMap,
             layoutVariant,
             totalColumns,
@@ -579,7 +578,7 @@ internal static partial class BmsChartParser
                 if (value == 0) continue; // 0 = "00"
 
                 var tick = mStart + mLength * i / pairCount;
-                output.Add(new BmsSampleEvent(timingMap.ProjectTickToTime(tick), tick, value, state.WavVolume));
+                output.Add(new BmsSampleEvent(timingMap.ProjectTickToTime(tick), value, state.WavVolume));
             }
         }
     }
@@ -591,7 +590,7 @@ internal static partial class BmsChartParser
             return;
 
         sampleDefinitions[midi_file_sample_key] = state.MidiFile;
-        output.Add(new BmsSampleEvent(0, 0, midi_file_sample_key, 100));
+        output.Add(new BmsSampleEvent(0, midi_file_sample_key, 100));
     }
 
     private static BmsBgaTimeline collectBga(ParseState state, IReadOnlyDictionary<int, long> measureStarts, BmsTimingMap timingMap)
@@ -657,7 +656,7 @@ internal static partial class BmsChartParser
             foreach (var cell in expandCells(line, measureStarts, false, state.UseBase62))
             {
                 if (state.TextDefinitions.TryGetValue(cell.Value, out var text))
-                    events.Add(new BmsTextEvent(timingMap.ProjectTickToTime(cell.Tick), cell.Tick, text));
+                    events.Add(new BmsTextEvent(timingMap.ProjectTickToTime(cell.Tick), text));
             }
         }
 
@@ -1171,7 +1170,6 @@ internal static partial class BmsChartParser
             startTime,
             Math.Max(0, endTime - startTime),
             start.Column,
-            start.Channel,
             start.Value,
             isLongNote,
             false,
@@ -1190,7 +1188,6 @@ internal static partial class BmsChartParser
             startTime,
             0,
             mine.Column,
-            mine.Channel,
             0,
             false,
             true,

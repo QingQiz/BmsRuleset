@@ -58,7 +58,6 @@ public class BmsBeatmapDecoder(Func<int, int>? randomValueSelector = null, BmsRe
 
         hitObject.StartTime = parsedObject.StartTime;
         hitObject.Column = parsedObject.Column;
-        hitObject.SourceChannel = parsedObject.SourceChannel;
         hitObject.SampleKey = parsedObject.SampleKey;
         hitObject.SampleVolume = parsedObject.SampleVolume;
         hitObject.JudgementRate = parsedObject.JudgementRate;

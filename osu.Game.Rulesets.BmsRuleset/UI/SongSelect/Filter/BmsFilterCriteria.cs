@@ -120,9 +120,9 @@ public class BmsFilterCriteria : IRulesetFilterCriteria
 
     internal static BmsLayoutVariant GetVariant(BeatmapInfo beatmapInfo)
     {
-        var foreignConverter = BmsForeignBeatmapConverterRegistry.FindConverter(beatmapInfo);
-        var keyCount = foreignConverter?.GetConvertedDifficultyInfo(beatmapInfo).KeyCount
-                       ?? BmsDifficultyInfo.GetKeyCount(beatmapInfo.Difficulty);
+        var keyCount = Mania7KBeatmapConverter.CanConvert(beatmapInfo)
+            ? Mania7KBeatmapConverter.GetConvertedDifficultyInfo(beatmapInfo).KeyCount
+            : BmsDifficultyInfo.GetKeyCount(beatmapInfo.Difficulty);
 
         return variantFromColumns(keyCount);
     }

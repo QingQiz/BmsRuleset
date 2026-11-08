@@ -46,7 +46,6 @@ using osu.Game.Overlays;
 using osu.Game.Overlays.Mods;
 using osu.Game.Overlays.Volume;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
-using osu.Game.Rulesets.BmsRuleset.Beatmaps.Conversion;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.DifficultyTable;
 using osu.Game.Rulesets.BmsRuleset.UI.Result;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Components;
@@ -777,7 +776,7 @@ public abstract partial class BmsSongSelect : ScreenWithBeatmapBackground, IKeyB
 
     private bool checkBeatmapValidForSelection(BeatmapInfo beatmap)
     {
-        if (!BmsForeignBeatmapConverterRegistry.AllowsGameplay(beatmap, Ruleset.Value, showConvertedBeatmaps.Value))
+        if (!BmsBeatmapConverter.AllowsGameplay(beatmap, Ruleset.Value, showConvertedBeatmaps.Value))
             return false;
 
         if (beatmap.Hidden)

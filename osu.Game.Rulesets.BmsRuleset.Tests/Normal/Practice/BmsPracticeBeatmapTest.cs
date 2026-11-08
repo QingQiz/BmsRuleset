@@ -270,7 +270,7 @@ public class BmsPracticeBeatmapTest
     {
         var hold = new BmsLongNote
         {
-            StartTime = 1000, Duration = 500, Column = 2, SourceChannel = 51,
+            StartTime = 1000, Duration = 500, Column = 2,
             SampleKey = 1, SampleVolume = 70, TailSampleKey = 2, TailSampleVolume = 60,
             ScrollPositionAtStartTime = 123, ScrollPositionAtEndTime = 456, VisualScrollPositionAtEndTime = 789,
             JudgementRate = 0.8, Samples = [new HitSampleInfo(HitSampleInfo.HIT_NORMAL)],
@@ -280,7 +280,7 @@ public class BmsPracticeBeatmapTest
         var clone = (BmsLongNote)practice.HitObjects.Single();
 
         Assert.That(clone.Beatmap, Is.SameAs(practice));
-        Assert.That(clone.SourceChannel, Is.EqualTo(hold.SourceChannel));
+        Assert.That(clone.Column, Is.EqualTo(hold.Column));
         Assert.That(clone.SampleKey, Is.EqualTo(hold.SampleKey));
         Assert.That(clone.SampleVolume, Is.EqualTo(hold.SampleVolume));
         Assert.That(clone.TailSampleKey, Is.EqualTo(hold.TailSampleKey));
@@ -339,7 +339,13 @@ public class BmsPracticeBeatmapTest
 
     private static BmsBeatmap createBeatmap(params BmsHitObject[] notes)
     {
-        var beatmap = new BmsBeatmap { TotalColumns = 8, LayoutVariant = BmsLayoutVariant.Bme7K, HitObjects = [.. notes] };
+        var beatmap = new BmsBeatmap
+        {
+            TotalColumns = 8,
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            TimingMap = new BmsTimingMap(192, [], [new(0, 130, 0)], []),
+            HitObjects = [.. notes],
+        };
         foreach (var note in notes)
             note.Beatmap = beatmap;
         return beatmap;

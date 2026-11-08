@@ -10,34 +10,23 @@ using osu.Game.Rulesets.Objects.Types;
 
 namespace osu.Game.Rulesets.BmsRuleset.Beatmaps.Conversion;
 
-internal sealed class Mania7KBeatmapConverter : IBmsForeignBeatmapConverter
+internal static class Mania7KBeatmapConverter
 {
     private const int ruleset_online_id = 3;
     private const int key_count = 7;
     private const int normal_rank = 2;
 
-    private static readonly ushort[] source_channels =
-    [
-        BmsChartParser.Enc("11"),
-        BmsChartParser.Enc("12"),
-        BmsChartParser.Enc("13"),
-        BmsChartParser.Enc("14"),
-        BmsChartParser.Enc("15"),
-        BmsChartParser.Enc("18"),
-        BmsChartParser.Enc("19"),
-    ];
-
-    public bool CanConvert(IBeatmapInfo beatmapInfo) =>
+    public static bool CanConvert(IBeatmapInfo beatmapInfo) =>
         beatmapInfo.Ruleset.OnlineID == ruleset_online_id
         && (int)Math.Round(beatmapInfo.Difficulty.CircleSize) == key_count;
 
-    public BmsDifficultyInfo GetConvertedDifficultyInfo(IBeatmapInfo beatmapInfo) =>
+    public static BmsDifficultyInfo GetConvertedDifficultyInfo(IBeatmapInfo beatmapInfo) =>
         createDifficultyInfo(beatmapInfo.TotalObjectCount);
 
-    public bool CanConvert(IBeatmap beatmap) =>
+    public static bool CanConvert(IBeatmap beatmap) =>
         CanConvert(beatmap.BeatmapInfo) && beatmap.HitObjects.All(isConvertibleHitObject);
 
-    public void Convert(IBeatmap source, BmsBeatmap target, CancellationToken cancellationToken)
+    public static void Convert(IBeatmap source, BmsBeatmap target, CancellationToken cancellationToken)
     {
         // BME 7K reserves column zero for scratch, while mania's seven lanes map to columns 1-7.
         var difficulty = createDifficultyInfo(source.HitObjects.Count);
@@ -78,7 +67,6 @@ internal sealed class Mania7KBeatmapConverter : IBmsForeignBeatmapConverter
 
         converted.StartTime = original.StartTime;
         converted.Column = maniaColumn + 1;
-        converted.SourceChannel = source_channels[maniaColumn];
         converted.Samples = original.Samples.ToList();
         return converted;
     }

@@ -311,7 +311,7 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
             var beatmap = new BmsBeatmap
             {
                 SampleDefinitions = new Dictionary<ushort, string> { [1] = "bgm.wav" },
-                BackgroundSampleEvents = [new BmsSampleEvent(0, 0, 1, 100)],
+                BackgroundSampleEvents = [new BmsSampleEvent(0, 1, 100)],
             };
 
             var working = new BmsWorkingBeatmap(new StubWorkingBeatmap(audio, beatmap, directory), audio);
@@ -400,7 +400,7 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
                 },
                 BackgroundSampleEvents =
                 [
-                    new BmsSampleEvent(0, 0, 1, 100),
+                    new BmsSampleEvent(0, 1, 100),
                 ],
             };
 

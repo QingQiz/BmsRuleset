@@ -1,5 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using osu.Game.Beatmaps;
@@ -33,13 +33,20 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
 
     public override bool CanConvert()
     {
-        if (Beatmap is IBmsBeatmap or BmsDecodedBeatmap { RawLines.Length: > 0 })
+        if (Beatmap is IBmsBeatmap)
             return true;
 
-        if (Beatmap.HitObjects.Count > 0 && Beatmap.HitObjects.All(h => h is BmsHitObject))
+        return Mania7KBeatmapConverter.CanConvert(Beatmap);
+    }
+
+    internal static bool AllowsGameplay(IBeatmapInfo source, RulesetInfo targetRuleset, bool allowConversion)
+    {
+        if (source.AllowGameplayWithRuleset(targetRuleset, allowConversion))
             return true;
 
-        return BmsForeignBeatmapConverterRegistry.FindConverter(Beatmap) != null;
+        return allowConversion
+               && targetRuleset.ShortName == Constant.SHORT_NAME
+               && Mania7KBeatmapConverter.CanConvert(source);
     }
 
     protected override Beatmap<BmsHitObject> CreateBeatmap() => new BmsBeatmap();
@@ -47,19 +54,13 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
     protected override Beatmap<BmsHitObject> ConvertBeatmap(IBeatmap original, CancellationToken cancellationToken)
     {
         var converted = convertToBmsBeatmap(original, cancellationToken);
-        var hasBmsData = original is IBmsBeatmap;
-        converted.TimingMap ??= createFallbackTimingMap(converted);
-        converted.TickResolution = converted.TimingMap.TickResolution;
+        if (converted.TimingMap is not { TickResolution: > 0, BpmEvents.Count: > 0 }
+            || converted.TotalColumns != BmsLayout.GetTotalColumns(converted.LayoutVariant))
+            throw new InvalidDataException("BMS conversion requires a complete timing map and layout.");
 
         // Precompute scroll positions once per hitobject to eliminate per-frame
         // GetScrollPositionAtTime calls in the DrawableBmsHitObject hot path.
         precomputeScrollPositions(converted);
-
-        if (converted.TotalColumns <= 0)
-        {
-            converted.TotalColumns = inferTotalColumns(original, converted.HitObjects);
-            converted.LayoutVariant = BmsLayout.VariantFromTotalColumns(converted.TotalColumns);
-        }
 
         new BmsDifficultyInfo
         {
@@ -69,9 +70,6 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
             KeyCount = converted.TotalColumns,
             LockedLongNoteMode = converted.LockedLongNoteMode,
         }.WriteToOsuDifficulty(converted);
-
-        if (!hasBmsData)
-            remapColumns(converted);
 
         foreach (var note in converted.HitObjects)
         {
@@ -83,75 +81,6 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
         return converted;
     }
 
-    private static int inferTotalColumns(IBeatmap original, IReadOnlyList<BmsHitObject> hitObjects)
-    {
-        if (original is BmsBeatmap { TotalColumns: > 0 } bmsBeatmap)
-            return bmsBeatmap.TotalColumns;
-
-        var inferred = BmsLayout.InferTotalColumns(hitObjects.Select(h => h.SourceChannel), original.BeatmapInfo.Path);
-
-        if (inferred > 0)
-        {
-            // Source-channel inference defaults to 6 (Bms5K) when channels are empty
-            // or don't match any known layout. If notes reference columns beyond that,
-            // use the max-column-based count so TotalColumns stays consistent with
-            // the actual note data.
-            if (hitObjects.Count > 0)
-            {
-                var maxColumn = hitObjects.Max(h => h.Column);
-                if (maxColumn >= inferred)
-                    inferred = maxColumn + 1;
-            }
-
-            // Use the inferred result only when it exceeds the explicit CS (CircleSize)
-            // config. CS is the chart author's intended column count — inference from
-            // visible channels should only override it when the chart uses more columns
-            // than CS declares (e.g. extended-play layouts).
-            var csKeyCount = BmsDifficultyInfo.GetKeyCount(original.Difficulty);
-            if (inferred > csKeyCount)
-                return inferred;
-
-            return BmsLayout.IsKnownTotalColumns(csKeyCount) ? csKeyCount : inferred;
-        }
-
-        var metadataKeyCount = BmsDifficultyInfo.GetKeyCount(original.Difficulty);
-
-        if (BmsLayout.IsKnownTotalColumns(metadataKeyCount))
-            return metadataKeyCount;
-
-        return Math.Max(BmsLayout.BMS5_KEY_COLUMNS, hitObjects.Count == 0 ? 0 : hitObjects.Max(h => h.Column) + 1);
-    }
-
-    private static void remapColumns(BmsBeatmap beatmap)
-    {
-        foreach (var hitObject in beatmap.HitObjects)
-        {
-            if (BmsLayout.TryMapPlayableChannel(hitObject.SourceChannel, beatmap.TotalColumns, out var column))
-                hitObject.Column = column;
-        }
-    }
-
-    private static BmsTimingMap createFallbackTimingMap(BmsBeatmap beatmap)
-    {
-        const double fallback_bpm = 130;
-
-        var tickResolution = beatmap.TickResolution;
-        var endTime = beatmap.HitObjects.Count == 0 ? 0 : beatmap.HitObjects.Max(h => h.GetEndTime());
-        var endTick = (long)Math.Ceiling(Math.Max(0, endTime) * fallback_bpm * tickResolution / (60000 * 4));
-        var measureCount = Math.Max(1, (int)(endTick / tickResolution) + 1);
-
-        var measures = Enumerable.Range(0, measureCount + 1)
-            .Select(i => new BmsMeasureInfo(i, (long)i * tickResolution, tickResolution, 1));
-
-        return new BmsTimingMap(
-            tickResolution,
-            measures,
-            [new BmsBpmEvent(0, fallback_bpm, 0)],
-            [],
-            [],
-            []);
-    }
-
     /// <summary>
     ///     Precomputes <see cref="BmsHitObject.ScrollPositionAtStartTime"/> and
     ///     <see cref="BmsLongNote.ScrollPositionAtEndTime"/> for every hitobject.
@@ -161,8 +90,7 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
     /// </summary>
     private static void precomputeScrollPositions(BmsBeatmap beatmap)
     {
-        var timingMap = beatmap.TimingMap;
-        if (timingMap == null) return;
+        var timingMap = beatmap.TimingMap!;
 
         foreach (var hitObject in beatmap.HitObjects.Concat(beatmap.InvisibleNotes))
         {
@@ -202,13 +130,12 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
             return converted;
         }
 
-        var foreignConverter = BmsForeignBeatmapConverterRegistry.FindConverter(original);
-
-        if (foreignConverter != null)
-            foreignConverter.Convert(original, converted, cancellationToken);
-        else
+        if (Mania7KBeatmapConverter.CanConvert(original))
+            Mania7KBeatmapConverter.Convert(original, converted, cancellationToken);
+        else if (original is IBmsBeatmap bmsSource)
         {
-            foreach (var note in original.HitObjects.OfType<BmsHitObject>())
+            converted.CopyBmsDataFrom(bmsSource);
+            foreach (var note in original.HitObjects.Cast<BmsHitObject>())
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 // The source can also back previews and later attempts, so only modify clones.
@@ -216,9 +143,13 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
                 converted.HitObjects.Add(clone);
             }
         }
-
-        if (original is IBmsBeatmap bmsSource)
-            converted.CopyBmsDataFrom(bmsSource);
+        else if (original.HitObjects.Count == 0)
+        {
+            // Framework placeholders bypass CanConvert(); use the native parser's empty-chart defaults.
+            converted.CopyFrom(BmsChartParser.Parse([], original.BeatmapInfo.Path));
+        }
+        else
+            throw new InvalidDataException("Only native BMS beatmaps and supported mania 7K beatmaps can be converted.");
 
         converted.HitObjects = converted.HitObjects.OrderBy(h => h.StartTime).ToList();
         cancellationToken.ThrowIfCancellationRequested();

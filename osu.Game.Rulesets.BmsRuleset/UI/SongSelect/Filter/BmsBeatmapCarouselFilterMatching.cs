@@ -5,7 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics.Carousel;
-using osu.Game.Rulesets.BmsRuleset.Beatmaps.Conversion;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Screens.Select;
 using osu.Game.Utils;
 
@@ -39,7 +39,7 @@ internal sealed class BmsBeatmapCarouselFilterMatching(Func<FilterCriteria> getC
     internal static bool Matches(BeatmapInfo beatmap, FilterCriteria criteria)
     {
         var match = criteria.Ruleset == null
-                    || BmsForeignBeatmapConverterRegistry.AllowsGameplay(beatmap, criteria.Ruleset, criteria.AllowConvertedBeatmaps);
+                    || BmsBeatmapConverter.AllowsGameplay(beatmap, criteria.Ruleset, criteria.AllowConvertedBeatmaps);
 
         if (criteria.SelectedBeatmapSet != null)
             return beatmap.BeatmapSet?.Equals(criteria.SelectedBeatmapSet) == true && match;

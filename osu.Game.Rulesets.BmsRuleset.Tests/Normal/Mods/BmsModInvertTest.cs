@@ -45,7 +45,6 @@ public class BmsModInvertTest
                 StartTime = 1000,
                 Duration = 500,
                 Column = 1,
-                SourceChannel = 0x11,
                 SampleKey = 12,
                 SampleVolume = 75,
                 TailSampleKey = 34,
@@ -61,7 +60,7 @@ public class BmsModInvertTest
         {
             Assert.That(inverted!.StartTime, Is.EqualTo(1000));
             Assert.That(inverted.Duration, Is.EqualTo(875));
-            Assert.That(inverted.SourceChannel, Is.EqualTo(0x11));
+            Assert.That(inverted.Column, Is.EqualTo(1));
             Assert.That(inverted.SampleKey, Is.EqualTo(12));
             Assert.That(inverted.SampleVolume, Is.EqualTo(75));
             Assert.That(inverted.TailSampleKey, Is.Null);
@@ -82,7 +81,6 @@ public class BmsModInvertTest
                 StartTime = 2000,
                 Duration = 500,
                 Column = 1,
-                SourceChannel = 0x51,
                 SampleKey = 12,
                 SampleVolume = 75,
                 TailSampleKey = 34,
@@ -96,7 +94,7 @@ public class BmsModInvertTest
         Assert.Multiple(() =>
         {
             Assert.That(last!.StartTime, Is.EqualTo(2000));
-            Assert.That(last.SourceChannel, Is.EqualTo(0x51));
+            Assert.That(last.Column, Is.EqualTo(1));
             Assert.That(last.SampleKey, Is.EqualTo(12));
             Assert.That(last.SampleVolume, Is.EqualTo(75));
             Assert.That(beatmap.BackgroundSampleEvents, Has.Count.EqualTo(1));

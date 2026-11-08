@@ -55,7 +55,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
 
             track = new BmsEventPreviewTrack(
                 _ => BmsEventPreviewTimeline.Create(
-                    () => [new BmsPreviewSampleEvent(new BmsSampleEvent(0, 0, 1, 100), false)],
+                    () => [new BmsPreviewSampleEvent(new BmsSampleEvent(0, 1, 100), false)],
                     new Dictionary<ushort, string> { [1] = "test.wav" }),
                 directory,
                 audio);
@@ -86,7 +86,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
                     () =>
                     {
                         timelineGate.Wait();
-                        return [new BmsPreviewSampleEvent(new BmsSampleEvent(0, 0, 1, 100), false)];
+                        return [new BmsPreviewSampleEvent(new BmsSampleEvent(0, 1, 100), false)];
                     },
                     new Dictionary<ushort, string> { [1] = "test.wav" }),
                 directory,
@@ -123,7 +123,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
                     () =>
                     {
                         timelineGate.Wait();
-                        return [new BmsPreviewSampleEvent(new BmsSampleEvent(0, 0, 1, 100), false)];
+                        return [new BmsPreviewSampleEvent(new BmsSampleEvent(0, 1, 100), false)];
                     },
                     new Dictionary<ushort, string> { [1] = "test.wav" }),
                 directory,
@@ -157,7 +157,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
             writePcmWave(Path.Combine(directory, "test.wav"), TimeSpan.FromSeconds(1));
 
             var events = Enumerable.Range(1, 18)
-                .Select(key => new BmsSampleEvent(0, 0, (ushort)key, 100))
+                .Select(key => new BmsSampleEvent(0, (ushort)key, 100))
                 .ToArray();
             var definitions = Enumerable.Range(1, 18).ToDictionary(key => (ushort)key, _ => "test.wav");
 
@@ -229,9 +229,9 @@ public partial class BmsPreviewTrackTest : OsuTestScene
                 _ => BmsEventPreviewTimeline.Create(
                     () =>
                     [
-                        new BmsPreviewSampleEvent(new BmsSampleEvent(0, 0, 1, 100), false),
-                        new BmsPreviewSampleEvent(new BmsSampleEvent(10_000, 0, 2, 100), false),
-                        new BmsPreviewSampleEvent(new BmsSampleEvent(10_001, 0, 3, 100), false),
+                        new BmsPreviewSampleEvent(new BmsSampleEvent(0, 1, 100), false),
+                        new BmsPreviewSampleEvent(new BmsSampleEvent(10_000, 2, 100), false),
+                        new BmsPreviewSampleEvent(new BmsSampleEvent(10_001, 3, 100), false),
                     ],
                     new Dictionary<ushort, string>
                     {
@@ -289,7 +289,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
             writePcmWave(Path.Combine(directory, "test.wav"), TimeSpan.FromSeconds(1));
 
             track = createTrack(
-                [new BmsSampleEvent(2000, 0, 1, 100)],
+                [new BmsSampleEvent(2000, 1, 100)],
                 new Dictionary<ushort, string> { [1] = "test.wav" },
                 directory);
 
@@ -342,7 +342,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
             writePcmWave(Path.Combine(directory, "bgm.wav"), TimeSpan.FromSeconds(6));
 
             track = createTrack(
-                [new BmsSampleEvent(0, 0, 1, 100)],
+                [new BmsSampleEvent(0, 1, 100)],
                 new Dictionary<ushort, string> { [1] = "bgm.wav" },
                 directory);
 
@@ -491,7 +491,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
             Assert.That(File.Exists(Path.Combine(directory, "Track_01_001.wav")), Is.False);
 
             track = createTrack(
-                [new BmsSampleEvent(0, 0, 1, 100)],
+                [new BmsSampleEvent(0, 1, 100)],
                 new Dictionary<ushort, string> { [1] = "Track_01_001.wav" },
                 directory);
             audio.AddItem(track);
@@ -561,7 +561,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
                     () =>
                     {
                         eventFactoryInvoked = true;
-                        return [new BmsPreviewSampleEvent(new BmsSampleEvent(0, 0, 1, 100), true)];
+                        return [new BmsPreviewSampleEvent(new BmsSampleEvent(0, 1, 100), true)];
                     },
                     new Dictionary<ushort, string> { [1] = "event.wav" }),
                 directory,
@@ -613,7 +613,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
             writePcmWave(Path.Combine(directory, "event.wav"), TimeSpan.FromSeconds(1));
 
             track = createTrack(
-                [new BmsSampleEvent(0, 0, 1, 100)],
+                [new BmsSampleEvent(0, 1, 100)],
                 new Dictionary<ushort, string> { [1] = "event.wav" },
                 directory);
 
@@ -717,8 +717,8 @@ public partial class BmsPreviewTrackTest : OsuTestScene
 
             track = createTrack(
                 [
-                    new BmsSampleEvent(1000, 0, 1, 100),
-                    new BmsSampleEvent(3000, 0, 1, 100),
+                    new BmsSampleEvent(1000, 1, 100),
+                    new BmsSampleEvent(3000, 1, 100),
                 ],
                 new Dictionary<ushort, string> { [1] = "event.wav" },
                 directory);
@@ -746,7 +746,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
 
             track = new BmsEventPreviewTrack(
                 _ => BmsEventPreviewTimeline.Create(
-                    () => [new BmsPreviewSampleEvent(new BmsSampleEvent(1000, 0, 1, 100), false)],
+                    () => [new BmsPreviewSampleEvent(new BmsSampleEvent(1000, 1, 100), false)],
                     new Dictionary<ushort, string> { [1] = "event.wav" }),
                 directory,
                 audio)
@@ -779,7 +779,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
             writePcmWave(Path.Combine(directory, "bgm.wav"), TimeSpan.FromSeconds(3));
 
             track = createTrack(
-                [new BmsSampleEvent(0, 0, 1, 100)],
+                [new BmsSampleEvent(0, 1, 100)],
                 new Dictionary<ushort, string> { [1] = "bgm.wav" },
                 directory);
             track.PlaybackMode = BmsPreviewTrackPlaybackMode.GameplayClockOnly;
@@ -812,8 +812,8 @@ public partial class BmsPreviewTrackTest : OsuTestScene
 
             track = createTrack(
                 [
-                    new BmsSampleEvent(0, 0, 1, 100),
-                    new BmsSampleEvent(1000, 0, 2, 100),
+                    new BmsSampleEvent(0, 1, 100),
+                    new BmsSampleEvent(1000, 2, 100),
                 ],
                 new Dictionary<ushort, string>
                 {
@@ -855,7 +855,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
 
             track = new BmsEventPreviewTrack(
                 _ => BmsEventPreviewTimeline.Create(
-                    () => [new BmsPreviewSampleEvent(new BmsSampleEvent(0, 0, 1, 100), true)],
+                    () => [new BmsPreviewSampleEvent(new BmsSampleEvent(0, 1, 100), true)],
                     new Dictionary<ushort, string> { [1] = "bgm.wav" }),
                 directory,
                 audio);
@@ -894,7 +894,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
             writePcmWave(Path.Combine(directory, "event.wav"), TimeSpan.FromSeconds(1));
 
             track = createTrack(
-                [new BmsSampleEvent(0, 0, 1, 100)],
+                [new BmsSampleEvent(0, 1, 100)],
                 new Dictionary<ushort, string> { [1] = "event.wav" },
                 directory);
             audio.AddItem(track);

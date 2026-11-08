@@ -59,9 +59,6 @@ public static class BmsLayout
         return visibleChannels.Overlaps(seven_key_only_channels) ? BmsLayoutVariant.Bme7K : BmsLayoutVariant.Bms5K;
     }
 
-    public static int InferTotalColumns(IEnumerable<ushort> channels, string? pathOrExtension = null)
-        => GetTotalColumns(InferVariant(channels, pathOrExtension));
-
     public static int GetTotalColumns(BmsLayoutVariant variant) => variant switch
     {
         BmsLayoutVariant.Bms5K or BmsLayoutVariant.Bms5K2P => BMS5_KEY_COLUMNS,

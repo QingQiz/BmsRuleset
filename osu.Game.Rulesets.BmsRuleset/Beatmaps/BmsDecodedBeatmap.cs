@@ -7,8 +7,6 @@ namespace osu.Game.Rulesets.BmsRuleset.Beatmaps;
 
 internal class BmsDecodedBeatmap : Beatmap, IBmsBeatmap
 {
-    public int TickResolution { get; set; }
-
     public int TotalColumns { get; set; }
 
     public BmsLayoutVariant LayoutVariant { get; set; } = BmsLayoutVariant.Bms5K;

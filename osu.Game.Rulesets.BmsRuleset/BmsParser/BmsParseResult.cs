@@ -9,7 +9,6 @@ public sealed record BmsParseResult(
     float? PlayLevel,
     int Rank,
     double Total,
-    int TickResolution,
     BmsTimingMap TimingMap,
     BmsLayoutVariant LayoutVariant,
     int TotalColumns,
@@ -43,7 +42,6 @@ public readonly record struct BmsParsedHitObject(
     double StartTime,
     double Duration,
     int Column,
-    ushort SourceChannel,
     ushort SampleKey,
     bool IsLongNote,
     bool IsMine,
@@ -53,10 +51,9 @@ public readonly record struct BmsParsedHitObject(
     int TailSampleVolume = 100,
     double JudgementRate = 0.75);
 
-public sealed record BmsSampleEvent(double Time, long Tick, ushort SampleKey, int Volume);
+public sealed record BmsSampleEvent(double Time, ushort SampleKey, int Volume);
 
-// ReSharper disable once NotAccessedPositionalProperty.Global
-public sealed record BmsTextEvent(double Time, long Tick, string Text);
+public sealed record BmsTextEvent(double Time, string Text);
 
 public sealed record BmsTextEvents(string? MistakeText, BmsTextEvent[] TextEvents);
 

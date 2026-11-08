@@ -50,9 +50,9 @@ public static class BmsPracticeBeatmap
         foreach (var note in fullBeatmap.HitObjects.Where(note => !settings.Contains(note.StartTime) && note is not BmsLandmine and not BmsInvisibleNote))
         {
             if (note.SampleKey is { } sample)
-                background.Add(new BmsSampleEvent(note.StartTime, 0, sample, note.SampleVolume));
+                background.Add(new BmsSampleEvent(note.StartTime, sample, note.SampleVolume));
             if (note is BmsLongNote { TailSampleKey: { } tailSample } longNote)
-                background.Add(new BmsSampleEvent(longNote.EndTime, 0, tailSample, longNote.TailSampleVolume));
+                background.Add(new BmsSampleEvent(longNote.EndTime, tailSample, longNote.TailSampleVolume));
         }
 
         practice.BackgroundSampleEvents = background.OrderBy(sample => sample.Time).ToArray();

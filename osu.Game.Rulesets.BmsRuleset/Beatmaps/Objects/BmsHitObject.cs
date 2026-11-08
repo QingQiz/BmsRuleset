@@ -12,8 +12,6 @@ public class BmsHitObject : HitObject
 
     public int Column { get; set; }
 
-    public ushort SourceChannel { get; set; }
-
     public ushort? SampleKey { get; set; }
 
     public int SampleVolume { get; set; } = 100;
@@ -72,7 +70,6 @@ public class BmsHitObject : HitObject
     {
         target.StartTime = StartTime;
         target.Column = Column;
-        target.SourceChannel = SourceChannel;
         target.SampleKey = SampleKey;
         target.SampleVolume = SampleVolume;
         target.JudgementRate = JudgementRate;

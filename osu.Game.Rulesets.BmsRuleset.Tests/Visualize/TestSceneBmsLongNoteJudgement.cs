@@ -92,11 +92,9 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
             for (var i = 0; i < cases.Count; i++)
             {
                 var expectedStartTime = first_case_time + i * case_spacing;
-                var expectedTick = caseTick(i);
 
                 if (longNotes[i].StartTime != expectedStartTime
                     || textEvents[i].Time != expectedStartTime - text_lead_time
-                    || textEvents[i].Tick != expectedTick - 48
                     || textEvents[i].Text != $"{i + 1:00} {cases[i].Text}")
                 {
                     return false;
@@ -263,7 +261,6 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
         for (var i = 0; i < cases.Count; i++)
         {
             var startTime = first_case_time + i * case_spacing;
-            var tick = caseTick(i);
 
             beatmap.HitObjects.Add(new BmsLongNote
             {
@@ -272,7 +269,7 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
                 Column = columns[i % columns.Length],
             });
 
-            textEvents.Add(new BmsTextEvent(startTime - text_lead_time, tick - 48, $"{i + 1:00} {cases[i].Text}"));
+            textEvents.Add(new BmsTextEvent(startTime - text_lead_time, $"{i + 1:00} {cases[i].Text}"));
         }
 
         beatmap.TextEvents = new BmsTextEvents(string.Empty, textEvents.ToArray());
@@ -476,8 +473,6 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
         const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
         return longNote.GetType().GetField(fieldName, flags)!.GetValue(longNote)!;
     }
-
-    private static long caseTick(int index) => 192L * (index + 1);
 
     private static double? firstFastReleaseCheckOffset(LongNoteVisualCase testCase, BmsLongNoteMode mode)
     {

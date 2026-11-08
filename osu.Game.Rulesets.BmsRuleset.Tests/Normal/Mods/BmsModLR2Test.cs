@@ -526,6 +526,7 @@ public class BmsModLr2Test
     public void DifficultyUsesOriginalRankRatherThanLayoutPercentage([Values] bool extendedRank)
     {
         var beatmap = createBeatmap();
+        beatmap.TimingMap = BmsChartParser.Parse([]).TimingMap;
         beatmap.LayoutVariant = BmsLayoutVariant.Pms9K;
         beatmap.TotalColumns = 9;
         beatmap.Rank = 4;

@@ -8,8 +8,6 @@ namespace osu.Game.Rulesets.BmsRuleset.Beatmaps;
 
 public interface IBmsBeatmap
 {
-    int TickResolution { get; set; }
-
     int TotalColumns { get; set; }
 
     BmsLayoutVariant LayoutVariant { get; set; }
@@ -60,7 +58,6 @@ internal static class BmsBeatmapExtensions
 
     public static void CopyFrom(this IBmsBeatmap target, BmsParseResult parseResult)
     {
-        target.TickResolution = parseResult.TickResolution;
         target.TimingMap = parseResult.TimingMap;
         target.TotalColumns = parseResult.TotalColumns;
         target.LayoutVariant = parseResult.LayoutVariant;
@@ -74,7 +71,6 @@ internal static class BmsBeatmapExtensions
             Beatmap = target,
             StartTime = n.StartTime,
             Column = n.Column,
-            SourceChannel = n.SourceChannel,
             SampleKey = n.SampleKey,
             SampleVolume = n.SampleVolume,
         }).ToArray();
@@ -90,7 +86,6 @@ internal static class BmsBeatmapExtensions
 
     public static void CopyBmsDataFrom(this IBmsBeatmap target, IBmsBeatmap source)
     {
-        target.TickResolution = source.TickResolution;
         target.TotalColumns = source.TotalColumns;
         target.LayoutVariant = source.LayoutVariant;
         target.Rank = source.Rank;

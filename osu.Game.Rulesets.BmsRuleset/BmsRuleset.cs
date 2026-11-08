@@ -122,9 +122,9 @@ public partial class BmsRuleset : Ruleset
 
     public override int GetVariantForBeatmap(IBeatmapInfo beatmapInfo, IReadOnlyList<Mod>? mods = null)
     {
-        var foreignConverter = BmsForeignBeatmapConverterRegistry.FindConverter(beatmapInfo);
-        var keyCount = foreignConverter?.GetConvertedDifficultyInfo(beatmapInfo).KeyCount
-                       ?? BmsDifficultyInfo.GetKeyCount(beatmapInfo.Difficulty);
+        var keyCount = Mania7KBeatmapConverter.CanConvert(beatmapInfo)
+            ? Mania7KBeatmapConverter.GetConvertedDifficultyInfo(beatmapInfo).KeyCount
+            : BmsDifficultyInfo.GetKeyCount(beatmapInfo.Difficulty);
 
         return (int)BmsLayout.VariantFromTotalColumns(keyCount);
     }
@@ -215,9 +215,8 @@ public partial class BmsRuleset : Ruleset
     public override BeatmapDifficulty GetAdjustedDisplayDifficulty(IBeatmapInfo beatmapInfo, IReadOnlyCollection<Mod> mods)
     {
         var adjustedDifficulty = new BeatmapDifficulty(beatmapInfo.Difficulty);
-        var foreignConverter = BmsForeignBeatmapConverterRegistry.FindConverter(beatmapInfo);
-
-        foreignConverter?.GetConvertedDifficultyInfo(beatmapInfo).WriteToOsuDifficulty(adjustedDifficulty);
+        if (Mania7KBeatmapConverter.CanConvert(beatmapInfo))
+            Mania7KBeatmapConverter.GetConvertedDifficultyInfo(beatmapInfo).WriteToOsuDifficulty(adjustedDifficulty);
 
         foreach (var mod in mods.OfType<IApplicableToDifficulty>())
             mod.ApplyToDifficulty(adjustedDifficulty);
@@ -233,9 +232,9 @@ public partial class BmsRuleset : Ruleset
 
     private IEnumerable<RulesetBeatmapAttribute> getBeatmapAttributesForDisplay(IBeatmapInfo beatmapInfo, IReadOnlyCollection<Mod> mods)
     {
-        var foreignConverter = BmsForeignBeatmapConverterRegistry.FindConverter(beatmapInfo);
-        var original = foreignConverter?.GetConvertedDifficultyInfo(beatmapInfo)
-                       ?? BmsDifficultyInfo.FromOsuDifficulty(beatmapInfo.Difficulty);
+        var original = Mania7KBeatmapConverter.CanConvert(beatmapInfo)
+            ? Mania7KBeatmapConverter.GetConvertedDifficultyInfo(beatmapInfo)
+            : BmsDifficultyInfo.FromOsuDifficulty(beatmapInfo.Difficulty);
         var adjustedDifficulty = GetAdjustedDisplayDifficulty(beatmapInfo, mods);
         var adjusted = BmsDifficultyInfo.FromOsuDifficulty(adjustedDifficulty);
         var colours = new OsuColour();

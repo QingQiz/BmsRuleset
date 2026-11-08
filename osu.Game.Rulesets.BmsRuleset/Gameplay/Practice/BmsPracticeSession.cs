@@ -78,7 +78,7 @@ public sealed class BmsPracticeSession
         };
 
     internal static bool SupportsBeatmap(IBeatmapInfo source) => source.Ruleset.ShortName == Constant.SHORT_NAME
-        || BmsForeignBeatmapConverterRegistry.FindConverter(source) != null;
+        || Mania7KBeatmapConverter.CanConvert(source);
 
     public static Mod[] PrepareMods(IEnumerable<Mod> mods)
     {

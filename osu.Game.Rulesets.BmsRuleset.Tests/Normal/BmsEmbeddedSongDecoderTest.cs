@@ -373,7 +373,7 @@ public partial class BmsEmbeddedSongDecoderTest
         var beatmap = decodeFile(path);
         var converted = convert(beatmap);
         var objects = beatmap.HitObjects.Cast<BmsHitObject>().ToArray();
-        var tickResolution = converted.TickResolution;
+        var tickResolution = converted.TimingMap!.TickResolution;
         var expected = analyseChart(path, tickResolution);
 
         Assert.That(expected.Notes, Has.Count.GreaterThan(100));
@@ -387,7 +387,6 @@ public partial class BmsEmbeddedSongDecoderTest
         Assert.That(expectedFirst.Channel, Is.EqualTo("11"));
         Assert.That(expectedFirst.Value, Is.EqualTo("08"));
         Assert.That(actualFirst.Column, Is.EqualTo(expectedFirst.Column));
-        Assert.That(actualFirst.SourceChannel, Is.EqualTo(BmsChartParser.Enc(expectedFirst.Channel)));
         Assert.That(actualFirst.SampleKey, Is.EqualTo(BmsChartParser.Enc(expectedFirst.Value)));
         Assert.That(actualFirst.StartTime, Is.EqualTo(expected.ProjectTickToTime(expectedFirst.Tick, true)).Within(0.001));
         Assert.That(

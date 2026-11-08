@@ -9,8 +9,6 @@ namespace osu.Game.Rulesets.BmsRuleset.Beatmaps;
 
 public class BmsBeatmap : Beatmap<BmsHitObject>, IBmsBeatmap
 {
-    public int TickResolution { get; set; } = 192;
-
     public int TotalColumns { get; set; }
 
     public BmsLayoutVariant LayoutVariant { get; set; } = BmsLayoutVariant.Bms5K;

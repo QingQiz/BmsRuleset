@@ -52,7 +52,7 @@ public class BmsModInvert : Mod, IApplicableAfterBeatmapConversion, IHasSeed
         var tailSampleEvents = bmsBeatmap.HitObjects
             .OfType<BmsLongNote>()
             .Where(longNote => longNote.TailSampleKey.HasValue)
-            .Select(longNote => new BmsSampleEvent(longNote.EndTime, 0, longNote.TailSampleKey!.Value, longNote.TailSampleVolume));
+            .Select(longNote => new BmsSampleEvent(longNote.EndTime, longNote.TailSampleKey!.Value, longNote.TailSampleVolume));
 
         foreach (var column in bmsBeatmap.HitObjects.Where(hitObject => hitObject is not BmsLandmine).GroupBy(hitObject => hitObject.Column))
         {
@@ -73,7 +73,6 @@ public class BmsModInvert : Mod, IApplicableAfterBeatmapConversion, IHasSeed
                     StartTime = source.StartTime,
                     Duration = duration,
                     Column = source.Column,
-                    SourceChannel = source.SourceChannel,
                     SampleKey = source.SampleKey,
                     SampleVolume = source.SampleVolume,
                     Samples = source.Samples.ToList(),
@@ -89,7 +88,6 @@ public class BmsModInvert : Mod, IApplicableAfterBeatmapConversion, IHasSeed
                 Beatmap = bmsBeatmap,
                 StartTime = last.StartTime,
                 Column = last.Column,
-                SourceChannel = last.SourceChannel,
                 SampleKey = last.SampleKey,
                 SampleVolume = last.SampleVolume,
                 Samples = last.Samples.ToList(),

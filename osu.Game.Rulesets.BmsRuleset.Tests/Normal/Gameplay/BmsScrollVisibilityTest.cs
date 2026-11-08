@@ -117,7 +117,7 @@ public class BmsScrollVisibilityTest
             ReferenceBpmMode = BmsReferenceBpmMode.StartBpm,
         }.Convert();
         var controller = createController(beatmap);
-        var folded = beatmap.HitObjects.Single(n => n.SourceChannel == BmsChartParser.Enc("11") && n.StartTime > 9900 && n.StartTime < 10000);
+        var folded = beatmap.HitObjects.Single(n => n.Column == 1 && n.StartTime > 9900 && n.StartTime < 10000);
 
         controller.Update(2000);
         Assert.That(Math.Abs(folded.ScrollPositionAtStartTime - controller.CurrentScrollPosition), Is.LessThan(controller.ScrollRange),

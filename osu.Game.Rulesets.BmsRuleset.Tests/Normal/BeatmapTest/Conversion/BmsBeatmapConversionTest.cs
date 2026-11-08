@@ -1,3 +1,4 @@
+using System.IO;
 using System.Linq;
 using NUnit.Framework;
 using osu.Game.Audio;
@@ -16,6 +17,32 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.BeatmapTest.Conversion;
 [TestFixture]
 public class BmsBeatmapConversionTest
 {
+    [Test]
+    public void TestAllowsSupportedForeignConversionForBms()
+    {
+        var mania = createManiaBeatmap(7).BeatmapInfo;
+        var bms = new RulesetInfo { ShortName = Constant.SHORT_NAME, OnlineID = -1 };
+
+        Assert.That(BmsBeatmapConverter.AllowsGameplay(mania, bms, true), Is.True);
+    }
+
+    [Test]
+    public void TestRejectsForeignConversionWhenDisabled()
+    {
+        var mania = createManiaBeatmap(7).BeatmapInfo;
+        var bms = new RulesetInfo { ShortName = Constant.SHORT_NAME, OnlineID = -1 };
+
+        Assert.That(BmsBeatmapConverter.AllowsGameplay(mania, bms, false), Is.False);
+    }
+
+    [Test]
+    public void TestDoesNotExtendForeignConversionToOtherTargetRulesets()
+    {
+        var mania = createManiaBeatmap(7).BeatmapInfo;
+        var catchRuleset = new RulesetInfo { ShortName = "fruits", OnlineID = 2 };
+
+        Assert.That(BmsBeatmapConverter.AllowsGameplay(mania, catchRuleset, true), Is.False);
+    }
 
     [TestCase(1)]
     [TestCase(4)]
@@ -70,7 +97,7 @@ public class BmsBeatmapConversionTest
     }
 
     [Test]
-    public void TestBeatmapConverterCanConvertBmsHitObjects()
+    public void TestBeatmapConverterRejectsBmsObjectsWithoutNativeBeatmapData()
     {
         var beatmap = new Beatmap
         {
@@ -82,22 +109,29 @@ public class BmsBeatmapConversionTest
         };
         var converter = new BmsRuleset().CreateBeatmapConverter(beatmap);
 
-        Assert.That(converter.CanConvert(), Is.True);
+        Assert.That(converter.CanConvert(), Is.False);
+        Assert.Throws<InvalidDataException>(() => converter.Convert());
     }
 
     [Test]
-    public void TestBeatmapConverterCanConvertEmptyBeatmap()
+    public void TestEmptyFrameworkPlaceholderStillConverts()
     {
         var converter = new BmsRuleset().CreateBeatmapConverter(new Beatmap());
 
         Assert.That(converter.CanConvert(), Is.False);
+        var converted = (BmsBeatmap)converter.Convert();
+        Assert.That(converted.HitObjects, Is.Empty);
+        Assert.That(converted.TotalColumns, Is.EqualTo(BmsLayout.BMS5_KEY_COLUMNS));
+        Assert.That(converted.TimingMap, Is.Not.Null);
     }
 
     [Test]
     public void TestBeatmapConverterConvert()
     {
-        var beatmap = new Beatmap
+        var beatmap = new BmsBeatmap
         {
+            TotalColumns = BmsLayout.BMS5_KEY_COLUMNS,
+            TimingMap = BmsChartParser.Parse([]).TimingMap,
             HitObjects =
             {
                 new BmsHitObject { StartTime = 1000, Column = 2 },
@@ -174,16 +208,6 @@ public class BmsBeatmapConversionTest
             Assert.That(converted.BeatmapInfo.Difficulty.DrainRate, Is.EqualTo(2));
             Assert.That(converted.HitObjects.Take(7).Select(h => h.Column), Is.EqualTo(Enumerable.Range(1, 7)));
             Assert.That(converted.HitObjects, Has.None.Matches<BmsHitObject>(h => h.Column == 0));
-            Assert.That(converted.HitObjects.Take(7).Select(h => h.SourceChannel), Is.EqualTo(
-            [
-                BmsChartParser.Enc("11"),
-                BmsChartParser.Enc("12"),
-                BmsChartParser.Enc("13"),
-                BmsChartParser.Enc("14"),
-                BmsChartParser.Enc("15"),
-                BmsChartParser.Enc("18"),
-                BmsChartParser.Enc("19"),
-            ]));
 
             var hold = converted.HitObjects.OfType<BmsLongNote>().Single();
             Assert.That(hold.Column, Is.EqualTo(4));
@@ -305,7 +329,7 @@ public class BmsBeatmapConversionTest
     }
 
     [Test]
-    public void TestFallbackTimingMapCoversHitObjectEndTime()
+    public void TestMissingNativeTimingMapIsRejected()
     {
         var longNote = new BmsLongNote
         {
@@ -316,17 +340,23 @@ public class BmsBeatmapConversionTest
         var beatmap = new BmsBeatmap
         {
             TotalColumns = 8,
+            LayoutVariant = BmsLayoutVariant.Bme7K,
             HitObjects = { longNote },
         };
 
-        var converted = (BmsBeatmap)new BmsRuleset().CreateBeatmapConverter(beatmap).Convert();
-        var timingMap = converted.TimingMap!;
-        var convertedLongNote = converted.HitObjects.OfType<BmsLongNote>().Single();
+        Assert.Throws<InvalidDataException>(() => new BmsRuleset().CreateBeatmapConverter(beatmap).Convert());
+    }
 
-        Assert.That(timingMap.ProjectTickToTime(timingMap.Measures[^1].StartTick), Is.GreaterThanOrEqualTo(longNote.EndTime));
-        Assert.That(convertedLongNote.ScrollPositionAtEndTime, Is.GreaterThan(convertedLongNote.ScrollPositionAtStartTime));
-        Assert.That(longNote.ScrollPositionAtEndTime, Is.Zero);
-        Assert.That(longNote.ScrollPositionAtStartTime, Is.Zero);
+    [Test]
+    public void TestMissingNativeLayoutIsRejected()
+    {
+        var beatmap = new BmsBeatmap
+        {
+            TimingMap = BmsChartParser.Parse([]).TimingMap,
+            HitObjects = { new BmsNote { Column = 7 } },
+        };
+
+        Assert.Throws<InvalidDataException>(() => new BmsRuleset().CreateBeatmapConverter(beatmap).Convert());
     }
 
     [Test]
@@ -337,6 +367,7 @@ public class BmsBeatmapConversionTest
             LayoutVariant = BmsLayoutVariant.Bme7K,
             TotalColumns = 8,
             Rank = 1,
+            TimingMap = BmsChartParser.Parse([]).TimingMap,
             HitObjects =
             {
                 new BmsHitObject { StartTime = 1000, Column = 1 },
