@@ -3,14 +3,12 @@ using osu.Framework.Allocation;
 using osuTK;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Rules;
-using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Components;
 using osu.Game.Rulesets.Objects.Drawables;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 
-public sealed partial class DrawableBmsLandmine<TCol> : DrawableBmsHitObject<TCol>
-    where TCol : struct, IColumnProvider
+public sealed partial class DrawableBmsLandmine : DrawableBmsHitObject
 {
     // The framework's reflection fallback misses the inherited protected draw-node factory.
     protected override bool CanBeFlattened => CanFlattenWithMines && !Masking && !HasProxy && !ForceLocalVertexBatch;

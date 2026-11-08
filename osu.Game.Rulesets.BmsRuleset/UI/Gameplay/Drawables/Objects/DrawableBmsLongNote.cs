@@ -5,7 +5,6 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.State;
-using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.LnHelper;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.Presentation;
@@ -19,8 +18,7 @@ using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 
-public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCol>
-    where TCol : struct, IColumnProvider
+public sealed partial class DrawableBmsLongNote : DrawableBmsHitObject
 {
     // The framework's reflection fallback misses the inherited protected draw-node factory.
     protected override bool CanBeFlattened => CanFlattenWithMines && !Masking && !HasProxy && !ForceLocalVertexBatch;

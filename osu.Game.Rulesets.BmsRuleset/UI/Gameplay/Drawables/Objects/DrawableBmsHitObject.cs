@@ -6,7 +6,6 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
-using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects.Drawables;
@@ -170,6 +169,8 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
     [Resolved(CanBeNull = true)]
     protected BmsColumn? ParentColumn { get; private set; }
 
+    protected int Column => ParentColumn!.Index;
+
     protected DrawableBmsHitObject()
         : base(null!)
     {
@@ -285,10 +286,4 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
         // The framework's reflection fallback misses the inherited protected draw-node factory.
         protected override bool CanBeFlattened => !Masking && !HasProxy && !ForceLocalVertexBatch;
     }
-}
-
-public abstract partial class DrawableBmsHitObject<TCol> : DrawableBmsHitObject
-    where TCol : struct, IColumnProvider
-{
-    protected int Column { get; } = default(TCol).Value;
 }

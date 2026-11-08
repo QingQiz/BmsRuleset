@@ -55,12 +55,6 @@
         <InternalsVisibleTo Include="osu.Game.Rulesets.BmsRuleset.Tests"/>
         <InternalsVisibleTo Include="MonoMod.Utils.Cil.ILGeneratorProxy"/>
     </ItemGroup>
-    <ItemGroup>
-        <ProjectReference
-            Include="..\osu.Game.Rulesets.BmsRuleset.SourceGeneration\osu.Game.Rulesets.BmsRuleset.SourceGeneration.csproj"
-            OutputItemType="Analyzer"
-            ReferenceOutputAssembly="false" />
-    </ItemGroup>
     <Target Name="RepackBmsRuleset" AfterTargets="Build">
         <ItemGroup>
             <BmsHarmonyAssembly Include="@(ReferencePath)" Condition="'%(ReferencePath.Filename)' == '0Harmony'" />

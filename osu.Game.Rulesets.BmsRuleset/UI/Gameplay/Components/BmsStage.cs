@@ -211,7 +211,7 @@ public sealed partial class BmsStage : CompositeDrawable
 
         for (var i = 0; i < playfield.TotalColumns; i++)
         {
-            Columns[i] = BmsColumn.Create(i, playfield);
+            Columns[i] = new BmsColumn(i, playfield);
             columnBackgrounds[i] = new SkinnableDrawable(new BmsSkinComponentLookup(BmsSkinComponents.ColumnBackground, layoutVariant, i))
             {
                 RelativeSizeAxes = Axes.Y,

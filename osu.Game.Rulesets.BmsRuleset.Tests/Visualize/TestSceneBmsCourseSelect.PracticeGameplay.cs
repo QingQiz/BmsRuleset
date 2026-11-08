@@ -23,9 +23,9 @@ using osu.Game.Rulesets.BmsRuleset.IO.Import;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
-using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Tests.Audio;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 using osu.Game.Rulesets.BmsRuleset.UI.Result.Course;
 using osu.Game.Rulesets.BmsRuleset.UI.Result.Practice;
@@ -177,7 +177,8 @@ public partial class TestSceneBmsCourseSelect
             Assert.That(first.GameplayState.ScoreProcessor.IsLoaded, Is.True);
             Assert.That(((BmsHealthProcessor)first.GameplayState.HealthProcessor).GaugeType, Is.EqualTo(BmsGaugeType.Hazard));
             Assert.That(firstPlayfield.IsLoaded, Is.True);
-            var notePool = firstPlayfield.ChildrenOfType<DrawablePool<DrawableBmsNote<Column1>>>().Single();
+            var column = (BmsColumn)firstPlayfield.Stage.Columns[1];
+            var notePool = column.ChildrenOfType<DrawablePool<DrawableBmsNote>>().Single();
             Assert.That(notePool.CountAvailable, Is.GreaterThan(0));
             var firstDrawable = notePool.Get();
             try

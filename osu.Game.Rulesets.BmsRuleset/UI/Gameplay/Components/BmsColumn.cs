@@ -1,6 +1,5 @@
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Judgement;
-using System;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
@@ -11,8 +10,8 @@ using osu.Framework.Graphics.Pooling;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
-using osu.Game.Rulesets.BmsRuleset.UI.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Configuration;
 using osu.Game.Rulesets.Objects;
@@ -112,8 +111,6 @@ public partial class BmsColumn : Playfield, IBmsColumn
     private readonly BmsHitExplosionPool normalHitExplosionPool;
     private readonly BmsHitExplosionPool longNoteHitExplosionPool;
 
-    internal BmsHitObjectPoolPlan.ColumnSizes InitialPoolSizes => ParentPlayfield.InitialPoolSizes[Index];
-
     [Resolved]
     private ISkinSource skin { get; set; } = null!;
 
@@ -162,13 +159,6 @@ public partial class BmsColumn : Playfield, IBmsColumn
     }
 
     #endregion
-
-    public static BmsColumn Create(int index, BmsPlayfield playfield)
-    {
-        var providerType = BmsColumnFactory.GetColumnProviderType(index);
-        var genericType = typeof(BmsColumnGeneric<>).MakeGenericType(providerType);
-        return (BmsColumn)Activator.CreateInstance(genericType, index, playfield)!;
-    }
 
     protected override HitObjectContainer CreateHitObjectContainer()
         => new BmsColumnHitObjectContainer(
@@ -234,6 +224,11 @@ public partial class BmsColumn : Playfield, IBmsColumn
         config?.BindWith(BmsRulesetSetting.ShowInvisibleNotes, showInvisibleNotes);
         skin.SourceChanged += updateFromSkin;
         updateFromSkin();
+
+        var poolSizes = ParentPlayfield.InitialPoolSizes[Index];
+        RegisterPool<BmsNote, DrawableBmsNote>(poolSizes.Notes, int.MaxValue);
+        RegisterPool<BmsLongNote, DrawableBmsLongNote>(poolSizes.LongNotes, int.MaxValue);
+        RegisterPool<BmsLandmine, DrawableBmsLandmine>(poolSizes.Mines, int.MaxValue);
     }
 
     private void updateFromSkin()
