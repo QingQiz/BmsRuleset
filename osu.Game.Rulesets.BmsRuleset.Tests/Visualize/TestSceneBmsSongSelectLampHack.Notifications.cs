@@ -528,6 +528,66 @@ public partial class TestSceneBmsSongSelectLampHack
         AddAssert("carousel selection cleared", () => carousel.CurrentBeatmap == null);
     }
 
+    [TestCase(16, false)]
+    [TestCase(64, false)]
+    [TestCase(16, true)]
+    [TestCase(64, true)]
+    public void TestBulkBmsDeletionCoalescesSongSelectNotifications(int setCount, bool cleanupOrphans)
+    {
+        var directory = string.Empty;
+        Task import = null!;
+        Task<int> cleanup = null!;
+        Guid selected = Guid.Empty;
+
+        importLampBeatmapSet();
+        AddStep("import external BMS sets", () =>
+        {
+            directory = createNotificationStormCharts(setCount);
+            import = new BmsFileImporter(Realm, LocalStorage).Import(directory);
+        });
+        waitForNotificationStormWork("orphan fixture import", () => import);
+        loadSongSelect();
+        AddStep("select a future orphan", () =>
+        {
+            var chart = Realm.Run(r => r.All<BeatmapInfo>().AsEnumerable()
+                .First(beatmap => beatmap.Metadata.Source.StartsWith(directory, StringComparison.Ordinal)).Detach());
+            selected = chart.ID;
+            songSelect.ScopeToBeatmapSet(chart.BeatmapSet!);
+            songSelect.LoadBeatmapSelection(chart);
+        });
+        AddUntilStep("orphan selection loaded", () => songSelect.Beatmap.Value.BeatmapInfo.ID == selected && !songSelect.IsFiltering);
+        observeNotificationStorm(() => directory);
+        if (cleanupOrphans)
+        {
+            AddStep("remove external source directories", () =>
+            {
+                Assert.That(Path.GetDirectoryName(directory), Is.EqualTo(Path.TrimEndingDirectorySeparator(LocalStorage.GetFullPath(string.Empty))));
+                Directory.Delete(directory, true);
+            });
+            AddStep("clean orphan sets from the real importer", () =>
+                cleanup = Task.Run(() => new BmsFileImporter(Realm, LocalStorage).CleanupOrphanedSets()));
+            waitForNotificationStormWork("orphan cleanup", () => cleanup);
+        }
+        else
+            AddStep("delete all BMS sets from the real importer", () =>
+                new BmsFileImporter(Realm, LocalStorage, beatmaps: beatmaps).DeleteAllBmsFilesAsync());
+
+        AddUntilStep("removed charts leave carousel", () => notificationStormProbe!.Charts.Length == 0 && !songSelect.IsFiltering);
+        AddUntilStep("removed selection is cleared", () => songSelect.Beatmap.IsDefault && carousel.CurrentBeatmap == null);
+        AddStep("deletion publishes one final library state", () =>
+        {
+            var probe = notificationStormProbe!;
+            if (cleanupOrphans)
+                Assert.That(cleanup.Result, Is.GreaterThanOrEqualTo(setCount));
+            else
+                Assert.That(Directory.Exists(directory), Is.True, "Deleting imported sets must preserve external source files.");
+
+            Assert.That(probe.Detached.Events, Is.GreaterThan(0).And.LessThanOrEqualTo(bulk_notification_budget), probe.ToString());
+            Assert.That(probe.Carousel.Events, Is.GreaterThan(0).And.LessThanOrEqualTo(bulk_notification_budget), probe.ToString());
+            Assert.That(probe.Carousel.SingleItemRemovals, Is.Zero, "Bulk deletion must not remove every difficulty separately on the update thread.");
+        });
+    }
+
     private void waitForNotificationStormWork(string name, Func<Task> getWork)
     {
         // Real imports perform hundreds of file and database operations on shared CI disks.

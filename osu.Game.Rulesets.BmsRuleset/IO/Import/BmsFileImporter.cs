@@ -75,6 +75,8 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
 
         try
         {
+            // Publish one final library snapshot instead of replaying every orphan removal on song select.
+            using var bulkUpdate = BmsBulkBeatmapUpdate.Begin(realm);
             var deleted = realm.Write(r =>
             {
                 var orphans = r.All<BeatmapSetInfo>()
@@ -138,6 +140,8 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
         {
             try
             {
+                // Keep per-set transactions from publishing individual removals to song select.
+                using var bulkUpdate = BmsBulkBeatmapUpdate.Begin(realm);
                 realm.Run(r =>
                 {
                     foreach (var set in r.All<BeatmapSetInfo>().Where(x => !x.DeletePending))
