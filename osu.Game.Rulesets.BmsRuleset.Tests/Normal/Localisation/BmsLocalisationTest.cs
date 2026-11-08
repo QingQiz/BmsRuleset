@@ -11,8 +11,13 @@ using System.Threading.Tasks;
 using NUnit.Framework;
 using osu.Framework.Configuration;
 using osu.Framework.Localisation;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
+using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
+using osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
+using osu.Game.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Localisation;
 
@@ -38,6 +43,53 @@ public class BmsLocalisationTest
     {
         localisation.Dispose();
         config.Dispose();
+    }
+
+    [Test]
+    public void TestStatisticLabelsRetainIdentityAcrossLanguagesAndStageMerging()
+    {
+        var beatmap = new BmsBeatmap
+        {
+            LayoutVariant = BmsLayoutVariant.Bms5K,
+            TotalColumns = 6,
+            HitObjects = [new BmsNote { StartTime = 1000, Column = 1 }],
+        };
+        var first = BmsTimelineStatistic.CreateData(new ScoreInfo(), beatmap);
+        var offset = BmsHitOffsetStatistic.CreateStatistics(beatmap, []);
+        var scatter = BmsHitScatterStatistic.CreateStatistics(beatmap, []);
+        var key = localisation.GetLocalisedBindableString(offset.Keys[1].Label);
+        var scratch = localisation.GetLocalisedBindableString(scatter.Keys[0].Label);
+        var note = localisation.GetLocalisedBindableString(first.Notes.Categories.Single(category => category.Label == BmsStrings.Note).Label);
+        Assert.That(new[] { key.Value, scratch.Value, note.Value }, Is.EqualTo(new[] { "Key 1", "Scratch", "note" }));
+
+        config.SetValue(FrameworkSetting.Locale, "zh");
+        Assert.That(new[] { key.Value, scratch.Value, note.Value }, Is.EqualTo(new[] { "按键 1", "皿", "单键" }));
+        var second = BmsTimelineStatistic.CreateData(new ScoreInfo(), beatmap);
+        second = second with
+        {
+            Notes = second.Notes with { Categories = second.Notes.Categories.Where(category => category.Label != BmsStrings.Scratch).ToArray() },
+        };
+        var combined = BmsTimelineStatistic.CreateCourseData([first, second]);
+        Assert.Multiple(() =>
+        {
+            Assert.That(combined.Notes.Categories.Select(category => category.Label), Is.EqualTo(new[] { BmsStrings.Scratch, BmsStrings.LongNote, BmsStrings.Note }));
+            Assert.That(combined.Notes.BucketWeights, Is.EqualTo(first.Notes.BucketWeights.Concat(second.Notes.BucketWeights)));
+            Assert.That(combined.StageBoundaries, Is.EqualTo(new[] { 0.5f }));
+            Assert.That(combined.Duration, Is.EqualTo(first.Duration + second.Duration));
+            foreach (var category in first.Notes.Categories)
+            {
+                var merged = combined.Notes.Categories.Single(item => item.Label == category.Label);
+                var next = second.Notes.Categories.SingleOrDefault(item => item.Label == category.Label);
+                Assert.That(merged.Buckets, Is.EqualTo(category.Buckets.Concat(next?.Buckets ?? new int[category.Buckets.Length])));
+                Assert.That(merged.Colour, Is.EqualTo(category.Colour));
+            }
+            Assert.That(first.FastSlow.Categories.Select(category => category.Label.GetHashCode()),
+                Is.EqualTo(second.FastSlow.Categories.Select(category => category.Label.GetHashCode())));
+            Assert.That(combined.FastSlow.Categories.Select(category => category.Label), Is.EqualTo(new[] { BmsStrings.Fast, BmsStrings.Slow }));
+        });
+
+        config.SetValue(FrameworkSetting.Locale, "en");
+        Assert.That(new[] { key.Value, scratch.Value, note.Value }, Is.EqualTo(new[] { "Key 1", "Scratch", "note" }));
     }
 
     [Test]

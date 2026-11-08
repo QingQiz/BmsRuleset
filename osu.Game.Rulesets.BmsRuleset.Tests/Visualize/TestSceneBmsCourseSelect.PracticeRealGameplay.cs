@@ -318,8 +318,8 @@ public partial class TestSceneBmsCourseSelect
         Assert.That(result.ExScore, Is.GreaterThan(0));
         Assert.That(result.Score.MaxCombo, Is.GreaterThan(3));
         Assert.That(player.MaxActiveVoices, Is.GreaterThan(0), "Real chart samples must reach the PCM mixer.");
-        Assert.That(result.Gauges, Is.Not.Empty);
-        Assert.That(result.GaugeHistory, Is.Not.Empty);
+        Assert.That(result.Statistics.EndingGaugeStates, Is.Not.Empty);
+        Assert.That(result.Statistics.Gauges.Any(series => series.Points.Count > 1), Is.True);
         Assert.That(player.ImportCount, Is.Zero);
         if (requireLongNote)
         {

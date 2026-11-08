@@ -104,12 +104,12 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable, IBmsResul
         return new HitOffsetStatistics(createSummary(displayedHitEvents.Select(e => (e.TimeOffset, e.Result))), keyGroups);
     }
 
-    private static string labelFor(int column, BmsLayoutVariant variant, ref int keyIndex)
+    private static LocalisableString labelFor(int column, BmsLayoutVariant variant, ref int keyIndex)
     {
         if (BmsLayout.IsScratchColumn(column, variant))
-            return "Scratch";
+            return BmsStrings.Scratch;
 
-        return $"Key {++keyIndex}";
+        return BmsStrings.Key(++keyIndex);
     }
 
     internal static HitOffsetStatistics CombineStatistics(IReadOnlyList<(HitOffsetStatistics Statistics, IReadOnlyList<HitEvent> HitEvents)> attempts)
@@ -135,7 +135,7 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable, IBmsResul
         if (expanded)
         {
             foreach (var key in statistics.Keys)
-                content.Add(createRow(localiseLabel(key.Label), key.Summary, key_graph_height));
+                content.Add(createRow(key.Label, key.Summary, key_graph_height));
         }
     }
 
@@ -152,14 +152,6 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable, IBmsResul
         rebuild();
 
         return true;
-    }
-
-    private static LocalisableString localiseLabel(string label)
-    {
-        if (label == "Scratch")
-            return BmsStrings.Scratch;
-
-        return int.TryParse(label.AsSpan("Key ".Length), out var key) ? BmsStrings.Key(key) : label;
     }
 
     private static Drawable createRow(LocalisableString label, HitOffsetSummary summary, float height) => new GridContainer
@@ -263,8 +255,6 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable, IBmsResul
             hitList.Count,
             averageOffset,
             standardDeviation,
-            timedValues.Count(v => v < 0),
-            timedValues.Count(v => v > 0),
             binSize,
             results,
             binsByResult);
@@ -273,14 +263,12 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable, IBmsResul
 
     internal sealed record HitOffsetStatistics(HitOffsetSummary Overall, IReadOnlyList<KeyHitOffsetStatistics> Keys);
 
-    internal sealed record KeyHitOffsetStatistics(string Label, HitOffsetSummary Summary);
+    internal sealed record KeyHitOffsetStatistics(LocalisableString Label, HitOffsetSummary Summary);
 
     internal sealed record HitOffsetSummary(
         int Count,
         double AverageOffset,
         double StandardDeviation,
-        int FastCount,
-        int SlowCount,
         double BinSize,
         IReadOnlyList<HitResult> Results,
         IReadOnlyDictionary<HitResult, int[]> BinsByResult);

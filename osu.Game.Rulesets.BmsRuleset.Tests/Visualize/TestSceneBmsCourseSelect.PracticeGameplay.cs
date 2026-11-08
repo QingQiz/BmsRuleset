@@ -252,8 +252,9 @@ public partial class TestSceneBmsCourseSelect
             Assert.That(practice.SelectedScore.Value, Is.Null);
             Assert.That(practice.LastResult!.Score.Statistics.Values.Sum(), Is.GreaterThan(0));
             Assert.That(practice.LastResult.Score.Mods.OfType<BmsModBranchReplay>(), Is.Empty);
-            Assert.That(practice.LastResult.Gauges.Any(gauge => gauge.Failed), Is.True);
-            Assert.That(practice.LastResult.GaugeHistory.Any(entry => entry.States.Any(gauge => gauge.Failed)), Is.True);
+            Assert.That(practice.LastResult.Statistics.EndingGaugeStates.Any(gauge => gauge.Failed), Is.True);
+            Assert.That(practice.LastResult.Health, Is.Zero);
+            Assert.That(practice.LastResult.Statistics.Gauges.Any(series => series.FailurePoint != null), Is.True);
             Assert.That(second, Is.Not.SameAs(first));
             Assert.That(second.HasAttemptStarted, Is.False);
             Assert.That(second.GameplayState.ScoreProcessor.JudgedHits, Is.Zero);

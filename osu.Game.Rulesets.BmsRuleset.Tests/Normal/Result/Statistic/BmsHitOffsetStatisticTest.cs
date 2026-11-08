@@ -3,6 +3,7 @@ using NUnit.Framework;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
@@ -78,10 +79,10 @@ public class BmsHitOffsetStatisticTest
                 new HitEvent(-8, 1, HitResult.Perfect, new BmsNote { Column = 8, StartTime = 1500 }, null, null),
             ]);
 
-        Assert.That(statistics.Keys.Select(k => k.Label), Is.EqualTo(Enumerable.Range(1, 9).Select(i => $"Key {i}")));
+        Assert.That(statistics.Keys.Select(k => k.Label), Is.EqualTo(Enumerable.Range(1, 9).Select(BmsStrings.Key)));
         Assert.That(statistics.Keys[0].Summary.Count, Is.EqualTo(1));
         Assert.That(statistics.Keys[8].Summary.Count, Is.EqualTo(1));
-        Assert.That(statistics.Keys.Any(k => k.Label == "Scratch"), Is.False);
+        Assert.That(statistics.Keys.Any(k => k.Label == BmsStrings.Scratch), Is.False);
     }
 
     [Test]
@@ -148,15 +149,13 @@ public class BmsHitOffsetStatisticTest
         Assert.That(statistics.Overall.Count, Is.EqualTo(7));
         Assert.That(statistics.Overall.AverageOffset, Is.EqualTo(1.5).Within(0.001));
         Assert.That(statistics.Overall.StandardDeviation, Is.EqualTo(19.358).Within(0.001));
-        Assert.That(statistics.Overall.FastCount, Is.EqualTo(2));
-        Assert.That(statistics.Overall.SlowCount, Is.EqualTo(2));
         Assert.That(statistics.Overall.BinSize, Is.EqualTo(1));
         Assert.That(statistics.Overall.BinsByResult.Values, Has.All.Length.EqualTo(101));
         Assert.That(statistics.Overall.BinsByResult.Values.SelectMany(b => b).Sum(), Is.EqualTo(7));
         Assert.That(statistics.Overall.BinsByResult[HitResult.Meh][^1], Is.EqualTo(1));
         Assert.That(statistics.Overall.BinsByResult[HitResult.Miss][0], Is.EqualTo(2));
 
-        Assert.That(statistics.Keys.Select(k => k.Label), Is.EqualTo(["Scratch", "Key 1", "Key 2", "Key 3", "Key 4", "Key 5"]));
+        Assert.That(statistics.Keys.Select(k => k.Label), Is.EqualTo(new[] { BmsStrings.Scratch }.Concat(Enumerable.Range(1, 5).Select(BmsStrings.Key))));
         Assert.That(statistics.Keys[0].Summary.Count, Is.EqualTo(4));
         Assert.That(statistics.Keys[0].Summary.AverageOffset, Is.EqualTo(-2).Within(0.001));
         Assert.That(statistics.Keys[0].Summary.StandardDeviation, Is.EqualTo(10).Within(0.001));

@@ -34,7 +34,6 @@ internal static class BmsScoreAggregation
             Mods = mods.Select(mod => mod.DeepClone()).ToArray(),
             Statistics = statistics,
             MaximumStatistics = sumStatistics(scores.Select(score => score.MaximumStatistics)),
-            HitEvents = scores.SelectMany(score => score.HitEvents).ToList(),
             Date = scores.Select(score => score.Date).DefaultIfEmpty().Max(),
         };
     }

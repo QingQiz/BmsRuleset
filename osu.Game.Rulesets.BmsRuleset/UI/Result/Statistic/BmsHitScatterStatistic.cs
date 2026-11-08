@@ -158,12 +158,12 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResu
         return new ScatterData(points, duration, offsetRange, [-offsetRange, -offsetRange / 2, 0, offsetRange / 2, offsetRange], boundaries);
     }
 
-    private static string labelFor(int column, BmsLayoutVariant variant, ref int keyIndex)
+    private static LocalisableString labelFor(int column, BmsLayoutVariant variant, ref int keyIndex)
     {
         if (BmsLayout.IsScratchColumn(column, variant))
-            return "Scratch";
+            return BmsStrings.Scratch;
 
-        return $"Key {++keyIndex}";
+        return BmsStrings.Key(++keyIndex);
     }
 
     private static double displayedOffsetFor(ScatterPoint point, double offsetRange) => point.Result switch
@@ -236,14 +236,6 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResu
             Spacing = new Vector2(10, 2),
             Children = children,
         };
-    }
-
-    private static LocalisableString localiseLabel(string label)
-    {
-        if (label == "Scratch")
-            return BmsStrings.Scratch;
-
-        return int.TryParse(label.AsSpan("Key ".Length), out var key) ? BmsStrings.Key(key) : label;
     }
 
     private static Drawable createRow(LocalisableString label, ScatterData data, float height) => new GridContainer
@@ -659,7 +651,7 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResu
         if (expanded)
         {
             foreach (var key in statistics.Keys)
-                content.Add(createRow(localiseLabel(key.Label), key.Data, key_graph_height));
+                content.Add(createRow(key.Label, key.Data, key_graph_height));
         }
     }
 
@@ -674,7 +666,7 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResu
 
     internal sealed record HitScatterStatistics(ScatterData Overall, IReadOnlyList<KeyHitScatterStatistics> Keys);
 
-    internal sealed record KeyHitScatterStatistics(string Label, ScatterData Data);
+    internal sealed record KeyHitScatterStatistics(LocalisableString Label, ScatterData Data);
 
     internal sealed record ScatterData(IReadOnlyList<ScatterPoint> Points, double Duration, double OffsetRange, IReadOnlyList<double> OffsetTicks, IReadOnlyList<float> StageBoundaries);
 }

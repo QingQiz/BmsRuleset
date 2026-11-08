@@ -11,6 +11,7 @@ internal static class BmsCourseScoreAggregation
         var played = session.Stages.Where(stage => stage.Score != null).Select(stage => stage.Score!).ToArray();
         var passed = session.Status == BmsCourseStatus.Passed;
         var aggregate = BmsScoreAggregation.CreateScore(played, session.Stages[0].Stage.Beatmap, session.Mods, passed);
+        aggregate.HitEvents = played.SelectMany(score => score.HitEvents).ToList();
         if (!passed)
             aggregate.Rank = ScoreRank.F;
         return aggregate;

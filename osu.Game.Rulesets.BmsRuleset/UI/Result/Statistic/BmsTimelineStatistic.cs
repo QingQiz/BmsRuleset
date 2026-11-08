@@ -98,14 +98,12 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable, IBmsResult
         var variant = playableBeatmap is BmsBeatmap bms ? bms.LayoutVariant : BmsLayoutVariant.Bms5K;
 
         var beatmapMax = playableBeatmap.HitObjects.Select(h => h.GetEndTime()).DefaultIfEmpty(0).Max();
-        var timingHitEvents = timingEvents.ToArray();
-        var scoringHitEvents = scoringEvents.ToArray();
-        var hitEventsMax = timingHitEvents.Length == 0 ? 0 : timingHitEvents.Max(e => e.HitObject.GetEndTime());
+        var hitEventsMax = timingEvents.Count == 0 ? 0 : timingEvents.Max(e => e.HitObject.GetEndTime());
         var duration = Math.Max(Math.Max(1, minimumDuration), Math.Max(beatmapMax, hitEventsMax));
 
         var notes = createNotesSubplot(playableBeatmap, variant, duration);
-        var judgements = createJudgementSubplot(scoringHitEvents, duration);
-        var fastSlow = createFastSlowSubplot(timingHitEvents, duration);
+        var judgements = createJudgementSubplot(scoringEvents, duration);
+        var fastSlow = createFastSlowSubplot(timingEvents, duration);
         return new TimelineData(notes, judgements, fastSlow, [], duration);
     }
 
@@ -174,9 +172,9 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable, IBmsResult
 
         return new SubplotData(
         [
-            new CategoryData("Scratch", scratch_colour, scratch),
-            new CategoryData("ln", ln_colour, ln),
-            new CategoryData("note", note_colour, note),
+            new CategoryData(BmsStrings.Scratch, scratch_colour, scratch),
+            new CategoryData(BmsStrings.LongNote, ln_colour, ln),
+            new CategoryData(BmsStrings.Note, note_colour, note),
         ], uniformBucketWeights(duration));
     }
 
@@ -209,11 +207,11 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable, IBmsResult
 
         return new SubplotData(
         [
-            new CategoryData("Poor", BmsHitResultColours.ForHitResult(HitResult.Meh), meh),
-            new CategoryData("Bad", BmsHitResultColours.ForHitResult(HitResult.Ok), ok),
-            new CategoryData("Good", BmsHitResultColours.ForHitResult(HitResult.Good), good),
-            new CategoryData("Great", BmsHitResultColours.ForHitResult(HitResult.Great), great),
-            new CategoryData("Perfect", BmsHitResultColours.ForHitResult(HitResult.Perfect), perfect),
+            new CategoryData(BmsStrings.Poor, BmsHitResultColours.ForHitResult(HitResult.Meh), meh),
+            new CategoryData(BmsStrings.Bad, BmsHitResultColours.ForHitResult(HitResult.Ok), ok),
+            new CategoryData(BmsStrings.Good, BmsHitResultColours.ForHitResult(HitResult.Good), good),
+            new CategoryData(BmsStrings.Great, BmsHitResultColours.ForHitResult(HitResult.Great), great),
+            new CategoryData(BmsStrings.Perfect, BmsHitResultColours.ForHitResult(HitResult.Perfect), perfect),
         ], uniformBucketWeights(duration));
     }
 
@@ -232,8 +230,8 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable, IBmsResult
 
         return new SubplotData(
         [
-            new CategoryData("fast", BmsResultColours.FAST, fast),
-            new CategoryData("slow", BmsResultColours.SLOW, slow),
+            new CategoryData(BmsStrings.Fast, BmsResultColours.FAST, fast),
+            new CategoryData(BmsStrings.Slow, BmsResultColours.SLOW, slow),
         ], uniformBucketWeights(duration));
     }
 
@@ -313,7 +311,7 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable, IBmsResult
                     },
                     new OsuSpriteText
                     {
-                        Text = localiseCategory(c.Label),
+                        Text = c.Label,
                         Anchor = Anchor.CentreLeft,
                         Origin = Anchor.CentreLeft,
                         Font = OsuFont.GetFont(size: 11),
@@ -331,22 +329,6 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable, IBmsResult
             Children = items,
         };
     }
-
-    private static LocalisableString localiseCategory(string category) => category switch
-    {
-        "note" => BmsStrings.Note,
-        "ln" => BmsStrings.LongNote,
-        "Scratch" => BmsStrings.Scratch,
-        "mine" => BmsStrings.Mine,
-        "Poor" => BmsStrings.Poor,
-        "Bad" => BmsStrings.Bad,
-        "Good" => BmsStrings.Good,
-        "Great" => BmsStrings.Great,
-        "Perfect" => BmsStrings.Perfect,
-        "fast" => BmsStrings.Fast,
-        "slow" => BmsStrings.Slow,
-        _ => category,
-    };
 
     private static Drawable createPlot(SubplotData subplot, IReadOnlyList<float> stageBoundaries)
     {
@@ -454,5 +436,5 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable, IBmsResult
 
     internal sealed record SubplotData(IReadOnlyList<CategoryData> Categories, IReadOnlyList<float> BucketWeights);
 
-    internal sealed record CategoryData(string Label, Color4 Colour, int[] Buckets);
+    internal sealed record CategoryData(LocalisableString Label, Color4 Colour, int[] Buckets);
 }

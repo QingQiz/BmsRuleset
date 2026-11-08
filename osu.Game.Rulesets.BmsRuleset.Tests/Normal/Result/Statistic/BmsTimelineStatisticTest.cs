@@ -3,6 +3,7 @@ using NUnit.Framework;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
@@ -108,7 +109,7 @@ public class BmsTimelineStatisticTest
 
         Assert.Multiple(() =>
         {
-            Assert.That(data.Notes.Categories.Select(category => category.Label), Does.Not.Contain("mine"));
+            Assert.That(data.Notes.Categories.Select(category => category.Label), Does.Not.Contain(BmsStrings.Mine));
             Assert.That(data.Notes.Categories.Sum(category => category.Buckets.Sum()), Is.EqualTo(1));
         });
     }

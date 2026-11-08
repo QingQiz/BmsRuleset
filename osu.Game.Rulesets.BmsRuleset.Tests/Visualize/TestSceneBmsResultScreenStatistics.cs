@@ -27,6 +27,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Gauge;
+using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.UI.Icons;
 using osu.Game.Rulesets.BmsRuleset.UI.Ranking;
 using osu.Game.Rulesets.BmsRuleset.UI.Result;
@@ -427,8 +428,8 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
         AddAssert("counts match timeline categories", () =>
         {
             var timeline = BmsTimelineStatistic.CreateData(new ScoreInfo { HitEvents = hitEvents }, new BmsBeatmap()).FastSlow;
-            return timeline.Categories.Single(category => category.Label == "fast").Buckets.Sum() == balance.FastCount
-                && timeline.Categories.Single(category => category.Label == "slow").Buckets.Sum() == balance.SlowCount;
+            return timeline.Categories.Single(category => category.Label == BmsStrings.Fast).Buckets.Sum() == balance.FastCount
+                && timeline.Categories.Single(category => category.Label == BmsStrings.Slow).Buckets.Sum() == balance.SlowCount;
         });
     }
 

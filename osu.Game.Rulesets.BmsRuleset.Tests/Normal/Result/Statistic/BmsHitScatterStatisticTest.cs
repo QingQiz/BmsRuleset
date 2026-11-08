@@ -3,6 +3,7 @@ using NUnit.Framework;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
@@ -109,7 +110,7 @@ public class BmsHitScatterStatisticTest
             ]);
 
         Assert.That(statistics.Overall.Points.Select(p => p.Offset), Is.EqualTo([-12, 8, 30, -20, -150]));
-        Assert.That(statistics.Keys.Select(k => k.Label), Is.EqualTo(["Scratch", "Key 1", "Key 2", "Key 3", "Key 4", "Key 5"]));
+        Assert.That(statistics.Keys.Select(k => k.Label), Is.EqualTo(new[] { BmsStrings.Scratch }.Concat(Enumerable.Range(1, 5).Select(BmsStrings.Key))));
         Assert.That(statistics.Keys[0].Data.Points.Select(p => p.Offset), Is.EqualTo([-12, 8]));
         Assert.That(statistics.Keys[1].Data.Points.Select(p => p.Offset), Is.EqualTo([30, -20]));
         Assert.That(statistics.Keys[2].Data.Points, Is.Empty);

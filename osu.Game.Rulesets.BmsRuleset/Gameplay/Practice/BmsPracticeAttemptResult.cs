@@ -16,22 +16,21 @@ namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Practice;
 internal sealed record BmsPracticeAttemptResult(
     int Attempt,
     ScoreInfo Score,
-    IReadOnlyList<BmsGaugeStateSnapshot> Gauges,
-    IReadOnlyList<BmsGaugeHistoryEvent> GaugeHistory,
     int Fast,
     int Slow,
     BmsResultStatisticsData Statistics)
 {
     internal int ExScore => BmsExScore.Calculate(Score.Statistics);
 
-    internal double Health => Gauges.FirstOrDefault(state => !state.Failed)?.Health ?? Gauges.LastOrDefault()?.Health ?? 0;
+    internal double Health => Statistics.EndingGaugeStates.FirstOrDefault(state => !state.Failed)?.Health
+                              ?? Statistics.EndingGaugeStates.LastOrDefault()?.Health ?? 0;
 
-    internal static BmsPracticeAttemptResult Create(int attempt, ScoreInfo score, BmsHealthProcessor health,
+    internal static BmsPracticeAttemptResult Create(int attempt, ScoreInfo score,
         IReadOnlyList<BmsGaugeHistoryEvent> gaugeHistory, BmsBeatmap beatmap, BmsPracticeSettings settings,
         IReadOnlyList<BmsJudgementEvent> judgements)
     {
         var timedHits = score.HitEvents.Where(hit => hit.Result is HitResult.Perfect or HitResult.Great or HitResult.Good).ToArray();
-        return new BmsPracticeAttemptResult(attempt, score.DeepClone(), health.CurrentGaugeStates.ToArray(), gaugeHistory.ToArray(),
+        return new BmsPracticeAttemptResult(attempt, score.DeepClone(),
             timedHits.Count(hit => hit.TimeOffset < 0), timedHits.Count(hit => hit.TimeOffset > 0),
             createStatistics(score, beatmap, settings, judgements, gaugeHistory));
     }

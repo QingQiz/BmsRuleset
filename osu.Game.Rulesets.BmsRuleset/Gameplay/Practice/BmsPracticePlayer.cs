@@ -424,7 +424,7 @@ internal partial class BmsPracticePlayer : Player
         ((BmsHealthProcessor)HealthProcessor).HasPassedAtEnd();
         ScoreProcessor.PopulateScore(Score.ScoreInfo);
         recordGaugeState();
-        var result = BmsPracticeAttemptResult.Create(session.Attempts, Score.ScoreInfo, (BmsHealthProcessor)HealthProcessor, gaugeHistory,
+        var result = BmsPracticeAttemptResult.Create(session.Attempts, Score.ScoreInfo, gaugeHistory,
             (BmsBeatmap)GameplayState.Beatmap, session.Settings, ((BmsScoreProcessor)ScoreProcessor).JudgementEvents);
 
         // Leave the frame-stable judgement traversal before replacing the entire Player.
