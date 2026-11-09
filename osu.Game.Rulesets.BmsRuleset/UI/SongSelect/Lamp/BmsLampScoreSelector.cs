@@ -24,11 +24,15 @@ public static class BmsLampScoreSelector
 
     internal static (BmsLamp Lamp, ScoreRank? Rank) SelectBestCourse(IReadOnlyList<BmsCourseResult> results, IReadOnlyList<Mod> selectedMods)
     {
-        var scores = results.Select(scoreFromResult).ToArray();
-        var matchingResults = results.Where((result, index) =>
-            hasHistoricalStage(result)
-            && scores[index].Mods.All(mod => mod.UserPlayable)
-            && MatchesSelectedMods(scores[index], selectedMods)).ToArray();
+        var ruleset = new BmsRuleset();
+        var matchingResults = results.Where(result =>
+        {
+            if (!hasHistoricalStage(result))
+                return false;
+
+            var mods = modsFromResult(result, ruleset);
+            return mods.All(mod => mod.UserPlayable) && matchesSelectedMods(mods, selectedMods);
+        }).ToArray();
 
         if (matchingResults.Length == 0)
             return (BmsLamp.NoPlay, null);
@@ -45,11 +49,14 @@ public static class BmsLampScoreSelector
     }
 
     internal static bool MatchesSelectedMods(ScoreInfo score, IReadOnlyList<Mod> selectedMods) =>
-        score.Mods.Concat(selectedMods)
+        matchesSelectedMods(score.Mods, selectedMods);
+
+    private static bool matchesSelectedMods(IReadOnlyList<Mod> scoreMods, IReadOnlyList<Mod> selectedMods) =>
+        scoreMods.Concat(selectedMods)
             .OfType<IApplicableToScoreSelection>()
             .Select(mod => mod.ScoreSelectionRule)
             .Distinct<IScoreSelectionRule>(ReferenceEqualityComparer.Instance)
-            .All(rule => rule.IsScoreEligible(score.Mods, selectedMods));
+            .All(rule => rule.IsScoreEligible(scoreMods, selectedMods));
 
     internal static bool MatchesExactMods(
         IEnumerable<Mod> scoreMods,
@@ -79,21 +86,14 @@ public static class BmsLampScoreSelector
         _ => throw new ArgumentOutOfRangeException(nameof(lamp), lamp, null),
     };
 
-    private static ScoreInfo scoreFromResult(BmsCourseResult result)
+    private static Mod[] modsFromResult(BmsCourseResult result, BmsRuleset ruleset)
     {
-        var ruleset = new BmsRuleset();
-
         // Class-tier gauge mods never appear in song select and are irrelevant to matching.
-        var mods = result.Attempt?.ModAcronyms
+        return result.Attempt?.ModAcronyms
             .Select(resolveMod)
             .Where(mod => mod != null)
             .Select(mod => mod!)
             .ToArray() ?? [];
-
-        return new ScoreInfo
-        {
-            Mods = mods,
-        };
 
         Mod? resolveMod(string acronym) => acronym.ToUpperInvariant() is "C1" or "C2" or "C3"
             ? null

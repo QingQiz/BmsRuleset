@@ -14,6 +14,30 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.SongSelect;
 public class BmsScoreSelectorCourseTest
 {
     [Test]
+    public void TestLowercaseHistoricalModsKeepIndependentEligibility()
+    {
+        var clear = result(BmsLamp.Clear, ScoreRank.S, acronyms: ["c1", "XX"]);
+        var hidden = result(BmsLamp.ExHardClear, ScoreRank.A, acronyms: ["c3", "hs"]);
+        var autoplay = result(BmsLamp.Max, ScoreRank.X, acronyms: ["at"]);
+
+        Assert.That(BmsLampScoreSelector.SelectBestCourse([autoplay, hidden, clear], []), Is.EqualTo((BmsLamp.Clear, (ScoreRank?)ScoreRank.S)));
+        Assert.That(BmsLampScoreSelector.SelectBestCourse([clear, autoplay, hidden], [new BmsModHideScratch()]),
+            Is.EqualTo((BmsLamp.ExHardClear, (ScoreRank?)ScoreRank.S)));
+    }
+
+    [TestCase(1.25, BmsLamp.ExHardClear, ScoreRank.A)]
+    [TestCase(1.5, BmsLamp.ExHardClear, ScoreRank.A)]
+    [TestCase(1.75, BmsLamp.NoPlay, null)]
+    public void TestHistoricalRateAcronymUsesItsDefaultRate(double selectedRate, BmsLamp expectedLamp, ScoreRank? expectedRank)
+    {
+        var faster = result(BmsLamp.ExHardClear, ScoreRank.A, acronyms: ["dt"]);
+        var noMod = result(BmsLamp.Clear, ScoreRank.S);
+        var selected = new BmsModDoubleTime { SpeedChange = { Value = selectedRate } };
+
+        Assert.That(BmsLampScoreSelector.SelectBestCourse([noMod, faster], [selected]), Is.EqualTo((expectedLamp, expectedRank)));
+    }
+
+    [Test]
     public void TestLampIsFilteredByMods()
     {
         var noModResult = result(BmsLamp.Clear, ScoreRank.S);

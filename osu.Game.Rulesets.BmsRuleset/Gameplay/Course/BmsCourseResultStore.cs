@@ -35,64 +35,6 @@ internal sealed class BmsCourseResultStore
         indexPersistedFiles();
     }
 
-    internal BmsLamp GetLamp(string courseId)
-    {
-        var history = GetHistory(courseId);
-        return history.Count == 0 ? BmsLamp.NoPlay : history.MaxBy(result => (int)result.Lamp).Lamp;
-    }
-
-    internal ScoreRank? GetRank(string courseId)
-    {
-        var history = GetHistory(courseId);
-        return history.Count == 0 ? null : history.MaxBy(result => (int)(result.Rank ?? ScoreRank.F)).Rank;
-    }
-
-    internal bool TryGet(string courseId, out BmsCourseResult result)
-    {
-        var history = GetHistory(courseId);
-        if (history.Count > 0)
-        {
-            result = history.MaxBy(resultPriority);
-            return true;
-        }
-
-        result = default;
-        return false;
-
-        static (int Lamp, int Rank, long Score) resultPriority(BmsCourseResult result) =>
-            ((int)result.Lamp, (int)(result.Rank ?? ScoreRank.F), result.Score?.TotalScore ?? 0);
-    }
-
-    internal IReadOnlyList<BmsCourseResult> GetHistory(string courseId)
-    {
-        lock (sync)
-        {
-            if (loadedResults.TryGetValue(courseId, out var history))
-                return history.ToArray();
-
-            history = [];
-            if (indexByCourseKey.TryGetValue(courseKeyFor(courseId), out var entries))
-            {
-                foreach (var entry in entries.OrderBy(entry => entry.Path, StringComparer.Ordinal))
-                {
-                    try
-                    {
-                        var result = JsonSerializer.Deserialize<BmsCourseResult>(File.ReadAllText(entry.Path));
-                        if (isValid(result))
-                            history.Add(result with { SourcePath = entry.Path });
-                    }
-                    catch (Exception e) when (e is IOException or JsonException or UnauthorizedAccessException)
-                    {
-                        BmsLogger.Error(e, $"Failed to read BMS course result {entry.Path}: {e.Message}");
-                    }
-                }
-            }
-
-            loadedResults[courseId] = history;
-            return history.ToArray();
-        }
-    }
-
     internal async Task<IReadOnlyList<BmsCourseResult>> GetHistoryAsync(string courseId, CancellationToken cancellationToken)
     {
         var attemptedPaths = new HashSet<string>(StringComparer.Ordinal);

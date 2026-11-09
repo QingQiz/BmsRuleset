@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
@@ -49,6 +50,10 @@ public partial class TestSceneBmsCourseSelect
         var courseId = Guid.NewGuid().ToString();
         var directory = string.Empty;
         Task import = null!;
+        IReadOnlyList<BmsCourseResult> history = [];
+        Task historyRead = null!;
+
+        async Task readHistory() => history = await BmsRulesetRuntime.CourseResults!.GetHistoryAsync(courseId, CancellationToken.None);
 
         AddStep("import actual stage chart", () =>
         {
@@ -117,7 +122,13 @@ public partial class TestSceneBmsCourseSelect
         AddStep("abort stage", () => player.Exit());
         AddUntilStep("score import started", () => player.ImportCount == 1);
         AddAssert("exit waits for import", () => Stack.CurrentScreen, () => Is.SameAs(player));
-        AddAssert("course is not recorded before import", () => BmsRulesetRuntime.CourseResults!.GetHistory(courseId), () => Is.Empty);
+        AddStep("request history before import", () => historyRead = readHistory());
+        AddUntilStep("history before import loaded", () => historyRead.IsCompleted);
+        AddStep("course is not recorded before import", () =>
+        {
+            Assert.That(historyRead.IsCompletedSuccessfully, Is.True, historyRead.Exception?.ToString());
+            Assert.That(history, Is.Empty);
+        });
         AddStep("repeat exit while importing", () => player.Exit());
         AddAssert("import is not duplicated", () => player.ImportCount, () => Is.EqualTo(1));
         AddStep("finish score import", () =>
@@ -165,10 +176,22 @@ public partial class TestSceneBmsCourseSelect
         }
 
         AddStep("show course results", () => Stack.Push(new BmsCourseResultsScreen(session)));
-        AddUntilStep("course result saved", () => BmsRulesetRuntime.CourseResults!.GetHistory(courseId).Count, () => Is.EqualTo(1));
+        AddStep("request saved history", () => historyRead = readHistory());
+        AddUntilStep("course result saved", () =>
+        {
+            if (!historyRead.IsCompleted)
+                return false;
+
+            Assert.That(historyRead.IsCompletedSuccessfully, Is.True, historyRead.Exception?.ToString());
+            if (history.Count == 1)
+                return true;
+
+            historyRead = readHistory();
+            return false;
+        });
         AddStep("saved course stages can be resolved", () =>
         {
-            var attempt = BmsRulesetRuntime.CourseResults!.GetHistory(courseId).Single().Attempt!;
+            var attempt = history.Single().Attempt!;
             Assert.That(attempt.Stages, Has.Length.EqualTo(session.Course.Stages.Count));
             foreach (var stage in attempt.Stages)
             {

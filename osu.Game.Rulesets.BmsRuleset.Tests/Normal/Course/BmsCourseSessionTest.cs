@@ -81,11 +81,11 @@ public class BmsCourseSessionTest
     {
         Status = BmsCourseStatus.Passed,
         GaugeType = gaugeType,
-        Stages = [],
+        Stages = [new BmsCourseStageAttemptData { Status = BmsCourseStageStatus.Passed, ScoreId = Guid.NewGuid() }],
     };
 
     [Test]
-    public void TestCourseRecordUsesFinalGaugeTierOverStartingTier()
+    public async Task TestCourseRecordUsesFinalGaugeTierOverStartingTier()
     {
         var store = new BmsCourseResultStore(courseResultsDirectory);
 
@@ -93,10 +93,10 @@ public class BmsCourseSessionTest
         // record the NORMAL lamp rather than the starting tier's EX-HARD.
         store.Record("course", BmsCourseStatus.Passed, ScoreRank.A, attempt: attempt(BmsGaugeType.ExHardClass), finalGaugeType: BmsGaugeType.Class);
 
-        Assert.That(store.GetLamp("course"), Is.EqualTo(BmsLamp.Clear));
+        Assert.That((await store.GetHistoryAsync("course", CancellationToken.None)).Single().Lamp, Is.EqualTo(BmsLamp.Clear));
 
         store = new BmsCourseResultStore(courseResultsDirectory);
-        Assert.That(store.GetLamp("course"), Is.EqualTo(BmsLamp.Clear));
+        Assert.That((await store.GetHistoryAsync("course", CancellationToken.None)).Single().Lamp, Is.EqualTo(BmsLamp.Clear));
     }
 
     [Test]
@@ -134,15 +134,15 @@ public class BmsCourseSessionTest
     }
 
     [Test]
-    public void TestAbortedCourseCreatesResultWhenScoreIsAvailable()
+    public async Task TestAbortedCourseCreatesResultWhenScoreIsAvailable()
     {
         var store = new BmsCourseResultStore(courseResultsDirectory);
 
         store.Record("aborted-course", BmsCourseStatus.Aborted, ScoreRank.F, createScore(false, 1000));
+        var result = (await store.GetHistoryAsync("aborted-course", CancellationToken.None)).Single();
 
         Assert.Multiple(() =>
         {
-            Assert.That(store.TryGet("aborted-course", out var result), Is.True);
             Assert.That(result.Lamp, Is.EqualTo(BmsLamp.Failed));
             Assert.That(result.Rank, Is.EqualTo(ScoreRank.F));
             Assert.That(result.Score?.TotalScore, Is.EqualTo(1000));
@@ -264,104 +264,104 @@ public class BmsCourseSessionTest
     }
 
     [Test]
-    public void TestCourseLampPersistsAndDoesNotDowngradeClear()
+    public async Task TestCourseLampPersistsAndDoesNotDowngradeClear()
     {
         var store = new BmsCourseResultStore(courseResultsDirectory);
 
-        store.Record("course", BmsCourseStatus.Failed);
-        Assert.That(store.GetLamp("course"), Is.EqualTo(BmsLamp.Failed));
-        Assert.That(store.GetRank("course"), Is.EqualTo(ScoreRank.F));
+        store.Record("course", BmsCourseStatus.Failed, attempt: attempt(BmsGaugeType.Class));
+        Assert.That(BmsLampScoreSelector.SelectBestCourse(await store.GetHistoryAsync("course", CancellationToken.None), []),
+            Is.EqualTo((BmsLamp.Failed, (ScoreRank?)ScoreRank.F)));
 
         store = new BmsCourseResultStore(courseResultsDirectory);
-        Assert.That(store.GetLamp("course"), Is.EqualTo(BmsLamp.Failed));
-        Assert.That(store.GetRank("course"), Is.EqualTo(ScoreRank.F));
+        Assert.That(BmsLampScoreSelector.SelectBestCourse(await store.GetHistoryAsync("course", CancellationToken.None), []),
+            Is.EqualTo((BmsLamp.Failed, (ScoreRank?)ScoreRank.F)));
 
-        store.Record("course", BmsCourseStatus.Passed, ScoreRank.S);
-        store.Record("course", BmsCourseStatus.Passed, ScoreRank.A);
+        store.Record("course", BmsCourseStatus.Passed, ScoreRank.S, attempt: attempt(BmsGaugeType.Class));
+        store.Record("course", BmsCourseStatus.Passed, ScoreRank.A, attempt: attempt(BmsGaugeType.Class));
         store.Record("course", BmsCourseStatus.Aborted);
-        Assert.That(store.GetLamp("course"), Is.EqualTo(BmsLamp.Clear));
-        Assert.That(store.GetRank("course"), Is.EqualTo(ScoreRank.S));
+        Assert.That(BmsLampScoreSelector.SelectBestCourse(await store.GetHistoryAsync("course", CancellationToken.None), []),
+            Is.EqualTo((BmsLamp.Clear, (ScoreRank?)ScoreRank.S)));
 
         store = new BmsCourseResultStore(courseResultsDirectory);
-        Assert.That(store.GetRank("course"), Is.EqualTo(ScoreRank.S));
+        Assert.That(BmsLampScoreSelector.SelectBestCourse(await store.GetHistoryAsync("course", CancellationToken.None), []).Rank, Is.EqualTo(ScoreRank.S));
     }
 
     [TestCase(BmsGaugeType.Class, BmsLamp.Clear)]
     [TestCase(BmsGaugeType.ExClass, BmsLamp.HardClear)]
     [TestCase(BmsGaugeType.ExHardClass, BmsLamp.ExHardClear)]
-    public void TestCourseLampReflectsClassTierOnPass(BmsGaugeType gaugeType, BmsLamp expectedLamp)
+    public async Task TestCourseLampReflectsClassTierOnPass(BmsGaugeType gaugeType, BmsLamp expectedLamp)
     {
         var store = new BmsCourseResultStore(courseResultsDirectory);
 
         store.Record("course", BmsCourseStatus.Passed, ScoreRank.A, attempt: attempt(gaugeType));
 
-        Assert.That(store.GetLamp("course"), Is.EqualTo(expectedLamp));
+        Assert.That((await store.GetHistoryAsync("course", CancellationToken.None)).Single().Lamp, Is.EqualTo(expectedLamp));
     }
 
     [TestCase(BmsGaugeType.Class, BmsLamp.Clear)]
     [TestCase(BmsGaugeType.ExClass, BmsLamp.HardClear)]
     [TestCase(BmsGaugeType.ExHardClass, BmsLamp.ExHardClear)]
-    public void TestCourseLampUsesFinalGaugeTierOnPass(BmsGaugeType finalGaugeType, BmsLamp expectedLamp)
+    public async Task TestCourseLampUsesFinalGaugeTierOnPass(BmsGaugeType finalGaugeType, BmsLamp expectedLamp)
     {
         var store = new BmsCourseResultStore(courseResultsDirectory);
 
         // Auto Gauge starts at ExHardClass but can conclude on any surviving tier.
         store.Record("course", BmsCourseStatus.Passed, ScoreRank.A, attempt: attempt(BmsGaugeType.ExHardClass), finalGaugeType: finalGaugeType);
 
-        Assert.That(store.GetLamp("course"), Is.EqualTo(expectedLamp));
+        Assert.That((await store.GetHistoryAsync("course", CancellationToken.None)).Single().Lamp, Is.EqualTo(expectedLamp));
 
         store = new BmsCourseResultStore(courseResultsDirectory);
-        Assert.That(store.GetLamp("course"), Is.EqualTo(expectedLamp));
+        Assert.That((await store.GetHistoryAsync("course", CancellationToken.None)).Single().Lamp, Is.EqualTo(expectedLamp));
     }
 
     [Test]
-    public void TestCourseLampFallsBackToStartingTierWithoutFinalGauge()
+    public async Task TestCourseLampFallsBackToStartingTierWithoutFinalGauge()
     {
         var store = new BmsCourseResultStore(courseResultsDirectory);
 
         store.Record("course", BmsCourseStatus.Passed, ScoreRank.A, attempt: attempt(BmsGaugeType.ExHardClass));
 
-        Assert.That(store.GetLamp("course"), Is.EqualTo(BmsLamp.ExHardClear));
+        Assert.That((await store.GetHistoryAsync("course", CancellationToken.None)).Single().Lamp, Is.EqualTo(BmsLamp.ExHardClear));
     }
 
     [Test]
-    public void TestCourseLampDefaultsToClearWithoutAttemptData()
+    public async Task TestCourseLampDefaultsToClearWithoutAttemptData()
     {
         var store = new BmsCourseResultStore(courseResultsDirectory);
 
         store.Record("course", BmsCourseStatus.Passed, ScoreRank.A);
 
-        Assert.That(store.GetLamp("course"), Is.EqualTo(BmsLamp.Clear));
+        Assert.That((await store.GetHistoryAsync("course", CancellationToken.None)).Single().Lamp, Is.EqualTo(BmsLamp.Clear));
     }
 
     [TestCase(BmsGaugeType.Class)]
     [TestCase(BmsGaugeType.ExClass)]
     [TestCase(BmsGaugeType.ExHardClass)]
-    public void TestCourseLampIgnoresTierOnFail(BmsGaugeType gaugeType)
+    public async Task TestCourseLampIgnoresTierOnFail(BmsGaugeType gaugeType)
     {
         var store = new BmsCourseResultStore(courseResultsDirectory);
 
         store.Record("course", BmsCourseStatus.Failed, ScoreRank.F, attempt: attempt(gaugeType));
 
-        Assert.That(store.GetLamp("course"), Is.EqualTo(BmsLamp.Failed));
+        Assert.That((await store.GetHistoryAsync("course", CancellationToken.None)).Single().Lamp, Is.EqualTo(BmsLamp.Failed));
     }
 
     [Test]
-    public void TestCourseLampDoesNotDowngradeHardOrExHardClear()
+    public async Task TestCourseLampDoesNotDowngradeHardOrExHardClear()
     {
         var store = new BmsCourseResultStore(courseResultsDirectory);
 
         store.Record("course", BmsCourseStatus.Passed, ScoreRank.A, attempt: attempt(BmsGaugeType.ExHardClass));
         store.Record("course", BmsCourseStatus.Passed, ScoreRank.A, attempt: attempt(BmsGaugeType.Class));
 
-        Assert.That(store.GetLamp("course"), Is.EqualTo(BmsLamp.ExHardClear));
+        Assert.That(BmsLampScoreSelector.SelectBestCourse(await store.GetHistoryAsync("course", CancellationToken.None), []).Lamp, Is.EqualTo(BmsLamp.ExHardClear));
 
         store = new BmsCourseResultStore(courseResultsDirectory);
-        Assert.That(store.GetLamp("course"), Is.EqualTo(BmsLamp.ExHardClear));
+        Assert.That(BmsLampScoreSelector.SelectBestCourse(await store.GetHistoryAsync("course", CancellationToken.None), []).Lamp, Is.EqualTo(BmsLamp.ExHardClear));
     }
 
     [Test]
-    public void TestCourseLampSurvivesAbortedResultsAndDoesNotDowngradeHardClear()
+    public async Task TestCourseLampSurvivesAbortedResultsAndDoesNotDowngradeHardClear()
     {
         var store = new BmsCourseResultStore(courseResultsDirectory);
 
@@ -370,14 +370,14 @@ public class BmsCourseSessionTest
         store.Record("course", BmsCourseStatus.Passed, ScoreRank.S, attempt: attempt(BmsGaugeType.ExClass));
         store.Record("course", BmsCourseStatus.Aborted, ScoreRank.F, createScore(false, 100_000));
 
-        Assert.That(store.GetLamp("course"), Is.EqualTo(BmsLamp.HardClear));
+        Assert.That(BmsLampScoreSelector.SelectBestCourse(await store.GetHistoryAsync("course", CancellationToken.None), []).Lamp, Is.EqualTo(BmsLamp.HardClear));
 
         store = new BmsCourseResultStore(courseResultsDirectory);
-        Assert.That(store.GetLamp("course"), Is.EqualTo(BmsLamp.HardClear));
+        Assert.That(BmsLampScoreSelector.SelectBestCourse(await store.GetHistoryAsync("course", CancellationToken.None), []).Lamp, Is.EqualTo(BmsLamp.HardClear));
     }
 
     [Test]
-    public void TestCourseRankDoesNotFollowLampHierarchy()
+    public async Task TestCourseRankDoesNotFollowLampHierarchy()
     {
         var store = new BmsCourseResultStore(courseResultsDirectory);
 
@@ -385,14 +385,11 @@ public class BmsCourseSessionTest
         store.Record("course", BmsCourseStatus.Passed, ScoreRank.S, createScore(true, 800_000), attempt(BmsGaugeType.Class));
         store.Record("course", BmsCourseStatus.Failed, ScoreRank.F, createScore(false, 700_000), attempt(BmsGaugeType.Class));
 
-        Assert.Multiple(() =>
-        {
-            Assert.That(store.GetLamp("course"), Is.EqualTo(BmsLamp.ExHardClear));
-            Assert.That(store.GetRank("course"), Is.EqualTo(ScoreRank.S));
-        });
+        Assert.That(BmsLampScoreSelector.SelectBestCourse(await store.GetHistoryAsync("course", CancellationToken.None), []),
+            Is.EqualTo((BmsLamp.ExHardClear, (ScoreRank?)ScoreRank.S)));
 
         store = new BmsCourseResultStore(courseResultsDirectory);
-        Assert.That(store.GetRank("course"), Is.EqualTo(ScoreRank.S));
+        Assert.That(BmsLampScoreSelector.SelectBestCourse(await store.GetHistoryAsync("course", CancellationToken.None), []).Rank, Is.EqualTo(ScoreRank.S));
     }
 
     [Test]
@@ -528,7 +525,7 @@ public class BmsCourseSessionTest
     }
 
     [Test]
-    public void TestCourseResultJsonIsLoadedOnDemand()
+    public async Task TestCourseResultJsonIsLoadedOnDemand()
     {
         var store = new BmsCourseResultStore(courseResultsDirectory);
         store.Record("course", BmsCourseStatus.Passed, ScoreRank.S, createScore(true, 900_000));
@@ -536,16 +533,11 @@ public class BmsCourseSessionTest
         store = new BmsCourseResultStore(courseResultsDirectory);
         File.Delete(Directory.EnumerateFiles(courseResultsDirectory, "*.json").Single());
 
-        Assert.Multiple(() =>
-        {
-            Assert.That(store.GetLamp("course"), Is.EqualTo(BmsLamp.NoPlay));
-            Assert.That(store.GetRank("course"), Is.Null);
-            Assert.That(store.GetHistory("course"), Is.Empty);
-        });
+        Assert.That(await store.GetHistoryAsync("course", CancellationToken.None), Is.Empty);
     }
 
     [Test]
-    public void TestCourseResultWithUnsupportedVersionIsIgnored()
+    public async Task TestCourseResultWithUnsupportedVersionIsIgnored()
     {
         var store = new BmsCourseResultStore(courseResultsDirectory);
         store.Record("course", BmsCourseStatus.Passed, ScoreRank.S);
@@ -554,11 +546,11 @@ public class BmsCourseSessionTest
 
         store = new BmsCourseResultStore(courseResultsDirectory);
 
-        Assert.That(store.GetHistory("course"), Is.Empty);
+        Assert.That((await store.GetHistoryAsync("course", CancellationToken.None)), Is.Empty);
     }
 
     [Test]
-    public void TestCourseResultWithoutVersionUsesVersionZero()
+    public async Task TestCourseResultWithoutVersionUsesVersionZero()
     {
         var store = new BmsCourseResultStore(courseResultsDirectory);
         store.Record("course", BmsCourseStatus.Passed, ScoreRank.S);
@@ -567,11 +559,11 @@ public class BmsCourseSessionTest
 
         store = new BmsCourseResultStore(courseResultsDirectory);
 
-        Assert.That(store.GetHistory("course"), Has.Count.EqualTo(1));
+        Assert.That(await store.GetHistoryAsync("course", CancellationToken.None), Has.Count.EqualTo(1));
     }
 
     [Test]
-    public void TestCourseResultsPersistAsIndividualFilesAndNotify()
+    public async Task TestCourseResultsPersistAsIndividualFilesAndNotify()
     {
         var store = new BmsCourseResultStore(courseResultsDirectory);
         var changed = new List<string>();
@@ -588,40 +580,43 @@ public class BmsCourseSessionTest
         });
 
         store = new BmsCourseResultStore(courseResultsDirectory);
+        var history = await store.GetHistoryAsync("course/with unsafe characters", CancellationToken.None);
+        var other = await store.GetHistoryAsync("other", CancellationToken.None);
 
         Assert.Multiple(() =>
         {
-            Assert.That(store.GetHistory("course/with unsafe characters").Select(result => result.Score?.TotalScore),
+            Assert.That(history.Select(result => result.Score?.TotalScore),
                 Is.EqualTo(new long?[] { 900_000, 500_000 }));
-            Assert.That(store.GetHistory("other").Single().Score?.TotalScore, Is.EqualTo(700_000));
+            Assert.That(other.Single().Score?.TotalScore, Is.EqualTo(700_000));
         });
     }
 
     [Test]
-    public void TestDeletingCourseResultOnlyRemovesSelectedHistoryFile()
+    public async Task TestDeletingCourseResultOnlyRemovesSelectedHistoryFile()
     {
         var store = new BmsCourseResultStore(courseResultsDirectory);
         store.Record("course", BmsCourseStatus.Passed, ScoreRank.S, createScore(true, 900_000));
         store.Record("course", BmsCourseStatus.Failed, ScoreRank.F, createScore(false, 500_000));
 
-        var history = store.GetHistory("course");
+        var history = await store.GetHistoryAsync("course", CancellationToken.None);
         Assert.That(history, Has.Count.EqualTo(2));
 
         var changed = new List<string>();
         store.Changed += changed.Add;
 
         Assert.That(store.Delete("course", history[0]), Is.True);
+        var remaining = await store.GetHistoryAsync("course", CancellationToken.None);
         Assert.Multiple(() =>
         {
             Assert.That(File.Exists(history[0].SourcePath), Is.False);
-            Assert.That(store.GetHistory("course"), Has.Count.EqualTo(1));
-            Assert.That(store.GetHistory("course").Single().Score?.TotalScore, Is.EqualTo(500_000));
+            Assert.That(remaining, Has.Count.EqualTo(1));
+            Assert.That(remaining.Single().Score?.TotalScore, Is.EqualTo(500_000));
             Assert.That(Directory.EnumerateFiles(courseResultsDirectory, "*.json"), Has.One.Items);
             Assert.That(changed, Is.EqualTo(["course"]));
         });
 
         var reloaded = new BmsCourseResultStore(courseResultsDirectory);
-        Assert.That(reloaded.GetHistory("course").Single().Score?.TotalScore, Is.EqualTo(500_000));
+        Assert.That((await reloaded.GetHistoryAsync("course", CancellationToken.None)).Single().Score?.TotalScore, Is.EqualTo(500_000));
     }
 
     [Test]
@@ -644,6 +639,50 @@ public class BmsCourseSessionTest
     }
 
     [Test]
+    public async Task TestCourseHistoryRequestsKeepSnapshotsAndObserveRecordedAndDeletedResults()
+    {
+        var store = new BmsCourseResultStore(courseResultsDirectory);
+        store.Record("course", BmsCourseStatus.Passed, ScoreRank.S, createScore(true, 900_000));
+        store.Record("course", BmsCourseStatus.Failed, ScoreRank.F, createScore(false, 500_000));
+        store = new BmsCourseResultStore(courseResultsDirectory);
+
+        var firstRead = store.GetHistoryAsync("course", CancellationToken.None);
+        var secondRead = store.GetHistoryAsync("course", CancellationToken.None);
+        await store.RecordAsync("course", BmsCourseStatus.Passed, ScoreRank.A, createScore(true, 700_000));
+        await Task.WhenAll(firstRead, secondRead);
+        var history = await store.GetHistoryAsync("course", CancellationToken.None);
+        Assert.That(history.Select(result => result.Score?.TotalScore), Is.EqualTo(new long?[] { 900_000, 500_000, 700_000 }));
+
+        Assert.That(store.Delete("course", history[0]), Is.True);
+        var remaining = await store.GetHistoryAsync("course", CancellationToken.None);
+        Assert.That(remaining.Select(result => result.Score?.TotalScore), Is.EqualTo(new long?[] { 500_000, 700_000 }));
+        Assert.That(history, Has.Count.EqualTo(3), "A published history snapshot must survive later deletion.");
+        ((BmsCourseResult[])remaining)[0] = default;
+        Assert.That((await store.GetHistoryAsync("course", CancellationToken.None)).Select(result => result.Score?.TotalScore),
+            Is.EqualTo(new long?[] { 500_000, 700_000 }), "Mutating a returned array must not modify the cached history.");
+
+        using var cancelled = new CancellationTokenSource();
+        await cancelled.CancelAsync();
+        Assert.ThrowsAsync<OperationCanceledException>(async () => await store.GetHistoryAsync("course", cancelled.Token));
+        var reloaded = new BmsCourseResultStore(courseResultsDirectory);
+        Assert.That((await reloaded.GetHistoryAsync("course", CancellationToken.None)).Select(result => result.Score?.TotalScore),
+            Is.EqualTo(new long?[] { 500_000, 700_000 }));
+    }
+
+    [Test]
+    public async Task TestCourseHistorySkipsMalformedFileAndRetainsValidResults()
+    {
+        var store = new BmsCourseResultStore(courseResultsDirectory);
+        store.Record("course", BmsCourseStatus.Passed, ScoreRank.S, createScore(true, 900_000));
+        store.Record("course", BmsCourseStatus.Failed, ScoreRank.F, createScore(false, 500_000));
+        var broken = (await store.GetHistoryAsync("course", CancellationToken.None))[0].SourcePath!;
+        await File.WriteAllTextAsync(broken, "{ invalid JSON");
+
+        store = new BmsCourseResultStore(courseResultsDirectory);
+        Assert.That((await store.GetHistoryAsync("course", CancellationToken.None)).Single().Score?.TotalScore, Is.EqualTo(500_000));
+    }
+
+    [Test]
     public async Task TestCourseScoreHistoryLoadsAsynchronouslyAndSupportsCancellation()
     {
         var store = new BmsCourseResultStore(courseResultsDirectory);
@@ -663,7 +702,7 @@ public class BmsCourseSessionTest
 
     [TestCase(false)]
     [TestCase(true)]
-    public void TestCourseScoreHistoryPersists(bool legacyEndingHealth)
+    public async Task TestCourseScoreHistoryPersists(bool legacyEndingHealth)
     {
         var store = new BmsCourseResultStore(courseResultsDirectory);
         var firstScore = createScore(true, 900_000);
@@ -690,18 +729,19 @@ public class BmsCourseSessionTest
 
         if (legacyEndingHealth)
         {
-            var path = store.GetHistory("course")[0].SourcePath;
+            var path = (await store.GetHistoryAsync("course", CancellationToken.None))[0].SourcePath;
             File.WriteAllText(path, File.ReadAllText(path).Replace("\"BeatmapHash\":\"first-stage\",",
                 "\"BeatmapHash\":\"first-stage\",\"EndingHealth\":0.75,", StringComparison.Ordinal));
         }
 
         store = new BmsCourseResultStore(courseResultsDirectory);
-        Assert.That(store.TryGet("course", out var result), Is.True);
+        var history = await store.GetHistoryAsync("course", CancellationToken.None);
+        var result = history[0];
         Assert.That(result.Score?.TotalScore, Is.EqualTo(900_000));
         Assert.That(result.Rank, Is.EqualTo(ScoreRank.S));
-        Assert.That(store.GetHistory("course").Select(history => history.Score?.TotalScore),
+        Assert.That(history.Select(entry => entry.Score?.TotalScore),
             Is.EqualTo(new long?[] { 900_000, 800_000 }));
-        Assert.That(store.GetHistory("course")[0].Attempt?.Stages.Single().ScoreId, Is.EqualTo(firstScore.ID));
+        Assert.That(history[0].Attempt?.Stages.Single().ScoreId, Is.EqualTo(firstScore.ID));
     }
 
     [Test]
@@ -770,13 +810,13 @@ public class BmsCourseSessionTest
     }
 
     [Test]
-    public void TestEmptyAbortedCourseDoesNotCreateResult()
+    public async Task TestEmptyAbortedCourseDoesNotCreateResult()
     {
         var store = new BmsCourseResultStore(courseResultsDirectory);
 
         store.Record("empty-aborted-course", BmsCourseStatus.Aborted);
 
-        Assert.That(store.TryGet("empty-aborted-course", out _), Is.False);
+        Assert.That(await store.GetHistoryAsync("empty-aborted-course", CancellationToken.None), Is.Empty);
     }
 
     [Test]
