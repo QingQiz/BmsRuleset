@@ -102,9 +102,12 @@ public class BmsPcmLeaseScheduleTest
         var (cache, pins) = BmsPcmMaintenanceTest.CreatePinnedCache(2);
         using var controller = createController();
         typeof(BmsPcmPlaybackController).GetField("assetCache", instance)!.SetValue(controller, cache);
-        var resources = BmsPcmMaintenanceTest.Field<Dictionary<ushort, string>>(controller, "resolvedResources");
+        var resources = BmsPcmMaintenanceTest.Field<Dictionary<int, string>>(controller, "resolvedResources");
         resources[0] = "0";
         resources[1] = "1";
+        var definitions = BmsPcmMaintenanceTest.Field<Dictionary<int, BmsSampleDefinition>>(controller, "sampleDefinitions");
+        definitions[0] = new BmsSampleDefinition("0");
+        definitions[1] = new BmsSampleDefinition("1");
         ends(controller)[0] = 100;
         ends(controller)[1] = 1;
         controller.PrepareSample(0);
@@ -131,7 +134,7 @@ public class BmsPcmLeaseScheduleTest
     public void EarlierClockTimeKeepsFutureLeasesAndLaterJumpReleasesAllExpiredLeases()
     {
         using var controller = createController();
-        for (ushort key = 0; key < 3; key++)
+        for (int key = 0; key < 3; key++)
         {
             addLease(controller, key, BmsPcmMaintenanceTest.CreateAsset());
             ends(controller)[key] = 10 * (key + 1);
@@ -150,11 +153,11 @@ public class BmsPcmLeaseScheduleTest
     {
         var chartTime = 0d;
         var (cache, pins) = BmsPcmMaintenanceTest.CreatePinnedCache(2);
-        using var controller = new BmsPcmPlaybackController(new Dictionary<ushort, string>(), null, 1,
+        using var controller = new BmsPcmPlaybackController(new Dictionary<int, BmsSampleDefinition> { [0] = new("0"), [1] = new("1") }, null, 1,
             [new BmsSampleUsage(0, 100, ResumeAfterSeek: true), new BmsSampleUsage(1, 20)],
             new BindableDouble(1), () => chartTime, new BmsPcmVoiceMixer());
         typeof(BmsPcmPlaybackController).GetField("assetCache", instance)!.SetValue(controller, cache);
-        var resources = BmsPcmMaintenanceTest.Field<Dictionary<ushort, string>>(controller, "resolvedResources");
+        var resources = BmsPcmMaintenanceTest.Field<Dictionary<int, string>>(controller, "resolvedResources");
         resources[0] = "0";
         resources[1] = "1";
         var lifetimes = typeof(BmsPcmPlaybackController).GetMethod("createLifetimes", instance)!.Invoke(controller, null);
@@ -196,12 +199,15 @@ public class BmsPcmLeaseScheduleTest
     private static void observeLengthRead() => lengthReads++;
 
     private static BmsPcmPlaybackController createController(double rate = 1)
-        => new(new Dictionary<ushort, string>(), null, rate, null, new BindableDouble(1), () => 0, new BmsPcmVoiceMixer());
+        => new(new Dictionary<int, BmsSampleDefinition>(), null, rate, null, new BindableDouble(1), () => 0, new BmsPcmVoiceMixer());
 
-    private static Dictionary<ushort, double> ends(BmsPcmPlaybackController controller)
-        => BmsPcmMaintenanceTest.Field<Dictionary<ushort, double>>(controller, "lifetimeEnds");
+    private static Dictionary<int, double> ends(BmsPcmPlaybackController controller)
+        => BmsPcmMaintenanceTest.Field<Dictionary<int, double>>(controller, "lifetimeEnds");
 
-    private static void addLease(BmsPcmPlaybackController controller, ushort key, BmsPcmAsset asset, Action? release = null)
-        => BmsPcmMaintenanceTest.Field<Dictionary<ushort, BmsPcmAssetLease>>(controller, "leases")
+    private static void addLease(BmsPcmPlaybackController controller, int key, BmsPcmAsset asset, Action? release = null)
+    {
+        BmsPcmMaintenanceTest.Field<Dictionary<int, BmsSampleDefinition>>(controller, "sampleDefinitions")[key] = new("sample");
+        BmsPcmMaintenanceTest.Field<Dictionary<int, BmsPcmAssetLease>>(controller, "leases")
             .Add(key, new BmsPcmAssetLease(asset, Task.CompletedTask, release ?? (() => { })));
+    }
 }

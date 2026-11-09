@@ -80,7 +80,7 @@ internal partial class BmsGameplayDiagnosticScene(BmsGameplayDiagnosticOptions o
     protected override IBeatmap CreateBeatmap(RulesetInfo ruleset)
     {
         var decoded = BmsBeatmapDecoder.DecodeBytes(File.ReadAllBytes(options.Chart),
-            randomValueSelector: _ => 1, referenceBpmMode: options.ReferenceBpm);
+            randomValueSelector: _ => 1);
         Chart = (BmsBeatmap)new BmsBeatmapConverter(decoded, new BmsRuleset())
         {
             BranchRandomValueSelector = _ => 1,

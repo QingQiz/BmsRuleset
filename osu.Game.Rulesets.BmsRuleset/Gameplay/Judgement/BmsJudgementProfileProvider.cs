@@ -88,8 +88,7 @@ public static class BmsJudgementProfileProvider
     public static double RateForRank(BmsLayoutVariant layout, int rank) => rateForLayoutRank(layout, Math.Clamp(rank, 0, 4));
 
     public static double RateForExRank(BmsLayoutVariant layout, double exRank)
-        // BMSPlayerRule first converts DEFEXRANK to an integer percentage.
-        => exRank > 0 ? Math.Truncate(Math.Truncate(exRank) * Math.Round(RateForRank(layout, 2) * 100) / 100) / 100 : RateForRank(layout, 2);
+        => exRank / 100 * RateForRank(layout, 2);
 
     public static double RateForDifficulty(BmsLayoutVariant layout, int rank, double? exRank)
         => exRank is { } value ? RateForExRank(layout, value) : RateForRank(layout, rank);

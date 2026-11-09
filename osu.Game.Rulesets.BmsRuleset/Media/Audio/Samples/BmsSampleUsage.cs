@@ -1,7 +1,7 @@
 namespace osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 
 public readonly record struct BmsSampleUsage(
-    ushort SampleKey,
+    int SampleKey,
     double Time,
     double? CandidateStartTime = null,
     double? CandidateEndTime = null,

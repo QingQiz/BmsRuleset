@@ -11,6 +11,41 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
 public class BmsJudgementProfileTest
 {
 
+    [TestCase(BmsLayoutVariant.Bme7K, 0, 0)]
+    [TestCase(BmsLayoutVariant.Bme7K, .1, .00075)]
+    [TestCase(BmsLayoutVariant.Bme7K, 75, .5625)]
+    [TestCase(BmsLayoutVariant.Bme7K, 99.9, .74925)]
+    [TestCase(BmsLayoutVariant.Bme7K, 134, 1.005)]
+    [TestCase(BmsLayoutVariant.Bme7K, 150.5, 1.12875)]
+    [TestCase(BmsLayoutVariant.Pms9K, 0, 0)]
+    [TestCase(BmsLayoutVariant.Pms9K, 75, .525)]
+    public void ExRankUsesContinuousPercentages(BmsLayoutVariant layout, double exRank, double expected)
+        => Assert.That(BmsJudgementProfileProvider.RateForExRank(layout, exRank), Is.EqualTo(expected).Within(1e-12));
+
+    [Test]
+    public void FractionalExRankPreservesThePgreatBoundary()
+    {
+        var rate = BmsJudgementProfileProvider.RateForExRank(BmsLayoutVariant.Bme7K, 75);
+        var table = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, 1, rate, false);
+        Assert.That(table.ResultForOffset(11.25), Is.EqualTo(HitResult.Perfect));
+        Assert.That(table.ResultForOffset(11.251), Is.EqualTo(HitResult.Great));
+    }
+
+    [Test]
+    public void FractionalAndZeroExRankEventsKeepTheirTimingAndPrecedence()
+    {
+        var parsed = BmsChartParser.Parse([
+            "#BPM 120", "#DEFEXRANK 150.5", "#EXRANK01 134.25", "#EXRANK02 0",
+            "#00011:01", "#001A0:01", "#00111:01", "#002A0:02", "#00211:01",
+        ]);
+        Assert.That(parsed.DefaultExRank, Is.EqualTo(150.5));
+        Assert.That(parsed.HitObjects[0].JudgementRate, Is.EqualTo(1.12875).Within(1e-12));
+        Assert.That(parsed.HitObjects[1].JudgementRate, Is.EqualTo(1.006875).Within(1e-12));
+        Assert.That(parsed.HitObjects[1].StartTime, Is.EqualTo(2000));
+        Assert.That(parsed.HitObjects[2].JudgementRate, Is.Zero);
+        Assert.That(parsed.HitObjects[2].StartTime, Is.EqualTo(4000));
+    }
+
     [Test]
     public void TestDoublePlayScratchColumnsUseScratchRows()
     {

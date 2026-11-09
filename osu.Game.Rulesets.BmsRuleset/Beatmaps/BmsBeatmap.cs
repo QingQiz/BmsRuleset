@@ -4,6 +4,7 @@ using System.Linq;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 
 namespace osu.Game.Rulesets.BmsRuleset.Beatmaps;
 
@@ -21,13 +22,13 @@ public class BmsBeatmap : Beatmap<BmsHitObject>, IBmsBeatmap
 
     /// <summary>
     ///     BMS #TOTAL value: gauge recovery coefficient.
-    ///     Zero means the default formula applies.
+    ///     Null selects the default formula applies.
     /// </summary>
-    public double Total { get; set; }
+    public double? Total { get; set; }
 
     public BmsTimingMap? TimingMap { get; set; }
 
-    public IReadOnlyDictionary<ushort, string> SampleDefinitions { get; set; } = new Dictionary<ushort, string>();
+    public IReadOnlyDictionary<int, BmsSampleDefinition> SampleDefinitions { get; set; } = new Dictionary<int, BmsSampleDefinition>();
 
     public IReadOnlyList<BmsSampleEvent> BackgroundSampleEvents { get; set; } = [];
 

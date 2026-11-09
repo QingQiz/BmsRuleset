@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 
 namespace osu.Game.Rulesets.BmsRuleset.BmsParser;
 
@@ -10,6 +11,8 @@ public sealed class BmsTimingMap
     public int TickResolution { get; }
 
     public IReadOnlyList<BmsMeasureInfo> Measures => measures;
+
+    public IReadOnlyList<long> BarLines { get; }
 
     /// <summary>Backed by array for zero-overhead access in hot-path binary searches.</summary>
     private readonly BmsMeasureInfo[] measures;
@@ -36,12 +39,15 @@ public sealed class BmsTimingMap
     /// </summary>
     public double ScrollReferenceBpm { get; }
 
+    private readonly double? explicitScrollReferenceBpm;
+    private readonly double mainBpm;
+
     // ── Precomputed timing point array (build once, query with walking cursor) ──
 
     private readonly struct TimingPoint(
         double time,
         double nextTime,
-        double scrollPos,
+        double scrollTick,
         double bpm,
         double scrollFactor,
         double speedFactor,
@@ -50,7 +56,7 @@ public sealed class BmsTimingMap
     {
         public readonly double Time = time;                 // segment start (ms)
         public readonly double NextTime = nextTime;         // segment end (ms), double.PositiveInfinity for last
-        public readonly double ScrollPos = scrollPos;       // precomputed scroll position at Time
+        public readonly double ScrollTick = scrollTick;     // independent of the playback reference BPM
         public readonly double Bpm = bpm;                   // active |BPM| for this segment (always positive)
         public readonly double ScrollFactor = scrollFactor; // active SCROLL factor
         public readonly double SpeedFactor = speedFactor;   // active SPEED factor
@@ -70,38 +76,90 @@ public sealed class BmsTimingMap
     public BmsTimingMap(int tickResolution, IEnumerable<BmsMeasureInfo> measures,
                         IEnumerable<BmsBpmEvent> bpmEvents, IEnumerable<BmsStopEvent> stopEvents,
                         IEnumerable<BmsScrollEvent> scrollEvents, IEnumerable<BmsSpeedEvent> speedEvents,
-                        double baseBpm = 0)
-        : this(tickResolution, measures, bpmEvents, stopEvents, scrollEvents, speedEvents, baseBpm, false)
+                        double? explicitScrollReferenceBpm = null)
+        : this(tickResolution, measures, bpmEvents, stopEvents, scrollEvents, speedEvents, false, null, explicitScrollReferenceBpm)
     {
     }
 
     private BmsTimingMap(int tickResolution, IEnumerable<BmsMeasureInfo> measures,
                          IEnumerable<BmsBpmEvent> bpmEvents, IEnumerable<BmsStopEvent> stopEvents,
                          IEnumerable<BmsScrollEvent> scrollEvents, IEnumerable<BmsSpeedEvent> speedEvents,
-                         double baseBpm, bool alreadySorted)
+                         bool alreadySorted, double? mainBpm, double? explicitScrollReferenceBpm, IReadOnlyList<long>? barLines = null)
     {
         TickResolution = tickResolution;
         this.measures = (alreadySorted ? measures : measures.OrderBy(m => m.Index)).ToArray();
+        BarLines = barLines ?? this.measures.Select(measure => measure.StartTick).ToArray();
         this.bpmEvents = (alreadySorted ? bpmEvents : bpmEvents.OrderBy(e => e.Tick).ThenBy(e => e.Sequence)).ToArray();
         this.stopEvents = (alreadySorted ? stopEvents : stopEvents.OrderBy(e => e.Tick).ThenBy(e => e.Sequence)).ToArray();
         this.scrollEvents = (alreadySorted ? scrollEvents : scrollEvents.OrderBy(e => e.Tick).ThenBy(e => e.Sequence)).ToArray();
         this.speedEvents = (alreadySorted ? speedEvents : speedEvents.OrderBy(e => e.Tick).ThenBy(e => e.Sequence)).ToArray();
-        ScrollReferenceBpm = baseBpm > 0 ? baseBpm : initialBpm();
+        this.mainBpm = mainBpm ?? initialBpm();
+        ScrollReferenceBpm = explicitScrollReferenceBpm ?? initialBpm();
+        this.explicitScrollReferenceBpm = explicitScrollReferenceBpm;
         points = buildTimingPoints();
         tickTimeConverter = new BmsTickTimeConverter(tickResolution, this.bpmEvents, this.stopEvents);
     }
 
     internal static BmsTimingMap FromSortedEvents(int tickResolution, IEnumerable<BmsMeasureInfo> measures,
                                                   IEnumerable<BmsBpmEvent> bpmEvents, IEnumerable<BmsStopEvent> stopEvents,
-                                                  IEnumerable<BmsScrollEvent> scrollEvents, IEnumerable<BmsSpeedEvent> speedEvents, double baseBpm) =>
-        new(tickResolution, measures, bpmEvents, stopEvents, scrollEvents, speedEvents, baseBpm, true);
+                                                  IEnumerable<BmsScrollEvent> scrollEvents, IEnumerable<BmsSpeedEvent> speedEvents, double mainBpm,
+                                                  double? explicitScrollReferenceBpm = null, IReadOnlyList<long>? barLines = null) =>
+        new(tickResolution, measures, bpmEvents, stopEvents, scrollEvents, speedEvents, true, mainBpm, explicitScrollReferenceBpm, barLines);
 
-    // Backward-compatible overload for tests and fallback paths that don't have scroll/speed events.
     public BmsTimingMap(int tickResolution, IEnumerable<BmsMeasureInfo> measures,
                         IEnumerable<BmsBpmEvent> bpmEvents, IEnumerable<BmsStopEvent> stopEvents,
-                        double baseBpm = 0)
-        : this(tickResolution, measures, bpmEvents, stopEvents, [], [], baseBpm)
+                        double? explicitScrollReferenceBpm = null)
+        : this(tickResolution, measures, bpmEvents, stopEvents, [], [], explicitScrollReferenceBpm)
     {
+    }
+
+    private BmsTimingMap(BmsTimingMap source, double referenceBpm)
+    {
+        TickResolution = source.TickResolution;
+        measures = source.measures;
+        BarLines = source.BarLines;
+        bpmEvents = source.bpmEvents;
+        stopEvents = source.stopEvents;
+        scrollEvents = source.scrollEvents;
+        speedEvents = source.speedEvents;
+        mainBpm = source.mainBpm;
+        explicitScrollReferenceBpm = source.explicitScrollReferenceBpm;
+        ScrollReferenceBpm = referenceBpm;
+        points = source.points;
+        tickTimeConverter = source.tickTimeConverter;
+    }
+
+    // Each conversion owns its query cursor; previews and other attempts share only immutable data.
+    internal BmsTimingMap WithReferenceBpm(BmsReferenceBpmMode mode) => new(this, explicitScrollReferenceBpm ?? (mode switch
+    {
+        BmsReferenceBpmMode.MaxBpm => bpmEvents.Max(evt => Math.Abs(evt.Bpm)),
+        BmsReferenceBpmMode.MinBpm => bpmEvents.Min(evt => Math.Abs(evt.Bpm)),
+        BmsReferenceBpmMode.MainBpm => mainBpm,
+        _ => initialBpm(),
+    }));
+
+    internal static double FindMainBpm(IReadOnlyList<BmsBpmEvent> events, IEnumerable<long> noteTicks)
+    {
+        var counts = new Dictionary<double, (int Count, long FirstTick)>();
+        foreach (var tick in noteTicks)
+        {
+            var low = 0;
+            var high = events.Count - 1;
+            while (low < high)
+            {
+                var middle = (low + high + 1) / 2;
+                if (events[middle].Tick <= tick)
+                    low = middle;
+                else
+                    high = middle - 1;
+            }
+
+            var bpm = Math.Abs(events[low].Bpm);
+            counts[bpm] = counts.TryGetValue(bpm, out var count) ? (count.Count + 1, count.FirstTick) : (1, tick);
+        }
+
+        return counts.Count == 0 ? Math.Abs(events[0].Bpm)
+            : counts.OrderByDescending(pair => pair.Value.Count).ThenBy(pair => pair.Value.FirstTick).First().Key;
     }
 
     // ── Time-based queries ────────────────────────────────────────────────────
@@ -165,12 +223,12 @@ public sealed class BmsTimingMap
         var pt = points[idx];
 
         if (pt.IsStop)
-            return pt.ScrollPos;
+            return GetScrollPositionAtTick(pt.ScrollTick);
 
         // Negative BPM → reverse scroll direction.
         var effectiveBpm = pt.Bpm * pt.ScrollFactor * pt.ScrollDir;
         var tickAdvance = millisecondsToTicks(time - pt.Time, effectiveBpm);
-        return GetScrollPositionAtTick(tickAdvance) + pt.ScrollPos;
+        return GetScrollPositionAtTick(tickAdvance) + GetScrollPositionAtTick(pt.ScrollTick);
     }
 
     /// <summary>
@@ -202,7 +260,7 @@ public sealed class BmsTimingMap
     /// </summary>
     public double GetBpmAtTick(long tick)
     {
-        var bpm = ScrollReferenceBpm;
+        var bpm = initialBpm();
 
         foreach (var evt in bpmEvents)
         {
@@ -238,7 +296,7 @@ public sealed class BmsTimingMap
         var currentSpeed = 1.0;
 
         if (currentBpm <= 0)
-            currentBpm = ScrollReferenceBpm;
+            currentBpm = initialBpm();
 
         var bpmIndex = 0;
         var stopIndex = 0;
@@ -260,9 +318,8 @@ public sealed class BmsTimingMap
 
                 if (duration > 0)
                 {
-                    var scrollPos = GetScrollPositionAtTick(scrollTick);
                     result.Add(new TimingPoint(currentTime, currentTime + duration,
-                        scrollPos, currentBpm, currentScroll, currentSpeed, currentDir, false));
+                        scrollTick, currentBpm, currentScroll, currentSpeed, currentDir, false));
                 }
 
                 currentTime += duration;
@@ -288,9 +345,8 @@ public sealed class BmsTimingMap
 
                 if (stop.Duration > 0)
                 {
-                    var scrollPos = GetScrollPositionAtTick(scrollTick);
                     result.Add(new TimingPoint(currentTime, currentTime + stop.Duration,
-                        scrollPos, currentBpm, currentScroll, currentSpeed, currentDir, true));
+                        scrollTick, currentBpm, currentScroll, currentSpeed, currentDir, true));
                     currentTime += stop.Duration;
                 }
             }
@@ -306,7 +362,7 @@ public sealed class BmsTimingMap
 
         // Final infinite segment
         result.Add(new TimingPoint(currentTime, double.PositiveInfinity,
-            GetScrollPositionAtTick(scrollTick), currentBpm, currentScroll, currentSpeed, currentDir, false));
+            scrollTick, currentBpm, currentScroll, currentSpeed, currentDir, false));
 
         return result.ToArray();
     }

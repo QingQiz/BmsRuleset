@@ -135,7 +135,7 @@ public partial class BmsFileImporterTest
         runImportTest((realm, storage) =>
         {
             var importer = new BmsFileImporter(realm, storage);
-            Assert.That(importer.HandledExtensions, Is.EquivalentTo(new[] { ".bms", ".bme", ".bml", ".pms" }));
+            Assert.That(importer.HandledExtensions, Is.EquivalentTo(new[] { ".bms", ".bme", ".bml", ".pms", ".bmson" }));
             return Task.CompletedTask;
         });
     }

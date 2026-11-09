@@ -9,7 +9,6 @@ using osu.Game.Beatmaps.Formats;
 using osu.Game.IO;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 
 namespace osu.Game.Rulesets.BmsRuleset.Beatmaps;
 
@@ -21,15 +20,12 @@ namespace osu.Game.Rulesets.BmsRuleset.Beatmaps;
 /// Decoder also does a deterministic branch-1 materialisation to create a usable cached BmsDecodedBeatmap preview/metadata objec
 /// </summary>
 /// <param name="randomValueSelector"></param>
-/// <param name="referenceBpmMode"></param>
-public class BmsBeatmapDecoder(Func<int, int>? randomValueSelector = null, BmsReferenceBpmMode? referenceBpmMode = null) : Decoder<Beatmap>
+public class BmsBeatmapDecoder(Func<int, int>? randomValueSelector = null) : Decoder<Beatmap>
 {
     private static readonly object registration_lock = new();
 
     // The decoded beatmap is cached before play starts; only playable conversion should roll runtime branches.
     private Func<int, int> decodeBranchSelector => randomValueSelector ?? (_ => 1);
-
-    private BmsReferenceBpmMode effectiveReferenceBpmMode => referenceBpmMode ?? BmsRulesetRuntime.CurrentReferenceBpmMode;
 
     private static bool registered;
 
@@ -60,6 +56,7 @@ public class BmsBeatmapDecoder(Func<int, int>? randomValueSelector = null, BmsRe
         hitObject.Column = parsedObject.Column;
         hitObject.SampleKey = parsedObject.SampleKey;
         hitObject.SampleVolume = parsedObject.SampleVolume;
+        hitObject.AdditionalSampleKeys = parsedObject.AdditionalSampleKeys;
         hitObject.JudgementRate = parsedObject.JudgementRate;
         if (hitObject is BmsLandmine mine)
             mine.LandmineDamagePercent = parsedObject.LandmineDamagePercent;
@@ -86,15 +83,23 @@ public class BmsBeatmapDecoder(Func<int, int>? randomValueSelector = null, BmsRe
         }
     }
 
-    protected override Beatmap CreateTemplateObject() => new BmsDecodedBeatmap();
+    // An undecoded template has no resolved name; imported BeatmapInfo supplies its own.
+    protected override Beatmap CreateTemplateObject() => new BmsDecodedBeatmap { BeatmapInfo = { DifficultyName = string.Empty } };
 
-    internal static Beatmap DecodeBytes(byte[] content, BeatmapInfo? beatmapInfo = null, Func<int, int>? randomValueSelector = null, BmsReferenceBpmMode? referenceBpmMode = null)
+    internal static Beatmap DecodeBytes(byte[] content, BeatmapInfo? beatmapInfo = null, Func<int, int>? randomValueSelector = null)
     {
-        var decoder = new BmsBeatmapDecoder(randomValueSelector, referenceBpmMode);
+        var decoder = new BmsBeatmapDecoder(randomValueSelector);
         var output = decoder.CreateTemplateObject();
 
         if (beatmapInfo != null)
             output.BeatmapInfo = beatmapInfo;
+
+        if (Constant.IsBmsonFile(output.BeatmapInfo.Path))
+        {
+            var result = BmsonParser.Parse(content);
+            applyParseResult(output, result);
+            return output;
+        }
 
         decoder.parseLinesInto(output, BmsChartParser.ReadAllLines(content), output.BeatmapInfo.Path);
         return output;
@@ -108,16 +113,18 @@ public class BmsBeatmapDecoder(Func<int, int>? randomValueSelector = null, BmsRe
 
     private void parseLinesInto(Beatmap output, string[] lines, string? path)
     {
-        var parseResult = BmsChartParser.Parse(lines, path, decodeBranchSelector, effectiveReferenceBpmMode);
+        applyParseResult(output, BmsChartParser.Parse(lines, path, decodeBranchSelector));
+        if (output is BmsDecodedBeatmap decoded)
+            decoded.RawLines = lines;
+    }
 
+    private static void applyParseResult(Beatmap output, BmsParseResult parseResult)
+    {
         applyMetadata(output, parseResult);
         PopulateTiming(output, parseResult.TimingMap.BpmEvents);
 
         if (output is BmsDecodedBeatmap bmsOutput)
-        {
             bmsOutput.CopyFrom(parseResult);
-            bmsOutput.RawLines = lines;
-        }
 
         if (output is IBmsBeatmap bmsBeatmap)
         {
@@ -175,7 +182,11 @@ public class BmsBeatmapDecoder(Func<int, int>? randomValueSelector = null, BmsRe
                 ? tags
                 : $"{output.Metadata.Tags} {tags}";
 
-        BmsDifficultyInfo.FromParseResult(parseResult).WriteToOsuDifficulty(output);
+        var difficulty = BmsDifficultyInfo.FromParseResult(parseResult);
+        if (string.IsNullOrWhiteSpace(output.BeatmapInfo.DifficultyName))
+            output.BeatmapInfo.DifficultyName = difficulty.ToDisplayName(Path.GetFileNameWithoutExtension(output.BeatmapInfo.Path));
+        difficulty.WriteToOsuDifficulty(output.Difficulty);
+        difficulty.WriteToOsuDifficulty(output.BeatmapInfo.Difficulty);
         BmsBeatmapStatistics.WriteScratchObjectCount(output,
             parseResult.HitObjects.Count(h => BmsLayout.IsScratchColumn(h.Column, parseResult.LayoutVariant)));
     }

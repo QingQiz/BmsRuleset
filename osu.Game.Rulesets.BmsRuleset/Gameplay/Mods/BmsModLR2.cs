@@ -46,9 +46,10 @@ public class BmsModLr2 : Mod, IApplicableToJudgement,
 
     public Func<BmsLayoutVariant, int, double?, double> JudgementRateCalculator => calculateJudgementRate;
 
+    // Keep LR2's common NORMAL baseline when applying EXRANK to other layouts.
     private static double calculateJudgementRate(BmsLayoutVariant layout, int rank, double? exRank)
         => exRank is { } value
-            ? value > 0 ? Math.Truncate(Math.Truncate(value) * 0.75) / 100 : 0.75
+            ? BmsJudgementProfileProvider.RateForExRank(BmsLayoutVariant.Bme7K, value)
             : rank switch { 0 => 0.25, 1 => 0.5, 3 => 1, _ => 0.75 };
 
     public void ApplyToBeatmapConverter(IBeatmapConverter beatmapConverter)

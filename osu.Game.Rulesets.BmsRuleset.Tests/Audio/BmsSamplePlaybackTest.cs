@@ -27,7 +27,7 @@ public partial class BmsSamplePlaybackTest : TestScene
         AddStep("create sample + playback", () =>
         {
             createWav("native-mixer.wav", 1);
-            Add(playback = new BmsSamplePlayback(new Dictionary<ushort, string> { { 1, "native-mixer.wav" } }, tempDir));
+            Add(playback = new BmsSamplePlayback(new Dictionary<int, BmsSampleDefinition> { { 1, new("native-mixer.wav") } }, tempDir));
         });
         AddUntilStep("wait for playback load", () => playback.IsLoaded);
         AddAssert("PCM backend initialised", () => BmsAudioTestAccess.GetOutputMixer(playback) != null);
@@ -44,7 +44,7 @@ public partial class BmsSamplePlaybackTest : TestScene
         {
             createWav("scheduled.wav", 1);
             playback = new BmsSamplePlayback(
-                new Dictionary<ushort, string> { { 1, "scheduled.wav" } },
+                new Dictionary<int, BmsSampleDefinition> { { 1, new("scheduled.wav") } },
                 tempDir,
                 sampleUsages: [new BmsSampleUsage(1, 10_001)])
             {
@@ -66,7 +66,7 @@ public partial class BmsSamplePlaybackTest : TestScene
         {
             createWav("early-candidate.wav", 1);
             playback = new BmsSamplePlayback(
-                new Dictionary<ushort, string> { { 1, "early-candidate.wav" } },
+                new Dictionary<int, BmsSampleDefinition> { { 1, new("early-candidate.wav") } },
                 tempDir,
                 sampleUsages: [new BmsSampleUsage(1, 100_000, CandidateStartTime: 1_000, CandidateEndTime: 100_280)]);
             Add(playback);
@@ -85,7 +85,7 @@ public partial class BmsSamplePlaybackTest : TestScene
         {
             createWav("expired-at-load.wav", 1);
             playback = new BmsSamplePlayback(
-                new Dictionary<ushort, string> { { 1, "expired-at-load.wav" } },
+                new Dictionary<int, BmsSampleDefinition> { { 1, new("expired-at-load.wav") } },
                 tempDir,
                 sampleUsages: [new BmsSampleUsage(1, 100)])
             {
@@ -107,7 +107,7 @@ public partial class BmsSamplePlaybackTest : TestScene
         {
             createWav("resumable-at-load.wav", 1);
             playback = new BmsSamplePlayback(
-                new Dictionary<ushort, string> { { 1, "resumable-at-load.wav" } },
+                new Dictionary<int, BmsSampleDefinition> { { 1, new("resumable-at-load.wav") } },
                 tempDir,
                 sampleUsages: [new BmsSampleUsage(1, 100, ResumeAfterSeek: true)])
             {
@@ -129,7 +129,7 @@ public partial class BmsSamplePlaybackTest : TestScene
         {
             createWav("retained.wav", 1);
             playback = new BmsSamplePlayback(
-                new Dictionary<ushort, string> { { 1, "retained.wav" } },
+                new Dictionary<int, BmsSampleDefinition> { { 1, new("retained.wav") } },
                 tempDir,
                 sampleUsages: [new BmsSampleUsage(1, 100)])
             {
@@ -150,7 +150,7 @@ public partial class BmsSamplePlaybackTest : TestScene
         AddStep("create sample + playback", () =>
         {
             createWav("sine.wav", 1);
-            Add(playback = new BmsSamplePlayback(new Dictionary<ushort, string> { { 1, "sine.wav" } }, tempDir));
+            Add(playback = new BmsSamplePlayback(new Dictionary<int, BmsSampleDefinition> { { 1, new("sine.wav") } }, tempDir));
         });
         AddUntilStep("wait for playback load", () => playback.IsLoaded);
         AddAssert("sample loaded during playback load", () => isSampleReady(1) && sampleLength(1) > 0);
@@ -164,7 +164,7 @@ public partial class BmsSamplePlaybackTest : TestScene
         {
             tempDir = Directory.CreateTempSubdirectory("bmstracks").FullName;
             File.WriteAllBytes(Path.Combine(tempDir, "sine.flac"), Convert.FromBase64String(silent_flac));
-            Add(playback = new BmsSamplePlayback(new Dictionary<ushort, string> { { 1, "sine.wav" } }, tempDir));
+            Add(playback = new BmsSamplePlayback(new Dictionary<int, BmsSampleDefinition> { { 1, new("sine.wav") } }, tempDir));
         });
         AddUntilStep("wait for playback load", () => playback.IsLoaded);
         AddAssert("FLAC fallback sample loaded", () => isSampleReady(1) && sampleLength(1) > 0);
@@ -177,17 +177,17 @@ public partial class BmsSamplePlaybackTest : TestScene
         AddStep("create batched sample playback", () =>
         {
             createWav("batched.wav", 1);
-            var definitions = new Dictionary<ushort, string>();
+            var definitions = new Dictionary<int, BmsSampleDefinition>();
 
-            for (ushort sampleKey = 1; sampleKey <= 17; sampleKey++)
-                definitions.Add(sampleKey, "batched.wav");
+            for (int sampleKey = 1; sampleKey <= 17; sampleKey++)
+                definitions.Add(sampleKey, new BmsSampleDefinition("batched.wav"));
 
             Add(playback = new BmsSamplePlayback(definitions, tempDir));
         });
         AddUntilStep("wait for batched playback load", () => playback.IsLoaded);
         AddAssert("all batches loaded", () =>
         {
-            for (ushort sampleKey = 1; sampleKey <= 17; sampleKey++)
+            for (int sampleKey = 1; sampleKey <= 17; sampleKey++)
             {
                 if (!isSampleReady(sampleKey) || sampleLength(sampleKey) <= 0)
                     return false;
@@ -204,10 +204,10 @@ public partial class BmsSamplePlaybackTest : TestScene
         AddStep("create shared sample + playback", () =>
         {
             createWav("shared.wav", 6);
-            Add(playback = new BmsSamplePlayback(new Dictionary<ushort, string>
+            Add(playback = new BmsSamplePlayback(new Dictionary<int, BmsSampleDefinition>
             {
-                { 1, "shared.wav" },
-                { 2, "shared.wav" },
+                { 1, new("shared.wav") },
+                { 2, new("shared.wav") },
             }, tempDir));
         });
         AddUntilStep("wait for playback load", () => playback.IsLoaded);
@@ -228,10 +228,10 @@ public partial class BmsSamplePlaybackTest : TestScene
         AddStep("create live sample + playback", () =>
         {
             createWav("live.wav", 6);
-            Add(playback = new BmsSamplePlayback(new Dictionary<ushort, string>
+            Add(playback = new BmsSamplePlayback(new Dictionary<int, BmsSampleDefinition>
             {
-                { 1, "live.wav" },
-                { 2, "live.wav" },
+                { 1, new("live.wav") },
+                { 2, new("live.wav") },
             }, tempDir));
         });
         AddUntilStep("wait for playback load", () => playback.IsLoaded);
@@ -253,7 +253,7 @@ public partial class BmsSamplePlaybackTest : TestScene
         AddStep("create landmine sample + playback", () =>
         {
             createWav("landmine.wav", 1);
-            Add(playback = new BmsSamplePlayback(new Dictionary<ushort, string> { { 0, "landmine.wav" } }, tempDir));
+            Add(playback = new BmsSamplePlayback(new Dictionary<int, BmsSampleDefinition> { { 0, new("landmine.wav") } }, tempDir));
         });
         AddUntilStep("wait for playback load", () => playback.IsLoaded);
         AddStep("play key zero", () => playback.Play(0));
@@ -267,7 +267,7 @@ public partial class BmsSamplePlaybackTest : TestScene
         AddStep("create sample + playback", () =>
         {
             createWav("retrigger.wav", 6);
-            Add(playback = new BmsSamplePlayback(new Dictionary<ushort, string> { { 1, "retrigger.wav" } }, tempDir));
+            Add(playback = new BmsSamplePlayback(new Dictionary<int, BmsSampleDefinition> { { 1, new("retrigger.wav") } }, tempDir));
         });
         AddUntilStep("wait for playback load", () => playback.IsLoaded);
         AddStep("start from offset", () => playback.Play(1, offset: 1000));
@@ -283,7 +283,7 @@ public partial class BmsSamplePlaybackTest : TestScene
         AddStep("create sample + rate playback", () =>
         {
             createWav("rate.wav", 1);
-            Add(playback = new BmsSamplePlayback(new Dictionary<ushort, string> { { 1, "rate.wav" } }, tempDir, rate: 2));
+            Add(playback = new BmsSamplePlayback(new Dictionary<int, BmsSampleDefinition> { { 1, new("rate.wav") } }, tempDir, rate: 2));
         });
         AddUntilStep("wait for playback load", () => playback.IsLoaded);
         AddAssert("fixed-rate backend selected", () => BmsAudioTestAccess.GetOutputMixer(playback) != null);
@@ -298,7 +298,7 @@ public partial class BmsSamplePlaybackTest : TestScene
         {
             tempDir = Directory.CreateTempSubdirectory("bmstracks").FullName;
             File.WriteAllBytes(Path.Combine(tempDir, "invalid.wav"), [0, 1, 2, 3]);
-            Add(playback = new BmsSamplePlayback(new Dictionary<ushort, string> { { 1, "invalid.wav" } }, tempDir));
+            Add(playback = new BmsSamplePlayback(new Dictionary<int, BmsSampleDefinition> { { 1, new("invalid.wav") } }, tempDir));
         });
         AddUntilStep("playback loads without timeout", () => playback.IsLoaded);
         AddAssert("invalid sample is unavailable", () => !playback.HasSampleDefinition(1));
@@ -309,7 +309,7 @@ public partial class BmsSamplePlaybackTest : TestScene
     public void EmptySampleDefinitionIsUnavailable()
     {
         AddStep("create playback with empty definition", () =>
-            Add(playback = new BmsSamplePlayback(new Dictionary<ushort, string> { { 1, string.Empty } }, tempDir)));
+            Add(playback = new BmsSamplePlayback(new Dictionary<int, BmsSampleDefinition> { { 1, new(string.Empty) } }, tempDir)));
         AddUntilStep("wait for playback load", () => playback.IsLoaded);
         AddAssert("empty definition is unavailable", () => !playback.HasSampleDefinition(1));
         addCleanupSteps();
@@ -321,7 +321,7 @@ public partial class BmsSamplePlaybackTest : TestScene
         AddStep("create sample + playback", () =>
         {
             createWav("dispose.wav", 1);
-            Add(playback = new BmsSamplePlayback(new Dictionary<ushort, string> { { 1, "dispose.wav" } }, tempDir));
+            Add(playback = new BmsSamplePlayback(new Dictionary<int, BmsSampleDefinition> { { 1, new("dispose.wav") } }, tempDir));
         });
         AddUntilStep("wait for playback load", () => playback.IsLoaded);
         AddStep("expire playback", () => playback.Expire());
@@ -342,9 +342,9 @@ public partial class BmsSamplePlaybackTest : TestScene
         });
     }
 
-    private bool isSampleReady(ushort sampleKey) => playback.IsSampleReady(sampleKey);
+    private bool isSampleReady(int sampleKey) => playback.IsSampleReady(sampleKey);
 
-    private double sampleLength(ushort sampleKey) => playback.GetSampleLength(sampleKey);
+    private double sampleLength(int sampleKey) => playback.GetSampleLength(sampleKey);
 
     private void createWav(string filename, int seconds)
     {

@@ -5,8 +5,8 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 
 namespace osu.Game.Rulesets.BmsRuleset.BmsParser;
 
@@ -50,7 +50,6 @@ internal static partial class BmsChartParser
         IEnumerable<string> lines,
         string? path = null,
         Func<int, int>? randomValueSelector = null,
-        BmsReferenceBpmMode referenceBpmMode = BmsReferenceBpmMode.StartBpm,
         Func<BmsLayoutVariant, int, double?, double>? judgementRateCalculator = null)
     {
         judgementRateCalculator ??= BmsJudgementProfileProvider.RateForDifficulty;
@@ -86,7 +85,8 @@ internal static partial class BmsChartParser
         var layoutVariant = BmsLayout.InferVariant(state.ChannelLines.Select(l => l.Channel), path);
         var totalColumns = BmsLayout.GetTotalColumns(layoutVariant);
 
-        var scrollReferenceBpm = resolveScrollReferenceBpm(state, timingEvents, measureStarts, totalColumns, referenceBpmMode);
+        // Long-note endpoints and source cells can disappear during materialisation.
+        var mainBpm = BmsTimingMap.FindMainBpm(timingEvents, collectPlayableNoteTicks(state, measureStarts, totalColumns));
         var judgementRateEvents = collectJudgementRateEvents(state, measureStarts, layoutVariant, judgementRateCalculator);
 
         var timingMap = BmsTimingMap.FromSortedEvents(
@@ -96,8 +96,8 @@ internal static partial class BmsChartParser
             stopEvents,
             scrollEvents,
             speedEvents,
-            scrollReferenceBpm);
-        var sampleDefinitions = new Dictionary<ushort, string>(state.SampleDefinitions);
+            mainBpm,
+            state.BaseBpm > 0 ? state.BaseBpm : null);
 
         // Pre-size output lists to avoid AddWithResize during collection.
         var hitObjects = new List<BmsParsedHitObject>(state.ChannelLines.Count);
@@ -109,7 +109,7 @@ internal static partial class BmsChartParser
 
         var bgSampleEvents = new List<BmsSampleEvent>(state.ChannelLines.Count / 10);
         collectBackgroundSampleEvents(state, measureStarts, timingMap, bgSampleEvents);
-        collectMidiFileBackgroundSampleEvent(state, sampleDefinitions, bgSampleEvents);
+        collectMidiFileBackgroundSampleEvent(state, bgSampleEvents);
 
         applyJudgementRates(hitObjects, judgementRateEvents);
 
@@ -122,7 +122,7 @@ internal static partial class BmsChartParser
             timingMap,
             layoutVariant,
             totalColumns,
-            sampleDefinitions,
+            state.SampleDefinitions,
             bgSampleEvents.ToArray(),
             hitObjects,
             state.BranchDecisions.ToArray(),
@@ -143,6 +143,7 @@ internal static partial class BmsChartParser
             state.DefaultExRank)
         {
             InvisibleNotes = collectInvisibleNotes(state, totalColumns, measureStarts, timingMap),
+            ExplicitDifficultyName = StripDifficultyDelimiters(state.Subtitle ?? string.Empty),
         };
     }
 
@@ -520,7 +521,7 @@ internal static partial class BmsChartParser
 
             case HeaderCommand.WavDefinition:
                 if (valueSpan.Length > 0)
-                    state.SampleDefinitions[encodeValue(state.UseBase62, name[3], name[4])] = valueSpan.Trim('"').ToString();
+                    state.SampleDefinitions[encodeValue(state.UseBase62, name[3], name[4])] = new BmsSampleDefinition(valueSpan.Trim('"').ToString());
                 return;
 
             case HeaderCommand.BmpDefinition:
@@ -584,12 +585,12 @@ internal static partial class BmsChartParser
     }
 
     private static void collectMidiFileBackgroundSampleEvent(
-        ParseState state, IDictionary<ushort, string> sampleDefinitions, List<BmsSampleEvent> output)
+        ParseState state, List<BmsSampleEvent> output)
     {
         if (string.IsNullOrWhiteSpace(state.MidiFile))
             return;
 
-        sampleDefinitions[midi_file_sample_key] = state.MidiFile;
+        state.SampleDefinitions[midi_file_sample_key] = new BmsSampleDefinition(state.MidiFile);
         output.Add(new BmsSampleEvent(0, midi_file_sample_key, 100));
     }
 
@@ -759,54 +760,6 @@ internal static partial class BmsChartParser
         }
 
         return ordered;
-    }
-
-    private static double resolveScrollReferenceBpm(
-        ParseState state,
-        IReadOnlyList<BmsBpmEvent> timingEvents,
-        IReadOnlyDictionary<int, long> measureStarts,
-        int totalColumns,
-        BmsReferenceBpmMode mode)
-    {
-        if (state.BaseBpm > 0)
-            return state.BaseBpm;
-
-        var positiveBpms = timingEvents.Select(e => Math.Abs(e.Bpm)).Where(b => b > 0).ToArray();
-        var startBpm = positiveBpms.Length > 0 ? positiveBpms[0] : 130;
-
-        return mode switch
-        {
-            BmsReferenceBpmMode.MaxBpm => positiveBpms.Length > 0 ? positiveBpms.Max() : startBpm,
-            BmsReferenceBpmMode.MainBpm => resolveMainBpm(state, timingEvents, measureStarts, totalColumns, startBpm),
-            BmsReferenceBpmMode.MinBpm => positiveBpms.Length > 0 ? positiveBpms.Min() : startBpm,
-            _ => startBpm,
-        };
-    }
-
-    private static double resolveMainBpm(
-        ParseState state,
-        IReadOnlyList<BmsBpmEvent> timingEvents,
-        IReadOnlyDictionary<int, long> measureStarts,
-        int totalColumns,
-        double fallbackBpm)
-    {
-        var counts = new Dictionary<double, int>();
-        var firstTickByBpm = new Dictionary<double, long>();
-
-        foreach (var tick in collectPlayableNoteTicks(state, measureStarts, totalColumns))
-        {
-            var bpm = Math.Abs(bpmAtTick(tick, timingEvents));
-            if (bpm <= 0)
-                continue;
-
-            counts[bpm] = counts.GetValueOrDefault(bpm) + 1;
-
-            firstTickByBpm.TryAdd(bpm, tick);
-        }
-
-        return counts.Count == 0
-            ? fallbackBpm
-            : counts.OrderByDescending(kv => kv.Value).ThenBy(kv => firstTickByBpm[kv.Key]).First().Key;
     }
 
     private static IEnumerable<long> collectPlayableNoteTicks(ParseState state, IReadOnlyDictionary<int, long> measureStarts, int totalColumns)
@@ -1096,7 +1049,7 @@ internal static partial class BmsChartParser
     }
 
     private static void collectLnType1Objects(
-        List<RawCell> lnCells, BmsTimingMap timingMap, IReadOnlyDictionary<ushort, string> sampleDefinitions, int wavVolume,
+        List<RawCell> lnCells, BmsTimingMap timingMap, IReadOnlyDictionary<int, BmsSampleDefinition> sampleDefinitions, int wavVolume,
         List<BmsParsedHitObject> output)
     {
         var openByColumn = new Dictionary<int, RawCell>();
@@ -1116,7 +1069,7 @@ internal static partial class BmsChartParser
     }
 
     private static void collectLnType2Objects(
-        IEnumerable<RawCell> lnCells, BmsTimingMap timingMap, IReadOnlyDictionary<ushort, string> sampleDefinitions, int wavVolume,
+        IEnumerable<RawCell> lnCells, BmsTimingMap timingMap, IReadOnlyDictionary<int, BmsSampleDefinition> sampleDefinitions, int wavVolume,
         List<BmsParsedHitObject> output)
     {
         foreach (var channelGroup in lnCells.GroupBy(c => c.Channel))
@@ -1143,7 +1096,7 @@ internal static partial class BmsChartParser
 
     private static BmsParsedHitObject createHitObject(
         RawCell start, long endTick, bool isLongNote, BmsTimingMap timingMap,
-        IReadOnlyDictionary<ushort, string> sampleDefinitions,
+        IReadOnlyDictionary<int, BmsSampleDefinition> sampleDefinitions,
         int wavVolume,
         ushort tailCellValue = 0)
     {
@@ -1162,8 +1115,8 @@ internal static partial class BmsChartParser
             ? tailCellValue
             : null;
         var hasTailSample = tailSampleKey is { } key
-                            && sampleDefinitions.TryGetValue(key, out var tailSamplePath)
-                            && !string.IsNullOrWhiteSpace(tailSamplePath);
+                            && sampleDefinitions.TryGetValue(key, out var tailSample)
+                            && !string.IsNullOrWhiteSpace(tailSample.Path);
 
         return new BmsParsedHitObject(
             start.Tick,
@@ -1432,7 +1385,7 @@ internal static partial class BmsChartParser
 
         public Dictionary<ushort, double> ExRankDefinitions { get; } = new();
 
-        public Dictionary<ushort, string> SampleDefinitions { get; } = new();
+        public Dictionary<int, BmsSampleDefinition> SampleDefinitions { get; } = new();
 
         public Dictionary<ushort, string> BitmapDefinitions { get; } = new();
 
@@ -1497,8 +1450,8 @@ internal static partial class BmsChartParser
 
         public int WavVolume { get; set; } = 100;
 
-        /// <summary>BMS #TOTAL value: gauge recovery coefficient. Zero means use the default formula.</summary>
-        public double Total { get; set; }
+        /// <summary>Positive BMS #TOTAL, or null for the default gauge recovery.</summary>
+        public double? Total { get; set; }
 
         public int MaxMeasure { get; set; }
 

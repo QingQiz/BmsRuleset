@@ -22,7 +22,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 [HeadlessTest]
 public partial class TestSceneBmsInitialBackgroundAudio : BmsPlayerTestScene
 {
-    private ushort backgroundKey;
+    private int backgroundKey;
     private bool replayPlayback;
 
     [SetUp]
@@ -50,7 +50,7 @@ public partial class TestSceneBmsInitialBackgroundAudio : BmsPlayerTestScene
 
         BmsTestBeatmaps.SetupBeatmapInfo(beatmap, ruleset, endPadding: 3000, bpm: 120);
         beatmap.BeatmapInfo.Metadata.Source = directory;
-        backgroundKey = beatmap.SampleDefinitions.Single(pair => pair.Value.Equals("bgm1.wav", StringComparison.OrdinalIgnoreCase)).Key;
+        backgroundKey = beatmap.SampleDefinitions.Single(pair => pair.Value.Path.Equals("bgm1.wav", StringComparison.OrdinalIgnoreCase)).Key;
         return beatmap;
     }
 

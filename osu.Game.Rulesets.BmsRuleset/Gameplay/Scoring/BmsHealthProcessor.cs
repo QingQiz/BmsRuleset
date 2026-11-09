@@ -436,9 +436,7 @@ public partial class BmsHealthProcessor : HealthProcessor
 
         var noteCount = Math.Max(1, beatmap?.CountScoringNotes() ?? 0);
 
-        double total = 0;
-        if (beatmap is BmsBeatmap bmsBeatmap)
-            total = bmsBeatmap.Total;
+        var total = (beatmap as BmsBeatmap)?.Total;
 
         var fullNoteCount = beatmap is BmsBeatmap { PracticeFullNoteCount: { } fullCount } ? Math.Max(1, fullCount) : noteCount;
         foreach (var state in gaugeStates)

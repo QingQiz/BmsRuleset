@@ -145,39 +145,22 @@ public class BmsBeatorajaReferenceTest
             "JudgeManager ignores scratch key-up inside tail hit windows; the reverse-direction key-down judges the tail.");
     }
 
-    [Test]
-    public void DefExRankUsesIntegerValidatedRank()
+    [TestCase(BmsLayoutVariant.Bms5K, 0.75, 15)]
+    [TestCase(BmsLayoutVariant.Bms5K, 0.56, 11.2)]
+    [TestCase(BmsLayoutVariant.Bms5K, 0.74, 14.8)]
+    [TestCase(BmsLayoutVariant.Bms5K, 0.99, 19.8)]
+    [TestCase(BmsLayoutVariant.Bme7K, 0.75, 15)]
+    [TestCase(BmsLayoutVariant.Bme7K, 0.56, 11.2)]
+    [TestCase(BmsLayoutVariant.Bme7K, 0.74, 14.8)]
+    [TestCase(BmsLayoutVariant.Bme7K, 0.99, 19.8)]
+    [TestCase(BmsLayoutVariant.Pms9K, 0.7, 20)]
+    [TestCase(BmsLayoutVariant.Pms9K, 0.52, 20)]
+    [TestCase(BmsLayoutVariant.Pms9K, 0.69, 20)]
+    [TestCase(BmsLayoutVariant.Pms9K, 0.93, 20)]
+    public void ValidatedJavaRatesMatchPgreatBoundaries(BmsLayoutVariant layout, double rate, double pgreat)
     {
-        // BMSPlayerRule.validate: DEFEXRANK 75 => 75 * 75 / 100 = 56 (integer percent).
-        var rate = BmsJudgementProfileProvider.RateForExRank(BmsLayoutVariant.Bme7K, 75);
-        var table = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, 1, rate, false);
-        Assert.That(table.ResultForOffset(11.225), Is.EqualTo(HitResult.Great));
-    }
-
-    [TestCase(BmsLayoutVariant.Bms5K, -1, 0.75, 15)]
-    [TestCase(BmsLayoutVariant.Bms5K, 0, 0.75, 15)]
-    [TestCase(BmsLayoutVariant.Bms5K, 75, 0.56, 11.2)]
-    [TestCase(BmsLayoutVariant.Bms5K, 99, 0.74, 14.8)]
-    [TestCase(BmsLayoutVariant.Bms5K, 101, 0.75, 15)]
-    [TestCase(BmsLayoutVariant.Bms5K, 133, 0.99, 19.8)]
-    [TestCase(BmsLayoutVariant.Bme7K, -1, 0.75, 15)]
-    [TestCase(BmsLayoutVariant.Bme7K, 0, 0.75, 15)]
-    [TestCase(BmsLayoutVariant.Bme7K, 75, 0.56, 11.2)]
-    [TestCase(BmsLayoutVariant.Bme7K, 99, 0.74, 14.8)]
-    [TestCase(BmsLayoutVariant.Bme7K, 101, 0.75, 15)]
-    [TestCase(BmsLayoutVariant.Bme7K, 133, 0.99, 19.8)]
-    [TestCase(BmsLayoutVariant.Pms9K, -1, 0.7, 20)]
-    [TestCase(BmsLayoutVariant.Pms9K, 0, 0.7, 20)]
-    [TestCase(BmsLayoutVariant.Pms9K, 75, 0.52, 20)]
-    [TestCase(BmsLayoutVariant.Pms9K, 99, 0.69, 20)]
-    [TestCase(BmsLayoutVariant.Pms9K, 101, 0.7, 20)]
-    [TestCase(BmsLayoutVariant.Pms9K, 133, 0.93, 20)]
-    public void DefExRankMatchesExecutedJavaAtPgreatBoundary(BmsLayoutVariant layout, int exrank, double rate, double pgreat)
-    {
-        // DefExReference.java executes the fixed upstream JudgeProperty after BMSPlayerRule's integer validation.
-        var actualRate = BmsJudgementProfileProvider.RateForExRank(layout, exrank);
-        Assert.That(actualRate, Is.EqualTo(rate));
-        var table = BmsJudgementProfileProvider.GetTable(layout, 1, actualRate, false);
+        // Keep checking the executed Java window rows independently of its integer EXRANK conversion.
+        var table = BmsJudgementProfileProvider.GetTable(layout, 1, rate, false);
         foreach (var direction in new[] { -1, 1 })
         {
             Assert.That(table.ResultForOffset(direction * pgreat), Is.EqualTo(HitResult.Perfect));

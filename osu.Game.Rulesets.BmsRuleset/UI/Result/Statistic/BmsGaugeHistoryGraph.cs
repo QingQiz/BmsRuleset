@@ -119,7 +119,7 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable, IBmsResult
         if (noteCount == 0)
             noteCount = 1;
 
-        var total = playableBeatmap is BmsBeatmap bms ? bms.Total : 0;
+        var total = (playableBeatmap as BmsBeatmap)?.Total;
         var duration = Math.Max(minimumDuration, graphDuration(playableBeatmap, hitEvents.Max(e => e.HitObject.GetEndTime())));
 
         var gaugeTypes = gaugeTypesFor(score.Mods).ToArray();
@@ -455,7 +455,7 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable, IBmsResult
     private static GaugeSeries createSeries(
         BmsGaugeType type,
         IReadOnlyList<HitEvent> hitEvents,
-        double total,
+        double? total,
         int noteCount,
         double duration,
         bool isFinalUsedGauge,

@@ -16,7 +16,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 ///     coordinates gameplay calls with the session lifecycle.
 /// </remarks>
 public partial class BmsSamplePlayback(
-    IReadOnlyDictionary<ushort, string> sampleDefinitions,
+    IReadOnlyDictionary<int, BmsSampleDefinition> sampleDefinitions,
     string? basePath = null,
     double rate = 1.0,
     IEnumerable<BmsSampleUsage>? sampleUsages = null) : Component
@@ -40,7 +40,7 @@ public partial class BmsSamplePlayback(
 
     public double MaxSampleLengthMilliseconds => controller?.MaxSampleLengthMilliseconds ?? 0;
 
-    internal bool IsSampleReady(ushort sampleKey) => controller?.IsSampleReady(sampleKey) == true;
+    internal bool IsSampleReady(int sampleKey) => controller?.IsSampleReady(sampleKey) == true;
 
     protected override void Dispose(bool isDisposing)
     {
@@ -49,24 +49,24 @@ public partial class BmsSamplePlayback(
         base.Dispose(isDisposing);
     }
 
-    internal double GetSampleLength(ushort sampleKey) => controller?.GetSampleLength(sampleKey) ?? 0;
+    internal double GetSampleLength(int sampleKey) => controller?.GetSampleLength(sampleKey) ?? 0;
 
-    internal bool HasSampleDefinition(ushort sampleKey) => controller?.HasSampleDefinition(sampleKey) == true;
+    internal bool HasSampleDefinition(int sampleKey) => controller?.HasSampleDefinition(sampleKey) == true;
 
     internal bool IsPlaybackAvailable => controller != null;
 
     internal Task WaitForPreparedSamplesAsync(CancellationToken cancellationToken)
         => controller?.WaitForPreparedSamplesAsync(cancellationToken) ?? Task.CompletedTask;
 
-    internal void QueueLivePlay(ushort sampleKey, int volume = 100) => controller?.QueueLivePlay(sampleKey, volume);
+    internal void QueueLivePlay(int sampleKey, int volume = 100) => controller?.QueueLivePlay(sampleKey, volume);
 
     internal void SubmitLivePlayBatch() => controller?.SubmitLivePlayBatch();
 
-    internal void Play(ushort sampleKey, int volume = 100, double offset = 0) => controller?.Play(sampleKey, volume, offset);
+    internal void Play(int sampleKey, int volume = 100, double offset = 0) => controller?.Play(sampleKey, volume, offset);
 
-    internal bool CanSchedule(ushort sampleKey) => controller?.CanSchedule(sampleKey) == true;
+    internal bool CanSchedule(int sampleKey) => controller?.CanSchedule(sampleKey) == true;
 
-    internal void SchedulePlay(ushort sampleKey, int volume, double targetTime) =>
+    internal void SchedulePlay(int sampleKey, int volume, double targetTime) =>
         controller?.SchedulePlay(sampleKey, volume, targetTime);
 
     internal void SetPlaybackBlocked(bool blocked, bool keepExistingVoices = false)

@@ -22,7 +22,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Difficulty;
 public class BmsStarRatingProcessorTest
 {
     [Test]
-    public void ExactZeroCompatibilityWindowsRemainUnrated([Values] bool lr2, [Values] bool timed, [Values(.1, 1)] double exRank)
+    public void ExRankRetainsSmallPositiveWindowsAndExplicitZero([Values] bool lr2, [Values] bool timed, [Values(0, .1, 1)] double exRank)
     {
         var beatmap = new BmsBeatmap
         {
@@ -37,9 +37,20 @@ public class BmsStarRatingProcessorTest
         Mod[] mods = lr2 ? [new BmsModLr2()] : [];
         var ratings = timed ? calculator.CalculateTimed(mods).Select(result => result.Attributes.StarRating).ToArray()
             : [calculator.Calculate(mods).StarRating];
-        Assert.That(ratings, Is.Not.Empty.And.All.EqualTo(0));
+        Assert.That(ratings, Is.Not.Empty);
         using var windows = BmsJudgementProfileProvider.UseWindowMods(mods.OfType<IApplicableToJudgement>().ToArray());
-        Assert.That(BmsJudgementProfileProvider.GetTable(beatmap.HitObjects[0], false).FrameworkWindowFor(osu.Game.Rulesets.Scoring.HitResult.Great), Is.Zero);
+        var greatWindow = BmsJudgementProfileProvider.GetTable(beatmap.HitObjects[0], false).FrameworkWindowFor(osu.Game.Rulesets.Scoring.HitResult.Great);
+        if (exRank == 0)
+        {
+            Assert.That(ratings, Is.All.EqualTo(0));
+            Assert.That(greatWindow, Is.Zero);
+        }
+        else
+        {
+            Assert.That(ratings, Is.All.GreaterThanOrEqualTo(0));
+            Assert.That(ratings[^1], Is.GreaterThan(0));
+            Assert.That(greatWindow, Is.GreaterThan(0));
+        }
     }
 
     [TestCase(-1)]

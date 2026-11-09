@@ -19,7 +19,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.BeatmapTest.Decoding;
 public class BmsTimingMapQueryTest
 {
     private const string CAUTION_LIFETIMES = "FB282145C2C0AC8E90BBC4C4FFC9F2C9CB2E818D81A0E1EBCBE8342043D0FFFD";
-    private const string SCROLLPLUS_LIFETIMES = "13D57E0EB00D932CC736B71494A633B0BB68707A8380B0616B1CADB3F10C570C";
+    private const string SCROLLPLUS_LIFETIMES = "21B40B5B5E0F4CD4BA9797873F5B01FBCA901A54418B6327656CF7EE1D92E337";
 
     private static int binarySearches;
     private static BmsTimingMap observedMap;
@@ -233,7 +233,8 @@ public class BmsTimingMapQueryTest
         return values.Cast<object>().Select(value =>
         {
             T field<T>(string name) => (T)value.GetType().GetField(name)!.GetValue(value)!;
-            return new Point(field<double>("Time"), field<double>("ScrollPos"), field<double>("Bpm"),
+            var scrollPosition = field<double>("ScrollTick") * (60000 / map.ScrollReferenceBpm) / (map.TickResolution / 4d);
+            return new Point(field<double>("Time"), scrollPosition, field<double>("Bpm"),
                 field<double>("ScrollFactor"), field<double>("SpeedFactor"), field<int>("ScrollDir"), field<bool>("IsStop"));
         }).ToArray();
     }

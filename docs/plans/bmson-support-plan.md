@@ -575,21 +575,15 @@ Preserve the [distinct meanings of missing, empty, and populated `lines`](#bar-l
 
 ### Normalised Judgement and Gauge Values
 
-Add format-neutral gameplay values to the decoded beatmap:
-
-```csharp
-public double DefaultJudgementRate { get; set; }
-
-public double GaugeTotal { get; set; }
-```
-
-Consumers should use normalised values; BMS `#RANK`, `#DEFEXRANK`, and `#TOTAL` may remain as source metadata.
-Per-object judgement-rate events still override the chart default.
+Reuse the existing `ExRank` and `Total` values. Convert BMSON source units during parsing and let the shared
+judgement and gauge consumers use their normal contracts. Per-object BMS judgement-rate events still override the
+chart default. An unspecified BMS TOTAL uses null; an explicit BMSON zero remains zero.
 
 BMSON values should be converted as follows:
 
 ```text
-default judgement rate = normal layout rate × judge_rank / 100
+BMS EXRANK             = judge_rank / normal layout rate
+default judgement rate = EXRANK / 100 × normal layout rate
 gauge total             = default BMS total for note count × total / 100
 ```
 
@@ -597,17 +591,9 @@ This avoids treating BMSON's relative `total: 100` as an absolute BMS `#TOTAL 10
 
 ### Metadata
 
-Keep song subtitle and chart name separate. Add at least:
-
-```csharp
-public string? ChartName { get; init; }
-
-public string? FormatVersion { get; init; }
-
-public string? ModeHint { get; init; }
-
-public IReadOnlyList<BmsCredit> Credits { get; init; } = [];
-```
+Keep song subtitle and chart name separate in the parser metadata and feed the chart name through the existing
+difficulty-name resolution path. Keep format/version and mode validation at the parser boundary rather than adding
+format flags to runtime beatmaps.
 
 ```csharp
 public sealed record BmsCredit(string Role, string Name);

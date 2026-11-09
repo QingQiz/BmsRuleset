@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -22,6 +23,7 @@ using osu.Game.Rulesets.BmsRuleset.Media.Audio.Preview;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.IO.ResourceStore;
+using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 using osu.Game.Rulesets.BmsRuleset.Tests.Audio;
 using osu.Game.Rulesets.BmsRuleset.Tests.Normal;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
@@ -114,9 +116,11 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
         {
             var sourceInfo = createBeatmapInfoWithAudio(beatmapId, "same-source.bms");
             var targetInfo = createBeatmapInfoWithAudio(beatmapId, "same-target.bms");
+            var bytes = Encoding.UTF8.GetBytes("#BPM 120\n#00111:01");
+            sourceInfo.MD5Hash = targetInfo.MD5Hash = Convert.ToHexString(MD5.HashData(bytes)).ToLowerInvariant();
 
-            source = new BmsWorkingBeatmap(new StubWorkingBeatmap(audio, new BmsBeatmap(), sourceInfo), audio);
-            target = new BmsWorkingBeatmap(new StubWorkingBeatmap(audio, new BmsBeatmap(), targetInfo), audio);
+            source = new BmsWorkingBeatmap(new StubWorkingBeatmap(audio, new BmsBeatmap(), sourceInfo, bytes), audio);
+            target = new BmsWorkingBeatmap(new StubWorkingBeatmap(audio, new BmsBeatmap(), targetInfo, bytes), audio);
         });
 
         AddStep("load source preview", () =>
@@ -310,7 +314,7 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
 
             var beatmap = new BmsBeatmap
             {
-                SampleDefinitions = new Dictionary<ushort, string> { [1] = "bgm.wav" },
+                SampleDefinitions = new Dictionary<int, BmsSampleDefinition> { [1] = new("bgm.wav") },
                 BackgroundSampleEvents = [new BmsSampleEvent(0, 1, 100)],
             };
 
@@ -394,9 +398,9 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
 
             var beatmap = new BmsBeatmap
             {
-                SampleDefinitions = new Dictionary<ushort, string>
+                SampleDefinitions = new Dictionary<int, BmsSampleDefinition>
                 {
-                    [1] = "bgm.wav",
+                    [1] = new("bgm.wav"),
                 },
                 BackgroundSampleEvents =
                 [
@@ -543,7 +547,9 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
             var beatmapSet = new BeatmapSetInfo();
             beatmapSet.Files.Add(new RealmNamedFileUsage(new RealmFile { Hash = "other-chart" }, "other.bms"));
             var beatmapInfo = createBeatmapInfo(beatmapSet, directory, "chart.bms");
-            var beatmap = BmsBeatmapDecoder.DecodeBytes(Encoding.UTF8.GetBytes("#BPM 120\n#STAGEFILE stage.png\n#00111:01"), beatmapInfo);
+            var bytes = Encoding.UTF8.GetBytes("#BPM 120\n#STAGEFILE stage.png\n#00111:01");
+            File.WriteAllBytes(Path.Combine(directory, "chart.bms"), bytes);
+            var beatmap = BmsBeatmapDecoder.DecodeBytes(bytes, beatmapInfo);
             working = new BmsWorkingBeatmap(new StubWorkingBeatmap(audio, beatmap, beatmapInfo), audio);
         });
 
@@ -634,6 +640,7 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
         {
             var beatmapSet = new BeatmapSetInfo();
             var beatmapInfo = createBeatmapInfo(beatmapSet, directory, "metadata.bms");
+            File.WriteAllText(Path.Combine(directory, "metadata.bms"), "#BPM 120\n#STAGEFILE stage.png\n#BANNER banner.png");
             var beatmap = new BmsBeatmap
             {
                 StageFile = "stage.png",
@@ -753,9 +760,9 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
 
             var innerBeatmap = new BmsBeatmap
             {
-                SampleDefinitions = new Dictionary<ushort, string>
+                SampleDefinitions = new Dictionary<int, BmsSampleDefinition>
                 {
-                    [1] = "b_accordion (�؂�)_v100l8o5c.wav",
+                    [1] = new("b_accordion (�؂�)_v100l8o5c.wav"),
                 },
             };
 
@@ -763,7 +770,7 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
         });
 
         AddAssert("sample path decoded from original bytes", () =>
-            ((IBmsBeatmap)working.Beatmap).SampleDefinitions[1] == "b_accordion (切る)_v100l8o5c.wav");
+            ((IBmsBeatmap)working.Beatmap).SampleDefinitions[1].Path == "b_accordion (切る)_v100l8o5c.wav");
 
         AddStep("load preview track", () => previewTrack = working.LoadTrack());
         AddUntilStep("preview playback created", () => BmsAudioTestAccess.HasPreviewPlayback((BmsPreviewTrack)previewTrack));
@@ -795,6 +802,11 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
             var thirdInfo = createBeatmapInfo(beatmapSet, directory, "third.bms");
             var fourthInfo = createBeatmapInfo(beatmapSet, directory, "fourth.bms");
             var fifthInfo = createBeatmapInfo(beatmapSet, directory, "fifth.bms");
+            File.WriteAllText(Path.Combine(directory, "first.bms"), "#BPM 120\n#BACKBMP first.png\n#BANNER banner.png");
+            File.WriteAllText(Path.Combine(directory, "second.bms"), "#BPM 120\n#BACKBMP second.png\n#BANNER banner.png");
+            File.WriteAllText(Path.Combine(directory, "third.bms"), "#BPM 120\n#BACKBMP first.png\n#BANNER banner.png");
+            File.WriteAllText(Path.Combine(directory, "fourth.bms"), "#BPM 120\n#BACKBMP first.png\n#BANNER other-banner.png");
+            File.WriteAllText(Path.Combine(directory, "fifth.bms"), "#BPM 120\n#BACKBMP second.png\n#BANNER other-banner.png");
 
             first = new BmsWorkingBeatmap(new StubWorkingBeatmap(audio, new BmsBeatmap { BackBmp = "first.png", Banner = "banner.png" }, firstInfo), audio);
             second = new BmsWorkingBeatmap(new StubWorkingBeatmap(audio, new BmsBeatmap { BackBmp = "second.png", Banner = "banner.png" }, secondInfo), audio);
@@ -859,6 +871,7 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
 
         BmsWorkingBeatmap createWorkingBeatmap(string sourceDirectory, string filename)
         {
+            File.WriteAllText(Path.Combine(sourceDirectory, filename), "#BPM 120\n#STAGEFILE stage.png\n#BANNER banner.png");
             var beatmapInfo = createBeatmapInfo(new BeatmapSetInfo(), sourceDirectory, filename);
             var inner = new StubWorkingBeatmap(audio, new BmsBeatmap { StageFile = "stage.png", Banner = "banner.png" }, beatmapInfo);
 
@@ -888,6 +901,29 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
         }
 
         createdDirectories.Clear();
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void TestBmsonLoadsThroughExternalAndCachedChartPaths(bool cached)
+    {
+        BmsWorkingBeatmap working = null!;
+        AddStep("create BMSON working beatmap", () =>
+        {
+            var directory = Path.Combine(Path.GetTempPath(), $"bmson-working-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(directory);
+            createdDirectories.Add(directory);
+            var bytes = Normal.BeatmapTest.Decoding.BmsonParserTest.Chart(
+                """[{"name":"stem.wav","notes":[{"x":1,"y":240}]}]""");
+            if (!cached)
+                File.WriteAllBytes(Path.Combine(directory, "chart.bmson"), bytes);
+            var info = createBeatmapInfo(new BeatmapSetInfo(), directory, "chart.bmson");
+            info.MD5Hash = Convert.ToHexString(MD5.HashData(bytes)).ToLowerInvariant();
+            working = new BmsWorkingBeatmap(new StubWorkingBeatmap(audio, new BmsBeatmap(), info, bytes), audio);
+        });
+        AddAssert("BMSON parser selected", () => working.Beatmap.HitObjects.Single().StartTime == 500);
+        AddAssert("notes decoded", () => working.Beatmap.HitObjects.Count == 1);
+        AddStep("resolve background metadata", () => working.PrepareBackgroundMetadataAsync().GetAwaiter().GetResult());
     }
 
     private static WorkingBeatmapCache getWorkingBeatmapCache(BeatmapManager manager) =>
@@ -1009,6 +1045,7 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
     private class StubWorkingBeatmap : WorkingBeatmap
     {
         private readonly IBeatmap beatmap = null!;
+        private readonly byte[]? chartContent;
 
         public StubWorkingBeatmap(AudioManager audioManager)
             : base(new BeatmapInfo(), audioManager)
@@ -1027,17 +1064,22 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
             this.beatmap = beatmap;
         }
 
-        public StubWorkingBeatmap(AudioManager audioManager, IBeatmap beatmap, BeatmapInfo beatmapInfo)
+        public StubWorkingBeatmap(AudioManager audioManager, IBeatmap beatmap, BeatmapInfo beatmapInfo, byte[]? chartContent = null)
             : base(beatmapInfo, audioManager)
         {
             this.beatmap = beatmap;
+            this.chartContent = chartContent;
         }
 
         // The wrapper serves backgrounds from the external texture store; this is only hit as a
         // fallback (e.g. when a test has no external store), so return null rather than throw.
         public override Texture GetBackground() => null!;
 
-        public override Stream GetStream(string storagePath) => throw new NotSupportedException();
+        public override Stream GetStream(string storagePath)
+        {
+            Assert.That(storagePath, Is.EqualTo(BeatmapSetInfo.GetPathForFile(BeatmapInfo.Path)));
+            return chartContent != null ? new MemoryStream(chartContent) : throw new NotSupportedException();
+        }
 
         protected override IBeatmap GetBeatmap() => beatmap ?? throw new NotSupportedException();
 

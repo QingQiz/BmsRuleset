@@ -175,7 +175,7 @@ public partial class BmsBackgroundAudioPlayer(
         int nextEventIndex,
         double currentTime,
         double maxLength,
-        Func<ushort, double> getLength,
+        Func<int, double> getLength,
         int firstEventIndex = 0)
     {
         var result = new List<SeekedBgm>();
@@ -183,7 +183,7 @@ public partial class BmsBackgroundAudioPlayer(
         if (maxLength <= 0)
             return result;
 
-        var seenKeys = new HashSet<ushort>();
+        var seenKeys = new HashSet<int>();
 
         for (var i = nextEventIndex - 1; i >= firstEventIndex; i--)
         {

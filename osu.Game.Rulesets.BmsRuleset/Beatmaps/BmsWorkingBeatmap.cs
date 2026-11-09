@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Track;
+using osu.Framework.Extensions;
 using osu.Framework.Graphics.Textures;
 using osu.Game.Beatmaps;
 using osu.Game.Models;
@@ -149,7 +150,21 @@ public class BmsWorkingBeatmap : WorkingBeatmap
         return new BmsEventPreviewTrack(timelineSources, Metadata.Source, audioManager);
     }
 
-    protected override IBeatmap GetBeatmap() => tryDecodeExternalBeatmap(BeatmapInfo) ?? inner.Beatmap;
+    protected override IBeatmap GetBeatmap()
+    {
+        if (BeatmapInfo.Path is not { } path || !Constant.IsChartFile(path))
+            return inner.Beatmap;
+
+        if (tryDecodeExternalBeatmap(BeatmapInfo) is { } external)
+            return external;
+
+        using var stream = inner.GetStream(BeatmapSetInfo.GetPathForFile(path))
+                           ?? throw new FileNotFoundException("Stored BMS chart was not found.", path);
+        // Keep the identity check used by osu!'s file-store loading path.
+        if (stream.ComputeMD5Hash() != BeatmapInfo.MD5Hash)
+            throw new InvalidDataException($"Stored BMS chart hash does not match: {path}");
+        return BmsBeatmapDecoder.DecodeBytes(stream.ReadAllBytesToArray(), cloneBeatmapInfo(BeatmapInfo));
+    }
 
     // BMS charts do not contain osu! beatmap skins. Keeping this source out of the skin chain also
     // prevents an empty LegacyBeatmapSkin from overriding the selected user skin during gameplay.
@@ -336,7 +351,7 @@ public class BmsWorkingBeatmap : WorkingBeatmap
             if (externalBackgroundResolved)
                 return;
 
-            var bmsBeatmap = tryDecodeExternalBeatmap(BeatmapInfo) as IBmsBeatmap ?? inner.Beatmap as IBmsBeatmap;
+            var bmsBeatmap = Beatmap as IBmsBeatmap;
 
             resolvedBackgroundPaths = resolveExternalBackgroundPaths(Metadata.Source, bmsBeatmap, false);
             resolvedPanelBackgroundPaths = resolveExternalBackgroundPaths(Metadata.Source, bmsBeatmap, true);

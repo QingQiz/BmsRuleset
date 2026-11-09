@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
@@ -50,9 +51,17 @@ public class BmsModHideScratch : Mod, IApplicableToDrawableRuleset<BmsHitObject>
         var scratchNotes = b.HitObjects
             .Where(x => BmsLayout.IsScratchColumn(x.Column, b.LayoutVariant)).ToArray();
 
-        var scratchStartSamples = scratchNotes
-            .Where(x => x is not BmsLandmine && x.SampleKey.HasValue)
-            .Select(x => new BmsSampleEvent(x.StartTime, x.SampleKey!.Value, x.SampleVolume));
+        var scratchStartSamples = new List<BmsSampleEvent>();
+        foreach (var note in scratchNotes)
+        {
+            if (note is BmsLandmine)
+                continue;
+            if (note.SampleKey is { } key)
+                scratchStartSamples.Add(new BmsSampleEvent(note.StartTime, key, note.SampleVolume));
+            var additional = note.AdditionalSampleKeys;
+            for (var i = 0; i < additional.Count; i++)
+                scratchStartSamples.Add(new BmsSampleEvent(note.StartTime, additional[i], note.SampleVolume));
+        }
 
         var scratchEndSamples = scratchNotes
             .OfType<BmsLongNote>()

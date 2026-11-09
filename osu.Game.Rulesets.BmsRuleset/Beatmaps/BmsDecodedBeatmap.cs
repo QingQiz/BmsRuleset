@@ -2,6 +2,7 @@
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 
 namespace osu.Game.Rulesets.BmsRuleset.Beatmaps;
 
@@ -15,11 +16,11 @@ internal class BmsDecodedBeatmap : Beatmap, IBmsBeatmap
 
     public double? ExRank { get; set; }
 
-    public double Total { get; set; }
+    public double? Total { get; set; }
 
     public BmsTimingMap? TimingMap { get; set; }
 
-    public IReadOnlyDictionary<ushort, string> SampleDefinitions { get; set; } = new Dictionary<ushort, string>();
+    public IReadOnlyDictionary<int, BmsSampleDefinition> SampleDefinitions { get; set; } = new Dictionary<int, BmsSampleDefinition>();
 
     public IReadOnlyList<BmsSampleEvent> BackgroundSampleEvents { get; set; } = [];
 

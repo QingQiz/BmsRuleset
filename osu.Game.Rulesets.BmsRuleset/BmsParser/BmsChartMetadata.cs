@@ -8,7 +8,7 @@ public readonly record struct BmsChartMetadata(
     int KeyCount,
     string RawTitle,
     int Rank,
-    double Total,
+    double? Total,
     float? PlayLevel,
     BmsLongNoteMode LockedLongNoteMode = BmsLongNoteMode.Undefined,
     double? ExRank = null

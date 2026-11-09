@@ -17,7 +17,7 @@ public class BmsLongNote : BmsHitObject, IHasDuration
     /// </summary>
     public double ScrollPositionAtEndTime { get; set; }
 
-    public ushort? TailSampleKey { get; set; }
+    public int? TailSampleKey { get; set; }
 
     public int TailSampleVolume { get; set; } = 100;
 

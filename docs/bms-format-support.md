@@ -4,6 +4,18 @@
 
 ## Features
 
+### BMSON
+
+Import BMSON 1.0.0 charts by dropping their files or song folders into the game. Supported layouts are
+`beat-5k`, `beat-7k`, `beat-10k`, `beat-14k`, and `popn-9k`.
+
+Support includes long notes, layered keysounds, automatic audio slicing, BPM changes, stops, explicit bar lines,
+BGA, and song previews. `chart_name` supplies the difficulty name; `judge_rank` scales judgement windows and
+`total` scales the default gauge recovery. Judgement percentages retain fractional values.
+
+Legacy BMSON 0.21 and player extensions such as mines, scroll events, and release sounds require conversion to
+the supported format before import.
+
 ### Parser
 
 **Header fields decoded:**

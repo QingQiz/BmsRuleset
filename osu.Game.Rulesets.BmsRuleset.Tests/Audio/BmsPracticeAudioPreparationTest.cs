@@ -26,7 +26,7 @@ public class BmsPracticeAudioPreparationTest
             new(4, 0, ResumeAfterSeek: true), new(5, 0, ResumeAfterSeek: true),
             new(6, 1001, ResumeAfterSeek: true), new(7, 500),
         ]);
-        preparation.SetDurations(new Dictionary<ushort, BmsSampleDuration>
+        preparation.SetDurations(new Dictionary<int, BmsSampleDuration>
         {
             [1] = new(BmsSampleDurationState.Known, 500),
             [2] = new(BmsSampleDurationState.Known, 1000),
@@ -34,13 +34,13 @@ public class BmsPracticeAudioPreparationTest
             [4] = new(BmsSampleDurationState.Unknown),
             [5] = new(BmsSampleDurationState.Failed),
         });
-        var offsets = preparation.GetResumeOffsets(1000, new Dictionary<ushort, double>());
+        var offsets = preparation.GetResumeOffsets(1000);
         Assert.That(offsets.Keys, Is.EquivalentTo((ushort[])[1, 3, 4]));
         Assert.That(offsets[1], Is.EqualTo(200));
         Assert.That(offsets[3], Is.Zero);
         Assert.That(offsets[4], Is.EqualTo(1000));
-        Assert.That(preparation.GetResumeOffsets(1400, new Dictionary<ushort, double> { [4] = 1000 }).Keys,
-            Is.EquivalentTo((ushort[])[3, 6]));
+        Assert.That(preparation.GetResumeOffsets(1400).Keys,
+            Is.EquivalentTo(new[] { 3, 4, 6 }), "Unknown durations remain candidates until PCM preparation resolves them.");
     }
 
     [TestCase(0.5)]
@@ -50,14 +50,14 @@ public class BmsPracticeAudioPreparationTest
     {
         var chartTime = 1000d;
         var mixer = new BmsPcmVoiceMixer();
-        using var controller = new BmsPcmPlaybackController(new Dictionary<ushort, string>(), null, rate,
+        using var controller = new BmsPcmPlaybackController(new Dictionary<int, BmsSampleDefinition>(), null, rate,
             [new BmsSampleUsage(1, 0, ResumeAfterSeek: true)], new BindableDouble(1), () => chartTime, mixer);
         var asset = new BmsPcmAsset(44100, 2);
         asset.SetOriginalDuration(2000);
         publish(8192);
         asset.MarkReady();
         addAsset(controller, 1, asset);
-        var prepared = controller.WaitForPreparedSamplesAsync(default, new Dictionary<ushort, double> { [1] = chartTime });
+        var prepared = controller.WaitForPreparedSamplesAsync(default, new Dictionary<int, double> { [1] = chartTime });
         Assert.That(prepared.IsCompleted, Is.False, "An initial buffer does not cover a later seek offset.");
         publish((int)(88200 / rate) - 8192);
         asset.Complete(asset.PublishedFrameCount);
@@ -74,7 +74,7 @@ public class BmsPracticeAudioPreparationTest
     {
         var chartTime = 1000d;
         var mixer = new BmsPcmVoiceMixer();
-        using var controller = new BmsPcmPlaybackController(new Dictionary<ushort, string>(), null, 1,
+        using var controller = new BmsPcmPlaybackController(new Dictionary<int, BmsSampleDefinition>(), null, 1,
             null, new BindableDouble(1), () => chartTime, mixer);
         var asset = new BmsPcmAsset(44100, 2);
         asset.SetOriginalDuration(2000);
@@ -98,14 +98,14 @@ public class BmsPracticeAudioPreparationTest
     [Test]
     public async Task PreparationCanBeCancelledWhileWaitingForTheSeekBuffer()
     {
-        using var controller = new BmsPcmPlaybackController(new Dictionary<ushort, string>(), null, 1,
+        using var controller = new BmsPcmPlaybackController(new Dictionary<int, BmsSampleDefinition>(), null, 1,
             [new BmsSampleUsage(1, 0, ResumeAfterSeek: true)], new BindableDouble(1), () => 1000, new BmsPcmVoiceMixer());
         var asset = new BmsPcmAsset(44100, 2);
         asset.Publish(new BmsPcmChunk(0, 8192, new float[16384]));
         asset.MarkReady();
         addAsset(controller, 1, asset);
         using var cancellation = new CancellationTokenSource();
-        var wait = controller.WaitForPreparedSamplesAsync(cancellation.Token, new Dictionary<ushort, double> { [1] = 1000 });
+        var wait = controller.WaitForPreparedSamplesAsync(cancellation.Token, new Dictionary<int, double> { [1] = 1000 });
         cancellation.Cancel();
         try
         {
@@ -117,10 +117,11 @@ public class BmsPracticeAudioPreparationTest
         }
     }
 
-    private static void addAsset(BmsPcmPlaybackController controller, ushort key, BmsPcmAsset asset)
+    private static void addAsset(BmsPcmPlaybackController controller, int key, BmsPcmAsset asset)
     {
-        BmsPcmMaintenanceTest.Field<Dictionary<ushort, string>>(controller, "resolvedResources")[key] = "sample";
-        BmsPcmMaintenanceTest.Field<Dictionary<ushort, BmsPcmAssetLease>>(controller, "leases")[key]
+        BmsPcmMaintenanceTest.Field<Dictionary<int, BmsSampleDefinition>>(controller, "sampleDefinitions")[key] = new("sample");
+        BmsPcmMaintenanceTest.Field<Dictionary<int, string>>(controller, "resolvedResources")[key] = "sample";
+        BmsPcmMaintenanceTest.Field<Dictionary<int, BmsPcmAssetLease>>(controller, "leases")[key]
             = new BmsPcmAssetLease(asset, Task.CompletedTask, () => { });
     }
 }

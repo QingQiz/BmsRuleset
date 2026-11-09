@@ -53,8 +53,11 @@ public static class BmsPracticeBeatmap
         var background = fullBeatmap.BackgroundSampleEvents.ToList();
         foreach (var note in fullBeatmap.HitObjects.Where(note => !settings.Contains(note.StartTime, millisecondPrecision) && note is not BmsLandmine and not BmsInvisibleNote))
         {
-            if (note.SampleKey is { } sample)
-                background.Add(new BmsSampleEvent(note.StartTime, sample, note.SampleVolume));
+            if (note.SampleKey is { } sampleKey)
+                background.Add(new BmsSampleEvent(note.StartTime, sampleKey, note.SampleVolume));
+            var additional = note.AdditionalSampleKeys;
+            for (var i = 0; i < additional.Count; i++)
+                background.Add(new BmsSampleEvent(note.StartTime, additional[i], note.SampleVolume));
             if (note is BmsLongNote { TailSampleKey: { } tailSample } longNote)
                 background.Add(new BmsSampleEvent(longNote.EndTime, tailSample, longNote.TailSampleVolume));
         }

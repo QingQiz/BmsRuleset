@@ -51,7 +51,7 @@ public class BmsPcmMaintenanceTest
     public void ExpiredSamplesAreReleasedOnceAndLengthsRemainAvailable()
     {
         using var controller = CreateController(3);
-        var ends = Field<Dictionary<ushort, double>>(controller, "lifetimeEnds");
+        var ends = Field<Dictionary<int, double>>(controller, "lifetimeEnds");
         ends[0] = 10;
         ends[1] = 20;
         ends[2] = 30;
@@ -85,9 +85,9 @@ public class BmsPcmMaintenanceTest
     public void MultiplePendingPlaysCanBecomeReadyInOneUpdate()
     {
         using var controller = CreateController(2);
-        var resources = Field<Dictionary<ushort, string>>(controller, "resolvedResources");
-        var leases = Field<Dictionary<ushort, BmsPcmAssetLease>>(controller, "leases");
-        for (ushort key = 0; key < 2; key++)
+        var resources = Field<Dictionary<int, string>>(controller, "resolvedResources");
+        var leases = Field<Dictionary<int, BmsPcmAssetLease>>(controller, "leases");
+        for (int key = 0; key < 2; key++)
         {
             resources[key] = key.ToString(System.Globalization.CultureInfo.InvariantCulture);
             leases[key].Dispose();
@@ -110,11 +110,11 @@ public class BmsPcmMaintenanceTest
 
     internal static BmsPcmPlaybackController CreateController(int count)
     {
-        var controller = new BmsPcmPlaybackController(new Dictionary<ushort, string>(), null, 1, null,
+        var controller = new BmsPcmPlaybackController(Enumerable.Range(0, count).ToDictionary(key => key, _ => new BmsSampleDefinition("sample")), null, 1, null,
             new BindableDouble(1), () => 0, new BmsPcmVoiceMixer());
-        var leases = Field<Dictionary<ushort, BmsPcmAssetLease>>(controller, "leases");
+        var leases = Field<Dictionary<int, BmsPcmAssetLease>>(controller, "leases");
         for (var i = 0; i < count; i++)
-            leases.Add((ushort)i, new BmsPcmAssetLease(CreateAsset(), Task.CompletedTask, () => { }));
+            leases.Add(i, new BmsPcmAssetLease(CreateAsset(), Task.CompletedTask, () => { }));
         return controller;
     }
 
@@ -122,7 +122,7 @@ public class BmsPcmMaintenanceTest
     public void LiveBatchCoalescesRetriggersBeforeAllocatingMixerCommands()
     {
         using var controller = CreateController(1);
-        Field<Dictionary<ushort, string>>(controller, "resolvedResources")[0] = "sample";
+        Field<Dictionary<int, string>>(controller, "resolvedResources")[0] = "sample";
         var mixer = Field<BmsPcmVoiceMixer>(controller, "mixer");
         var output = new float[2];
         controller.QueueLivePlay(0, 100);
@@ -142,14 +142,14 @@ public class BmsPcmMaintenanceTest
     public void ConsecutiveLiveBatchesKeepCommandsIndependentUntilTheMixerConsumesThem()
     {
         using var controller = CreateController(10);
-        var resources = Field<Dictionary<ushort, string>>(controller, "resolvedResources");
-        var leases = Field<Dictionary<ushort, BmsPcmAssetLease>>(controller, "leases");
+        var resources = Field<Dictionary<int, string>>(controller, "resolvedResources");
+        var leases = Field<Dictionary<int, BmsPcmAssetLease>>(controller, "leases");
         var mixer = Field<BmsPcmVoiceMixer>(controller, "mixer");
         var reference = new BmsPcmVoiceMixer();
         var firstBatch = new BmsVoicePlay[8];
-        for (ushort key = 0; key < 10; key++)
+        for (int key = 0; key < 10; key++)
             resources[key] = key.ToString(System.Globalization.CultureInfo.InvariantCulture);
-        for (ushort key = 0; key < firstBatch.Length; key++)
+        for (int key = 0; key < firstBatch.Length; key++)
         {
             controller.QueueLivePlay(key, 10 + key);
             firstBatch[key] = new BmsVoicePlay(leases[key].Asset, key, 0, (10 + key) / 100f);
@@ -175,8 +175,8 @@ public class BmsPcmMaintenanceTest
     public void CatchUpSustainsExistingAudioButPauseAndSeekStillStopIt()
     {
         using var controller = CreateController(1);
-        Field<Dictionary<ushort, string>>(controller, "resolvedResources")[0] = "sample";
-        var leases = Field<Dictionary<ushort, BmsPcmAssetLease>>(controller, "leases");
+        Field<Dictionary<int, string>>(controller, "resolvedResources")[0] = "sample";
+        var leases = Field<Dictionary<int, BmsPcmAssetLease>>(controller, "leases");
         leases[0].Dispose();
         leases[0] = new BmsPcmAssetLease(BmsPcmTestHelpers.CreateAsset([new BmsPcmChunk(0, 8, Enumerable.Repeat(0.1f, 16).ToArray())]), Task.CompletedTask, () => { });
         var mixer = Field<BmsPcmVoiceMixer>(controller, "mixer");
@@ -208,8 +208,8 @@ public class BmsPcmMaintenanceTest
     public void DeferredLivePlaySurvivesPreparationCompletingDuringPause()
     {
         using var controller = CreateController(1);
-        Field<Dictionary<ushort, string>>(controller, "resolvedResources")[0] = "sample";
-        var leases = Field<Dictionary<ushort, BmsPcmAssetLease>>(controller, "leases");
+        Field<Dictionary<int, string>>(controller, "resolvedResources")[0] = "sample";
+        var leases = Field<Dictionary<int, BmsPcmAssetLease>>(controller, "leases");
         leases[0].Dispose();
         var asset = new BmsPcmAsset(44100, 2);
         leases[0] = new BmsPcmAssetLease(asset, Task.CompletedTask, () => { });
@@ -233,9 +233,9 @@ public class BmsPcmMaintenanceTest
     public void LiveChordWaitsForPreparingAssetsInsteadOfLosingThem()
     {
         using var controller = CreateController(2);
-        var resources = Field<Dictionary<ushort, string>>(controller, "resolvedResources");
-        var leases = Field<Dictionary<ushort, BmsPcmAssetLease>>(controller, "leases");
-        for (ushort key = 0; key < 2; key++)
+        var resources = Field<Dictionary<int, string>>(controller, "resolvedResources");
+        var leases = Field<Dictionary<int, BmsPcmAssetLease>>(controller, "leases");
+        for (int key = 0; key < 2; key++)
         {
             resources[key] = key.ToString(System.Globalization.CultureInfo.InvariantCulture);
             leases[key].Dispose();

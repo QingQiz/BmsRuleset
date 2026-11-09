@@ -33,7 +33,7 @@ internal sealed partial class BmsColumnKeySound : CompositeDrawable
     private BmsSamplePlayback samplePlayback { get; set; } = null!;
 
     /// <summary>Triggers a note-hit / LN-tail definition through shared sample playback.</summary>
-    public void PlaySample(ushort? sampleKey, int volume = 100)
+    public void PlaySample(int? sampleKey, int volume = 100)
     {
         if (sampleKey is { } key)
             samplePlayback.QueueLivePlay(key, volume);
@@ -52,6 +52,9 @@ internal sealed partial class BmsColumnKeySound : CompositeDrawable
             return;
 
         PlaySample(hitObject.SampleKey, hitObject.SampleVolume);
+        var additional = hitObject.AdditionalSampleKeys;
+        for (var i = 0; i < additional.Count; i++)
+            PlaySample(additional[i], hitObject.SampleVolume);
     }
 
     /// <summary>Triggers the landmine explosion definition (#WAV00).</summary>

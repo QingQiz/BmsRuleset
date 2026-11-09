@@ -58,18 +58,22 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
             || converted.TotalColumns != BmsLayout.GetTotalColumns(converted.LayoutVariant))
             throw new InvalidDataException("BMS conversion requires a complete timing map and layout.");
 
+        converted.TimingMap = converted.TimingMap.WithReferenceBpm(ReferenceBpmMode ?? BmsRulesetRuntime.CurrentReferenceBpmMode);
+
         // Precompute scroll positions once per hitobject to eliminate per-frame
         // GetScrollPositionAtTime calls in the DrawableBmsHitObject hot path.
         precomputeScrollPositions(converted);
 
-        new BmsDifficultyInfo
+        var difficulty = new BmsDifficultyInfo
         {
             Rank = converted.Rank,
             ExRank = converted.ExRank,
             Total = converted.Total,
             KeyCount = converted.TotalColumns,
             LockedLongNoteMode = converted.LockedLongNoteMode,
-        }.WriteToOsuDifficulty(converted);
+        };
+        difficulty.WriteToOsuDifficulty(converted.Difficulty);
+        difficulty.WriteToOsuDifficulty(converted.BeatmapInfo.Difficulty);
 
         foreach (var note in converted.HitObjects)
         {
@@ -163,8 +167,7 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
         if (!string.IsNullOrWhiteSpace(BranchReplayDecisions))
             selector = BmsChartParser.CreateReplayDecisionSelector(BmsChartParser.DeserialiseBranchDecisions(BranchReplayDecisions));
 
-        var parseResult = BmsChartParser.Parse(decoded.RawLines, decoded.BeatmapInfo.Path, selector,
-            ReferenceBpmMode ?? BmsRulesetRuntime.CurrentReferenceBpmMode, JudgementRateCalculator);
+        var parseResult = BmsChartParser.Parse(decoded.RawLines, decoded.BeatmapInfo.Path, selector, JudgementRateCalculator);
         converted.CopyFrom(parseResult);
         converted.ControlPointInfo = new ControlPointInfo();
         BmsBeatmapDecoder.PopulateTiming(converted, parseResult.TimingMap.BpmEvents);

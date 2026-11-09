@@ -18,7 +18,7 @@ internal sealed class BmsPcmPlaybackController : IDisposable
     private const double preload_time = 10_000;
     private static readonly TimeSpan initial_ready_timeout = TimeSpan.FromSeconds(30);
 
-    private readonly IReadOnlyDictionary<ushort, string> sampleDefinitions;
+    private readonly IReadOnlyDictionary<int, BmsSampleDefinition> sampleDefinitions;
     private readonly IReadOnlyList<BmsSampleUsage>? sampleUsages;
     private readonly string? basePath;
     private readonly double rate;
@@ -26,14 +26,14 @@ internal sealed class BmsPcmPlaybackController : IDisposable
     private readonly Func<double> currentTime;
     private readonly BmsPcmVoiceMixer mixer;
     private readonly BmsPlaybackClockMapper clockMapper;
-    private readonly Dictionary<ushort, string> resolvedResources = [];
-    private readonly Dictionary<ushort, BmsPcmAssetLease> leases = [];
-    private readonly Dictionary<ushort, double> lifetimeEnds = [];
-    private readonly HashSet<ushort> resumableSamples = [];
-    private readonly Dictionary<ushort, double> sampleLengths = [];
-    private readonly Dictionary<ushort, PendingPlay> pendingPlays = [];
+    private readonly Dictionary<int, string> resolvedResources = [];
+    private readonly Dictionary<int, BmsPcmAssetLease> leases = [];
+    private readonly Dictionary<int, double> lifetimeEnds = [];
+    private readonly HashSet<int> resumableSamples = [];
+    private readonly Dictionary<int, double> sampleLengths = [];
+    private readonly Dictionary<int, PendingPlay> pendingPlays = [];
     private readonly List<PendingLivePlay> livePlays = [];
-    private readonly Dictionary<ushort, int> livePlayIndices = [];
+    private readonly Dictionary<int, int> livePlayIndices = [];
 
     private BmsAudioResourceStore? resourceStore;
     private BmsPcmAssetCache? assetCache;
@@ -49,11 +49,11 @@ internal sealed class BmsPcmPlaybackController : IDisposable
 
     internal bool IsInitialised => assetCache != null;
 
-    internal IEnumerable<ushort> PreparedSampleKeys => leases.Keys;
+    internal IEnumerable<int> PreparedSampleKeys => leases.Keys;
 
-    internal Task WaitForPreparedSamplesAsync(CancellationToken cancellationToken, IReadOnlyDictionary<ushort, double>? offsets = null)
+    internal Task WaitForPreparedSamplesAsync(CancellationToken cancellationToken, IReadOnlyDictionary<int, double>? offsets = null)
     {
-        var prepared = leases.Select(pair => (pair.Value, Offset: offsets?.GetValueOrDefault(pair.Key) ?? 0,
+        var prepared = leases.Select(pair => (pair.Value, Offset: sampleDefinitions[pair.Key].StartOffset + (offsets?.GetValueOrDefault(pair.Key) ?? 0),
             NeedLength: offsets?.ContainsKey(pair.Key) == true)).ToArray();
         return waitForPreparedSamples(prepared, cancellationToken);
     }
@@ -78,10 +78,10 @@ internal sealed class BmsPcmPlaybackController : IDisposable
 
     internal double MaxSampleLengthMilliseconds => Math.Max(
         sampleLengths.Values.DefaultIfEmpty(0).Max(),
-        leases.Values.Select(lease => getOriginalLength(lease.Asset)).DefaultIfEmpty(0).Max());
+        leases.Select(pair => rememberSampleLength(pair.Key, pair.Value.Asset)).DefaultIfEmpty(0).Max());
 
     internal BmsPcmPlaybackController(
-        IReadOnlyDictionary<ushort, string> sampleDefinitions,
+        IReadOnlyDictionary<int, BmsSampleDefinition> sampleDefinitions,
         string? basePath,
         double rate,
         IEnumerable<BmsSampleUsage>? sampleUsages,
@@ -89,9 +89,7 @@ internal sealed class BmsPcmPlaybackController : IDisposable
         Func<double> currentTime,
         BmsPcmVoiceMixer mixer)
     {
-        this.sampleDefinitions = sampleDefinitions
-            .Where(pair => !string.IsNullOrEmpty(pair.Value))
-            .ToDictionary(pair => pair.Key, pair => pair.Value);
+        this.sampleDefinitions = sampleDefinitions;
         this.basePath = basePath;
         this.rate = rate;
         this.sampleUsages = sampleUsages?.ToArray();
@@ -103,7 +101,7 @@ internal sealed class BmsPcmPlaybackController : IDisposable
     }
 
     internal void Initialise(CancellationToken cancellationToken, double chartTime, bool waitForInitialAssets = true,
-                             IReadOnlyDictionary<ushort, double>? knownLengths = null)
+                             IReadOnlyDictionary<int, double>? knownLengths = null)
     {
         if (knownLengths != null)
         {
@@ -151,29 +149,18 @@ internal sealed class BmsPcmPlaybackController : IDisposable
         }
     }
 
-    internal bool HasSampleDefinition(ushort sampleKey) =>
+    internal bool HasSampleDefinition(int sampleKey) =>
         resolvedResources.ContainsKey(sampleKey)
         && (!leases.TryGetValue(sampleKey, out var lease) || lease.Asset.State != BmsPcmAssetState.Failed);
 
-    internal double GetSampleLength(ushort sampleKey)
+    internal double GetSampleLength(int sampleKey)
     {
         if (leases.TryGetValue(sampleKey, out var lease))
             rememberSampleLength(sampleKey, lease.Asset);
         return sampleLengths.GetValueOrDefault(sampleKey);
     }
 
-    internal bool IsSampleReady(ushort sampleKey) =>
-        leases.TryGetValue(sampleKey, out var lease)
-        && lease.Asset.State is BmsPcmAssetState.Ready or BmsPcmAssetState.Complete;
-
-    internal bool IsSampleReady(ushort sampleKey, double offset)
-    {
-        if (!leases.TryGetValue(sampleKey, out var lease)
-            || lease.Asset.State is not (BmsPcmAssetState.Ready or BmsPcmAssetState.Complete))
-            return false;
-
-        return isReadyAtOffset(lease.Asset, offset);
-    }
+    internal bool IsSampleReady(int sampleKey, double offset = 0) => tryGetReadyAsset(sampleKey, offset, out _);
 
     private bool isReadyAtOffset(BmsPcmAsset asset, double offset)
     {
@@ -190,11 +177,11 @@ internal sealed class BmsPcmPlaybackController : IDisposable
         return asset.PublishedFrameCount >= requiredFrames;
     }
 
-    internal void PrepareSample(ushort sampleKey) => ensureLease(sampleKey);
+    internal void PrepareSample(int sampleKey) => ensureLease(sampleKey);
 
-    internal void QueueLivePlay(ushort sampleKey, int volume) => QueuePlay(sampleKey, volume, 0);
+    internal void QueueLivePlay(int sampleKey, int volume) => QueuePlay(sampleKey, volume, 0);
 
-    internal void QueuePlay(ushort sampleKey, int volume, double offset)
+    internal void QueuePlay(int sampleKey, int volume, double offset)
     {
         if (playbackBlocked || !HasSampleDefinition(sampleKey))
             return;
@@ -229,7 +216,7 @@ internal sealed class BmsPcmPlaybackController : IDisposable
 
         foreach (var pending in livePlays)
         {
-            if (!IsSampleReady(pending.SampleKey, pending.Offset) || !tryGetReadyAsset(pending.SampleKey, out var asset))
+            if (!tryGetReadyAsset(pending.SampleKey, pending.Offset, out var asset))
             {
                 // Decoder contention must not turn a live key/BGM event into permanent silence.
                 // Keep only the newest trigger for a definition, just as the mixer retriggers it.
@@ -238,11 +225,11 @@ internal sealed class BmsPcmPlaybackController : IDisposable
             }
 
             pendingPlays.Remove(pending.SampleKey);
-            var sourceOffset = clockMapper.MapSourceOffset(pending.Offset);
-            if (asset.TotalFrameCount >= 0 && sourceOffset >= asset.TotalFrameCount)
+            var play = createPlay(asset, pending.SampleKey, pending.Volume, targetFrame, pending.Offset);
+            if (asset.TotalFrameCount >= 0 && play.SourceOffsetFrame >= asset.TotalFrameCount)
                 continue;
 
-            plays.Add(createPlay(asset, pending.SampleKey, pending.Volume, targetFrame, sourceOffset));
+            plays.Add(play);
         }
 
         clearLivePlays();
@@ -255,14 +242,14 @@ internal sealed class BmsPcmPlaybackController : IDisposable
         }
     }
 
-    internal void Play(ushort sampleKey, int volume, double offset)
+    internal void Play(int sampleKey, int volume, double offset)
     {
         if (playbackBlocked || !HasSampleDefinition(sampleKey))
             return;
 
         ensureLease(sampleKey);
 
-        if (!IsSampleReady(sampleKey, offset) || !tryGetReadyAsset(sampleKey, out var asset))
+        if (!tryGetReadyAsset(sampleKey, offset, out var asset))
         {
             pendingPlays[sampleKey] = new PendingPlay(volume, Math.Max(0, offset), currentTime());
             return;
@@ -272,12 +259,12 @@ internal sealed class BmsPcmPlaybackController : IDisposable
         submitSingle(asset, sampleKey, volume, offset);
     }
 
-    internal bool CanSchedule(ushort sampleKey) =>
-        !playbackBlocked && tryGetReadyAsset(sampleKey, out _);
+    internal bool CanSchedule(int sampleKey) =>
+        !playbackBlocked && IsSampleReady(sampleKey);
 
-    internal void SchedulePlay(ushort sampleKey, int volume, double targetTime)
+    internal void SchedulePlay(int sampleKey, int volume, double targetTime)
     {
-        if (!CanSchedule(sampleKey) || !tryGetReadyAsset(sampleKey, out var asset))
+        if (playbackBlocked || !tryGetReadyAsset(sampleKey, 0, out var asset))
         {
             Play(sampleKey, volume, 0);
             return;
@@ -351,7 +338,7 @@ internal sealed class BmsPcmPlaybackController : IDisposable
 
             var elapsed = Math.Max(0, chartTime - pending.RequestedAt);
             var offset = pending.Offset + elapsed;
-            if (!IsSampleReady(sampleKey, offset) || !tryGetReadyAsset(sampleKey, out var asset))
+            if (!tryGetReadyAsset(sampleKey, offset, out var asset))
                 continue;
 
             pendingPlays.Remove(sampleKey);
@@ -418,16 +405,15 @@ internal sealed class BmsPcmPlaybackController : IDisposable
         resourceStore = null;
     }
 
-    private void submitSingle(BmsPcmAsset asset, ushort sampleKey, int volume, double offset)
+    private void submitSingle(BmsPcmAsset asset, int sampleKey, int volume, double offset)
     {
-        var sourceOffset = clockMapper.MapSourceOffset(offset);
+        var play = createPlay(asset, sampleKey, volume, mixer.RenderedFrames, offset);
         var totalFrames = asset.TotalFrameCount;
 
-        if (totalFrames >= 0 && sourceOffset >= totalFrames)
+        if (totalFrames >= 0 && play.SourceOffsetFrame >= totalFrames)
             return;
 
-        var targetFrame = mixer.RenderedFrames;
-        mixer.SubmitPlayBatch([createPlay(asset, sampleKey, volume, targetFrame, sourceOffset)]);
+        mixer.SubmitPlayBatch([play]);
     }
 
     private void clearLivePlays()
@@ -436,19 +422,18 @@ internal sealed class BmsPcmPlaybackController : IDisposable
         livePlayIndices.Clear();
     }
 
-    private BmsVoicePlay createPlay(BmsPcmAsset asset, ushort sampleKey, int volume, long targetFrame, long sourceOffset) =>
-        new(
-            asset,
-            sampleKey,
-            targetFrame,
-            sanitiseVolume(volume),
-            sourceOffset,
-            epoch);
+    private BmsVoicePlay createPlay(BmsPcmAsset asset, int sampleKey, int volume, long targetFrame, double offset)
+    {
+        var definition = sampleDefinitions[sampleKey];
+        return new BmsVoicePlay(asset, sampleKey, targetFrame, sanitiseVolume(volume),
+            clockMapper.MapSourceOffset(definition.StartOffset + offset), epoch,
+            definition.EndOffset is { } end ? clockMapper.MapSourceOffset(end) : null);
+    }
 
-    private bool tryGetReadyAsset(ushort sampleKey, [NotNullWhen(true)] out BmsPcmAsset? asset)
+    private bool tryGetReadyAsset(int sampleKey, double offset, [NotNullWhen(true)] out BmsPcmAsset? asset)
     {
         if (leases.TryGetValue(sampleKey, out var lease)
-            && lease.Asset.State is BmsPcmAssetState.Ready or BmsPcmAssetState.Complete)
+            && isReadyAtOffset(lease.Asset, sampleDefinitions[sampleKey].StartOffset + offset))
         {
             asset = lease.Asset;
             return true;
@@ -458,7 +443,7 @@ internal sealed class BmsPcmPlaybackController : IDisposable
         return false;
     }
 
-    private void ensureLease(ushort sampleKey)
+    private void ensureLease(int sampleKey)
     {
         if (leases.ContainsKey(sampleKey) || assetCache == null || !resolvedResources.TryGetValue(sampleKey, out var identity))
             return;
@@ -474,7 +459,7 @@ internal sealed class BmsPcmPlaybackController : IDisposable
 
         foreach (var (sampleKey, definition) in sampleDefinitions)
         {
-            if (resourceStore.ResolveSamplePath(definition) is { } identity)
+            if (!string.IsNullOrEmpty(definition.Path) && resourceStore.ResolveSamplePath(definition.Path) is { } identity)
                 resolvedResources[sampleKey] = identity;
         }
     }
@@ -507,10 +492,11 @@ internal sealed class BmsPcmPlaybackController : IDisposable
         asset.OriginalDurationMilliseconds
         ?? (asset.TotalFrameCount < 0 ? 0 : asset.TotalFrameCount * 1000d / asset.SampleRate * rate);
 
-    private double rememberSampleLength(ushort sampleKey, BmsPcmAsset asset)
+    private double rememberSampleLength(int sampleKey, BmsPcmAsset asset)
     {
-        var length = getOriginalLength(asset);
-        if (length > 0)
+        var sourceLength = getOriginalLength(asset);
+        var length = sampleDefinitions[sampleKey].GetLength(sourceLength);
+        if (sourceLength > 0 || asset.IsComplete)
             sampleLengths[sampleKey] = length;
 
         return length;
@@ -544,9 +530,9 @@ internal sealed class BmsPcmPlaybackController : IDisposable
 
     private static float sanitiseVolume(int volume) => Math.Max(0, volume) / 100f;
 
-    private readonly record struct SampleLifetime(ushort SampleKey, double StartTime);
+    private readonly record struct SampleLifetime(int SampleKey, double StartTime);
 
     private readonly record struct PendingPlay(int Volume, double Offset, double RequestedAt);
 
-    private readonly record struct PendingLivePlay(ushort SampleKey, int Volume, double Offset);
+    private readonly record struct PendingLivePlay(int SampleKey, int Volume, double Offset);
 }

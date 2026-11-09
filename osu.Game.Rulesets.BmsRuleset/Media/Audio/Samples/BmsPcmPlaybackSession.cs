@@ -17,7 +17,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 /// </remarks>
 internal sealed class BmsPcmPlaybackSession : IDisposable
 {
-    private readonly IReadOnlyDictionary<ushort, string> sampleDefinitions;
+    private readonly IReadOnlyDictionary<int, BmsSampleDefinition> sampleDefinitions;
     private readonly string? basePath;
     private readonly double rate;
     private readonly IEnumerable<BmsSampleUsage>? sampleUsages;
@@ -30,7 +30,7 @@ internal sealed class BmsPcmPlaybackSession : IDisposable
     private bool disposed;
 
     internal BmsPcmPlaybackSession(
-        IReadOnlyDictionary<ushort, string> sampleDefinitions,
+        IReadOnlyDictionary<int, BmsSampleDefinition> sampleDefinitions,
         string? basePath,
         double rate,
         IEnumerable<BmsSampleUsage>? sampleUsages,
@@ -56,7 +56,7 @@ internal sealed class BmsPcmPlaybackSession : IDisposable
     private AudioMixer? outputMixer;
 
     internal void Initialise(CancellationToken cancellationToken, double chartTime, bool waitForInitialAssets = true,
-                             IReadOnlyDictionary<ushort, double>? knownLengths = null)
+                             IReadOnlyDictionary<int, double>? knownLengths = null)
     {
         BmsPcmMixerPatcher.InstallOnce();
 

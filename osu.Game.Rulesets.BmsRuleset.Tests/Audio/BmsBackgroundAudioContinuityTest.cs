@@ -35,11 +35,11 @@ public class BmsBackgroundAudioContinuityTest
         disabled.Value = paused.Value = false;
         clock = new TestClock(source);
         mixer = new BmsPcmVoiceMixer();
-        controller = new BmsPcmPlaybackController(new Dictionary<ushort, string>(), null, 1, null,
+        controller = new BmsPcmPlaybackController(Enumerable.Range(0, 2).ToDictionary(key => key, key => new BmsSampleDefinition($"sample-{key}")), null, 1, null,
             new BindableDouble(1), () => source.CurrentTime, mixer);
-        var leases = BmsPcmMaintenanceTest.Field<Dictionary<ushort, BmsPcmAssetLease>>(controller, "leases");
-        var resources = BmsPcmMaintenanceTest.Field<Dictionary<ushort, string>>(controller, "resolvedResources");
-        for (ushort key = 0; key < 2; key++)
+        var leases = BmsPcmMaintenanceTest.Field<Dictionary<int, BmsPcmAssetLease>>(controller, "leases");
+        var resources = BmsPcmMaintenanceTest.Field<Dictionary<int, string>>(controller, "resolvedResources");
+        for (int key = 0; key < 2; key++)
         {
             resources[key] = $"sample-{key}";
             var asset = BmsPcmTestHelpers.CreateAsset([new BmsPcmChunk(0, 88200, Enumerable.Repeat(0.1f, 176400).ToArray())]);
@@ -47,9 +47,9 @@ public class BmsBackgroundAudioContinuityTest
         }
 
         // Drive the real controller and mixer synchronously so assertions measure PCM, not audio-thread timing.
-        var session = new BmsPcmPlaybackSession(new Dictionary<ushort, string>(), null, 1, null, null!, () => source.CurrentTime);
+        var session = new BmsPcmPlaybackSession(new Dictionary<int, BmsSampleDefinition>(), null, 1, null, null!, () => source.CurrentTime);
         typeof(BmsPcmPlaybackSession).GetProperty(nameof(BmsPcmPlaybackSession.Controller), private_instance)!.SetValue(session, controller);
-        playback = new BmsSamplePlayback(new Dictionary<ushort, string>());
+        playback = new BmsSamplePlayback(new Dictionary<int, BmsSampleDefinition>());
         typeof(BmsSamplePlayback).GetField("playbackSession", private_instance)!.SetValue(playback, session);
     }
 
@@ -165,7 +165,7 @@ public class BmsBackgroundAudioContinuityTest
     [Test]
     public void ForwardRecoveryDoesNotRestartConsumedBackground()
     {
-        var leases = BmsPcmMaintenanceTest.Field<Dictionary<ushort, BmsPcmAssetLease>>(controller, "leases");
+        var leases = BmsPcmMaintenanceTest.Field<Dictionary<int, BmsPcmAssetLease>>(controller, "leases");
         leases[1].Dispose();
         var samples = Enumerable.Range(0, 88200).SelectMany(i => new[] { i / 88200f, i / 88200f }).ToArray();
         leases[1] = new BmsPcmAssetLease(BmsPcmTestHelpers.CreateAsset([new BmsPcmChunk(0, 88200, samples)]), Task.CompletedTask, () => { });

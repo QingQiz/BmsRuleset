@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
@@ -12,9 +13,11 @@ public class BmsHitObject : HitObject
 
     public int Column { get; set; }
 
-    public ushort? SampleKey { get; set; }
+    public int? SampleKey { get; set; }
 
     public int SampleVolume { get; set; } = 100;
+
+    public IReadOnlyList<int> AdditionalSampleKeys { get; set; } = [];
 
     public double JudgementRate { get; set; } = double.NaN;
 
@@ -72,6 +75,7 @@ public class BmsHitObject : HitObject
         target.Column = Column;
         target.SampleKey = SampleKey;
         target.SampleVolume = SampleVolume;
+        target.AdditionalSampleKeys = AdditionalSampleKeys;
         target.JudgementRate = JudgementRate;
         target.ScrollPositionAtStartTime = ScrollPositionAtStartTime;
         target.Beatmap = Beatmap;

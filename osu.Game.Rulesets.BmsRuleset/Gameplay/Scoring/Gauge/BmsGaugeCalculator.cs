@@ -15,7 +15,7 @@ public class BmsGaugeCalculator
 
     public BmsGaugeCalculator(
         BmsGaugeProfile profile,
-        double total,
+        double? total,
         int noteCount,
         BmsGaugeProfileFamily profileFamily = BmsGaugeProfileFamily.SevenKeys)
     {
@@ -37,8 +37,8 @@ public class BmsGaugeCalculator
             : Math.Max(260.0, 7.605 * noteCount / (0.01 * noteCount + 6.5));
     }
 
-    internal static double ResolveTotal(BmsGaugeProfile profile, double total, int noteCount, BmsGaugeProfileFamily family)
-        => total > 0 ? total : profile.DefaultTotal?.Invoke(noteCount) ?? CalculateDefaultTotal(noteCount, family);
+    internal static double ResolveTotal(BmsGaugeProfile profile, double? total, int noteCount, BmsGaugeProfileFamily family)
+        => total ?? profile.DefaultTotal?.Invoke(noteCount) ?? CalculateDefaultTotal(noteCount, family);
 
     public double GetDeltaFor(HitResult result, double currentHealth)
     {

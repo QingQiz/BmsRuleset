@@ -32,12 +32,18 @@ internal partial class BmsPracticeSamplePlayback(BmsBeatmap beatmap, IReadOnlyLi
             var usages = BmsGameplayAudioController.GetSampleUsages(beatmap).ToArray();
             var plan = new BmsPracticeAudioPreparation(usages);
             using var store = new BmsAudioResourceStore(BmsGameplayAudioController.ResolveBeatmapSource(beatmap), cancellationToken);
-            var resources = beatmap.SampleDefinitions.Where(pair => !string.IsNullOrEmpty(pair.Value))
-                .Select(pair => (pair.Key, Path: store.ResolveSamplePath(pair.Value)))
+            var resources = beatmap.SampleDefinitions.Where(pair => !string.IsNullOrEmpty(pair.Value.Path))
+                .Select(pair => (pair.Key, Path: store.ResolveSamplePath(pair.Value.Path)))
                 .Where(pair => pair.Path != null).ToDictionary(pair => pair.Key, pair => pair.Path!);
             var candidates = plan.GetDurationResources(targetTime, resources);
             var result = await durations.GetAsync(candidates.Values, cancellationToken).ConfigureAwait(false);
-            plan.SetDurations(candidates.ToDictionary(pair => pair.Key, pair => result[pair.Value]));
+            plan.SetDurations(candidates.ToDictionary(pair => pair.Key, pair =>
+            {
+                var duration = result[pair.Value];
+                return duration.State == BmsSampleDurationState.Known
+                    ? duration with { Milliseconds = beatmap.SampleDefinitions[pair.Key].GetLength(duration.Milliseconds) }
+                    : duration;
+            }));
             cancellationToken.ThrowIfCancellationRequested();
 
             var prepared = CreatePlaybackSession(plan.GetPlaybackUsages(usages, targetTime));
@@ -49,15 +55,17 @@ internal partial class BmsPracticeSamplePlayback(BmsBeatmap beatmap, IReadOnlyLi
                     try
                     {
                         await controller.WaitForPreparedSamplesAsync(cancellationToken,
-                            plan.GetResumeOffsets(targetTime, new Dictionary<ushort, double>())).ConfigureAwait(false);
+                            plan.GetResumeOffsets(targetTime)).ConfigureAwait(false);
                     }
                     catch (TimeoutException exception)
                     {
                         // Keep the decoder alive so pending playback can recover after contention.
                         BmsLogger.LogAudioFailure("Timed out while preparing BMS practice seek buffers.", exception);
                     }
+
                     return prepared;
                 }
+
                 prepared.Dispose();
                 return null;
             }
@@ -90,8 +98,10 @@ internal partial class BmsPracticeSamplePlayback(BmsBeatmap beatmap, IReadOnlyLi
             {
                 // The player's preparation continuation reports failures; disposal only joins it.
             }
+
             preparation = null;
         }
+
         base.Dispose(isDisposing);
     }
 }

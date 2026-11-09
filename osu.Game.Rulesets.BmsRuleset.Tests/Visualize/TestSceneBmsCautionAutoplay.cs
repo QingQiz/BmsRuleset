@@ -53,7 +53,7 @@ public partial class TestSceneBmsCautionAutoplay : BmsPlayerTestScene
         using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(resourceName)!;
         using var reader = new LineBufferedReader(stream);
 
-        var decoded = new BmsBeatmapDecoder(referenceBpmMode: BmsReferenceBpmMode.StartBpm).Decode(reader);
+        var decoded = new BmsBeatmapDecoder().Decode(reader);
         var src = (BmsBeatmap)new BmsBeatmapConverter(decoded, new BmsRuleset())
         {
             ReferenceBpmMode = BmsReferenceBpmMode.StartBpm,

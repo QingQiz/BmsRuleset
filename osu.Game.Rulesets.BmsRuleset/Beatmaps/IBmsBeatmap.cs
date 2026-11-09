@@ -3,6 +3,7 @@ using System.Linq;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 
 namespace osu.Game.Rulesets.BmsRuleset.Beatmaps;
 
@@ -19,14 +20,13 @@ public interface IBmsBeatmap
     double? ExRank { get; set; }
 
     /// <summary>
-    ///     BMS #TOTAL value: gauge recovery coefficient.
-    ///     Zero means the default formula <c>7.605 × N / (0.01 × N + 6.5)</c> applies, where N is the total note count.
+    ///     Gauge recovery coefficient. Null uses the active profile default; zero disables TOTAL-based recovery.
     /// </summary>
-    double Total { get; set; }
+    double? Total { get; set; }
 
     BmsTimingMap? TimingMap { get; set; }
 
-    IReadOnlyDictionary<ushort, string> SampleDefinitions { get; set; }
+    IReadOnlyDictionary<int, BmsSampleDefinition> SampleDefinitions { get; set; }
 
     IReadOnlyList<BmsSampleEvent> BackgroundSampleEvents { get; set; }
 

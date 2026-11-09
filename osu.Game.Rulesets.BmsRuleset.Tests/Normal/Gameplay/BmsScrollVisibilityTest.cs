@@ -111,7 +111,7 @@ public class BmsScrollVisibilityTest
             .Single(n => n.EndsWith("99_outlaw_prison_breaker.bms", StringComparison.Ordinal));
         using var stream = typeof(BmsScrollVisibilityTest).Assembly.GetManifestResourceStream(resource)!;
         using var reader = new LineBufferedReader(stream);
-        var decoded = new BmsBeatmapDecoder(referenceBpmMode: BmsReferenceBpmMode.StartBpm).Decode(reader);
+        var decoded = new BmsBeatmapDecoder().Decode(reader);
         var beatmap = (BmsBeatmap)new BmsBeatmapConverter(decoded, new BmsRuleset())
         {
             ReferenceBpmMode = BmsReferenceBpmMode.StartBpm,

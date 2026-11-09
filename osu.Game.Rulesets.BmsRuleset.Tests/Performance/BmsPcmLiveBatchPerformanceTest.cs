@@ -76,9 +76,9 @@ public class BmsPcmLiveBatchPerformanceTest
     public void LiveChords(int voices)
     {
         using var controller = BmsPcmMaintenanceTest.CreateController(voices);
-        var resources = BmsPcmMaintenanceTest.Field<Dictionary<ushort, string>>(controller, "resolvedResources");
+        var resources = BmsPcmMaintenanceTest.Field<Dictionary<int, string>>(controller, "resolvedResources");
         var mixer = BmsPcmMaintenanceTest.Field<BmsPcmVoiceMixer>(controller, "mixer");
-        for (ushort key = 0; key < voices; key++)
+        for (int key = 0; key < voices; key++)
             resources[key] = key.ToString(CultureInfo.InvariantCulture);
         var output = new float[2];
         var samples = new List<Sample>();
@@ -119,7 +119,7 @@ public class BmsPcmLiveBatchPerformanceTest
             var checksum = 0d;
             for (var i = 0; i < count; i++)
             {
-                for (ushort key = 0; key < voices; key++)
+                for (int key = 0; key < voices; key++)
                     controller.QueueLivePlay(key, 20 + (i + key) % 80);
                 controller.SubmitLivePlayBatch();
                 // Consume each batch so the benchmark measures submission and mixing,

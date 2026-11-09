@@ -16,6 +16,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Preview;
+using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 using osu.Game.Rulesets.BmsRuleset.Tests.Audio;
 using osu.Game.Tests.Visual;
 
@@ -54,7 +55,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
             writePcmWave(Path.Combine(directory, "test.wav"), TimeSpan.FromSeconds(1));
 
             track = new BmsEventPreviewTrack(
-                _ => BmsEventPreviewTimeline.Create([new BmsPreviewTimelineEntry(0, 1, "test.wav", 100, false)]),
+                _ => BmsEventPreviewTimeline.Create([new BmsPreviewTimelineEntry(0, 1, new BmsSampleDefinition("test.wav"), 100, false)]),
                 directory,
                 audio);
 
@@ -83,7 +84,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
                 _ =>
                 {
                     timelineGate.Wait();
-                    return BmsEventPreviewTimeline.Create([new BmsPreviewTimelineEntry(0, 1, "test.wav", 100, false)]);
+                    return BmsEventPreviewTimeline.Create([new BmsPreviewTimelineEntry(0, 1, new BmsSampleDefinition("test.wav"), 100, false)]);
                 },
                 directory,
                 audio);
@@ -118,7 +119,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
                 _ =>
                 {
                     timelineGate.Wait();
-                    return BmsEventPreviewTimeline.Create([new BmsPreviewTimelineEntry(0, 1, "test.wav", 100, false)]);
+                    return BmsEventPreviewTimeline.Create([new BmsPreviewTimelineEntry(0, 1, new BmsSampleDefinition("test.wav"), 100, false)]);
                 },
                 directory,
                 audio);
@@ -153,7 +154,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
             var events = Enumerable.Range(1, 18)
                 .Select(key => new BmsSampleEvent(0, (ushort)key, 100))
                 .ToArray();
-            var definitions = Enumerable.Range(1, 18).ToDictionary(key => (ushort)key, _ => "test.wav");
+            var definitions = Enumerable.Range(1, 18).ToDictionary(key => key, _ => new BmsSampleDefinition("test.wav"));
 
             track = createTrack(events, definitions, directory);
             audio.AddItem(track);
@@ -222,9 +223,9 @@ public partial class BmsPreviewTrackTest : OsuTestScene
             track = new BmsEventPreviewTrack(
                 _ => BmsEventPreviewTimeline.Create(
                 [
-                    new BmsPreviewTimelineEntry(0, 1, "first.wav", 100, false),
-                    new BmsPreviewTimelineEntry(10_000, 2, "second.wav", 100, false),
-                    new BmsPreviewTimelineEntry(10_001, 3, "third.wav", 100, false),
+                    new BmsPreviewTimelineEntry(0, 1, new BmsSampleDefinition("first.wav"), 100, false),
+                    new BmsPreviewTimelineEntry(10_000, 2, new BmsSampleDefinition("second.wav"), 100, false),
+                    new BmsPreviewTimelineEntry(10_001, 3, new BmsSampleDefinition("third.wav"), 100, false),
                 ]),
                 directory,
                 audio);
@@ -249,7 +250,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
         {
             track = new BmsEventPreviewTrack(
                 _ => new BmsEventPreviewTimeline(
-                    [new BmsPreviewTimelineEntry(0, 1, "missing.wav", 100, false)],
+                    [new BmsPreviewTimelineEntry(0, 1, new BmsSampleDefinition("missing.wav"), 100, false)],
                     1000),
                 null,
                 audio);
@@ -277,7 +278,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
 
             track = createTrack(
                 [new BmsSampleEvent(2000, 1, 100)],
-                new Dictionary<ushort, string> { [1] = "test.wav" },
+                new Dictionary<int, BmsSampleDefinition> { [1] = new("test.wav") },
                 directory);
 
             audio.AddItem(track);
@@ -330,7 +331,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
 
             track = createTrack(
                 [new BmsSampleEvent(0, 1, 100), new BmsSampleEvent(2000, 1, 80)],
-                new Dictionary<ushort, string> { [1] = "bgm.wav" },
+                new Dictionary<int, BmsSampleDefinition> { [1] = new("bgm.wav") },
                 directory);
 
             audio.AddItem(track);
@@ -479,7 +480,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
 
             track = createTrack(
                 [new BmsSampleEvent(0, 1, 100)],
-                new Dictionary<ushort, string> { [1] = "Track_01_001.wav" },
+                new Dictionary<int, BmsSampleDefinition> { [1] = new("Track_01_001.wav") },
                 directory);
             audio.AddItem(track);
             track.Start();
@@ -547,7 +548,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
                 _ =>
                 {
                     eventFactoryInvoked = true;
-                    return BmsEventPreviewTimeline.Create([new BmsPreviewTimelineEntry(0, 1, "event.wav", 100, true)]);
+                    return BmsEventPreviewTimeline.Create([new BmsPreviewTimelineEntry(0, 1, new BmsSampleDefinition("event.wav"), 100, true)]);
                 },
                 directory,
                 audio);
@@ -599,7 +600,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
 
             track = createTrack(
                 [new BmsSampleEvent(0, 1, 100)],
-                new Dictionary<ushort, string> { [1] = "event.wav" },
+                new Dictionary<int, BmsSampleDefinition> { [1] = new("event.wav") },
                 directory);
 
             audio.AddItem(track);
@@ -633,7 +634,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
                         fallbackStarted.Set();
                         fallbackGate.Wait();
                         return new BmsEventPreviewTimeline(
-                            [new BmsPreviewTimelineEntry(0, 1, "event.wav", 100, false)],
+                            [new BmsPreviewTimelineEntry(0, 1, new BmsSampleDefinition("event.wav"), 100, false)],
                             1000);
                     },
                 ],
@@ -673,7 +674,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
                 [
                     _ => BmsEventPreviewTimeline.CreateSingleFile("preview.wav"),
                     _ => new BmsEventPreviewTimeline(
-                        [new BmsPreviewTimelineEntry(0, 1, "event.wav", 100, true)],
+                        [new BmsPreviewTimelineEntry(0, 1, new BmsSampleDefinition("event.wav"), 100, true)],
                         2000),
                 ],
                 directory);
@@ -705,7 +706,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
                     new BmsSampleEvent(1000, 1, 100),
                     new BmsSampleEvent(3000, 1, 100),
                 ],
-                new Dictionary<ushort, string> { [1] = "event.wav" },
+                new Dictionary<int, BmsSampleDefinition> { [1] = new("event.wav") },
                 directory);
 
             audio.AddItem(track);
@@ -730,7 +731,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
             writePcmWave(Path.Combine(directory, "event.wav"), TimeSpan.FromSeconds(1));
 
             track = new BmsEventPreviewTrack(
-                _ => BmsEventPreviewTimeline.Create([new BmsPreviewTimelineEntry(1000, 1, "event.wav", 100, false)]),
+                _ => BmsEventPreviewTimeline.Create([new BmsPreviewTimelineEntry(1000, 1, new BmsSampleDefinition("event.wav"), 100, false)]),
                 directory,
                 audio)
             {
@@ -763,7 +764,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
 
             track = createTrack(
                 [new BmsSampleEvent(0, 1, 100)],
-                new Dictionary<ushort, string> { [1] = "bgm.wav" },
+                new Dictionary<int, BmsSampleDefinition> { [1] = new("bgm.wav") },
                 directory);
             track.PlaybackMode = BmsPreviewTrackPlaybackMode.GameplayClockOnly;
             audio.AddItem(track);
@@ -798,10 +799,10 @@ public partial class BmsPreviewTrackTest : OsuTestScene
                     new BmsSampleEvent(0, 1, 100),
                     new BmsSampleEvent(1000, 2, 100),
                 ],
-                new Dictionary<ushort, string>
+                new Dictionary<int, BmsSampleDefinition>
                 {
-                    [1] = "first.wav",
-                    [2] = "second.wav",
+                    [1] = new("first.wav"),
+                    [2] = new("second.wav"),
                 },
                 directory);
 
@@ -837,7 +838,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
             writePcmWave(Path.Combine(directory, "bgm.wav"), TimeSpan.FromSeconds(3));
 
             track = new BmsEventPreviewTrack(
-                _ => BmsEventPreviewTimeline.Create([new BmsPreviewTimelineEntry(0, 1, "bgm.wav", 100, true)]),
+                _ => BmsEventPreviewTimeline.Create([new BmsPreviewTimelineEntry(0, 1, new BmsSampleDefinition("bgm.wav"), 100, true)]),
                 directory,
                 audio);
 
@@ -876,7 +877,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
 
             track = createTrack(
                 [new BmsSampleEvent(0, 1, 100)],
-                new Dictionary<ushort, string> { [1] = "event.wav" },
+                new Dictionary<int, BmsSampleDefinition> { [1] = new("event.wav") },
                 directory);
             audio.AddItem(track);
             track.AddAdjustment(AdjustableProperty.Tempo, tempo);
@@ -898,7 +899,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
         {
             track = createTrack(
                 [],
-                new Dictionary<ushort, string>(),
+                new Dictionary<int, BmsSampleDefinition>(),
                 null);
             audio.AddItem(track);
         });
@@ -982,7 +983,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
 
     private BmsPreviewTrack createTrack(
         IReadOnlyList<BmsSampleEvent> sampleEvents,
-        IReadOnlyDictionary<ushort, string> sampleDefinitions,
+        IReadOnlyDictionary<int, BmsSampleDefinition> sampleDefinitions,
         string? basePath)
     {
         var beatmap = new BmsBeatmap { SampleDefinitions = sampleDefinitions, BackgroundSampleEvents = sampleEvents };

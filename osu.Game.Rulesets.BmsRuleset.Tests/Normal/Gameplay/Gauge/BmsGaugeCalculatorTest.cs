@@ -19,10 +19,10 @@ public class BmsGaugeCalculatorTest
     }
 
     [Test]
-    public void TestDefaultTotalFormulaIsUsedWhenHeaderTotalIsZero()
+    public void TestDefaultTotalFormulaIsUsedWhenTotalIsUnspecified()
     {
         var profile = BmsGaugeProfileFactory.Create(BmsGaugeType.Normal);
-        var calculator = new BmsGaugeCalculator(profile, total: 0, noteCount: 100);
+        var calculator = new BmsGaugeCalculator(profile, total: null, noteCount: 100);
 
         Assert.That(calculator.Total, Is.EqualTo(260).Within(0.0001));
         Assert.That(calculator.GetDeltaFor(HitResult.Perfect, 0.2), Is.EqualTo(0.026).Within(0.0001));

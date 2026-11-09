@@ -246,6 +246,8 @@ internal sealed class BmsPcmVoiceMixer
 
         var sourceStart = play.SourceOffsetFrame;
         var assetEnd = play.Asset.TotalFrameCount >= 0 ? play.Asset.TotalFrameCount : long.MaxValue;
+        if (play.SourceEndFrame is { } clipEnd)
+            assetEnd = Math.Min(assetEnd, clipEnd);
         if (sourceStart >= assetEnd)
         {
             releaseVoiceReservation();
@@ -440,7 +442,7 @@ internal sealed class BmsPcmVoiceMixer
         public BmsPcmVoiceState State;
         public BmsPcmAsset? Asset;
         public BmsPcmAsset.ReadCursor ReadCursor;
-        public ushort SampleKey;
+        public int SampleKey;
         public long SourceFrame;
         public long EndFrame;
         public float BaseGain;

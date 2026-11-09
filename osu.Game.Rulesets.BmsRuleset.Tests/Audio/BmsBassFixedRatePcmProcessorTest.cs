@@ -164,12 +164,12 @@ public class BmsBassFixedRatePcmProcessorTest
                 new(2, 0, ResumeAfterSeek: true), new(3, 1000, ResumeAfterSeek: true),
                 new(4, 2000, ResumeAfterSeek: true), new(5, 0, ResumeAfterSeek: true), new(5, 25000, ResumeAfterSeek: true),
             ];
-            var definitions = new Dictionary<ushort, string>
+            var definitions = new Dictionary<int, BmsSampleDefinition>
             {
-                [1] = "long.wav", [2] = "short.wav", [3] = "long.wav", [4] = "long.wav", [5] = "short.wav",
+                [1] = new("long.wav"), [2] = new("short.wav"), [3] = new("long.wav"), [4] = new("long.wav"), [5] = new("short.wav"),
             };
             using var store = new BmsAudioResourceStore(directory);
-            var resolved = definitions.ToDictionary(pair => pair.Key, pair => store.ResolveSamplePath(pair.Value)!);
+            var resolved = definitions.ToDictionary(pair => pair.Key, pair => store.ResolveSamplePath(pair.Value.Path)!);
             var plan = new BmsPracticeAudioPreparation(usages);
             var resources = plan.GetDurationResources(chartTime, resolved);
             Assert.That(resources.Keys, Is.EquivalentTo((ushort[])[1, 2, 3, 5]));
@@ -186,7 +186,7 @@ public class BmsBassFixedRatePcmProcessorTest
             using var controller = new BmsPcmPlaybackController(definitions, directory, rate, plan.GetPlaybackUsages(usages, chartTime),
                 new BindableDouble(1), () => chartTime, new BmsPcmVoiceMixer());
             controller.Initialise(default, chartTime, knownLengths: plan.KnownLengths);
-            await controller.WaitForPreparedSamplesAsync(default, plan.GetResumeOffsets(chartTime, new Dictionary<ushort, double>()));
+            await controller.WaitForPreparedSamplesAsync(default, plan.GetResumeOffsets(chartTime));
             Assert.That(controller.PreparedSampleKeys, Is.EquivalentTo((ushort[])[1, 3, 4]));
             Assert.That(controller.IsSampleReady(1, 800), Is.True);
             Assert.That(controller.GetSampleLength(1), Is.EqualTo(2000).Within(1));

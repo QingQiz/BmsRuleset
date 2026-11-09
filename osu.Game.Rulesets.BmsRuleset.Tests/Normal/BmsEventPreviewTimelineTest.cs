@@ -9,18 +9,35 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Preview;
+using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal;
 
 [TestFixture]
 public class BmsEventPreviewTimelineTest
 {
+    [TestCase(0, false)]
+    [TestCase(0, true)]
+    [TestCase(200, false)]
+    [TestCase(200, true)]
+    public void PreviewRecoveryIsIndependentOfSampleOffset(double offset, bool resume)
+    {
+        var beatmap = new BmsBeatmap
+        {
+            SampleDefinitions = new Dictionary<int, BmsSampleDefinition> { [1] = new("stem.wav", offset, ResumeInPreview: resume) },
+            HitObjects = [new BmsNote { StartTime = 1000, SampleKey = 1 }],
+        };
+        var timeline = BmsEventPreviewTimeline.Create(beatmap, beatmap, default);
+        Assert.That(timeline.Entries.Single().ResumeAfterSeek, Is.EqualTo(resume));
+        Assert.That(timeline.Entries.Single().Sample.StartOffset, Is.EqualTo(offset));
+    }
+
     [Test]
     public void TestMixedSourcesKeepAudioIdentityVolumeAndRecoveryRules()
     {
         var beatmap = new BmsBeatmap
         {
-            SampleDefinitions = new Dictionary<ushort, string> { [1] = "shared.wav", [2] = "shared.wav", [3] = "tail.wav" },
+            SampleDefinitions = new Dictionary<int, BmsSampleDefinition> { [1] = new("shared.wav"), [2] = new("shared.wav"), [3] = new("tail.wav") },
             BackgroundSampleEvents = [new(0, 9, 100), new(1000, 1, 80)],
             HitObjects =
             [
@@ -35,10 +52,10 @@ public class BmsEventPreviewTimelineTest
 
         Assert.That(timeline.Entries, Is.EqualTo(new BmsPreviewTimelineEntry[]
         {
-            new(0, 1, "shared.wav", 80, true),
-            new(250, 2, "shared.wav", 70, false),
-            new(500, 1, "shared.wav", 60, false),
-            new(1500, 3, "tail.wav", 50, false),
+            new(0, 1, new BmsSampleDefinition("shared.wav"), 80, true),
+            new(250, 2, new BmsSampleDefinition("shared.wav"), 70, false),
+            new(500, 1, new BmsSampleDefinition("shared.wav"), 60, false),
+            new(1500, 3, new BmsSampleDefinition("tail.wav"), 50, false),
         }));
         Assert.That(timeline.Length, Is.EqualTo(6500));
         Assert.That(timeline.ExtendLengthFromSamples, Is.True);
@@ -49,7 +66,7 @@ public class BmsEventPreviewTimelineTest
     {
         var beatmap = new BmsBeatmap
         {
-            SampleDefinitions = new Dictionary<ushort, string> { [1] = "shared.wav", [2] = "shared.wav" },
+            SampleDefinitions = new Dictionary<int, BmsSampleDefinition> { [1] = new("shared.wav"), [2] = new("shared.wav") },
         };
         beatmap.BackgroundSampleEvents = Enumerable.Range(0, 80)
             .Select(index => new BmsSampleEvent(1000 + index % 3 * 100, (ushort)(index % 3 + 1), index + 1)).ToArray();

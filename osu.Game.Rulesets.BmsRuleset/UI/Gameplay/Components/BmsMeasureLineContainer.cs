@@ -50,9 +50,9 @@ public sealed partial class BmsMeasureLineContainer : Container
             return;
         }
 
-        lines = timingMap.Measures
-            .Select(m => new MeasureLineInfo(timingMap.GetVisualScrollPositionAtTick(m.StartTick),
-                timingMap.ProjectTickToTime(m.StartTick)))
+        lines = timingMap.BarLines
+            .Select(tick => new MeasureLineInfo(timingMap.GetVisualScrollPositionAtTick(tick),
+                timingMap.ProjectTickToTime(tick)))
             .ToArray();
 
         scrollPositionsMonotonic = isMonotonic(lines);

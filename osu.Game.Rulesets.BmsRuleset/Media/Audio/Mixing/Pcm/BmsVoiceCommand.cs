@@ -4,11 +4,12 @@ namespace osu.Game.Rulesets.BmsRuleset.Media.Audio.Mixing.Pcm;
 
 internal readonly record struct BmsVoicePlay(
     BmsPcmAsset Asset,
-    ushort SampleKey,
+    int SampleKey,
     long TargetFrame,
     float Gain = 1,
     long SourceOffsetFrame = 0,
-    int Epoch = 0);
+    int Epoch = 0,
+    long? SourceEndFrame = null);
 
 internal enum BmsVoiceCommandType : byte
 {

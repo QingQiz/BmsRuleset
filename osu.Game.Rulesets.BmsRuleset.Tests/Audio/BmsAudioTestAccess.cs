@@ -45,14 +45,14 @@ internal static class BmsAudioTestAccess
         return mixer == null ? 0 : getRequiredPropertyValue<int>(mixer, "ActiveVoiceCount");
     }
 
-    internal static double? GetDecodedSampleDuration(BmsSamplePlayback playback, ushort sampleKey)
+    internal static double? GetDecodedSampleDuration(BmsSamplePlayback playback, int sampleKey)
     {
         var session = getSession(playback);
         var controller = session == null ? null : getOptionalPropertyValue<object>(session, "Controller");
         if (controller == null)
             return null;
 
-        var leases = getRequiredFieldValue<Dictionary<ushort, BmsPcmAssetLease>>(controller, "leases");
+        var leases = getRequiredFieldValue<Dictionary<int, BmsPcmAssetLease>>(controller, "leases");
         if (!leases.TryGetValue(sampleKey, out var lease) || !lease.Asset.IsComplete)
             return null;
 
@@ -113,7 +113,7 @@ internal static class BmsAudioTestAccess
             if (!enumerator.MoveNext())
                 throw new InvalidOperationException("Preview playback contains no sample events.");
 
-            return getRequiredPropertyValue<string>(enumerator.Current!, "SamplePath");
+            return getRequiredPropertyValue<BmsSampleDefinition>(enumerator.Current!, "Sample").Path;
         }
         finally
         {
@@ -131,11 +131,11 @@ internal static class BmsAudioTestAccess
         return getRequiredPropertyValue<int>(leases, "Count");
     }
 
-    internal static IDisposable HoldPreviewSampleNotReady(BmsPreviewTrack track, ushort sampleKey)
+    internal static IDisposable HoldPreviewSampleNotReady(BmsPreviewTrack track, int sampleKey)
     {
         var controller = getPreviewController(track)
                          ?? throw new InvalidOperationException("Preview playback controller has not been created.");
-        var leases = getRequiredFieldValue<Dictionary<ushort, BmsPcmAssetLease>>(controller, "leases");
+        var leases = getRequiredFieldValue<Dictionary<int, BmsPcmAssetLease>>(controller, "leases");
 
         if (!leases.TryGetValue(sampleKey, out var originalLease))
             throw new InvalidOperationException($"Preview sample {sampleKey} has not been prepared.");

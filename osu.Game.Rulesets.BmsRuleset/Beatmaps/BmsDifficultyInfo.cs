@@ -28,8 +28,8 @@ public readonly struct BmsDifficultyInfo
     /// </summary>
     public double? ExRank { get; init; }
 
-    /// <summary>#TOTAL — gauge recovery coefficient. Zero means default formula.</summary>
-    public double Total { get; init; }
+    /// <summary>Gauge recovery coefficient, or null to use the active profile default.</summary>
+    public double? Total { get; init; }
 
     /// <summary>Playable column count (inferred from chart or CircleSize).</summary>
     public int KeyCount { get; init; }
@@ -41,6 +41,7 @@ public readonly struct BmsDifficultyInfo
     /// </summary>
     public static BmsDifficultyInfo FromParseResult(BmsParseResult result) => new()
     {
+        ParsedName = result.ExplicitDifficultyName,
         PlayLevel = result.PlayLevel,
         Rank = result.Rank,
         ExRank = result.DefaultExRank,
@@ -68,6 +69,9 @@ public readonly struct BmsDifficultyInfo
     /// </summary>
     private const double exrank_od_sentinel = 100;
 
+    // Historical BMS metadata uses AR 0 for an unspecified TOTAL. Reserve -1 for an explicit zero.
+    private const float zero_total_ar = -1;
+
     /// <summary>
     /// Encodes <see cref="Rank"/> / <see cref="ExRank"/> into an osu! OverallDifficulty value.
     /// </summary>
@@ -85,12 +89,15 @@ public readonly struct BmsDifficultyInfo
     /// <summary>
     /// Converts the BMS difficulty to a display name string suitable for
     /// <see cref="BeatmapInfo.DifficultyName"/>.
-    /// Returns the <see cref="PlayLevel"/> value when set, or a name based on <see cref="Rank"/>.
+    /// Uses the resolved label, then the loading boundary's fallback, then PlayLevel or Rank.
     /// </summary>
-    public string ToDisplayName()
+    public string ToDisplayName(string? fallbackName = null)
     {
         if (!string.IsNullOrWhiteSpace(ParsedName))
             return ParsedName;
+
+        if (!string.IsNullOrWhiteSpace(fallbackName))
+            return fallbackName;
 
         if (PlayLevel.HasValue)
             return PlayLevel.Value.ToString("F0");
@@ -118,7 +125,7 @@ public readonly struct BmsDifficultyInfo
         {
             Rank = rank,
             ExRank = exRank,
-            Total = Math.Max(0, difficulty.ApproachRate),
+            Total = difficulty.ApproachRate == zero_total_ar ? 0 : difficulty.ApproachRate > 0 ? difficulty.ApproachRate : null,
             KeyCount = GetKeyCount(difficulty),
             LockedLongNoteMode = (BmsLongNoteMode)Math.Clamp((int)Math.Round(difficulty.DrainRate), 0, 3),
         };
@@ -155,7 +162,7 @@ public readonly struct BmsDifficultyInfo
         var od = EncodeOverallDifficulty(Rank, ExRank);
         difficulty.OverallDifficulty = od;
         difficulty.CircleSize = KeyCount;
-        difficulty.ApproachRate = (float)Total;
+        difficulty.ApproachRate = Total == 0 ? zero_total_ar : (float)Total.GetValueOrDefault();
         difficulty.DrainRate = (float)LockedLongNoteMode;
     }
 

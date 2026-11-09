@@ -252,7 +252,9 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
         if (content == null)
             return null;
 
-        var summary = BmsChartParser.ParseImportSummary(content, path, _ => 1, cancellationToken);
+        var summary = Constant.IsBmsonFile(path)
+            ? BmsonParser.ParseImportSummary(content, cancellationToken)
+            : BmsChartParser.ParseImportSummary(content, path, _ => 1, cancellationToken);
         var starRating = computeStarRating(summary, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -601,7 +603,8 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
             // the authoritative base for splitting each chart's raw #TITLE into (base,
             // difficulty suffix). The raw #TITLE stays in BmsChartMetadata.RawTitle for
             // that split.
-            var setTitle = BmsChartParser.InferCommonSetTitle(chartImports.Select(c => c.Metadata.RawTitle).ToArray());
+            var bmsonTitle = chartImports.FirstOrDefault(chart => Constant.IsBmsonFile(chart.Path))?.Metadata.RawTitle;
+            var setTitle = bmsonTitle ?? BmsChartParser.InferCommonSetTitle(chartImports.Select(c => c.Metadata.RawTitle).ToArray());
 
             // Create beatmap infos.
             foreach (var chart in chartImports)
@@ -610,7 +613,6 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
 
                 var beatmapInfo = new BeatmapInfo
                 {
-                    DifficultyName = metadata.DifficultyName,
                     Ruleset = rulesetInfo,
                     Metadata = new BeatmapMetadata
                     {
@@ -654,22 +656,22 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
             BmsLogger.Error(e, $"BMS import: failed to import {prepared.Directory}: {e.Message}");
             return false;
         }
+    }
 
-        // Derive DifficultyName for one chart, given the set's common base title.
-        // Priority: #SUBTITLE (author's explicit label) > InferDifficultyName
-        // (set-relative suffix; outliers that don't share the base use their raw
-        // title; single-chart sets fall back to a per-chart InferTitle split) > filename.
-        static string resolveDifficultyName(ChartImport chart, string setTitle)
+    private static string resolveDifficultyName(ChartImport chart, string setTitle)
+    {
+        if (!string.IsNullOrWhiteSpace(chart.Metadata.DifficultyName))
+            return chart.Metadata.DifficultyName;
+
+        // BMSON separates song title and chart name; only BMS titles contain difficulty suffixes.
+        if (!Constant.IsBmsonFile(chart.Path))
         {
-            if (!string.IsNullOrEmpty(chart.Metadata.DifficultyName))
-                return chart.Metadata.DifficultyName;
-
             var inferred = BmsChartParser.InferDifficultyName(chart.Metadata.RawTitle, setTitle);
             if (!string.IsNullOrEmpty(inferred))
                 return inferred;
-
-            return Path.GetFileNameWithoutExtension(chart.Path);
         }
+
+        return Path.GetFileNameWithoutExtension(chart.Path);
     }
 
     // ── Private records (data flowing through the pipeline) ──

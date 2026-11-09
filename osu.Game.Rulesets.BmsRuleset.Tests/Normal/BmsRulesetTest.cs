@@ -264,6 +264,18 @@ public class BmsRulesetTest
         Assert.That(decoded.Rank, Is.EqualTo(2)); // normalised to NORMAL while EXRANK is the source of truth
     }
 
+    [TestCase(null)]
+    [TestCase(0)]
+    [TestCase(180)]
+    public void TestTotalRoundTripsWithoutConflatingUnspecifiedAndZero(double? total)
+    {
+        var info = new BeatmapInfo();
+        new BmsDifficultyInfo { Total = total }.WriteToOsuDifficulty(info);
+        Assert.That(BmsDifficultyInfo.FromOsuDifficulty(info.Difficulty).Total, Is.EqualTo(total));
+        if (total == null)
+            Assert.That(info.Difficulty.ApproachRate, Is.Zero, "Keep the historical encoding for unspecified BMS TOTAL.");
+    }
+
     [Test]
     public void TestFrameRateUnlockIsDisabledByDefault()
     {

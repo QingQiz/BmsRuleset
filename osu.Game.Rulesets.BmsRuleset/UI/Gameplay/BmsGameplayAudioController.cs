@@ -105,9 +105,13 @@ internal sealed class BmsGameplayAudioController
                 .Concat(invisibleColumn).OrderBy(n => n.StartTime).ThenBy(n => n is BmsInvisibleNote ? 0 : 1).ToArray();
             for (var i = 0; i < changes.Length; i++)
             {
-                if (changes[i].SampleKey is { } key)
-                    yield return new BmsSampleUsage(key, changes[i].StartTime, changes[i].StartTime,
-                        i + 1 < changes.Length ? changes[i + 1].StartTime : double.MaxValue);
+                var note = changes[i];
+                var latestTriggerTime = i + 1 < changes.Length ? changes[i + 1].StartTime : double.MaxValue;
+                if (note.SampleKey is { } sampleKey)
+                    yield return new BmsSampleUsage(sampleKey, note.StartTime, note.StartTime, latestTriggerTime);
+                var additional = note.AdditionalSampleKeys;
+                for (var j = 0; j < additional.Count; j++)
+                    yield return new BmsSampleUsage(additional[j], note.StartTime, note.StartTime, latestTriggerTime);
             }
         }
 
@@ -119,7 +123,8 @@ internal sealed class BmsGameplayAudioController
 
             foreach (var hitObject in column.OrderBy(hitObject => hitObject.StartTime))
             {
-                if (hitObject.SampleKey is { } sampleKey)
+                var additional = hitObject.AdditionalSampleKeys;
+                if (hitObject.SampleKey.HasValue || additional.Count > 0)
                 {
                     // A column exposes its next note's sample as soon as the preceding note can be judged.
                     var earliestTriggerTime = previousHitObject == null
@@ -127,7 +132,10 @@ internal sealed class BmsGameplayAudioController
                         : Math.Max(0, previousHitObject.StartTime - getFastJudgementWindow(previousHitObject));
                     var latestTriggerTime = hitObject.StartTime + getSlowJudgementWindow(hitObject);
 
-                    yield return new BmsSampleUsage(sampleKey, hitObject.StartTime, earliestTriggerTime, latestTriggerTime);
+                    if (hitObject.SampleKey is { } sampleKey)
+                        yield return new BmsSampleUsage(sampleKey, hitObject.StartTime, earliestTriggerTime, latestTriggerTime);
+                    for (var i = 0; i < additional.Count; i++)
+                        yield return new BmsSampleUsage(additional[i], hitObject.StartTime, earliestTriggerTime, latestTriggerTime);
                 }
 
                 if (hitObject is BmsLongNote { TailSampleKey: { } tailSampleKey } longNote)

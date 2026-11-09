@@ -200,7 +200,7 @@ public partial class BmsFileImportScreen(BmsRulesetConfigManager? config = null)
         var newDirectory = directoryChangedEvent.NewValue;
         var hasBmsFiles = newDirectory != null
                           && newDirectory.Exists
-                          && newDirectory.EnumerateFiles().Any(f => Constant.BMS_EXTENSIONS.Contains(f.Extension));
+                          && newDirectory.EnumerateFiles().Any(f => Constant.IsChartFile(f.Name));
 
         buttons[1].Enabled.Value = importer != null && hasBmsFiles;
 

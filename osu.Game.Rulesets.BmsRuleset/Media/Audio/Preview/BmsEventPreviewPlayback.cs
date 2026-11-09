@@ -24,7 +24,7 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
     private readonly bool extendLengthFromSamples;
     private readonly BindableDouble masterGain = new(1);
     private readonly CancellationTokenSource cancellation = new();
-    private readonly Dictionary<ushort, double> sampleEndTimes = [];
+    private readonly Dictionary<int, double> sampleEndTimes = [];
 
     private BmsPcmPlaybackSession? playbackSession;
     private int nextEventIndex;
@@ -52,10 +52,10 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
         deriveLengthFromSamples = timeline.DeriveLengthFromSamples;
         extendLengthFromSamples = timeline.ExtendLengthFromSamples;
 
-        var definitions = new Dictionary<ushort, string>();
+        var definitions = new Dictionary<int, BmsSampleDefinition>();
         foreach (var evt in sortedEvents)
         {
-            definitions.TryAdd(evt.SampleKey, evt.SamplePath);
+            definitions.TryAdd(evt.SampleKey, evt.Sample);
             if (deriveLengthFromSamples || extendLengthFromSamples)
                 sampleEndTimes[evt.SampleKey] = evt.Time;
         }
@@ -214,7 +214,7 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
                 : BmsPreviewPlaybackStartState.Ready;
 
         var resumeEvents = new List<BmsPreviewTimelineEntry>();
-        var seenKeys = new HashSet<ushort>();
+        var seenKeys = new HashSet<int>();
 
         for (var i = nextEventIndex - 1; i >= 0; i--)
         {
@@ -292,7 +292,7 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
 
     private void stopPlayback() => playbackSession?.Controller?.StopAll();
 
-    private void updateLength(ushort sampleKey, double sampleLength)
+    private void updateLength(int sampleKey, double sampleLength)
     {
         if (sampleLength <= 0 || !sampleEndTimes.Remove(sampleKey, out var eventTime))
             return;

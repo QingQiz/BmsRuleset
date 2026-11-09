@@ -310,7 +310,7 @@ public partial class BmsColumn : Playfield, IBmsColumn
     /// Triggers a note-hit / LN-tail definition key. All columns and automation route through the
     /// shared key Track, so retriggering the definition has the same truncation behaviour.
     /// </summary>
-    public void PlaySample(ushort? sampleKey, int volume) => keySound?.PlaySample(sampleKey, volume);
+    public void PlaySample(int? sampleKey, int volume) => keySound?.PlaySample(sampleKey, volume);
 
     /// <summary>
     /// Plays the landmine explosion sample (#WAV00) when a landmine in this column detonates.

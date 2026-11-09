@@ -271,7 +271,7 @@ public partial class BmsRuleset : Ruleset
             };
         }
 
-        yield return new RulesetBeatmapAttribute("TOTAL", "TL", (float)original.Total, (float)adjusted.Total, 300)
+        yield return new RulesetBeatmapAttribute("TOTAL", "TL", (float)original.Total.GetValueOrDefault(), (float)adjusted.Total.GetValueOrDefault(), 300)
         {
             Description = createTotalDescription(beatmapInfo, adjusted, mods, layout),
             AdditionalMetrics = createTotalMetrics(beatmapInfo, adjusted, mods, layout),
@@ -346,7 +346,7 @@ public partial class BmsRuleset : Ruleset
             _ => gaugeType.ToString(),
         };
 
-        static string formatTotal(BmsDifficultyInfo difficulty, BmsGaugeCalculator calculator) => difficulty.Total > 0
+        static string formatTotal(BmsDifficultyInfo difficulty, BmsGaugeCalculator calculator) => difficulty.Total.HasValue
             ? $"#TOTAL {calculator.Total:0.###}"
             : $"default TOTAL {calculator.Total:0.###}";
     }

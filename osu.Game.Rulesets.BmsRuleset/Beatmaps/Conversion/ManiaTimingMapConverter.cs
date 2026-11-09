@@ -22,18 +22,18 @@ internal static class ManiaTimingMapConverter
         var measures = createMeasures(projection, endTime);
         var scrollEvents = createScrollEvents(source.ControlPointInfo, projection, endTime);
         var mostCommonBeatLength = source.GetMostCommonBeatLength();
-        var referenceBpm = mostCommonBeatLength > 0 && double.IsFinite(mostCommonBeatLength)
+        var mainBpm = mostCommonBeatLength > 0 && double.IsFinite(mostCommonBeatLength)
             ? 60000 / mostCommonBeatLength
             : TimingControlPoint.DEFAULT.BPM;
 
-        return new BmsTimingMap(
+        return BmsTimingMap.FromSortedEvents(
             tick_resolution,
             measures,
             projection.BpmEvents,
             [],
             scrollEvents,
             [],
-            referenceBpm);
+            mainBpm);
     }
 
     private static double getEndTime(IBeatmap source)

@@ -7,7 +7,7 @@
 - [Online leaderboard (中文)](plans/online-leaderboard-plan.zh-CN.md): osu! OAuth, replay uploads, and SQLite storage.
 - [BMSON support](plans/bmson-support-plan.md): native BMSON 1.0 parsing and shared runtime chart data.
 
-Both are proposals for features that are not implemented.
+The online leaderboard is a proposal. BMSON 1.0 support is available; see the [supported formats](bms-format-support.md#bmson).
 
 ## Build Manually
 
@@ -81,7 +81,7 @@ dotnet test osu.Game.Rulesets.BmsRuleset.Tests/osu.Game.Rulesets.BmsRuleset.Test
 | **Parser**    | `#POORBGAxx` — per-slot POOR BGA crop definition (distinct from scalar `#POORBGA` mode)  | 2        |
 | **Parser**    | `#BGAEXPAND` — global BGA scaling mode (0=stretch, 1=keep aspect, 2=no expand)           | 2        |
 | **Parser**    | `#BGAOFF` — disable BGA for the chart                                                    | 2        |
-| **Parser**    | [BMSON support](plans/bmson-support-plan.md)                                             | 1        |
+| **Parser**    | BMSON legacy formats and player extensions; see [supported BMSON charts](bms-format-support.md#bmson) |          |
 | **Parser**    | `#BMPxx` / `#EXBMPxx` — image definitions (non-resource-scan)                            |
 | **Parser**    | `#CDDA` — CD audio                                                                       |
 | **Parser**    | `#CHARFILE` / `#ExtChr` — character / skin                                               |

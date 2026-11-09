@@ -27,6 +27,5 @@ public interface IBmsColumn
 
     void TriggerHitExplosion(BmsHitLightStyle style);
 
-    void PlaySample(ushort? sampleKey, int volume);
-
+    void PlaySample(int? sampleKey, int volume);
 }

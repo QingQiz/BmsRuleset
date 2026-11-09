@@ -28,7 +28,7 @@ internal partial class BmsAudioDiagnosticGame : osu.Framework.Game
     private readonly double requestedDuration;
     private readonly double requestedVolume;
     private readonly double requestedSampleGain;
-    private readonly HashSet<ushort>? requestedSampleKeys;
+    private readonly HashSet<int>? requestedSampleKeys;
     private readonly bool traceEvents;
     private readonly bool traceScheduling;
     private readonly bool liveBatch;
@@ -93,7 +93,7 @@ internal partial class BmsAudioDiagnosticGame : osu.Framework.Game
         events = collectEvents(parsed)
             .Where(evt => evt.Time >= requestedStartTime)
             .Where(evt => requestedSampleKeys == null || requestedSampleKeys.Contains(evt.SampleKey))
-            .Where(evt => parsed.SampleDefinitions.TryGetValue(evt.SampleKey, out var path) && !string.IsNullOrEmpty(path))
+            .Where(evt => parsed.SampleDefinitions.TryGetValue(evt.SampleKey, out var path) && !string.IsNullOrEmpty(path.Path))
             .OrderBy(evt => evt.Time)
             .ToArray();
 
@@ -382,7 +382,7 @@ internal partial class BmsAudioDiagnosticGame : osu.Framework.Game
         {
             if (note.IsLongNote && note.TailSampleKey is { } tailSampleKey
                                 && parsed.SampleDefinitions.TryGetValue(tailSampleKey, out var samplePath)
-                                && !string.IsNullOrWhiteSpace(samplePath))
+                                && !string.IsNullOrWhiteSpace(samplePath.Path))
                 yield return new ScheduledSample(note.StartTime + note.Duration, tailSampleKey, note.TailSampleVolume);
         }
     }
@@ -418,7 +418,7 @@ internal partial class BmsAudioDiagnosticGame : osu.Framework.Game
         return value;
     }
 
-    private static HashSet<ushort>? getHexArguments(IReadOnlyList<string> args, string name)
+    private static HashSet<int>? getHexArguments(IReadOnlyList<string> args, string name)
     {
         var index = findArgument(args, name);
 
@@ -428,7 +428,7 @@ internal partial class BmsAudioDiagnosticGame : osu.Framework.Game
         if (index + 1 >= args.Count)
             throw new ArgumentException($"Argument {name} must be a hexadecimal sample key.");
 
-        var values = new HashSet<ushort>();
+        var values = new HashSet<int>();
 
         foreach (var argument in args[index + 1].Split(','))
         {
@@ -452,5 +452,5 @@ internal partial class BmsAudioDiagnosticGame : osu.Framework.Game
         return -1;
     }
 
-    private readonly record struct ScheduledSample(double Time, ushort SampleKey, int Volume);
+    private readonly record struct ScheduledSample(double Time, int SampleKey, int Volume);
 }

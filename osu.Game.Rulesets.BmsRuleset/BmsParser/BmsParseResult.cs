@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
+using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 
 namespace osu.Game.Rulesets.BmsRuleset.BmsParser;
 
@@ -8,11 +9,11 @@ public sealed record BmsParseResult(
     string? Artist,
     float? PlayLevel,
     int Rank,
-    double Total,
+    double? Total,
     BmsTimingMap TimingMap,
     BmsLayoutVariant LayoutVariant,
     int TotalColumns,
-    IReadOnlyDictionary<ushort, string> SampleDefinitions,
+    IReadOnlyDictionary<int, BmsSampleDefinition> SampleDefinitions,
     IReadOnlyList<BmsSampleEvent> BackgroundSampleEvents,
     IReadOnlyList<BmsParsedHitObject> HitObjects,
     IReadOnlyList<BmsBranchDecision> BranchDecisions,
@@ -33,6 +34,8 @@ public sealed record BmsParseResult(
     double? DefaultExRank = null)
 {
     public IReadOnlyList<BmsParsedHitObject> InvisibleNotes { get; init; } = [];
+    /// <summary>Source-provided chart label; set-relative inference and display fallbacks belong to loading.</summary>
+    public string? ExplicitDifficultyName { get; init; }
 }
 
 public readonly record struct BmsBranchDecision(int MaxValue, int SelectedValue);
@@ -42,16 +45,19 @@ public readonly record struct BmsParsedHitObject(
     double StartTime,
     double Duration,
     int Column,
-    ushort SampleKey,
+    int SampleKey,
     bool IsLongNote,
     bool IsMine,
     double LandmineDamagePercent,
-    ushort? TailSampleKey,
+    int? TailSampleKey,
     int SampleVolume = 100,
     int TailSampleVolume = 100,
-    double JudgementRate = 0.75);
+    double JudgementRate = 0.75)
+{
+    public IReadOnlyList<int> AdditionalSampleKeys { get; init; } = [];
+}
 
-public sealed record BmsSampleEvent(double Time, ushort SampleKey, int Volume);
+public sealed record BmsSampleEvent(double Time, int SampleKey, int Volume);
 
 public sealed record BmsTextEvent(double Time, string Text);
 

@@ -3,10 +3,11 @@ using System.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
+using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 
 namespace osu.Game.Rulesets.BmsRuleset.Media.Audio.Preview;
 
-internal readonly record struct BmsPreviewTimelineEntry(double Time, ushort SampleKey, string SamplePath, int Volume, bool ResumeAfterSeek);
+internal readonly record struct BmsPreviewTimelineEntry(double Time, int SampleKey, BmsSampleDefinition Sample, int Volume, bool ResumeAfterSeek);
 
 internal sealed record BmsEventPreviewTimeline(
     IReadOnlyList<BmsPreviewTimelineEntry> Entries,
@@ -17,7 +18,7 @@ internal sealed record BmsEventPreviewTimeline(
     internal const double DEFAULT_LENGTH = 30000;
 
     internal static BmsEventPreviewTimeline CreateSingleFile(string samplePath) => new(
-        [new BmsPreviewTimelineEntry(0, 0, samplePath, 100, true)],
+        [new BmsPreviewTimelineEntry(0, 0, new BmsSampleDefinition(samplePath), 100, true)],
         DEFAULT_LENGTH,
         DeriveLengthFromSamples: true);
 
@@ -40,6 +41,9 @@ internal sealed record BmsEventPreviewTimeline(
 
             if (hit.SampleKey is { } sampleKey)
                 addEntry(hit.StartTime, sampleKey, hit.SampleVolume, false);
+            var additional = hit.AdditionalSampleKeys;
+            for (var i = 0; i < additional.Count; i++)
+                addEntry(hit.StartTime, additional[i], hit.SampleVolume, false);
             if (hit is BmsLongNote { TailSampleKey: { } tailKey } hold)
                 addEntry(hold.EndTime, tailKey, hold.TailSampleVolume, false);
         }
@@ -50,10 +54,10 @@ internal sealed record BmsEventPreviewTimeline(
         entries.RemoveAll(entry => !bmsBeatmap.SampleDefinitions.ContainsKey(entry.SampleKey));
         return Create(entries, cancellationToken);
 
-        void addEntry(double time, ushort key, int volume, bool resumeAfterSeek)
+        void addEntry(double time, int key, int volume, bool resumeAfterSeek)
         {
-            bmsBeatmap.SampleDefinitions.TryGetValue(key, out var path);
-            entries.Add(new BmsPreviewTimelineEntry(time, key, path ?? string.Empty, volume, resumeAfterSeek));
+            bmsBeatmap.SampleDefinitions.TryGetValue(key, out var sample);
+            entries.Add(new BmsPreviewTimelineEntry(time, key, sample!, volume, resumeAfterSeek || sample?.ResumeInPreview == true));
         }
     }
 

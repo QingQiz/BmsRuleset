@@ -35,7 +35,7 @@ public class BmsTextEncodingTest
         {
             Assert.That(decoded.Metadata.Title, Is.EqualTo(title));
             Assert.That(decoded.Metadata.Artist, Is.EqualTo(artist));
-            Assert.That(decoded.SampleDefinitions[BmsChartParser.Enc("01")], Is.EqualTo(samplePath));
+            Assert.That(decoded.SampleDefinitions[BmsChartParser.Enc("01")].Path, Is.EqualTo(samplePath));
             Assert.That(decoded.HitObjects.Select(h => h.StartTime), Is.EqualTo([1600d, 2400d]));
             Assert.That(summary.Metadata.RawTitle, Is.EqualTo(title));
             Assert.That(summary.Metadata.Artist, Is.EqualTo(artist));

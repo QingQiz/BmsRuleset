@@ -16,6 +16,7 @@ using osu.Game.Rulesets.BmsRuleset.Gameplay.Difficulty;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
+using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
@@ -41,14 +42,6 @@ public class BmsBeatmapDecoderTest
         return new BmsBeatmapDecoder(randomValueSelector).Decode(reader);
     }
 
-    private static Beatmap decode(string text, BmsReferenceBpmMode referenceBpmMode)
-    {
-        using var memoryStream = new MemoryStream(Encoding.UTF8.GetBytes(text));
-        using var reader = new LineBufferedReader(memoryStream);
-
-        return new BmsBeatmapDecoder(referenceBpmMode: referenceBpmMode).Decode(reader);
-    }
-
     private static Beatmap decodeResource(string resourceName)
     {
         using var stream = typeof(BmsBeatmapDecoderTest).Assembly.GetManifestResourceStream(resourceName)
@@ -71,12 +64,21 @@ public class BmsBeatmapDecoderTest
             ReferenceBpmMode = referenceBpmMode,
         }.Convert();
 
-    private static string getSamplePath(BmsHitObject hitObject, ushort? sampleKey = null)
+    private static string getSamplePath(BmsHitObject hitObject, int? sampleKey = null)
     {
         var key = sampleKey ?? hitObject.SampleKey;
         return key is { } value
-            ? hitObject.Beatmap.SampleDefinitions.GetValueOrDefault(value, string.Empty)
+            ? hitObject.Beatmap.SampleDefinitions.GetValueOrDefault(value)?.Path ?? string.Empty
             : string.Empty;
+    }
+
+    [TestCase("#SUBTITLE [HYPER]", "HYPER")]
+    [TestCase("#PLAYLEVEL 12", "12")]
+    public void TestStandaloneDecodingResolvesItsDifficultyName(string header, string expected)
+    {
+        var decoded = decode(header + "\n#BPM 120\n#00111:01");
+        Assert.That(decoded.BeatmapInfo.DifficultyName, Is.EqualTo(expected));
+        Assert.That(new BmsBeatmapConverter(decoded, new BmsRuleset()).Convert().BeatmapInfo.DifficultyName, Is.EqualTo(expected));
     }
 
     [TestCase("Aleph-0 (by LeaF)", "_7NORMAL.bms")]
@@ -115,7 +117,7 @@ public class BmsBeatmapDecoderTest
 
         // Must mirror production extractImportMetadata: only the #SUBTITLE-derived
         // name is known per-chart; the title-vs-difficulty split is deferred to the
-        // set level (BmsFileImporter.resolveDifficultyName).
+        // set level (BmsFileImporter).
         var diffName = string.IsNullOrWhiteSpace(parsed.Subtitle)
             ? string.Empty
             : BmsChartParser.StripDifficultyDelimiters(parsed.Subtitle);
@@ -305,7 +307,7 @@ public class BmsBeatmapDecoderTest
         var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
         var note = converted.HitObjects.Single();
 
-        Assert.That(note.JudgementRate, Is.EqualTo(1.12).Within(0.0001));
+        Assert.That(note.JudgementRate, Is.EqualTo(1.125).Within(0.0001));
     }
 
     [Test]
@@ -504,8 +506,11 @@ public class BmsBeatmapDecoderTest
         // (At 647.5, the health processor triggers instant death.)
     }
 
-    [Test]
-    public void TestBaseBpmOverridesReferenceBpmMode()
+    [TestCase(BmsReferenceBpmMode.StartBpm)]
+    [TestCase(BmsReferenceBpmMode.MainBpm)]
+    [TestCase(BmsReferenceBpmMode.MaxBpm)]
+    [TestCase(BmsReferenceBpmMode.MinBpm)]
+    public void TestBaseBpmOverridesReferenceBpmMode(BmsReferenceBpmMode mode)
     {
         var beatmap = decode("""
                              #BPM 120
@@ -513,8 +518,8 @@ public class BmsBeatmapDecoderTest
                              #BPM01 240
                              #00108:01
                              #00211:01
-                             """, BmsReferenceBpmMode.MaxBpm);
-        var converted = convert(beatmap, BmsReferenceBpmMode.MaxBpm);
+                             """);
+        var converted = convert(beatmap, mode);
 
         Assert.That(converted.TimingMap!.ScrollReferenceBpm, Is.EqualTo(200).Within(0.000001));
     }
@@ -799,7 +804,7 @@ public class BmsBeatmapDecoderTest
 
         var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
 
-        Assert.That(converted.HitObjects.Select(h => h.JudgementRate), Is.EqualTo([1.5, 1.5, 0.37, 0.37]).Within(0.0001));
+        Assert.That(converted.HitObjects.Select(h => h.JudgementRate), Is.EqualTo([1.5, 1.5, 0.375, 0.375]).Within(0.0001));
     }
 
     [Test]
@@ -940,8 +945,8 @@ public class BmsBeatmapDecoderTest
         var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
 
         Assert.That(getSamplePath(hitObject), Is.EqualTo("kick.wav"));
-        Assert.That(converted.SampleDefinitions[BmsChartParser.Enc("01")], Is.EqualTo("kick.wav"));
-        Assert.That(converted.SampleDefinitions[BmsChartParser.Enc("02")], Is.EqualTo("bgm.ogg"));
+        Assert.That(converted.SampleDefinitions[BmsChartParser.Enc("01")].Path, Is.EqualTo("kick.wav"));
+        Assert.That(converted.SampleDefinitions[BmsChartParser.Enc("02")].Path, Is.EqualTo("bgm.ogg"));
         Assert.That(converted.BackgroundSampleEvents, Has.Count.EqualTo(1));
         Assert.That(converted.BackgroundSampleEvents[0].SampleKey, Is.EqualTo(BmsChartParser.Enc("02")));
         Assert.That(converted.BackgroundSampleEvents[0].Time, Is.EqualTo(2000).Within(0.001));
@@ -963,7 +968,7 @@ public class BmsBeatmapDecoderTest
         Assert.That(mine.SampleKey, Is.Zero);
         Assert.That(getSamplePath(mine), Is.EqualTo("bomb.wav"));
         Assert.That((mine as BmsLandmine)?.LandmineDamagePercent ?? 0, Is.EqualTo(25));
-        Assert.That(mine.Beatmap.SampleDefinitions.TryGetValue(0, out var p) ? p : null, Is.EqualTo("bomb.wav"));
+        Assert.That(mine.Beatmap.SampleDefinitions.TryGetValue(0, out var p) ? p.Path : null, Is.EqualTo("bomb.wav"));
     }
 
     [Test]
@@ -1005,19 +1010,19 @@ public class BmsBeatmapDecoderTest
 
         // Flat filename (no subdir) — baseline.
         Assert.That(getSamplePath(hitObjects[0]), Is.EqualTo("kick.wav"));
-        Assert.That(converted.SampleDefinitions[BmsChartParser.Enc("01")], Is.EqualTo("kick.wav"));
+        Assert.That(converted.SampleDefinitions[BmsChartParser.Enc("01")].Path, Is.EqualTo("kick.wav"));
 
         // Single subdirectory level.
         Assert.That(getSamplePath(hitObjects[1]), Is.EqualTo("wav/kick.wav"));
-        Assert.That(converted.SampleDefinitions[BmsChartParser.Enc("02")], Is.EqualTo("wav/kick.wav"));
+        Assert.That(converted.SampleDefinitions[BmsChartParser.Enc("02")].Path, Is.EqualTo("wav/kick.wav"));
 
         // Single subdirectory, different path.
         Assert.That(getSamplePath(hitObjects[2]), Is.EqualTo("subdir/sample.wav"));
-        Assert.That(converted.SampleDefinitions[BmsChartParser.Enc("03")], Is.EqualTo("subdir/sample.wav"));
+        Assert.That(converted.SampleDefinitions[BmsChartParser.Enc("03")].Path, Is.EqualTo("subdir/sample.wav"));
 
         // Nested subdirectories.
         Assert.That(getSamplePath(hitObjects[3]), Is.EqualTo("a/b/c.wav"));
-        Assert.That(converted.SampleDefinitions[BmsChartParser.Enc("04")], Is.EqualTo("a/b/c.wav"));
+        Assert.That(converted.SampleDefinitions[BmsChartParser.Enc("04")].Path, Is.EqualTo("a/b/c.wav"));
     }
 
     [Test]
@@ -1065,7 +1070,7 @@ public class BmsBeatmapDecoderTest
         var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
         var note = converted.HitObjects.Single();
 
-        Assert.That(note.JudgementRate, Is.EqualTo(0.65).Within(0.0001));
+        Assert.That(note.JudgementRate, Is.EqualTo(0.65625).Within(0.0001));
     }
 
     [Test]
@@ -1777,7 +1782,7 @@ public class BmsBeatmapDecoderTest
         var bmsBeatmap = (IBmsBeatmap)beatmap;
         var midiEvent = bmsBeatmap.BackgroundSampleEvents.Single(e => e.Time == 0);
 
-        Assert.That(bmsBeatmap.SampleDefinitions[midiEvent.SampleKey], Is.EqualTo("audio/midi-bgm.ogg"));
+        Assert.That(bmsBeatmap.SampleDefinitions[midiEvent.SampleKey].Path, Is.EqualTo("audio/midi-bgm.ogg"));
 
         var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
         midiEvent = converted.BackgroundSampleEvents.Single(e => e.Time == 0);
@@ -1785,7 +1790,7 @@ public class BmsBeatmapDecoderTest
         Assert.Multiple(() =>
         {
             Assert.That(midiEvent.Time, Is.EqualTo(converted.TimingMap!.ProjectTickToTime(0)));
-            Assert.That(converted.SampleDefinitions[midiEvent.SampleKey], Is.EqualTo("audio/midi-bgm.ogg"));
+            Assert.That(converted.SampleDefinitions[midiEvent.SampleKey].Path, Is.EqualTo("audio/midi-bgm.ogg"));
         });
     }
 
@@ -2287,7 +2292,7 @@ public class BmsBeatmapDecoderTest
                              #00211:0101
                              #00308:02
                              #00311:010101010101
-                             """, BmsReferenceBpmMode.MainBpm);
+                             """);
         var converted = convert(beatmap, BmsReferenceBpmMode.MainBpm);
 
         Assert.That(converted.TimingMap!.ScrollReferenceBpm, Is.EqualTo(90).Within(0.000001));
@@ -2303,7 +2308,7 @@ public class BmsBeatmapDecoderTest
                              #00108:01
                              #00208:02
                              #00311:01
-                             """, BmsReferenceBpmMode.MaxBpm);
+                             """);
         var converted = convert(beatmap, BmsReferenceBpmMode.MaxBpm);
 
         Assert.That(converted.TimingMap!.ScrollReferenceBpm, Is.EqualTo(240).Within(0.000001));
@@ -2319,7 +2324,7 @@ public class BmsBeatmapDecoderTest
                              #00108:01
                              #00208:02
                              #00311:01
-                             """, BmsReferenceBpmMode.MinBpm);
+                             """);
         var converted = convert(beatmap, BmsReferenceBpmMode.MinBpm);
 
         Assert.That(converted.TimingMap!.ScrollReferenceBpm, Is.EqualTo(90).Within(0.000001));
@@ -2708,7 +2713,7 @@ public class BmsBeatmapDecoderTest
     }
 
     [Test]
-    public void TestTotalDefaultsToZeroWhenAbsent()
+    public void TestTotalIsUnspecifiedWhenAbsent()
     {
         var beatmap = decode("""
                              #BPM 130
@@ -2716,7 +2721,7 @@ public class BmsBeatmapDecoderTest
                              """);
         var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
 
-        Assert.That(converted.Total, Is.EqualTo(0).Within(0.001));
+        Assert.That(converted.Total, Is.Null);
     }
 
     [Test]

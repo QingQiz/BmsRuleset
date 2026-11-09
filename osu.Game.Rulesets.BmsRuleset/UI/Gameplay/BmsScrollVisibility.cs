@@ -72,8 +72,8 @@ internal sealed class BmsScrollVisibility
 
         foreach (var note in beatmap.InvisibleNotes)
             yield return note.StartTime;
-        foreach (var measure in map.Measures)
-            yield return map.ProjectTickToTime(measure.StartTick);
+        foreach (var tick in map.BarLines)
+            yield return map.ProjectTickToTime(tick);
 
         var bpm = map.ScrollReferenceBpm;
         foreach (var change in map.BpmEvents.GroupBy(e => e.Tick).Select(g => g.Last()))
