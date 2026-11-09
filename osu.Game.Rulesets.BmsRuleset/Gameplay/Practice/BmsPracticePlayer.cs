@@ -137,14 +137,6 @@ internal partial class BmsPracticePlayer : Player
             container.Depth = 1;
             container.Child = countInOverlay = new BmsPracticeCountInOverlay();
         }));
-        AddInternal(new OsuSpriteText
-        {
-            Anchor = Anchor.TopCentre,
-            Origin = Anchor.TopCentre,
-            Y = 12,
-            Text = BmsStrings.PracticeAttempt(session.Attempts + 1),
-            Font = OsuFont.GetFont(size: 18),
-        });
         AddInternal(progress = new OsuSpriteText
         {
             Anchor = Anchor.TopCentre,
