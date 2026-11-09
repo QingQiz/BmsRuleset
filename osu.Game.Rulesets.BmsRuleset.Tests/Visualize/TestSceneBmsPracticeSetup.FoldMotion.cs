@@ -121,8 +121,9 @@ public partial class TestSceneBmsPracticeSetup
             Assert.That(samples.Max(frame => frame.InputWidth) - samples.Min(frame => frame.InputWidth), Is.LessThan(0.1), "input width must stay fixed");
             Assert.That(samples.Max(frame => frame.InputLeft) - samples.Min(frame => frame.InputLeft), Is.LessThan(0.1), "input must not shift horizontally");
             Assert.That(samples.Max(frame => frame.StartButtonTop) - samples.Min(frame => frame.StartButtonTop), Is.LessThan(0.1), "fixed actions must not move");
-            var panelTravel = Math.Abs(samples[^1].PanelTop - samples[0].PanelTop);
-            Assert.That(largestFrameMovement(samples.Select(frame => frame.PanelTop)), Is.LessThan(Math.Max(1, panelTravel * 0.35)), "panel must not jump in a single frame");
+            // A wrapped checkbox can stop the panel shrinking before the count-in finishes collapsing.
+            var foldTravel = Math.Abs(samples[^1].CountInHeight - samples[0].CountInHeight);
+            Assert.That(largestFrameMovement(samples.Select(frame => frame.PanelTop)), Is.LessThan(Math.Max(1, foldTravel * 0.35)), "panel must not jump in a single frame");
             Assert.That(largestFrameMovement(samples.Where(frame => frame.Time >= 200).Select(frame => frame.PanelTop)), Is.LessThan(1), "panel must not snap at the end of the fold");
             Assert.That(largestFrameMovement(samples.Where(frame => frame.Time >= 200).Select(frame => frame.SummaryTop)), Is.LessThan(1), "summary must not snap at the end of the fold");
             if (width >= 900 && !scrollToEnd)

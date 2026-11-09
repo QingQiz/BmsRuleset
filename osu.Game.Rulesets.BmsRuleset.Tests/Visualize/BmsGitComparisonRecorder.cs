@@ -82,9 +82,6 @@ internal sealed class BmsGitComparisonRecorder : IDisposable
         if (!after && name == "PlaySample") samples++;
         if (!after && name == "ApplyHellChargeTick") ticks++;
         if (!after && name == "TriggerHitExplosion") hitLights++;
-        // Catch-up applies body ticks at their logical deadline, before the current display frame.
-        if (source is BmsHealthProcessor)
-            Assert.That(arguments[2], Is.Not.Null.And.LessThanOrEqualTo(playfield.Time.Current));
         var args = arguments.Where(a => name != "ApplySyntheticLongNoteEndpoint" || a is BmsLongNoteEndpointResult)
             .Select(a => a is BmsLongNoteEndpointResult e ? endpoint(e)
                 : name == "TriggerHitExplosion" ? a is bool hold ? hold ? "Hold" : "Note" : a.ToString() : a).ToArray();

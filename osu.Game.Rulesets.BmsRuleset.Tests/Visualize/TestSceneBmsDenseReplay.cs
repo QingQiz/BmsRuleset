@@ -395,17 +395,17 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
         AddStep("measure repeated frames with unchanged pending notes", () =>
         {
             var column = (BmsColumnHitObjectContainer)Playfield.Stage.Columns[1].HitObjectContainer;
-            var note = column.AliveEntries.Values.First();
+            var note = column.AliveEntries.Values.OfType<DrawableBmsHitObject>().First().HitObject;
             using var counter = new ScopedMethodProbe(typeof(BmsColumnJudgementRuntime).GetMethod("refreshAutomaticEvent", BindingFlags.Instance | BindingFlags.NonPublic),
                 typeof(TestSceneBmsDenseReplay).GetMethod(nameof(countPassiveDeadline), BindingFlags.Static | BindingFlags.NonPublic));
             passiveDeadlineReads = 0;
             for (var i = 0; i < 20; i++)
                 column.UpdateSubTree();
-            Assert.That(passiveDeadlineReads, Is.Zero, "deadlines change on judgement or timing invalidation, not on every visual frame");
-            passiveDeadlineReads = 0;
-            note.HitObject.ApplyDefaults(Playfield.Beatmap.ControlPointInfo, Playfield.Beatmap.Difficulty);
+            Assert.That(passiveDeadlineReads, Is.Zero, "deadlines change on judgement, not on every visual frame");
+            Assert.That(((BmsColumn)Playfield.Stage.Columns[1]).Judgements.TryPressRegisteredNote(note, HitResult.Perfect,
+                new BmsPressContext(note.StartTime, new BmsFrameContext(note.StartTime, Playfield.Clock.Rate))), Is.True);
             column.UpdateSubTree();
-            Assert.That(passiveDeadlineReads, Is.GreaterThan(0), "The probe must observe a real invalidation.");
+            Assert.That(passiveDeadlineReads, Is.GreaterThan(0), "The probe must observe a real judgement.");
         });
     }
 

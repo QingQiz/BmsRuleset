@@ -10,6 +10,7 @@ using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Difficulty;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
+using osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 using osu.Game.Rulesets.Difficulty;
 using osu.Game.Rulesets.Difficulty.Skills;
 using osu.Game.Rulesets.Mods;
@@ -30,6 +31,7 @@ public class BmsStarRatingProcessorTest
         };
         for (var i = 0; i < 20; i++)
             beatmap.HitObjects.Add(new BmsNote { Beatmap = beatmap, Column = 1 + i % 7, StartTime = i * 75 });
+        BmsTestBeatmaps.SetupBeatmapInfo(beatmap, beatmap.BeatmapInfo.Ruleset);
         new BmsDifficultyInfo { Rank = 2, ExRank = exRank, KeyCount = 8 }.WriteToOsuDifficulty(beatmap);
         var calculator = new BmsDifficultyCalculator(new BmsRuleset().RulesetInfo, new TestWorkingBeatmap(beatmap));
         Mod[] mods = lr2 ? [new BmsModLr2()] : [];
@@ -80,6 +82,7 @@ public class BmsStarRatingProcessorTest
             note.StartTime = timing.StartTime;
             beatmap.HitObjects.Add(note);
         }
+        BmsTestBeatmaps.SetupBeatmapInfo(beatmap, beatmap.BeatmapInfo.Ruleset);
         new BmsDifficultyInfo { Rank = 2, KeyCount = 8 }.WriteToOsuDifficulty(beatmap);
         var calculator = new BmsDifficultyCalculator(new BmsRuleset().RulesetInfo, new TestWorkingBeatmap(beatmap));
         Mod[] baseMods = lr2 ? [new BmsModLr2()] : [];

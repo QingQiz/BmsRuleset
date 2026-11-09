@@ -10,6 +10,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
+using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 using osu.Game.Screens.Play;
 using osu.Game.Screens.Play.HUD;
@@ -34,7 +35,7 @@ public partial class TestSceneBmsKeyCounter : BmsPlayerTestScene
 
     protected override IBeatmap CreateBeatmap(RulesetInfo ruleset)
     {
-        var beatmap = new BmsBeatmap { TotalColumns = 8 };
+        var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, TotalColumns = 8 };
         beatmap.HitObjects.Add(new BmsNote { StartTime = 60000, Column = 1 });
         BmsTestBeatmaps.SetupBeatmapInfo(beatmap, ruleset);
         return beatmap;
