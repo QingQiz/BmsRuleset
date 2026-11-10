@@ -203,7 +203,7 @@ public class BmsLongNoteJudgementTest
         var beatmap = new BmsBeatmap
         {
             Rank = 1,
-            LayoutVariant = BmsLayoutVariant.Pms9K,
+            LayoutVariant = BmsLayoutVariant.Popn9K,
         };
 
         var ln = new BmsLongNote

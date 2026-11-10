@@ -83,10 +83,10 @@
   <data name="beatmap_management" xml:space="preserve"><value>谱面管理</value></data>
   <data name="show_bms_5k" xml:space="preserve"><value>显示 BMS 5K</value></data>
   <data name="show_bme_7k" xml:space="preserve"><value>显示 BME 7K</value></data>
-  <data name="show_pms_9k" xml:space="preserve"><value>显示 PMS 9K</value></data>
+  <data name="show_pms_9k" xml:space="preserve"><value>显示 Pop’n 9K</value></data>
   <data name="show_bms_5k_dp" xml:space="preserve"><value>显示 BMS 5K DP</value></data>
   <data name="show_bme_7k_dp" xml:space="preserve"><value>显示 BME 7K DP</value></data>
-  <data name="show_pms_9k_dp" xml:space="preserve"><value>显示 PMS 9K DP</value></data>
+  <data name="show_pms_9k_dp" xml:space="preserve"><value>显示 Pop’n 9K DP</value></data>
   <data name="import_bms_files" xml:space="preserve"><value>导入 BMS 文件</value></data>
   <data name="cleanup_orphaned_sets" xml:space="preserve"><value>清理失去源文件的 BMS 谱面集</value></data>
   <data name="cleanup_orphaned_sets_tooltip" xml:space="preserve"><value>移除源文件（音频、图片）已无法在磁盘上找到的 BMS 谱面</value></data>
@@ -212,24 +212,24 @@
   <data name="action_p2_key_5" xml:space="preserve"><value>P2 按键 5</value></data>
   <data name="action_p2_key_6" xml:space="preserve"><value>P2 按键 6</value></data>
   <data name="action_p2_key_7" xml:space="preserve"><value>P2 按键 7</value></data>
-  <data name="action_pms_key_1" xml:space="preserve"><value>PMS 按键 1</value></data>
-  <data name="action_pms_key_2" xml:space="preserve"><value>PMS 按键 2</value></data>
-  <data name="action_pms_key_3" xml:space="preserve"><value>PMS 按键 3</value></data>
-  <data name="action_pms_key_4" xml:space="preserve"><value>PMS 按键 4</value></data>
-  <data name="action_pms_key_5" xml:space="preserve"><value>PMS 按键 5</value></data>
-  <data name="action_pms_key_6" xml:space="preserve"><value>PMS 按键 6</value></data>
-  <data name="action_pms_key_7" xml:space="preserve"><value>PMS 按键 7</value></data>
-  <data name="action_pms_key_8" xml:space="preserve"><value>PMS 按键 8</value></data>
-  <data name="action_pms_key_9" xml:space="preserve"><value>PMS 按键 9</value></data>
-  <data name="action_p2_pms_key_1" xml:space="preserve"><value>P2 PMS 按键 1</value></data>
-  <data name="action_p2_pms_key_2" xml:space="preserve"><value>P2 PMS 按键 2</value></data>
-  <data name="action_p2_pms_key_3" xml:space="preserve"><value>P2 PMS 按键 3</value></data>
-  <data name="action_p2_pms_key_4" xml:space="preserve"><value>P2 PMS 按键 4</value></data>
-  <data name="action_p2_pms_key_5" xml:space="preserve"><value>P2 PMS 按键 5</value></data>
-  <data name="action_p2_pms_key_6" xml:space="preserve"><value>P2 PMS 按键 6</value></data>
-  <data name="action_p2_pms_key_7" xml:space="preserve"><value>P2 PMS 按键 7</value></data>
-  <data name="action_p2_pms_key_8" xml:space="preserve"><value>P2 PMS 按键 8</value></data>
-  <data name="action_p2_pms_key_9" xml:space="preserve"><value>P2 PMS 按键 9</value></data>
+  <data name="action_pms_key_1" xml:space="preserve"><value>Pop’n 按键 1</value></data>
+  <data name="action_pms_key_2" xml:space="preserve"><value>Pop’n 按键 2</value></data>
+  <data name="action_pms_key_3" xml:space="preserve"><value>Pop’n 按键 3</value></data>
+  <data name="action_pms_key_4" xml:space="preserve"><value>Pop’n 按键 4</value></data>
+  <data name="action_pms_key_5" xml:space="preserve"><value>Pop’n 按键 5</value></data>
+  <data name="action_pms_key_6" xml:space="preserve"><value>Pop’n 按键 6</value></data>
+  <data name="action_pms_key_7" xml:space="preserve"><value>Pop’n 按键 7</value></data>
+  <data name="action_pms_key_8" xml:space="preserve"><value>Pop’n 按键 8</value></data>
+  <data name="action_pms_key_9" xml:space="preserve"><value>Pop’n 按键 9</value></data>
+  <data name="action_p2_pms_key_1" xml:space="preserve"><value>P2 Pop’n 按键 1</value></data>
+  <data name="action_p2_pms_key_2" xml:space="preserve"><value>P2 Pop’n 按键 2</value></data>
+  <data name="action_p2_pms_key_3" xml:space="preserve"><value>P2 Pop’n 按键 3</value></data>
+  <data name="action_p2_pms_key_4" xml:space="preserve"><value>P2 Pop’n 按键 4</value></data>
+  <data name="action_p2_pms_key_5" xml:space="preserve"><value>P2 Pop’n 按键 5</value></data>
+  <data name="action_p2_pms_key_6" xml:space="preserve"><value>P2 Pop’n 按键 6</value></data>
+  <data name="action_p2_pms_key_7" xml:space="preserve"><value>P2 Pop’n 按键 7</value></data>
+  <data name="action_p2_pms_key_8" xml:space="preserve"><value>P2 Pop’n 按键 8</value></data>
+  <data name="action_p2_pms_key_9" xml:space="preserve"><value>P2 Pop’n 按键 9</value></data>
   <data name="action_increase_scroll_speed" xml:space="preserve"><value>提高滚动速度</value></data>
   <data name="action_decrease_scroll_speed" xml:space="preserve"><value>降低滚动速度</value></data>
   <data name="start_bpm" xml:space="preserve"><value>起始 BPM</value></data>
@@ -564,5 +564,35 @@
   </data>
   <data name="mod_lr2" xml:space="preserve">
     <value>使用 LR2 的判定、长条和血量规则游玩。</value>
+  </data>
+  <data name="popn_layout" xml:space="preserve">
+    <value>Pop’n {0} 键</value>
+  </data>
+  <data name="keyboard_layout" xml:space="preserve">
+    <value>键盘 {0} 键</value>
+  </data>
+  <data name="keyboard_double_layout" xml:space="preserve">
+    <value>键盘双打 {0} 键</value>
+  </data>
+  <data name="generic_layout" xml:space="preserve">
+    <value>通用 {0} 键</value>
+  </data>
+  <data name="action_keyboard_key" xml:space="preserve">
+    <value>键盘键 {0}</value>
+  </data>
+  <data name="popn_double_layout" xml:space="preserve">
+    <value>Pop’n 双打 {0} 键</value>
+  </data>
+  <data name="show_popn_5k" xml:space="preserve">
+    <value>显示 Pop’n 5K</value>
+  </data>
+  <data name="show_keyboard_24k" xml:space="preserve">
+    <value>显示键盘 24K</value>
+  </data>
+  <data name="show_keyboard_24k_dp" xml:space="preserve">
+    <value>显示键盘 24K DP</value>
+  </data>
+  <data name="show_generic_keyboard" xml:space="preserve">
+    <value>显示通用键盘布局</value>
   </data>
 </root>

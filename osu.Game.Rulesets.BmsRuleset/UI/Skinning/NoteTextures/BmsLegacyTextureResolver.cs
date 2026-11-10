@@ -27,7 +27,7 @@ public static class BmsLegacyTextureResolver
         {
             BmsLayoutVariant.Bms5KDouble => 5,
             BmsLayoutVariant.Bme7KDouble => 7,
-            BmsLayoutVariant.Pms9KDouble => 9,
+            BmsLayoutVariant.Popn9KDouble => 9,
             _ => lookup.ManiaKeyCount,
         };
         var columnInStage = Math.Clamp(lookup.ManiaColumnIndex ?? 0, 0, Math.Max(0, maniaColumnsPerStage - 1)) % maniaColumnsPerStage;

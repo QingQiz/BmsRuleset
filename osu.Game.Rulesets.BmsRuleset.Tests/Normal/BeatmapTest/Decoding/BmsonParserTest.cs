@@ -170,7 +170,7 @@ public class BmsonParserTest
     [TestCase("version", "null")]
     [TestCase("info.init_bpm", "0")]
     [TestCase("info.init_bpm", "null")]
-    [TestCase("info.mode_hint", "\"generic-8keys\"")]
+    [TestCase("info.mode_hint", "\"generic-0keys\"")]
     [TestCase("info.resolution", "0.5")]
     public void RejectsUnsupportedOrInvalidCharts(string field, string json)
     {
@@ -213,7 +213,7 @@ public class BmsonParserTest
     public void ConvertedExRankUsesExistingDisplayAttributes()
     {
         var info = new BeatmapInfo();
-        new BmsDifficultyInfo { Rank = 2, KeyCount = 8, ExRank = 200 }.WriteToOsuDifficulty(info);
+        new BmsDifficultyInfo { Rank = 2, LayoutVariant = BmsLayoutVariant.Bme7K, ExRank = 200 }.WriteToOsuDifficulty(info);
         var rank = new BmsRuleset().GetBeatmapAttributesForDisplay(info, []).Single(attribute => attribute.Acronym == "EX");
         Assert.That(rank.AdjustedValue, Is.EqualTo(200));
         Assert.That(rank.AdditionalMetrics.Single(metric => metric.Name.ToString() == "Normal note PGREAT").Value.ToString(),

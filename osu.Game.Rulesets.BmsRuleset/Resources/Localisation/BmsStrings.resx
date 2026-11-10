@@ -83,10 +83,10 @@
   <data name="beatmap_management" xml:space="preserve"><value>Beatmap management</value></data>
   <data name="show_bms_5k" xml:space="preserve"><value>Show BMS 5K</value></data>
   <data name="show_bme_7k" xml:space="preserve"><value>Show BME 7K</value></data>
-  <data name="show_pms_9k" xml:space="preserve"><value>Show PMS 9K</value></data>
+  <data name="show_pms_9k" xml:space="preserve"><value>Show Pop’n 9K</value></data>
   <data name="show_bms_5k_dp" xml:space="preserve"><value>Show BMS 5K DP</value></data>
   <data name="show_bme_7k_dp" xml:space="preserve"><value>Show BME 7K DP</value></data>
-  <data name="show_pms_9k_dp" xml:space="preserve"><value>Show PMS 9K DP</value></data>
+  <data name="show_pms_9k_dp" xml:space="preserve"><value>Show Pop’n 9K DP</value></data>
   <data name="import_bms_files" xml:space="preserve"><value>Import BMS files</value></data>
   <data name="cleanup_orphaned_sets" xml:space="preserve"><value>Clean up orphaned BMS sets</value></data>
   <data name="cleanup_orphaned_sets_tooltip" xml:space="preserve"><value>Removes BMS beatmaps whose source files (audio, images) can no longer be found on disk</value></data>
@@ -212,24 +212,24 @@
   <data name="action_p2_key_5" xml:space="preserve"><value>P2 Key 5</value></data>
   <data name="action_p2_key_6" xml:space="preserve"><value>P2 Key 6</value></data>
   <data name="action_p2_key_7" xml:space="preserve"><value>P2 Key 7</value></data>
-  <data name="action_pms_key_1" xml:space="preserve"><value>PMS Key 1</value></data>
-  <data name="action_pms_key_2" xml:space="preserve"><value>PMS Key 2</value></data>
-  <data name="action_pms_key_3" xml:space="preserve"><value>PMS Key 3</value></data>
-  <data name="action_pms_key_4" xml:space="preserve"><value>PMS Key 4</value></data>
-  <data name="action_pms_key_5" xml:space="preserve"><value>PMS Key 5</value></data>
-  <data name="action_pms_key_6" xml:space="preserve"><value>PMS Key 6</value></data>
-  <data name="action_pms_key_7" xml:space="preserve"><value>PMS Key 7</value></data>
-  <data name="action_pms_key_8" xml:space="preserve"><value>PMS Key 8</value></data>
-  <data name="action_pms_key_9" xml:space="preserve"><value>PMS Key 9</value></data>
-  <data name="action_p2_pms_key_1" xml:space="preserve"><value>P2 PMS Key 1</value></data>
-  <data name="action_p2_pms_key_2" xml:space="preserve"><value>P2 PMS Key 2</value></data>
-  <data name="action_p2_pms_key_3" xml:space="preserve"><value>P2 PMS Key 3</value></data>
-  <data name="action_p2_pms_key_4" xml:space="preserve"><value>P2 PMS Key 4</value></data>
-  <data name="action_p2_pms_key_5" xml:space="preserve"><value>P2 PMS Key 5</value></data>
-  <data name="action_p2_pms_key_6" xml:space="preserve"><value>P2 PMS Key 6</value></data>
-  <data name="action_p2_pms_key_7" xml:space="preserve"><value>P2 PMS Key 7</value></data>
-  <data name="action_p2_pms_key_8" xml:space="preserve"><value>P2 PMS Key 8</value></data>
-  <data name="action_p2_pms_key_9" xml:space="preserve"><value>P2 PMS Key 9</value></data>
+  <data name="action_pms_key_1" xml:space="preserve"><value>Pop’n Key 1</value></data>
+  <data name="action_pms_key_2" xml:space="preserve"><value>Pop’n Key 2</value></data>
+  <data name="action_pms_key_3" xml:space="preserve"><value>Pop’n Key 3</value></data>
+  <data name="action_pms_key_4" xml:space="preserve"><value>Pop’n Key 4</value></data>
+  <data name="action_pms_key_5" xml:space="preserve"><value>Pop’n Key 5</value></data>
+  <data name="action_pms_key_6" xml:space="preserve"><value>Pop’n Key 6</value></data>
+  <data name="action_pms_key_7" xml:space="preserve"><value>Pop’n Key 7</value></data>
+  <data name="action_pms_key_8" xml:space="preserve"><value>Pop’n Key 8</value></data>
+  <data name="action_pms_key_9" xml:space="preserve"><value>Pop’n Key 9</value></data>
+  <data name="action_p2_pms_key_1" xml:space="preserve"><value>P2 Pop’n Key 1</value></data>
+  <data name="action_p2_pms_key_2" xml:space="preserve"><value>P2 Pop’n Key 2</value></data>
+  <data name="action_p2_pms_key_3" xml:space="preserve"><value>P2 Pop’n Key 3</value></data>
+  <data name="action_p2_pms_key_4" xml:space="preserve"><value>P2 Pop’n Key 4</value></data>
+  <data name="action_p2_pms_key_5" xml:space="preserve"><value>P2 Pop’n Key 5</value></data>
+  <data name="action_p2_pms_key_6" xml:space="preserve"><value>P2 Pop’n Key 6</value></data>
+  <data name="action_p2_pms_key_7" xml:space="preserve"><value>P2 Pop’n Key 7</value></data>
+  <data name="action_p2_pms_key_8" xml:space="preserve"><value>P2 Pop’n Key 8</value></data>
+  <data name="action_p2_pms_key_9" xml:space="preserve"><value>P2 Pop’n Key 9</value></data>
   <data name="action_increase_scroll_speed" xml:space="preserve"><value>Increase Scroll Speed</value></data>
   <data name="action_decrease_scroll_speed" xml:space="preserve"><value>Decrease Scroll Speed</value></data>
   <data name="start_bpm" xml:space="preserve"><value>Start BPM</value></data>
@@ -564,5 +564,35 @@
   </data>
   <data name="mod_lr2" xml:space="preserve">
     <value>Play with LR2 judgement, long-note and gauge rules.</value>
+  </data>
+  <data name="popn_layout" xml:space="preserve">
+    <value>Pop’n {0}K</value>
+  </data>
+  <data name="keyboard_layout" xml:space="preserve">
+    <value>Keyboard {0}K</value>
+  </data>
+  <data name="keyboard_double_layout" xml:space="preserve">
+    <value>Keyboard DP {0}K</value>
+  </data>
+  <data name="generic_layout" xml:space="preserve">
+    <value>Generic {0}K</value>
+  </data>
+  <data name="action_keyboard_key" xml:space="preserve">
+    <value>Keyboard key {0}</value>
+  </data>
+  <data name="popn_double_layout" xml:space="preserve">
+    <value>Pop’n DP {0}K</value>
+  </data>
+  <data name="show_popn_5k" xml:space="preserve">
+    <value>Show Pop’n 5K</value>
+  </data>
+  <data name="show_keyboard_24k" xml:space="preserve">
+    <value>Show Keyboard 24K</value>
+  </data>
+  <data name="show_keyboard_24k_dp" xml:space="preserve">
+    <value>Show Keyboard 24K DP</value>
+  </data>
+  <data name="show_generic_keyboard" xml:space="preserve">
+    <value>Show generic keyboard layouts</value>
   </data>
 </root>

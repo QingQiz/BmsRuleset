@@ -275,7 +275,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
             if (summary.StarRatingNoteTimings.Count == 0)
                 return 0;
 
-            var layout = BmsLayout.VariantFromTotalColumns(summary.Metadata.KeyCount);
+            var layout = summary.Metadata.LayoutVariant;
             var judgementRate = summary.Metadata.ExRank is { } exRank
                 ? BmsJudgementProfileProvider.RateForExRank(layout, exRank)
                 : BmsJudgementProfileProvider.RateForRank(layout, summary.Metadata.Rank);

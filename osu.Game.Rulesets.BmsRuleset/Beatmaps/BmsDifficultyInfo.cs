@@ -32,7 +32,9 @@ public readonly struct BmsDifficultyInfo
     public double? Total { get; init; }
 
     /// <summary>Playable column count (inferred from chart or CircleSize).</summary>
-    public int KeyCount { get; init; }
+    public int KeyCount => BmsLayout.GetTotalColumns(LayoutVariant);
+
+    public required BmsLayoutVariant LayoutVariant { get; init; }
 
     public BmsLongNoteMode LockedLongNoteMode { get; init; }
 
@@ -46,7 +48,7 @@ public readonly struct BmsDifficultyInfo
         Rank = result.Rank,
         ExRank = result.DefaultExRank,
         Total = result.Total,
-        KeyCount = result.TotalColumns,
+        LayoutVariant = result.LayoutVariant,
         LockedLongNoteMode = result.LockedLongNoteMode,
     };
 
@@ -57,7 +59,7 @@ public readonly struct BmsDifficultyInfo
         Rank = metadata.Rank,
         ExRank = metadata.ExRank,
         Total = metadata.Total,
-        KeyCount = metadata.KeyCount,
+        LayoutVariant = metadata.LayoutVariant,
         LockedLongNoteMode = metadata.LockedLongNoteMode,
     };
 
@@ -126,7 +128,7 @@ public readonly struct BmsDifficultyInfo
             Rank = rank,
             ExRank = exRank,
             Total = difficulty.ApproachRate == zero_total_ar ? 0 : difficulty.ApproachRate > 0 ? difficulty.ApproachRate : null,
-            KeyCount = GetKeyCount(difficulty),
+            LayoutVariant = GetLayout(difficulty),
             LockedLongNoteMode = (BmsLongNoteMode)Math.Clamp((int)Math.Round(difficulty.DrainRate), 0, 3),
         };
     }
@@ -161,7 +163,9 @@ public readonly struct BmsDifficultyInfo
     {
         var od = EncodeOverallDifficulty(Rank, ExRank);
         difficulty.OverallDifficulty = od;
-        difficulty.CircleSize = KeyCount;
+        // A column count cannot distinguish a generic keyboard chart from a scratch-based layout.
+        // Explicit layout IDs occupy values outside the historical column-count range.
+        difficulty.CircleSize = requiresLayoutEncoding(LayoutVariant) ? (int)LayoutVariant : KeyCount;
         difficulty.ApproachRate = Total == 0 ? zero_total_ar : (float)Total.GetValueOrDefault();
         difficulty.DrainRate = (float)LockedLongNoteMode;
     }
@@ -170,7 +174,19 @@ public readonly struct BmsDifficultyInfo
     /// Reads the total column count from an osu! difficulty object (<see cref="BeatmapDifficulty"/>
     /// or <see cref="IBeatmapDifficultyInfo"/>).
     /// </summary>
-    public static int GetKeyCount(IBeatmapDifficultyInfo difficulty) =>
-        Math.Max(1, (int)Math.Round(difficulty.CircleSize));
+    public static BmsLayoutVariant GetLayout(IBeatmapDifficultyInfo difficulty)
+    {
+        var value = (int)Math.Round(difficulty.CircleSize);
+        var layout = (BmsLayoutVariant)value;
+        return requiresLayoutEncoding(layout) ? layout : BmsLayout.VariantFromTotalColumns(value);
+    }
+
+    public static int GetKeyCount(IBeatmapDifficultyInfo difficulty)
+    {
+        var value = (int)Math.Round(difficulty.CircleSize);
+        return requiresLayoutEncoding((BmsLayoutVariant)value) ? BmsLayout.GetTotalColumns((BmsLayoutVariant)value) : Math.Max(1, value);
+    }
+
+    private static bool requiresLayoutEncoding(BmsLayoutVariant variant) => variant == BmsLayoutVariant.Popn5K || BmsLayout.IsKeyboard(variant);
 
 }

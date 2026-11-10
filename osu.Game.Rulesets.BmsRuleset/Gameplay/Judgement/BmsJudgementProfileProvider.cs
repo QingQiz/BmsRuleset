@@ -137,7 +137,7 @@ public static class BmsJudgementProfileProvider
     private static double rateForLayoutRank(BmsLayoutVariant layout, int rank)
         => layout switch
         {
-            BmsLayoutVariant.Pms9K or BmsLayoutVariant.Pms9K2P or BmsLayoutVariant.Pms9KDouble => pms_rank_rates[rank],
+            BmsLayoutVariant.Popn5K or BmsLayoutVariant.Popn9K or BmsLayoutVariant.Popn9K2P or BmsLayoutVariant.Popn9KDouble => pms_rank_rates[rank],
             _ => rank_rates[rank],
         };
 
@@ -147,7 +147,9 @@ public static class BmsJudgementProfileProvider
             BmsLayoutVariant.Bms5K or BmsLayoutVariant.Bms5K2P or BmsLayoutVariant.Bms5KDouble => fiveKeys(rate),
             // ReSharper disable once RedundantSwitchExpressionArms
             BmsLayoutVariant.Bme7K or BmsLayoutVariant.Bme7K2P or BmsLayoutVariant.Bme7KDouble => sevenKeys(rate),
-            BmsLayoutVariant.Pms9K or BmsLayoutVariant.Pms9K2P or BmsLayoutVariant.Pms9KDouble => pms(rate),
+            BmsLayoutVariant.Popn5K or BmsLayoutVariant.Popn9K or BmsLayoutVariant.Popn9K2P or BmsLayoutVariant.Popn9KDouble => pms(rate),
+            BmsLayoutVariant.Keyboard24K or BmsLayoutVariant.Keyboard24KDouble => keyboard(rate),
+            _ when BmsLayout.IsGeneric(layout) => keyboard(rate),
             _ => sevenKeys(rate),
         };
 
@@ -179,7 +181,7 @@ public static class BmsJudgementProfileProvider
     }
 
     public static bool IsPms(BmsLayoutVariant layout)
-        => layout is BmsLayoutVariant.Pms9K or BmsLayoutVariant.Pms9K2P or BmsLayoutVariant.Pms9KDouble;
+        => layout is BmsLayoutVariant.Popn5K or BmsLayoutVariant.Popn9K or BmsLayoutVariant.Popn9K2P or BmsLayoutVariant.Popn9KDouble;
 
     public static bool EmptyPoorBreaksCombo(BmsLayoutVariant layout)
         => IsPms(layout) || layout is BmsLayoutVariant.Bms5K or BmsLayoutVariant.Bms5K2P or BmsLayoutVariant.Bms5KDouble;
@@ -195,6 +197,12 @@ public static class BmsJudgementProfileProvider
         head(rate, (-30, 30), (-70, 70), (-160, 160), (-290, 230), (-160, 500)),
         tail(rate, (-120, 120), (-160, 160), (-200, 200), (-280, 220)),
         tail(rate, (-130, 130), (-170, 170), (-210, 210), (-290, 230)));
+
+    private static BmsJudgementProfile keyboard(double rate) => new(
+        head(rate, (-30, 30), (-90, 90), (-200, 200), (-320, 240), (-200, 650)),
+        head(rate, (-30, 30), (-90, 90), (-200, 200), (-320, 240), (-200, 650)),
+        tail(rate, (-160, 25), (-200, 75), (-260, 140), (-320, 240)),
+        tail(rate, (-160, 25), (-200, 75), (-260, 140), (-320, 240)));
 
     private static BmsJudgementProfile pms(double rate) => new(
         pmsHead(rate, (-20, 20), (-50, 50), (-117, 117), (-183, 183), (-175, 500)),

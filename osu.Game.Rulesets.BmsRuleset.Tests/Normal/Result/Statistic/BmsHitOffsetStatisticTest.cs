@@ -73,7 +73,7 @@ public class BmsHitOffsetStatisticTest
     public void TestPmsStatisticsHaveNoScratch()
     {
         var statistics = BmsHitOffsetStatistic.CreateStatistics(
-            createBeatmap(BmsLayoutVariant.Pms9K),
+            createBeatmap(BmsLayoutVariant.Popn9K),
             [
                 new HitEvent(12, 1, HitResult.Great, new BmsNote { Column = 0, StartTime = 1000 }, null, null),
                 new HitEvent(-8, 1, HitResult.Perfect, new BmsNote { Column = 8, StartTime = 1500 }, null, null),

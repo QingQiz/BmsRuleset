@@ -251,10 +251,14 @@ matching the selected mods.
 | Adjust visual offset automatically | Off | On / off | Applies each valid local play's suggested offset. See [calibration](#visual-offset-calibration). |
 | Show BMS 5K                   | On       | On / off                                   | Shows or hides single-play BMS 5K charts in song select.                                                                                                                                       |
 | Show BME 7K                   | On       | On / off                                   | Shows or hides single-play BME 7K charts in song select.                                                                                                                                       |
-| Show PMS 9K                   | On       | On / off                                   | Shows or hides single-play PMS 9K charts in song select.                                                                                                                                       |
+| Show Pop’n 9K                   | On       | On / off                                   | Shows or hides single-play Pop’n 9K charts in song select.                                                                                                                                       |
 | Show BMS 5K DP                | On       | On / off                                   | Shows or hides double-play BMS 5K charts in song select.                                                                                                                                       |
 | Show BME 7K DP                | On       | On / off                                   | Shows or hides double-play BME 7K charts in song select.                                                                                                                                       |
-| Show PMS 9K DP                | On       | On / off                                   | Shows or hides double-play PMS 9K charts in song select.                                                                                                                                       |
+| Show Pop’n 9K DP                | On       | On / off                                   | Shows or hides double-play Pop’n 9K charts in song select.                                                                                                                                       |
+| Show Pop’n 5K | On | On / off | Shows or hides Pop’n 5K charts. |
+| Show Keyboard 24K | On | On / off | Shows or hides Keyboard 24K charts. |
+| Show Keyboard 24K DP | On | On / off | Shows or hides double-play Keyboard 24K charts. |
+| Show generic keyboard layouts | On | On / off | Shows or hides all generic keyboard layouts. |
 
 Layout filters take effect immediately in song select.
 

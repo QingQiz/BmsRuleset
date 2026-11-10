@@ -893,7 +893,7 @@ public class BmsHealthProcessorTest
 
     [TestCase(BmsLayoutVariant.Bms5K, 0.75, -0.03)]
     [TestCase(BmsLayoutVariant.Bme7K, 0.80, -0.03)]
-    [TestCase(BmsLayoutVariant.Pms9K, 0.85, -0.02)]
+    [TestCase(BmsLayoutVariant.Popn9K, 0.85, -0.02)]
     public void TestRegularGameplayGaugeProfileFollowsLayout(BmsLayoutVariant layout, double clearThreshold, double badDelta)
     {
         var processor = new BmsHealthProcessor();

@@ -20,7 +20,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Course;
 [TestFixture]
 public class BmsCourseHealthInheritanceTest
 {
-    private static readonly BmsLayoutVariant[] layouts = [BmsLayoutVariant.Bme7K, BmsLayoutVariant.Bms5K, BmsLayoutVariant.Pms9K];
+    private static readonly BmsLayoutVariant[] layouts = [BmsLayoutVariant.Bme7K, BmsLayoutVariant.Bms5K, BmsLayoutVariant.Popn9K];
 
     [Test]
     public void SingleGaugeCarriesHealthAcrossThreeStages(

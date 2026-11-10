@@ -18,8 +18,8 @@ public partial class TestSceneBmsPracticeChart
     [TestCase(BmsLayoutVariant.Bme7K, BmsLayoutVariant.Bme7K2P)]
     [TestCase(BmsLayoutVariant.Bms5KDouble, BmsLayoutVariant.Bms5KDouble)]
     [TestCase(BmsLayoutVariant.Bme7KDouble, BmsLayoutVariant.Bme7KDouble)]
-    [TestCase(BmsLayoutVariant.Pms9K, BmsLayoutVariant.Pms9K)]
-    [TestCase(BmsLayoutVariant.Pms9KDouble, BmsLayoutVariant.Pms9KDouble)]
+    [TestCase(BmsLayoutVariant.Popn9K, BmsLayoutVariant.Popn9K)]
+    [TestCase(BmsLayoutVariant.Popn9KDouble, BmsLayoutVariant.Popn9KDouble)]
     public void MainChartAndMiniatureUseGameplayColumnOrder(BmsLayoutVariant originalLayout, BmsLayoutVariant displayedLayout)
     {
         BmsBeatmap beatmap = null!;

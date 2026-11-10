@@ -50,7 +50,7 @@ public class BmsModLr2Test
     // Values are transcribed from LR2oraja's JudgeProperty.LR2_SCALING, independently of production interpolation.
     [Test]
     public void RankWindows([Values(0, 1, 2, 3, 4)] int rank,
-                            [Values(BmsLayoutVariant.Bms5K, BmsLayoutVariant.Bme7K, BmsLayoutVariant.Bme7KDouble, BmsLayoutVariant.Pms9K)]
+                            [Values(BmsLayoutVariant.Bms5K, BmsLayoutVariant.Bme7K, BmsLayoutVariant.Bme7KDouble, BmsLayoutVariant.Popn9K)]
                             BmsLayoutVariant layout,
                             [Values(0, 1)] int column)
     {
@@ -250,7 +250,7 @@ public class BmsModLr2Test
         using (BmsJudgementProfileProvider.UseWindowMods([new BmsModNoGood(), new BmsModLr2(), new BmsModNoBad()]))
         {
             first = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, 1, 2, false);
-            Assert.That(BmsJudgementProfileProvider.ResolveJudgementRate(BmsLayoutVariant.Pms9K, 4, null), Is.EqualTo(.75));
+            Assert.That(BmsJudgementProfileProvider.ResolveJudgementRate(BmsLayoutVariant.Popn9K, 4, null), Is.EqualTo(.75));
         }
         using (BmsJudgementProfileProvider.UseWindowMods([new BmsModNoBad(), new BmsModLr2(), new BmsModNoGood()]))
         {
@@ -258,8 +258,8 @@ public class BmsModLr2Test
             Assert.That(second.HitWindows, Is.EqualTo(first.HitWindows));
             Assert.That(second.ResultForOffset(70), Is.EqualTo(HitResult.None));
             Assert.That(second.ResultForOffset(20), Is.EqualTo(HitResult.Great));
-            Assert.That(BmsJudgementProfileProvider.ResolveJudgementRate(BmsLayoutVariant.Pms9K, 4, null), Is.EqualTo(.75));
-            var behaviour = BmsJudgementProfileProvider.GetBehaviour(BmsLayoutVariant.Pms9K);
+            Assert.That(BmsJudgementProfileProvider.ResolveJudgementRate(BmsLayoutVariant.Popn9K, 4, null), Is.EqualTo(.75));
+            var behaviour = BmsJudgementProfileProvider.GetBehaviour(BmsLayoutVariant.Popn9K);
             Assert.That(behaviour.SearchWindow, Is.EqualTo(1000));
             Assert.That(behaviour.NonConsumingBad, Is.False);
         }
@@ -293,9 +293,9 @@ public class BmsModLr2Test
     [TestCase(1400, HitResult.Perfect, BmsLayoutVariant.Bme7K)]
     [TestCase(1399.99, HitResult.Ok, BmsLayoutVariant.Bme7K)]
     [TestCase(1500, HitResult.Perfect, BmsLayoutVariant.Bme7K)]
-    [TestCase(1400, HitResult.Perfect, BmsLayoutVariant.Pms9K)]
-    [TestCase(1399.99, HitResult.Ok, BmsLayoutVariant.Pms9K)]
-    [TestCase(1500, HitResult.Perfect, BmsLayoutVariant.Pms9K)]
+    [TestCase(1400, HitResult.Perfect, BmsLayoutVariant.Popn9K)]
+    [TestCase(1399.99, HitResult.Ok, BmsLayoutVariant.Popn9K)]
+    [TestCase(1500, HitResult.Perfect, BmsLayoutVariant.Popn9K)]
     public void LongNoteReleaseKeepsHeadOrBecomesBad(double release, HitResult expected,
                                                      BmsLayoutVariant layout)
     {
@@ -347,7 +347,7 @@ public class BmsModLr2Test
     }
 
     [Test]
-    public void EmptyPoorPreservesComboInAllLayouts([Values(BmsLayoutVariant.Bms5K, BmsLayoutVariant.Pms9K)] BmsLayoutVariant layout)
+    public void EmptyPoorPreservesComboInAllLayouts([Values(BmsLayoutVariant.Bms5K, BmsLayoutVariant.Popn9K)] BmsLayoutVariant layout)
     {
         using var score = new BmsScoreProcessor();
         score.ApplyBeatmap(new BmsBeatmap { LayoutVariant = layout });
@@ -358,7 +358,7 @@ public class BmsModLr2Test
     }
 
     [Test]
-    public void ComboRulesBelongToTheScoreInstance([Values(BmsLayoutVariant.Bms5K, BmsLayoutVariant.Pms9K)] BmsLayoutVariant layout)
+    public void ComboRulesBelongToTheScoreInstance([Values(BmsLayoutVariant.Bms5K, BmsLayoutVariant.Popn9K)] BmsLayoutVariant layout)
     {
         using var score = new BmsScoreProcessor();
         score.ApplyBeatmap(new BmsBeatmap { LayoutVariant = layout });
@@ -378,7 +378,7 @@ public class BmsModLr2Test
     {
         using var windows = BmsJudgementProfileProvider.UseWindowMods([new BmsModLr2()]);
         var normal = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, 1, 2, false);
-        Assert.That(BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Pms9K, 1, 2, false), Is.SameAs(normal));
+        Assert.That(BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Popn9K, 1, 2, false), Is.SameAs(normal));
         Assert.That(BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, 1, 4, false), Is.SameAs(normal));
         Assert.That(BmsJudgementProfileProvider.GetTable(new BmsJudgementWindowContext(BmsLayoutVariant.Bme7K, .75, false), 1), Is.SameAs(normal));
     }
@@ -452,7 +452,7 @@ public class BmsModLr2Test
 
     [Test]
     public void GaugeApplicationOrderAndAutoGaugeAreStable([Values] bool lr2First,
-                                                           [Values(BmsLayoutVariant.Bme7K, BmsLayoutVariant.Pms9K)]
+                                                           [Values(BmsLayoutVariant.Bme7K, BmsLayoutVariant.Popn9K)]
                                                            BmsLayoutVariant layout)
     {
         var mod = new BmsModLr2();
@@ -479,7 +479,7 @@ public class BmsModLr2Test
     public void ProfileMigrationPreservesExplicitSeedsAndStartedGameplay([Values] bool explicitSeed)
     {
         var beatmap = createBeatmap();
-        beatmap.LayoutVariant = BmsLayoutVariant.Pms9K;
+        beatmap.LayoutVariant = BmsLayoutVariant.Popn9K;
         beatmap.HitObjects.Add(new BmsNote { Beatmap = beatmap, JudgementRate = .75, Column = 1, StartTime = 1000 });
         using var health = new BmsHealthProcessor();
         health.ApplyBeatmap(beatmap);
@@ -528,7 +528,7 @@ public class BmsModLr2Test
     {
         var beatmap = createBeatmap();
         beatmap.TimingMap = BmsChartParser.Parse([]).TimingMap;
-        beatmap.LayoutVariant = BmsLayoutVariant.Pms9K;
+        beatmap.LayoutVariant = BmsLayoutVariant.Popn9K;
         beatmap.TotalColumns = 9;
         beatmap.Rank = 4;
         beatmap.ExRank = extendedRank ? 100 : null;
@@ -536,7 +536,7 @@ public class BmsModLr2Test
             new BmsNote { Beatmap = beatmap, JudgementRate = .75, Column = 1, StartTime = 0 },
             new BmsNote { Beatmap = beatmap, JudgementRate = .75, Column = 2, StartTime = 250 },
         ]);
-        new BmsDifficultyInfo { Rank = 4, ExRank = beatmap.ExRank, KeyCount = 9 }.WriteToOsuDifficulty(beatmap);
+        new BmsDifficultyInfo { Rank = 4, ExRank = beatmap.ExRank, LayoutVariant = BmsLayoutVariant.Popn9K }.WriteToOsuDifficulty(beatmap);
         var calculator = new BmsDifficultyCalculator(new BmsRuleset().RulesetInfo, new TestWorkingBeatmap(beatmap));
         calculator.Calculate([new BmsModLr2()]);
         Assert.That(calculator.StarRatingProcessor.HitLeniencyX, Is.EqualTo(BmsHitLeniency.FromGreatWindow(40)).Within(1e-12));
@@ -546,7 +546,7 @@ public class BmsModLr2Test
     public void DisplayMetricsUseModsAndRestoreTheirScope()
     {
         var info = new BeatmapInfo(new BmsRuleset().RulesetInfo);
-        new BmsDifficultyInfo { Rank = 2, KeyCount = 8, Total = 300, LockedLongNoteMode = BmsLongNoteMode.ChargeNote }.WriteToOsuDifficulty(info);
+        new BmsDifficultyInfo { Rank = 2, LayoutVariant = BmsLayoutVariant.Bme7K, Total = 300, LockedLongNoteMode = BmsLongNoteMode.ChargeNote }.WriteToOsuDifficulty(info);
         var defaultTable = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, 1, 2, false);
         var attributes = new BmsRuleset().GetBeatmapAttributesForDisplay(info, [new BmsModLr2()]).ToArray();
         Assert.That(attributes, Is.Not.Empty);
@@ -558,13 +558,13 @@ public class BmsModLr2Test
 
     [Test]
     public void ExtendedRankUsesRawPercentageInEveryLayout([Values(0, 80, 100)] int exRank,
-                                                           [Values(BmsLayoutVariant.Bme7K, BmsLayoutVariant.Pms9K)]
+                                                           [Values(BmsLayoutVariant.Bme7K, BmsLayoutVariant.Popn9K)]
                                                            BmsLayoutVariant layout)
     {
         using var scope = BmsJudgementProfileProvider.UseWindowMods([new BmsModLr2()]);
         var beatmap = createBeatmap(BmsChartParser.Parse([
             "#RANK 3", $"#DEFEXRANK {exRank}", "#WAV01 note.wav", "#00011:01",
-        ], layout == BmsLayoutVariant.Pms9K ? "rank.pms" : "rank.bms", judgementRateCalculator: new BmsModLr2().JudgementRateCalculator));
+        ], layout == BmsLayoutVariant.Popn9K ? "rank.pms" : "rank.bms", judgementRateCalculator: new BmsModLr2().JudgementRateCalculator));
         var note = beatmap.HitObjects.Single();
         Assert.That(note.JudgementRate, Is.EqualTo(exRank * .75 / 100).Within(1e-12));
         Assert.That(BmsJudgementProfileProvider.GetTable(note, false).FrameworkWindowFor(HitResult.Great), Is.EqualTo(exRank == 0 ? 0 : exRank == 80 ? 34 : 40));
@@ -592,7 +592,7 @@ public class BmsModLr2Test
 
     [Test]
     public void LiveInputsArchiveAndOfflineReplayProduceTheSameResults([Values(1, 1.5)] double rate, [Values] bool autoFirst,
-                                                                       [Values(BmsLayoutVariant.Bme7K, BmsLayoutVariant.Pms9K)]
+                                                                       [Values(BmsLayoutVariant.Bme7K, BmsLayoutVariant.Popn9K)]
                                                                        BmsLayoutVariant layout)
     {
         var mod = new BmsModLr2();
@@ -668,7 +668,7 @@ public class BmsModLr2Test
     {
         var beatmap = createBeatmap();
         beatmap.LayoutVariant = layout;
-        beatmap.TotalColumns = layout == BmsLayoutVariant.Pms9K ? 9 : 8;
+        beatmap.TotalColumns = layout == BmsLayoutVariant.Popn9K ? 9 : 8;
         return new BmsLongNoteTestContext(new BmsLongNote { Beatmap = beatmap, JudgementRate = .75, Column = 1, StartTime = 1000, Duration = 500 });
     }
 

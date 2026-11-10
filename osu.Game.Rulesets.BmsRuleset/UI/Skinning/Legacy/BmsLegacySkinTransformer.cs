@@ -100,7 +100,7 @@ public partial class BmsLegacySkinTransformer : LegacySkinTransformer, IBmsGamep
         }
         else
         {
-            layoutVariant1 = BmsLayout.VariantFromTotalColumns(BmsDifficultyInfo.GetKeyCount(beatmap.BeatmapInfo.Difficulty));
+            layoutVariant1 = BmsDifficultyInfo.GetLayout(beatmap.BeatmapInfo.Difficulty);
         }
 
         configurationProvider = new BmsLegacySkinConfigurationProvider(Skin, layoutVariant1);

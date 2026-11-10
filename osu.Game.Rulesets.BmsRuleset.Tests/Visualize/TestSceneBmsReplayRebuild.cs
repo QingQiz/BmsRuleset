@@ -66,7 +66,7 @@ public partial class TestSceneBmsReplayRebuild : BmsPlayerTestScene
         var beatmap = new BmsBeatmap
         {
             LayoutVariant = layout,
-            TotalColumns = layout == BmsLayoutVariant.Pms9K ? 9 : 8,
+            TotalColumns = layout == BmsLayoutVariant.Popn9K ? 9 : 8,
             Rank = 2,
             Total = 100,
             HitObjects =
@@ -89,7 +89,7 @@ public partial class TestSceneBmsReplayRebuild : BmsPlayerTestScene
     [Test]
     public void RebuildIsSilentAndContinuesWithTheSameRuntime(
         [Values(BmsLongNoteMode.LongNote, BmsLongNoteMode.ChargeNote, BmsLongNoteMode.HellChargeNote)] BmsLongNoteMode mode,
-        [Values(BmsLayoutVariant.Bme7K, BmsLayoutVariant.Pms9K)] BmsLayoutVariant variant)
+        [Values(BmsLayoutVariant.Bme7K, BmsLayoutVariant.Popn9K)] BmsLayoutVariant variant)
     {
         var snapshots = new Dictionary<double, string>();
         var rebuilds = 0;

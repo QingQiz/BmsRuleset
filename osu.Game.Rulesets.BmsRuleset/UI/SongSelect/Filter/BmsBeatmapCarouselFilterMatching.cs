@@ -59,7 +59,9 @@ internal sealed class BmsBeatmapCarouselFilterMatching(Func<FilterCriteria> getC
         match &= !criteria.StarDifficulty.HasFilter || criteria.StarDifficulty.IsInRange(beatmap.StarRating.FloorToDecimalDigits(2));
         match &= !criteria.ApproachRate.HasFilter || criteria.ApproachRate.IsInRange(beatmap.Difficulty.ApproachRate);
         match &= !criteria.DrainRate.HasFilter || criteria.DrainRate.IsInRange(beatmap.Difficulty.DrainRate);
-        match &= !criteria.CircleSize.HasFilter || criteria.CircleSize.IsInRange(beatmap.Difficulty.CircleSize);
+        match &= !criteria.CircleSize.HasFilter || criteria.CircleSize.IsInRange(beatmap.Ruleset.ShortName == Constant.SHORT_NAME
+            ? BmsDifficultyInfo.GetKeyCount(beatmap.Difficulty)
+            : beatmap.Difficulty.CircleSize);
         match &= !criteria.OverallDifficulty.HasFilter || criteria.OverallDifficulty.IsInRange(beatmap.Difficulty.OverallDifficulty);
         match &= !criteria.Length.HasFilter || criteria.Length.IsInRange(beatmap.Length);
         match &= !criteria.LastPlayed.HasFilter || criteria.LastPlayed.IsInRange(beatmap.LastPlayed ?? DateTimeOffset.MinValue);

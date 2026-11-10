@@ -32,7 +32,7 @@ internal static class Mania7KBeatmapConverter
         var difficulty = createDifficultyInfo(source.HitObjects.Count);
 
         target.TotalColumns = difficulty.KeyCount;
-        target.LayoutVariant = BmsLayout.VariantFromTotalColumns(difficulty.KeyCount);
+        target.LayoutVariant = difficulty.LayoutVariant;
         target.Rank = difficulty.Rank;
         target.ExRank = difficulty.ExRank;
         target.Total = difficulty.Total;
@@ -50,7 +50,7 @@ internal static class Mania7KBeatmapConverter
     {
         Rank = normal_rank,
         Total = BmsGaugeCalculator.CalculateDefaultTotal(noteCount),
-        KeyCount = BmsLayout.BME7_KEY_COLUMNS,
+        LayoutVariant = BmsLayoutVariant.Bme7K,
         LockedLongNoteMode = BmsLongNoteMode.ChargeNote,
     };
 

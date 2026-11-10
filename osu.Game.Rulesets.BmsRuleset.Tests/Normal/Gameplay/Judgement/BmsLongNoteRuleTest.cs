@@ -41,7 +41,7 @@ public class BmsLongNoteRuleTest
     [TestCase(BmsLongNoteMode.ChargeNote)]
     public void TestPmsEarlyReleaseCanBeRescuedWithinMargin(BmsLongNoteMode mode)
     {
-        var run = new BmsLongNoteTestContext(mode, 1000, 2000, layout: BmsLayoutVariant.Pms9K);
+        var run = new BmsLongNoteTestContext(mode, 1000, 2000, layout: BmsLayoutVariant.Popn9K);
         run.Press(1000, HitResult.Perfect);
         run.Release(1500);
         run.Frame(1699, 199, false);
@@ -57,7 +57,7 @@ public class BmsLongNoteRuleTest
     [Test]
     public void TestPmsReleaseMarginRestoresAfterRewind()
     {
-        var run = new BmsLongNoteTestContext(BmsLongNoteMode.LongNote, 1000, 2000, layout: BmsLayoutVariant.Pms9K);
+        var run = new BmsLongNoteTestContext(BmsLongNoteMode.LongNote, 1000, 2000, layout: BmsLayoutVariant.Popn9K);
         run.Press(1000, HitResult.Perfect);
         run.Release(1500);
         run.Repress(1600);
@@ -150,7 +150,7 @@ public class BmsLongNoteRuleTest
     [TestCase(1701, true)]
     public void TestPmsReleaseExpiresAtExactlyTwoHundredMilliseconds(double time, bool expired)
     {
-        var run = new BmsLongNoteTestContext(BmsLongNoteMode.LongNote, 1000, 2000, layout: BmsLayoutVariant.Pms9K);
+        var run = new BmsLongNoteTestContext(BmsLongNoteMode.LongNote, 1000, 2000, layout: BmsLayoutVariant.Popn9K);
         run.Press(1000, HitResult.Perfect);
         run.Release(1500);
         run.Frame(time, time - 1500, false);
@@ -168,7 +168,7 @@ public class BmsLongNoteRuleTest
     [TestCase(1683.001, true)]
     public void TestPmsChargeTailTimeoutUsesHeadWindow(double time, bool expired)
     {
-        var run = new BmsLongNoteTestContext(BmsLongNoteMode.ChargeNote, 1000, 500, layout: BmsLayoutVariant.Pms9K);
+        var run = new BmsLongNoteTestContext(BmsLongNoteMode.ChargeNote, 1000, 500, layout: BmsLayoutVariant.Popn9K);
         run.Press(1000, HitResult.Perfect);
         run.Passive(time);
         Assert.That(run.State.TailJudged, Is.EqualTo(expired));
@@ -283,7 +283,7 @@ public class BmsLongNoteRuleTest
     [Test]
     public void TestChargeLifetimeEndUsesHeadBadWindow()
     {
-        var run = new BmsLongNoteTestContext(BmsLongNoteMode.ChargeNote, 1000, 500, layout: BmsLayoutVariant.Pms9K);
+        var run = new BmsLongNoteTestContext(BmsLongNoteMode.ChargeNote, 1000, 500, layout: BmsLayoutVariant.Popn9K);
 
         // PMS head BAD ends at 183ms, unlike the 283ms tail BAD window.
         Assert.That(run.Presentation().LifetimeEnd, Is.EqualTo(1783));

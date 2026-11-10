@@ -32,7 +32,7 @@ public class BmsStarRatingProcessorTest
         for (var i = 0; i < 20; i++)
             beatmap.HitObjects.Add(new BmsNote { Beatmap = beatmap, Column = 1 + i % 7, StartTime = i * 75 });
         BmsTestBeatmaps.SetupBeatmapInfo(beatmap, beatmap.BeatmapInfo.Ruleset);
-        new BmsDifficultyInfo { Rank = 2, ExRank = exRank, KeyCount = 8 }.WriteToOsuDifficulty(beatmap);
+        new BmsDifficultyInfo { Rank = 2, ExRank = exRank, LayoutVariant = BmsLayoutVariant.Bme7K }.WriteToOsuDifficulty(beatmap);
         var calculator = new BmsDifficultyCalculator(new BmsRuleset().RulesetInfo, new TestWorkingBeatmap(beatmap));
         Mod[] mods = lr2 ? [new BmsModLr2()] : [];
         var ratings = timed ? calculator.CalculateTimed(mods).Select(result => result.Attributes.StarRating).ToArray()
@@ -94,7 +94,7 @@ public class BmsStarRatingProcessorTest
             beatmap.HitObjects.Add(note);
         }
         BmsTestBeatmaps.SetupBeatmapInfo(beatmap, beatmap.BeatmapInfo.Ruleset);
-        new BmsDifficultyInfo { Rank = 2, KeyCount = 8 }.WriteToOsuDifficulty(beatmap);
+        new BmsDifficultyInfo { Rank = 2, LayoutVariant = BmsLayoutVariant.Bme7K }.WriteToOsuDifficulty(beatmap);
         var calculator = new BmsDifficultyCalculator(new BmsRuleset().RulesetInfo, new TestWorkingBeatmap(beatmap));
         Mod[] baseMods = lr2 ? [new BmsModLr2()] : [];
         Mod[] constraints = constraintKind switch
@@ -140,7 +140,7 @@ public class BmsStarRatingProcessorTest
 
     [TestCase(BmsLayoutVariant.Bme7K, 2, 45)]
     [TestCase(BmsLayoutVariant.Bms5K, 2, 37.5)]
-    [TestCase(BmsLayoutVariant.Pms9K, 2, 35)]
+    [TestCase(BmsLayoutVariant.Popn9K, 2, 35)]
     public void TestStarRatingProcessorHitLeniencyUsesBmsGreatWindow(BmsLayoutVariant layout, int rank, double greatWindow)
     {
         var totalColumns = BmsLayout.GetTotalColumns(layout);
@@ -237,7 +237,7 @@ public class BmsStarRatingProcessorTest
     public void TestDifficultyCalculatorUsesModRate()
     {
         var beatmap = new Beatmap();
-        new BmsDifficultyInfo { Rank = 2, KeyCount = 8 }.WriteToOsuDifficulty(beatmap);
+        new BmsDifficultyInfo { Rank = 2, LayoutVariant = BmsLayoutVariant.Bme7K }.WriteToOsuDifficulty(beatmap);
         beatmap.HitObjects.AddRange(createSimpleHitObjects());
 
         var calculator = new BmsDifficultyCalculator(new BmsRuleset().RulesetInfo, new TestWorkingBeatmap(beatmap));
@@ -260,7 +260,7 @@ public class BmsStarRatingProcessorTest
     public void TestDifficultyCalculatorWrapperPathUsesEncodedExRank()
     {
         var beatmap = new Beatmap();
-        new BmsDifficultyInfo { Rank = 0, ExRank = 200, KeyCount = 8 }.WriteToOsuDifficulty(beatmap);
+        new BmsDifficultyInfo { Rank = 0, ExRank = 200, LayoutVariant = BmsLayoutVariant.Bme7K }.WriteToOsuDifficulty(beatmap);
         beatmap.HitObjects.AddRange(createSimpleHitObjects());
 
         var calculator = new BmsDifficultyCalculator(new BmsRuleset().RulesetInfo, new TestWorkingBeatmap(beatmap));

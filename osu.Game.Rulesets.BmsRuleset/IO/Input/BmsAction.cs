@@ -77,75 +77,57 @@ public enum BmsAction
     [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionP2Key7))]
     P2Key7,
 
-    [Description("PMS Key 1")]
     [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionPmsKey1))]
     PmsKey1,
 
-    [Description("PMS Key 2")]
     [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionPmsKey2))]
     PmsKey2,
 
-    [Description("PMS Key 3")]
     [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionPmsKey3))]
     PmsKey3,
 
-    [Description("PMS Key 4")]
     [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionPmsKey4))]
     PmsKey4,
 
-    [Description("PMS Key 5")]
     [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionPmsKey5))]
     PmsKey5,
 
-    [Description("PMS Key 6")]
     [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionPmsKey6))]
     PmsKey6,
 
-    [Description("PMS Key 7")]
     [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionPmsKey7))]
     PmsKey7,
 
-    [Description("PMS Key 8")]
     [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionPmsKey8))]
     PmsKey8,
 
-    [Description("PMS Key 9")]
     [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionPmsKey9))]
     PmsKey9,
 
-    [Description("P2 PMS Key 1")]
     [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionP2PmsKey1))]
     P2PmsKey1,
 
-    [Description("P2 PMS Key 2")]
     [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionP2PmsKey2))]
     P2PmsKey2,
 
-    [Description("P2 PMS Key 3")]
     [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionP2PmsKey3))]
     P2PmsKey3,
 
-    [Description("P2 PMS Key 4")]
     [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionP2PmsKey4))]
     P2PmsKey4,
 
-    [Description("P2 PMS Key 5")]
     [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionP2PmsKey5))]
     P2PmsKey5,
 
-    [Description("P2 PMS Key 6")]
     [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionP2PmsKey6))]
     P2PmsKey6,
 
-    [Description("P2 PMS Key 7")]
     [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionP2PmsKey7))]
     P2PmsKey7,
 
-    [Description("P2 PMS Key 8")]
     [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionP2PmsKey8))]
     P2PmsKey8,
 
-    [Description("P2 PMS Key 9")]
     [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionP2PmsKey9))]
     P2PmsKey9,
 
@@ -163,4 +145,197 @@ public enum BmsAction
 
     [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionP2ScratchReverse))]
     P2ScratchReverse,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey1))]
+    KeyboardKey1,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey2))]
+    KeyboardKey2,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey3))]
+    KeyboardKey3,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey4))]
+    KeyboardKey4,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey5))]
+    KeyboardKey5,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey6))]
+    KeyboardKey6,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey7))]
+    KeyboardKey7,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey8))]
+    KeyboardKey8,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey9))]
+    KeyboardKey9,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey10))]
+    KeyboardKey10,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey11))]
+    KeyboardKey11,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey12))]
+    KeyboardKey12,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey13))]
+    KeyboardKey13,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey14))]
+    KeyboardKey14,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey15))]
+    KeyboardKey15,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey16))]
+    KeyboardKey16,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey17))]
+    KeyboardKey17,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey18))]
+    KeyboardKey18,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey19))]
+    KeyboardKey19,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey20))]
+    KeyboardKey20,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey21))]
+    KeyboardKey21,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey22))]
+    KeyboardKey22,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey23))]
+    KeyboardKey23,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey24))]
+    KeyboardKey24,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey25))]
+    KeyboardKey25,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey26))]
+    KeyboardKey26,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey27))]
+    KeyboardKey27,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey28))]
+    KeyboardKey28,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey29))]
+    KeyboardKey29,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey30))]
+    KeyboardKey30,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey31))]
+    KeyboardKey31,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey32))]
+    KeyboardKey32,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey33))]
+    KeyboardKey33,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey34))]
+    KeyboardKey34,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey35))]
+    KeyboardKey35,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey36))]
+    KeyboardKey36,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey37))]
+    KeyboardKey37,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey38))]
+    KeyboardKey38,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey39))]
+    KeyboardKey39,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey40))]
+    KeyboardKey40,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey41))]
+    KeyboardKey41,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey42))]
+    KeyboardKey42,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey43))]
+    KeyboardKey43,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey44))]
+    KeyboardKey44,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey45))]
+    KeyboardKey45,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey46))]
+    KeyboardKey46,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey47))]
+    KeyboardKey47,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey48))]
+    KeyboardKey48,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey49))]
+    KeyboardKey49,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey50))]
+    KeyboardKey50,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey51))]
+    KeyboardKey51,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey52))]
+    KeyboardKey52,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey53))]
+    KeyboardKey53,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey54))]
+    KeyboardKey54,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey55))]
+    KeyboardKey55,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey56))]
+    KeyboardKey56,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey57))]
+    KeyboardKey57,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey58))]
+    KeyboardKey58,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey59))]
+    KeyboardKey59,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey60))]
+    KeyboardKey60,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey61))]
+    KeyboardKey61,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey62))]
+    KeyboardKey62,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey63))]
+    KeyboardKey63,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionKeyboardKey64))]
+    KeyboardKey64,
+
 }

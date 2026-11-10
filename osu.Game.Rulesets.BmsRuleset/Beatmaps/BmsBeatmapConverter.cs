@@ -69,7 +69,7 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
             Rank = converted.Rank,
             ExRank = converted.ExRank,
             Total = converted.Total,
-            KeyCount = converted.TotalColumns,
+            LayoutVariant = converted.LayoutVariant,
             LockedLongNoteMode = converted.LockedLongNoteMode,
         };
         difficulty.WriteToOsuDifficulty(converted.Difficulty);

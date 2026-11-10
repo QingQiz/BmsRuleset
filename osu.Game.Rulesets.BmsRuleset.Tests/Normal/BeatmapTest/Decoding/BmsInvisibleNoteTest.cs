@@ -20,9 +20,9 @@ public class BmsInvisibleNoteTest
     [TestCase("41", ".bms", BmsLayoutVariant.Bms5KDouble, 6)]
     [TestCase("46", ".bms", BmsLayoutVariant.Bms5KDouble, 11)]
     [TestCase("49", ".bms", BmsLayoutVariant.Bme7KDouble, 14)]
-    [TestCase("37", ".pms", BmsLayoutVariant.Pms9K, 8)]
-    [TestCase("42", ".pms", BmsLayoutVariant.Pms9K, 5)]
-    [TestCase("47", ".pms", BmsLayoutVariant.Pms9KDouble, 15)]
+    [TestCase("37", ".pms", BmsLayoutVariant.Popn9K, 8)]
+    [TestCase("42", ".pms", BmsLayoutVariant.Popn9K, 5)]
+    [TestCase("47", ".pms", BmsLayoutVariant.Popn9KDouble, 15)]
     public void TestLayoutAndImportSummary(string channel, string extension, BmsLayoutVariant variant, int column)
     {
         string[] lines = ["#BPM 120", $"#001{channel}:01"];

@@ -12,7 +12,7 @@ public class BmsModNoBadTest
 {
     [Test]
     public void TestOnlyBadIsRemoved(
-        [Values(BmsLayoutVariant.Bms5K, BmsLayoutVariant.Bme7K, BmsLayoutVariant.Pms9K)] BmsLayoutVariant layout,
+        [Values(BmsLayoutVariant.Bms5K, BmsLayoutVariant.Bme7K, BmsLayoutVariant.Popn9K)] BmsLayoutVariant layout,
         [Values(0, 1)] int column,
         [Values(0, 1, 2, 3, 4)] int rank,
         [Values(false, true)] bool tail)

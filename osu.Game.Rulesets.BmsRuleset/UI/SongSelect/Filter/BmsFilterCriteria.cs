@@ -20,16 +20,6 @@ public class BmsFilterCriteria : IRulesetFilterCriteria
 {
     private readonly HashSet<BmsLayoutVariant> enabledVariants;
 
-    private static readonly Dictionary<int, BmsLayoutVariant> column_to_variant = new()
-    {
-        [BmsLayout.BMS5_KEY_COLUMNS] = BmsLayoutVariant.Bms5K,
-        [BmsLayout.BME7_KEY_COLUMNS] = BmsLayoutVariant.Bme7K,
-        [BmsLayout.PMS_COLUMNS] = BmsLayoutVariant.Pms9K,
-        [BmsLayout.BMS5_DOUBLE_PLAY_COLUMNS] = BmsLayoutVariant.Bms5KDouble,
-        [BmsLayout.DOUBLE_PLAY_COLUMNS] = BmsLayoutVariant.Bme7KDouble,
-        [BmsLayout.PMS_DOUBLE_PLAY_COLUMNS] = BmsLayoutVariant.Pms9KDouble,
-    };
-
     private HashSet<BmsLayoutVariant>? keyRestrictedVariants;
     private FilterCriteria.OptionalRange<float> longNotePercentage;
     private FilterCriteria.OptionalRange<float> scratchPercentage;
@@ -39,31 +29,8 @@ public class BmsFilterCriteria : IRulesetFilterCriteria
 
     public BmsFilterCriteria(BmsRulesetConfigManager? config)
     {
-        if (config != null)
-        {
-            enabledVariants = new HashSet<BmsLayoutVariant>(6);
-
-            if (config.Get<bool>(BmsRulesetSetting.ShowBms5K))
-                enabledVariants.Add(BmsLayoutVariant.Bms5K);
-            if (config.Get<bool>(BmsRulesetSetting.ShowBme7K))
-                enabledVariants.Add(BmsLayoutVariant.Bme7K);
-            if (config.Get<bool>(BmsRulesetSetting.ShowPms9K))
-                enabledVariants.Add(BmsLayoutVariant.Pms9K);
-            if (config.Get<bool>(BmsRulesetSetting.ShowBms5KDouble))
-                enabledVariants.Add(BmsLayoutVariant.Bms5KDouble);
-            if (config.Get<bool>(BmsRulesetSetting.ShowBme7KDouble))
-                enabledVariants.Add(BmsLayoutVariant.Bme7KDouble);
-            if (config.Get<bool>(BmsRulesetSetting.ShowPms9KDouble))
-                enabledVariants.Add(BmsLayoutVariant.Pms9KDouble);
-        }
-        else
-        {
-            enabledVariants =
-            [
-                BmsLayoutVariant.Bms5K, BmsLayoutVariant.Bme7K, BmsLayoutVariant.Pms9K,
-                BmsLayoutVariant.Bms5KDouble, BmsLayoutVariant.Bme7KDouble, BmsLayoutVariant.Pms9KDouble,
-            ];
-        }
+        enabledVariants = BmsLayoutVisibility.Options.Where(option => config == null || config.Get<bool>(option.Setting))
+            .Select(option => option.Layout).ToHashSet();
     }
 
     public bool Matches(BeatmapInfo beatmapInfo, FilterCriteria criteria)
@@ -71,7 +38,15 @@ public class BmsFilterCriteria : IRulesetFilterCriteria
         var variant = GetVariant(beatmapInfo);
         var layoutKnown = !UnavailableTableBeatmapFactory.IsUnavailable(beatmapInfo);
 
-        if (layoutKnown && !enabledVariants.Contains(variant))
+        var visibilityVariant = variant switch
+        {
+            BmsLayoutVariant.Bms5K2P => BmsLayoutVariant.Bms5K,
+            BmsLayoutVariant.Bme7K2P => BmsLayoutVariant.Bme7K,
+            BmsLayoutVariant.Popn9K2P => BmsLayoutVariant.Popn9K,
+            _ when BmsLayout.IsGeneric(variant) => BmsLayoutVariant.Generic,
+            _ => variant,
+        };
+        if (layoutKnown && !enabledVariants.Contains(visibilityVariant))
             return false;
 
         if (layoutKnown && keyRestrictedVariants != null && !keyRestrictedVariants.Contains(variant))
@@ -120,11 +95,9 @@ public class BmsFilterCriteria : IRulesetFilterCriteria
 
     internal static BmsLayoutVariant GetVariant(BeatmapInfo beatmapInfo)
     {
-        var keyCount = Mania7KBeatmapConverter.CanConvert(beatmapInfo)
-            ? Mania7KBeatmapConverter.GetConvertedDifficultyInfo(beatmapInfo).KeyCount
-            : BmsDifficultyInfo.GetKeyCount(beatmapInfo.Difficulty);
-
-        return variantFromColumns(keyCount);
+        return Mania7KBeatmapConverter.CanConvert(beatmapInfo)
+            ? Mania7KBeatmapConverter.GetConvertedDifficultyInfo(beatmapInfo).LayoutVariant
+            : BmsDifficultyInfo.GetLayout(beatmapInfo.Difficulty);
     }
 
     public bool TryParseCustomKeywordCriteria(string key, Operator op, string strValues)
@@ -163,8 +136,6 @@ public class BmsFilterCriteria : IRulesetFilterCriteria
     }
 
     public bool FilterMayChangeFromMods(FilterCriteria criteria, ValueChangedEvent<IReadOnlyList<Mod>> mods) => false;
-
-    private static BmsLayoutVariant variantFromColumns(int columns) => column_to_variant.GetValueOrDefault(columns, BmsLayoutVariant.Bms5K);
 
     private static float calculatePercentage(int matchingObjectCount, int totalObjectCount) =>
         matchingObjectCount / (float)Math.Max(1, totalObjectCount) * 100;
@@ -238,7 +209,7 @@ public class BmsFilterCriteria : IRulesetFilterCriteria
 
         int? singleKeyCount = keyCounts.Count == 1 ? keyCounts.Single() : null;
 
-        var allowedVariants = new HashSet<BmsLayoutVariant>(column_to_variant.Values);
+        var allowedVariants = new HashSet<BmsLayoutVariant>(BmsKeyBindingConfiguration.AvailableVariants.Select(value => (BmsLayoutVariant)value));
 
         switch (op)
         {

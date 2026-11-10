@@ -712,7 +712,7 @@ Initial mode mappings:
 | `beat-7k` | `1`-`7`, scratch `8` | `Bme7K` |
 | `beat-10k` | keys `1`-`5` and `9`-`13`, scratches `8` and `16` | `Bms5KDouble` |
 | `beat-14k` | keys `1`-`7` and `9`-`15`, scratches `8` and `16` | `Bme7KDouble` |
-| `popn-9k` | `1`-`9` | `Pms9K` |
+| `popn-9k` | `1`-`9` | `Popn9K` |
 
 Reject unsupported modes with a diagnostic; never fall back to BMS 5K.
 

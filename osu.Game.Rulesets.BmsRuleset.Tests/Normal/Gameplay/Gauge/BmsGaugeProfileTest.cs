@@ -98,7 +98,7 @@ public class BmsGaugeProfileTest
 
     [TestCase(BmsLayoutVariant.Bms5K, BmsGaugeProfileFamily.FiveKeys)]
     [TestCase(BmsLayoutVariant.Bme7K, BmsGaugeProfileFamily.SevenKeys)]
-    [TestCase(BmsLayoutVariant.Pms9K, BmsGaugeProfileFamily.Pms)]
+    [TestCase(BmsLayoutVariant.Popn9K, BmsGaugeProfileFamily.Pms)]
     public void TestLayoutSelectsGaugeProfileFamily(BmsLayoutVariant layout, BmsGaugeProfileFamily expected)
     {
         Assert.That(BmsGaugeProfileFamilyProvider.FromLayout(layout), Is.EqualTo(expected));

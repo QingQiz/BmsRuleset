@@ -92,7 +92,7 @@ internal static partial class BmsChartParser
         var length = hitObjects.Count == 0 ? 0 : Math.Max(0, hitObjects[^1].EndTime);
 
         return new BmsImportSummary(
-            extractImportMetadata(state, totalColumns, path),
+            extractImportMetadata(state, layoutVariant, path),
             computeImportBpm(timingEvents, length),
             length,
             hitObjects.Count,
@@ -175,7 +175,7 @@ internal static partial class BmsChartParser
         public Func<int, int> RandomValueSelector { get; } = randomValueSelector;
     }
 
-    private static BmsChartMetadata extractImportMetadata(ParseState state, int totalColumns, string? path)
+    private static BmsChartMetadata extractImportMetadata(ParseState state, BmsLayoutVariant layout, string? path)
     {
         var title = state.Title ?? (path == null ? string.Empty : Path.GetFileNameWithoutExtension(path));
 
@@ -191,7 +191,7 @@ internal static partial class BmsChartParser
         return new BmsChartMetadata(
             Artist: state.Artist ?? string.Empty,
             DifficultyName: diffName,
-            KeyCount: totalColumns,
+            LayoutVariant: layout,
             RawTitle: title,
             Rank: state.Rank,
             Total: state.Total,

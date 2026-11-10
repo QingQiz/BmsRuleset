@@ -32,12 +32,8 @@ public class BmsRulesetConfigManager(SettingsStore? settings, RulesetInfo rulese
         SetDefault(BmsRulesetSetting.UnlockFrameRateLimit, false);
         SetDefault(BmsRulesetSetting.ShowInvisibleNotes, false);
 
-        SetDefault(BmsRulesetSetting.ShowBms5K, true);
-        SetDefault(BmsRulesetSetting.ShowBme7K, true);
-        SetDefault(BmsRulesetSetting.ShowPms9K, true);
-        SetDefault(BmsRulesetSetting.ShowBms5KDouble, true);
-        SetDefault(BmsRulesetSetting.ShowBme7KDouble, true);
-        SetDefault(BmsRulesetSetting.ShowPms9KDouble, true);
+        foreach (var option in BmsLayoutVisibility.Options)
+            SetDefault(option.Setting, true);
         SetDefault(BmsRulesetSetting.DifficultyTableSources, string.Empty);
         SetDefault(BmsRulesetSetting.DifficultyTableHistory, string.Empty);
         SetDefault(BmsRulesetSetting.DifficultyTableSubdividedTables, string.Empty);
@@ -68,4 +64,8 @@ public enum BmsRulesetSetting
     ShowInvisibleNotes,
     SoftConstant,
     SoftConstantFadeIn,
+    ShowPopn5K,
+    ShowKeyboard24K,
+    ShowKeyboard24KDouble,
+    ShowGenericKeyboard,
 }

@@ -47,7 +47,7 @@ public partial class TestSceneBmsGitComparison : BmsPlayerTestScene
     {
         var beatmap = new BmsBeatmap
         {
-            LayoutVariant = layout, TotalColumns = layout == BmsLayoutVariant.Bme7KDouble ? 16 : layout == BmsLayoutVariant.Pms9K ? 9 : 8,
+            LayoutVariant = layout, TotalColumns = layout == BmsLayoutVariant.Bme7KDouble ? 16 : layout == BmsLayoutVariant.Popn9K ? 9 : 8,
             Rank = 2, Total = 24, LockedLongNoteMode = mode,
             HitObjects =
             [
@@ -102,7 +102,7 @@ public partial class TestSceneBmsGitComparison : BmsPlayerTestScene
     public void CaptureKeyboard(
         [Values(BmsLongNoteMode.LongNote, BmsLongNoteMode.ChargeNote, BmsLongNoteMode.HellChargeNote)]
         BmsLongNoteMode noteMode,
-        [Values(BmsLayoutVariant.Bme7K, BmsLayoutVariant.Pms9K, BmsLayoutVariant.Bme7KDouble, BmsLayoutVariant.Bme7K2P)]
+        [Values(BmsLayoutVariant.Bme7K, BmsLayoutVariant.Popn9K, BmsLayoutVariant.Bme7KDouble, BmsLayoutVariant.Bme7K2P)]
         BmsLayoutVariant variant,
         [Values(false, true)] bool deferred)
     {
@@ -145,7 +145,7 @@ public partial class TestSceneBmsGitComparison : BmsPlayerTestScene
     public void CaptureReplay(
         [Values(BmsLongNoteMode.LongNote, BmsLongNoteMode.ChargeNote, BmsLongNoteMode.HellChargeNote)]
         BmsLongNoteMode noteMode,
-        [Values(BmsLayoutVariant.Bme7K, BmsLayoutVariant.Pms9K, BmsLayoutVariant.Bme7KDouble, BmsLayoutVariant.Bme7K2P)]
+        [Values(BmsLayoutVariant.Bme7K, BmsLayoutVariant.Popn9K, BmsLayoutVariant.Bme7KDouble, BmsLayoutVariant.Bme7K2P)]
         BmsLayoutVariant variant,
         [Values(null, BmsJudgementAlgorithm.Combo, BmsJudgementAlgorithm.Duration, BmsJudgementAlgorithm.Lowest, BmsJudgementAlgorithm.Score)]
         BmsJudgementAlgorithm? selection)

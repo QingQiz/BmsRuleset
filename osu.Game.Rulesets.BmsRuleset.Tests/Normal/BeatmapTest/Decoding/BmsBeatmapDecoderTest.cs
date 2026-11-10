@@ -125,7 +125,7 @@ public class BmsBeatmapDecoderTest
         return new BmsChartMetadata(
             parsed.Artist ?? string.Empty,
             diffName,
-            parsed.TotalColumns,
+            parsed.LayoutVariant,
             title,
             parsed.Rank,
             parsed.Total,

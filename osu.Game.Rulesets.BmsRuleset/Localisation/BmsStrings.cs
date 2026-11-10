@@ -127,6 +127,76 @@ public static class BmsStrings
 
     public static LocalisableString Layout => get("layout");
 
+    public static LocalisableString PopnLayout(int keys) => get("popn_layout", keys);
+    public static LocalisableString PopnDoubleLayout(int keys) => get("popn_double_layout", keys);
+    public static LocalisableString KeyboardLayout(int keys) => get("keyboard_layout", keys);
+    public static LocalisableString KeyboardDoubleLayout(int keys) => get("keyboard_double_layout", keys);
+    public static LocalisableString GenericLayout(int keys) => get("generic_layout", keys);
+    public static LocalisableString ActionKeyboardKey1 => get("action_keyboard_key", 1);
+    public static LocalisableString ActionKeyboardKey2 => get("action_keyboard_key", 2);
+    public static LocalisableString ActionKeyboardKey3 => get("action_keyboard_key", 3);
+    public static LocalisableString ActionKeyboardKey4 => get("action_keyboard_key", 4);
+    public static LocalisableString ActionKeyboardKey5 => get("action_keyboard_key", 5);
+    public static LocalisableString ActionKeyboardKey6 => get("action_keyboard_key", 6);
+    public static LocalisableString ActionKeyboardKey7 => get("action_keyboard_key", 7);
+    public static LocalisableString ActionKeyboardKey8 => get("action_keyboard_key", 8);
+    public static LocalisableString ActionKeyboardKey9 => get("action_keyboard_key", 9);
+    public static LocalisableString ActionKeyboardKey10 => get("action_keyboard_key", 10);
+    public static LocalisableString ActionKeyboardKey11 => get("action_keyboard_key", 11);
+    public static LocalisableString ActionKeyboardKey12 => get("action_keyboard_key", 12);
+    public static LocalisableString ActionKeyboardKey13 => get("action_keyboard_key", 13);
+    public static LocalisableString ActionKeyboardKey14 => get("action_keyboard_key", 14);
+    public static LocalisableString ActionKeyboardKey15 => get("action_keyboard_key", 15);
+    public static LocalisableString ActionKeyboardKey16 => get("action_keyboard_key", 16);
+    public static LocalisableString ActionKeyboardKey17 => get("action_keyboard_key", 17);
+    public static LocalisableString ActionKeyboardKey18 => get("action_keyboard_key", 18);
+    public static LocalisableString ActionKeyboardKey19 => get("action_keyboard_key", 19);
+    public static LocalisableString ActionKeyboardKey20 => get("action_keyboard_key", 20);
+    public static LocalisableString ActionKeyboardKey21 => get("action_keyboard_key", 21);
+    public static LocalisableString ActionKeyboardKey22 => get("action_keyboard_key", 22);
+    public static LocalisableString ActionKeyboardKey23 => get("action_keyboard_key", 23);
+    public static LocalisableString ActionKeyboardKey24 => get("action_keyboard_key", 24);
+    public static LocalisableString ActionKeyboardKey25 => get("action_keyboard_key", 25);
+    public static LocalisableString ActionKeyboardKey26 => get("action_keyboard_key", 26);
+    public static LocalisableString ActionKeyboardKey27 => get("action_keyboard_key", 27);
+    public static LocalisableString ActionKeyboardKey28 => get("action_keyboard_key", 28);
+    public static LocalisableString ActionKeyboardKey29 => get("action_keyboard_key", 29);
+    public static LocalisableString ActionKeyboardKey30 => get("action_keyboard_key", 30);
+    public static LocalisableString ActionKeyboardKey31 => get("action_keyboard_key", 31);
+    public static LocalisableString ActionKeyboardKey32 => get("action_keyboard_key", 32);
+    public static LocalisableString ActionKeyboardKey33 => get("action_keyboard_key", 33);
+    public static LocalisableString ActionKeyboardKey34 => get("action_keyboard_key", 34);
+    public static LocalisableString ActionKeyboardKey35 => get("action_keyboard_key", 35);
+    public static LocalisableString ActionKeyboardKey36 => get("action_keyboard_key", 36);
+    public static LocalisableString ActionKeyboardKey37 => get("action_keyboard_key", 37);
+    public static LocalisableString ActionKeyboardKey38 => get("action_keyboard_key", 38);
+    public static LocalisableString ActionKeyboardKey39 => get("action_keyboard_key", 39);
+    public static LocalisableString ActionKeyboardKey40 => get("action_keyboard_key", 40);
+    public static LocalisableString ActionKeyboardKey41 => get("action_keyboard_key", 41);
+    public static LocalisableString ActionKeyboardKey42 => get("action_keyboard_key", 42);
+    public static LocalisableString ActionKeyboardKey43 => get("action_keyboard_key", 43);
+    public static LocalisableString ActionKeyboardKey44 => get("action_keyboard_key", 44);
+    public static LocalisableString ActionKeyboardKey45 => get("action_keyboard_key", 45);
+    public static LocalisableString ActionKeyboardKey46 => get("action_keyboard_key", 46);
+    public static LocalisableString ActionKeyboardKey47 => get("action_keyboard_key", 47);
+    public static LocalisableString ActionKeyboardKey48 => get("action_keyboard_key", 48);
+    public static LocalisableString ActionKeyboardKey49 => get("action_keyboard_key", 49);
+    public static LocalisableString ActionKeyboardKey50 => get("action_keyboard_key", 50);
+    public static LocalisableString ActionKeyboardKey51 => get("action_keyboard_key", 51);
+    public static LocalisableString ActionKeyboardKey52 => get("action_keyboard_key", 52);
+    public static LocalisableString ActionKeyboardKey53 => get("action_keyboard_key", 53);
+    public static LocalisableString ActionKeyboardKey54 => get("action_keyboard_key", 54);
+    public static LocalisableString ActionKeyboardKey55 => get("action_keyboard_key", 55);
+    public static LocalisableString ActionKeyboardKey56 => get("action_keyboard_key", 56);
+    public static LocalisableString ActionKeyboardKey57 => get("action_keyboard_key", 57);
+    public static LocalisableString ActionKeyboardKey58 => get("action_keyboard_key", 58);
+    public static LocalisableString ActionKeyboardKey59 => get("action_keyboard_key", 59);
+    public static LocalisableString ActionKeyboardKey60 => get("action_keyboard_key", 60);
+    public static LocalisableString ActionKeyboardKey61 => get("action_keyboard_key", 61);
+    public static LocalisableString ActionKeyboardKey62 => get("action_keyboard_key", 62);
+    public static LocalisableString ActionKeyboardKey63 => get("action_keyboard_key", 63);
+    public static LocalisableString ActionKeyboardKey64 => get("action_keyboard_key", 64);
+
     public static LocalisableString ShowInvisibleNotes => get("show_invisible_notes");
 
     public static LocalisableString ShowInvisibleNotesHint => get("show_invisible_notes_hint");
@@ -469,6 +539,14 @@ public static class BmsStrings
     public static LocalisableString ShowBme7KDp => get("show_bme_7k_dp");
 
     public static LocalisableString ShowPms9KDp => get("show_pms_9k_dp");
+
+    public static LocalisableString ShowPopn5K => get("show_popn_5k");
+
+    public static LocalisableString ShowKeyboard24K => get("show_keyboard_24k");
+
+    public static LocalisableString ShowKeyboard24KDouble => get("show_keyboard_24k_dp");
+
+    public static LocalisableString ShowGenericKeyboard => get("show_generic_keyboard");
 
     public static LocalisableString ImportBmsFiles => get("import_bms_files");
 

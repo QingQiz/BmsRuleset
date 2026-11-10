@@ -31,15 +31,8 @@ internal static class BmsonParser
             throw new InvalidDataException("Invalid BMSON resolution.");
 
         var tickResolution = checked((int)resolution * 4);
-        var layout = text(info, "mode_hint", "beat-7k") switch
-        {
-            "beat-5k" => BmsLayoutVariant.Bms5K,
-            "beat-7k" => BmsLayoutVariant.Bme7K,
-            "beat-10k" => BmsLayoutVariant.Bms5KDouble,
-            "beat-14k" => BmsLayoutVariant.Bme7KDouble,
-            "popn-9k" => BmsLayoutVariant.Pms9K,
-            var mode => throw new InvalidDataException($"Unsupported BMSON mode_hint: {mode}."),
-        };
+        var modeHint = text(info, "mode_hint", "beat-7k");
+        var layout = BmsLayout.ParseModeHint(modeHint) ?? throw new InvalidDataException($"Unsupported BMSON mode_hint: {modeHint}.");
         foreach (var extension in new[] { "scroll_events", "mine_channels", "key_channels" })
         {
             if (array(root, extension).Any())
@@ -167,7 +160,7 @@ internal static class BmsonParser
         }).ToArray();
         var mainBpm = BmsTimingMap.FindMainBpm(bpmEvents, hitObjects.Select(note => note.Tick));
         var timingMap = BmsTimingMap.FromSortedEvents(tickResolution, measures, bpmEvents, stopEvents, [], [], mainBpm, barLines: barLines);
-        var total = BmsGaugeCalculator.CalculateDefaultTotal(hitObjects.Length) * Math.Abs(number(info, "total", 100)) / 100;
+        var total = BmsGaugeCalculator.CalculateDefaultTotal(hitObjects.Length, BmsGaugeProfileFamilyProvider.FromLayout(layout)) * Math.Abs(number(info, "total", 100)) / 100;
         var credits = array(info, "subartists").Select(value => value.GetString() ?? string.Empty).ToArray();
         var maker = credits.Select(credit => credit.Split(':', 2, StringSplitOptions.TrimEntries))
             .Where(credit => credit.Length == 2 && credit[0] == "chart").Select(credit => credit[1]);
@@ -187,7 +180,7 @@ internal static class BmsonParser
         var length = result.HitObjects.Select(note => note.StartTime + note.Duration).DefaultIfEmpty(0).Max();
         return new BmsImportSummary(new BmsChartMetadata(result.Artist ?? string.Empty,
                 result.ExplicitDifficultyName ?? string.Empty,
-                result.TotalColumns, result.Title ?? string.Empty, result.Rank, result.Total, result.PlayLevel, result.LockedLongNoteMode, result.DefaultExRank),
+                result.LayoutVariant, result.Title ?? string.Empty, result.Rank, result.Total, result.PlayLevel, result.LockedLongNoteMode, result.DefaultExRank),
             result.TimingMap.BpmEvents.First().Bpm, length, result.HitObjects.Count,
             result.HitObjects.Count(note => note.IsLongNote), result.HitObjects.Count(note => BmsLayout.IsScratchColumn(note.Column, result.LayoutVariant)),
             result.HitObjects.Select(note => new BmsNoteTiming(note.Column, note.StartTime, note.StartTime + note.Duration)).ToArray());
@@ -272,7 +265,10 @@ internal static class BmsonParser
 
     private static int mapColumn(int lane, BmsLayoutVariant layout) => layout switch
     {
-        BmsLayoutVariant.Pms9K when lane is >= 1 and <= 9 => lane - 1,
+        BmsLayoutVariant.Popn9K when lane is >= 1 and <= 9 => lane - 1,
+        BmsLayoutVariant.Popn5K when lane is >= 1 and <= 5 => lane - 1,
+        _ when BmsLayout.IsKeyboard(layout)
+               && lane >= 1 && lane <= BmsLayout.GetTotalColumns(layout) => lane - 1,
         BmsLayoutVariant.Bms5K when lane == 8 => 0,
         BmsLayoutVariant.Bms5K when lane is >= 1 and <= 5 => lane,
         BmsLayoutVariant.Bme7K when lane == 8 => 0,

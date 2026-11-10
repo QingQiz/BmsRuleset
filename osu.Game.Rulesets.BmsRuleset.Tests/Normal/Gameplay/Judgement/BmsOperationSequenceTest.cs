@@ -18,7 +18,7 @@ public class BmsOperationSequenceTest
     [Test]
     public void ResultsAndGaugeDoNotDependOnUpdatePartition(
         [Values(BmsLongNoteMode.LongNote, BmsLongNoteMode.ChargeNote, BmsLongNoteMode.HellChargeNote)] BmsLongNoteMode mode,
-        [Values(BmsLayoutVariant.Bme7K, BmsLayoutVariant.Pms9K)] BmsLayoutVariant layout,
+        [Values(BmsLayoutVariant.Bme7K, BmsLayoutVariant.Popn9K)] BmsLayoutVariant layout,
         [Values(1, 1000.0 / 144, 137, 5000)] double interval)
     {
         var expected = run(mode, layout, 5000);
@@ -108,7 +108,7 @@ public class BmsOperationSequenceTest
     public void PmsRepressAtReleaseDeadlineCancelsThePendingRelease(
         [Values(BmsLongNoteMode.LongNote, BmsLongNoteMode.ChargeNote, BmsLongNoteMode.HellChargeNote)] BmsLongNoteMode mode)
     {
-        var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Pms9K, Rank = 2, LockedLongNoteMode = mode };
+        var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Popn9K, Rank = 2, LockedLongNoteMode = mode };
         var hold = new BmsLongNote { Beatmap = beatmap, Column = 1, StartTime = 1000, Duration = 2000 };
         var output = new BmsRecordingJudgementOutput();
         var engine = new BmsJudgementEngine([hold], beatmap.LayoutVariant, 1, output);

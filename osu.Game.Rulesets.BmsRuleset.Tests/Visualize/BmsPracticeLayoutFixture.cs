@@ -60,7 +60,7 @@ internal static class BmsPracticeLayoutFixture
             }
         }
 
-        var path = layout is BmsLayoutVariant.Pms9K or BmsLayoutVariant.Pms9KDouble ? "layout-fixture.pms" : "layout-fixture.bms";
+        var path = layout is BmsLayoutVariant.Popn9K or BmsLayoutVariant.Popn9KDouble ? "layout-fixture.pms" : "layout-fixture.bms";
         var info = new BeatmapInfo { Hash = path, BeatmapSet = new BeatmapSetInfo() };
         info.BeatmapSet.Files.Add(new RealmNamedFileUsage(new RealmFile { Hash = info.Hash }, path));
         var decoded = BmsBeatmapDecoder.DecodeBytes(Encoding.UTF8.GetBytes(string.Join('\n', lines)), info, _ => 1);
@@ -80,10 +80,10 @@ internal static class BmsPracticeLayoutFixture
     {
         BmsLayoutVariant.Bms5K or BmsLayoutVariant.Bms5K2P => ["16", "11", "12", "13", "14", "15"],
         BmsLayoutVariant.Bme7K or BmsLayoutVariant.Bme7K2P => ["16", "11", "12", "13", "14", "15", "18", "19"],
-        BmsLayoutVariant.Pms9K => ["11", "12", "13", "14", "15", "18", "19", "16", "17"],
+        BmsLayoutVariant.Popn9K => ["11", "12", "13", "14", "15", "18", "19", "16", "17"],
         BmsLayoutVariant.Bms5KDouble => ["16", "11", "12", "13", "14", "15", "21", "22", "23", "24", "25", "26"],
         BmsLayoutVariant.Bme7KDouble => ["16", "11", "12", "13", "14", "15", "18", "19", "21", "22", "23", "24", "25", "28", "29", "26"],
-        BmsLayoutVariant.Pms9KDouble => ["11", "12", "13", "14", "15", "16", "17", "18", "19", "21", "22", "23", "24", "25", "26", "27", "28", "29"],
+        BmsLayoutVariant.Popn9KDouble => ["11", "12", "13", "14", "15", "16", "17", "18", "19", "21", "22", "23", "24", "25", "26", "27", "28", "29"],
         _ => throw new ArgumentOutOfRangeException(nameof(layout), layout, "Unsupported practice layout fixture."),
     };
 }

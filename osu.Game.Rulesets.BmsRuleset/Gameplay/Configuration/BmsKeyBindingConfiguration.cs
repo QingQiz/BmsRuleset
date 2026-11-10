@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Collections.Generic;
 using osu.Framework.Input.Bindings;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
@@ -13,10 +14,14 @@ public static class BmsKeyBindingConfiguration
         (int)BmsLayoutVariant.Bms5K2P,
         (int)BmsLayoutVariant.Bme7K,
         (int)BmsLayoutVariant.Bme7K2P,
-        (int)BmsLayoutVariant.Pms9K,
+        (int)BmsLayoutVariant.Popn9K,
         (int)BmsLayoutVariant.Bms5KDouble,
         (int)BmsLayoutVariant.Bme7KDouble,
-        (int)BmsLayoutVariant.Pms9KDouble,
+        (int)BmsLayoutVariant.Popn9KDouble,
+        (int)BmsLayoutVariant.Popn5K,
+        (int)BmsLayoutVariant.Keyboard24K,
+        (int)BmsLayoutVariant.Keyboard24KDouble,
+        ..Enumerable.Range(1, BmsLayout.MAX_GENERIC_KEYS).Select(keys => (int)BmsLayout.GenericLayout(keys)),
     ];
 
     public static KeyBinding[] GetDefaultKeyBindings(int variant) => (BmsLayoutVariant)variant switch
@@ -25,10 +30,12 @@ public static class BmsKeyBindingConfiguration
         BmsLayoutVariant.Bms5K2P => bindings5K2P(),
         BmsLayoutVariant.Bme7K => bindings7K(),
         BmsLayoutVariant.Bme7K2P => bindings7K2P(),
-        BmsLayoutVariant.Pms9K => bindings9K(),
+        BmsLayoutVariant.Popn9K => bindings9K(),
+        BmsLayoutVariant.Popn5K => bindings9K().Where(binding => binding.GetAction<BmsAction>() is not (>= BmsAction.PmsKey6 and <= BmsAction.PmsKey9)).ToArray(),
+        var layout when BmsLayout.IsKeyboard(layout) => keyboardBindings(BmsLayout.GetTotalColumns(layout)),
         BmsLayoutVariant.Bms5KDouble => bindings5KDouble(),
         BmsLayoutVariant.Bme7KDouble => bindings7KDouble(),
-        BmsLayoutVariant.Pms9KDouble => bindings9KDouble(),
+        BmsLayoutVariant.Popn9KDouble => bindings9KDouble(),
         _ => bindings7K(),
     };
 
@@ -36,10 +43,13 @@ public static class BmsKeyBindingConfiguration
     {
         BmsLayoutVariant.Bms5K or BmsLayoutVariant.Bms5K2P => map5K(action),
         BmsLayoutVariant.Bme7K or BmsLayoutVariant.Bme7K2P => map7K(action),
-        BmsLayoutVariant.Pms9K => map9K(action),
+        BmsLayoutVariant.Popn9K => map9K(action),
+        BmsLayoutVariant.Popn5K => map9K(action) is { } column && column < 5 ? column : null,
+        var layout when BmsLayout.IsKeyboard(layout) && action is >= BmsAction.KeyboardKey1 and <= BmsAction.KeyboardKey64
+                                                     && action - BmsAction.KeyboardKey1 < BmsLayout.GetTotalColumns(layout) => action - BmsAction.KeyboardKey1,
         BmsLayoutVariant.Bms5KDouble => map5KDouble(action),
         BmsLayoutVariant.Bme7KDouble => map7KDouble(action),
-        BmsLayoutVariant.Pms9KDouble => map9KDouble(action),
+        BmsLayoutVariant.Popn9KDouble => map9KDouble(action),
         _ => null,
     };
 
@@ -47,10 +57,13 @@ public static class BmsKeyBindingConfiguration
     {
         BmsLayoutVariant.Bms5K or BmsLayoutVariant.Bms5K2P => actionFor5K(column),
         BmsLayoutVariant.Bme7K or BmsLayoutVariant.Bme7K2P => actionFor7K(column),
-        BmsLayoutVariant.Pms9K => actionFor9K(column),
+        BmsLayoutVariant.Popn9K => actionFor9K(column),
+        BmsLayoutVariant.Popn5K => column is >= 0 and < 5 ? actionFor9K(column) : null,
+        var variant when BmsLayout.IsKeyboard(variant) && column >= 0 && column < BmsLayout.GetTotalColumns(variant)
+            => BmsAction.KeyboardKey1 + column,
         BmsLayoutVariant.Bms5KDouble => actionFor5KDouble(column),
         BmsLayoutVariant.Bme7KDouble => actionFor7KDouble(column),
-        BmsLayoutVariant.Pms9KDouble => actionFor9KDouble(column),
+        BmsLayoutVariant.Popn9KDouble => actionFor9KDouble(column),
         _ => null,
     };
 
@@ -62,6 +75,16 @@ public static class BmsKeyBindingConfiguration
         BmsAction.P2Scratch => BmsAction.P2ScratchReverse,
         _ => null,
     };
+
+    private static readonly InputKey[] keyboard_keys =
+    [
+        InputKey.Z, InputKey.S, InputKey.X, InputKey.D, InputKey.C, InputKey.F, InputKey.V, InputKey.G, InputKey.B, InputKey.H, InputKey.N, InputKey.J, InputKey.M, InputKey.K, InputKey.Comma, InputKey.L, InputKey.Period, InputKey.Semicolon, InputKey.Slash, InputKey.Quote, InputKey.A, InputKey.Q, InputKey.W, InputKey.E, InputKey.LShift, InputKey.LControl, InputKey.R, InputKey.T, InputKey.Y,
+        InputKey.U, InputKey.I, InputKey.O, InputKey.P, InputKey.Number1, InputKey.Number2, InputKey.Number3, InputKey.Number4, InputKey.Number5, InputKey.Number6, InputKey.Number7, InputKey.Number8, InputKey.Number9, InputKey.Number0, InputKey.Space, InputKey.RShift, InputKey.RControl, InputKey.Keypad1, InputKey.Keypad2, InputKey.Keypad3, InputKey.Keypad4, InputKey.Keypad5,
+        InputKey.Keypad6, InputKey.Keypad7, InputKey.Keypad8, InputKey.Keypad9, InputKey.Keypad0, InputKey.KeypadDecimal, InputKey.LBracket, InputKey.RBracket, InputKey.BackSlash, InputKey.Minus, InputKey.Plus, InputKey.Tab, InputKey.BackSpace
+    ];
+
+    private static KeyBinding[] keyboardBindings(int count) =>
+        [..scrollSpeedBindings(), ..keyboard_keys.Take(count).Select((key, index) => new KeyBinding(key, BmsAction.KeyboardKey1 + index))];
 
     private static KeyBinding[] bindings5K() =>
     [

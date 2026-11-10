@@ -15,7 +15,7 @@ public class BmsJudgementProfileCacheTest
     [Test]
     public void AlternatingThreadsLayoutsRatesAndEndpointsPreserveTables()
     {
-        var requests = (from layout in new[] { BmsLayoutVariant.Bms5K, BmsLayoutVariant.Bme7KDouble, BmsLayoutVariant.Pms9K }
+        var requests = (from layout in new[] { BmsLayoutVariant.Bms5K, BmsLayoutVariant.Bme7KDouble, BmsLayoutVariant.Popn9K }
                         from rate in new[] { .25, .75, 1.3580245 }
                         from column in new[] { 0, 1, 15 }
                         from tail in new[] { false, true }

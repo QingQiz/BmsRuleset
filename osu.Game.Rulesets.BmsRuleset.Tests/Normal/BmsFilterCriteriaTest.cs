@@ -2,6 +2,7 @@ using NUnit.Framework;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Filter;
 using osu.Game.Screens.Select;
 using osu.Game.Screens.Select.Filter;
@@ -11,6 +12,48 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal;
 [TestFixture]
 public class BmsFilterCriteriaTest
 {
+    [TestCase(BmsLayoutVariant.Popn5K, BmsRulesetSetting.ShowPopn5K)]
+    [TestCase(BmsLayoutVariant.Keyboard24K, BmsRulesetSetting.ShowKeyboard24K)]
+    [TestCase(BmsLayoutVariant.Keyboard24KDouble, BmsRulesetSetting.ShowKeyboard24KDouble)]
+    public void TestAdditionalLayoutsHaveIndependentVisibility(BmsLayoutVariant layout, BmsRulesetSetting setting)
+    {
+        using var config = new BmsRulesetConfigManager(null, new BmsRuleset().RulesetInfo);
+        var beatmap = createBeatmap(BmsLayout.GetTotalColumns(layout));
+        new BmsDifficultyInfo { LayoutVariant = layout }.WriteToOsuDifficulty(beatmap);
+        Assert.That(new BmsFilterCriteria(config).Matches(beatmap, new FilterCriteria()), Is.True);
+        config.SetValue(setting, false);
+        Assert.That(new BmsFilterCriteria(config).Matches(beatmap, new FilterCriteria()), Is.False);
+        Assert.That(new BmsFilterCriteria(config).Matches(createBeatmap(9), new FilterCriteria()), Is.True);
+        config.SetValue(setting, true);
+        Assert.That(new BmsFilterCriteria(config).Matches(beatmap, new FilterCriteria()), Is.True);
+    }
+
+    [TestCase(1)]
+    [TestCase(8)]
+    [TestCase(64)]
+    public void TestGenericKeyboardVisibilityKeepsBeatLayoutsIndependent(int keys)
+    {
+        using var config = new BmsRulesetConfigManager(null, new BmsRuleset().RulesetInfo);
+        var beatmap = createBeatmap(keys);
+        new BmsDifficultyInfo { LayoutVariant = BmsLayout.GenericLayout(keys) }.WriteToOsuDifficulty(beatmap);
+        Assert.That(new BmsFilterCriteria(config).Matches(beatmap, new FilterCriteria()), Is.True);
+        config.SetValue(BmsRulesetSetting.ShowGenericKeyboard, false);
+        Assert.That(new BmsFilterCriteria(config).Matches(beatmap, new FilterCriteria()), Is.False);
+        Assert.That(new BmsFilterCriteria(config).Matches(createBeatmap(8), new FilterCriteria()), Is.True);
+    }
+
+    [Test]
+    public void TestPopnFiveAndNineKeyVisibilityAreIndependent()
+    {
+        using var config = new BmsRulesetConfigManager(null, new BmsRuleset().RulesetInfo);
+        var fiveKeys = createBeatmap(5);
+        new BmsDifficultyInfo { LayoutVariant = BmsLayoutVariant.Popn5K }.WriteToOsuDifficulty(fiveKeys);
+        config.SetValue(BmsRulesetSetting.ShowPms9K, false);
+        var criteria = new BmsFilterCriteria(config);
+        Assert.That(criteria.Matches(fiveKeys, new FilterCriteria()), Is.True);
+        Assert.That(criteria.Matches(createBeatmap(9), new FilterCriteria()), Is.False);
+    }
+
     [Test]
     public void TestMania7KConvertUsesBme7KVariant()
     {

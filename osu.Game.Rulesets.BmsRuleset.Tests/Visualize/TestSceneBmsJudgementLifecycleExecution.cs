@@ -56,7 +56,7 @@ public partial class TestSceneBmsJudgementLifecycleExecution : BmsPlayerTestScen
     {
         var beatmap = new BmsBeatmap
         {
-            LayoutVariant = pmsFixture ? BmsLayoutVariant.Pms9K : BmsLayoutVariant.Bme7K, TotalColumns = pmsFixture ? 9 : 8, Rank = 2, Total = 24,
+            LayoutVariant = pmsFixture ? BmsLayoutVariant.Popn9K : BmsLayoutVariant.Bme7K, TotalColumns = pmsFixture ? 9 : 8, Rank = 2, Total = 24,
             LockedLongNoteMode = kind switch { Kind.CN => BmsLongNoteMode.ChargeNote, Kind.HCN => BmsLongNoteMode.HellChargeNote, _ => BmsLongNoteMode.LongNote },
             HitObjects = [make(3000), make(9000), new BmsNote { StartTime = 30000, Column = 2 }],
         };

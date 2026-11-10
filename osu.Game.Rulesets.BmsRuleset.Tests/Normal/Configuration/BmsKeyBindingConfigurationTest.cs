@@ -64,8 +64,8 @@ public class BmsKeyBindingConfigurationTest
         Assert.That(BmsKeyBindingConfiguration.ActionToColumn(BmsAction.Key5, BmsLayoutVariant.Bms5K), Is.EqualTo(5));
         Assert.That(BmsKeyBindingConfiguration.ActionToColumn(BmsAction.Key6, BmsLayoutVariant.Bms5K), Is.Null);
         Assert.That(BmsKeyBindingConfiguration.ActionToColumn(BmsAction.P2Scratch, BmsLayoutVariant.Bms5KDouble), Is.EqualTo(11));
-        Assert.That(BmsKeyBindingConfiguration.ActionToColumn(BmsAction.PmsKey1, BmsLayoutVariant.Pms9K), Is.EqualTo(0));
-        Assert.That(BmsKeyBindingConfiguration.ActionToColumn(BmsAction.Scratch, BmsLayoutVariant.Pms9K), Is.Null);
-        Assert.That(BmsKeyBindingConfiguration.ActionToColumn(BmsAction.P2PmsKey9, BmsLayoutVariant.Pms9KDouble), Is.EqualTo(17));
+        Assert.That(BmsKeyBindingConfiguration.ActionToColumn(BmsAction.PmsKey1, BmsLayoutVariant.Popn9K), Is.EqualTo(0));
+        Assert.That(BmsKeyBindingConfiguration.ActionToColumn(BmsAction.Scratch, BmsLayoutVariant.Popn9K), Is.Null);
+        Assert.That(BmsKeyBindingConfiguration.ActionToColumn(BmsAction.P2PmsKey9, BmsLayoutVariant.Popn9KDouble), Is.EqualTo(17));
     }
 }

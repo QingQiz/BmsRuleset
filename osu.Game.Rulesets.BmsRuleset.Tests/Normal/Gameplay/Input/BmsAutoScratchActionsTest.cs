@@ -112,9 +112,9 @@ public class BmsAutoScratchActionsTest
         Assert.That(drain(producer, 2000), Is.EqualTo(new[] { new ActionChange(expected, false) }));
     }
 
-    [TestCase(BmsLayoutVariant.Pms9K)]
-    [TestCase(BmsLayoutVariant.Pms9K2P)]
-    [TestCase(BmsLayoutVariant.Pms9KDouble)]
+    [TestCase(BmsLayoutVariant.Popn9K)]
+    [TestCase(BmsLayoutVariant.Popn9K2P)]
+    [TestCase(BmsLayoutVariant.Popn9KDouble)]
     public void LayoutWithoutScratchProducesNoActions(BmsLayoutVariant layout)
     {
         var producer = create([new BmsNote { StartTime = 1000, Column = 0 }], layout: layout);

@@ -18,7 +18,9 @@ public static class BmsGaugeProfileFamilyProvider
     {
         BmsLayoutVariant.Bms5K or BmsLayoutVariant.Bms5K2P or BmsLayoutVariant.Bms5KDouble => BmsGaugeProfileFamily.FiveKeys,
         BmsLayoutVariant.Bme7K or BmsLayoutVariant.Bme7K2P or BmsLayoutVariant.Bme7KDouble => BmsGaugeProfileFamily.SevenKeys,
-        BmsLayoutVariant.Pms9K or BmsLayoutVariant.Pms9K2P or BmsLayoutVariant.Pms9KDouble => BmsGaugeProfileFamily.Pms,
+        BmsLayoutVariant.Popn5K or BmsLayoutVariant.Popn9K or BmsLayoutVariant.Popn9K2P or BmsLayoutVariant.Popn9KDouble => BmsGaugeProfileFamily.Pms,
+        BmsLayoutVariant.Keyboard24K or BmsLayoutVariant.Keyboard24KDouble => BmsGaugeProfileFamily.Keyboard,
+        _ when BmsLayout.IsGeneric(layout) => BmsGaugeProfileFamily.Keyboard,
         _ => throw new ArgumentOutOfRangeException(nameof(layout), layout, null),
     };
 }

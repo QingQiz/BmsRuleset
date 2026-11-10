@@ -106,21 +106,15 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
         if (Config is not BmsRulesetConfigManager manager)
             return;
 
-        var bindable5K = manager.GetBindable<bool>(BmsRulesetSetting.ShowBms5K);
-        var bindable7K = manager.GetBindable<bool>(BmsRulesetSetting.ShowBme7K);
-        var bindable9K = manager.GetBindable<bool>(BmsRulesetSetting.ShowPms9K);
-        var bindable5KDp = manager.GetBindable<bool>(BmsRulesetSetting.ShowBms5KDouble);
-        var bindable7KDp = manager.GetBindable<bool>(BmsRulesetSetting.ShowBme7KDouble);
-        var bindable9KDp = manager.GetBindable<bool>(BmsRulesetSetting.ShowPms9KDouble);
+        var layoutFilters = BmsLayoutVisibility.Options.Select(option =>
+        {
+            var current = manager.GetBindable<bool>(option.Setting);
+            current.BindValueChanged(_ => onLayoutSettingChanged());
+            return new SettingsItemV2(new FormCheckBox { Caption = option.Caption, Current = current });
+        }).ToArray();
         var useDedicatedPreviewAudio = manager.GetBindable<bool>(BmsRulesetSetting.UseDedicatedPreviewAudio);
         var softConstant = manager.GetBindable<bool>(BmsRulesetSetting.SoftConstant);
 
-        bindable5K.BindValueChanged(_ => onLayoutSettingChanged());
-        bindable7K.BindValueChanged(_ => onLayoutSettingChanged());
-        bindable9K.BindValueChanged(_ => onLayoutSettingChanged());
-        bindable5KDp.BindValueChanged(_ => onLayoutSettingChanged());
-        bindable7KDp.BindValueChanged(_ => onLayoutSettingChanged());
-        bindable9KDp.BindValueChanged(_ => onLayoutSettingChanged());
         useDedicatedPreviewAudio.BindValueChanged(_ => reloadCurrentPreview());
 
         Children =
@@ -212,36 +206,7 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
             {
                 Children =
                 [
-                    new SettingsItemV2(new FormCheckBox
-                    {
-                        Caption = BmsStrings.ShowBms5K,
-                        Current = bindable5K,
-                    }),
-                    new SettingsItemV2(new FormCheckBox
-                    {
-                        Caption = BmsStrings.ShowBme7K,
-                        Current = bindable7K,
-                    }),
-                    new SettingsItemV2(new FormCheckBox
-                    {
-                        Caption = BmsStrings.ShowPms9K,
-                        Current = bindable9K,
-                    }),
-                    new SettingsItemV2(new FormCheckBox
-                    {
-                        Caption = BmsStrings.ShowBms5KDp,
-                        Current = bindable5KDp,
-                    }),
-                    new SettingsItemV2(new FormCheckBox
-                    {
-                        Caption = BmsStrings.ShowBme7KDp,
-                        Current = bindable7KDp,
-                    }),
-                    new SettingsItemV2(new FormCheckBox
-                    {
-                        Caption = BmsStrings.ShowPms9KDp,
-                        Current = bindable9KDp,
-                    }),
+                    ..layoutFilters,
                     new RoundedButton
                     {
                         Text = BmsStrings.ImportBmsFiles,

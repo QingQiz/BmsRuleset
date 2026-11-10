@@ -235,7 +235,7 @@ public class BmsRulesetTest
     public void TestExRankDisplayAttributeShowsPercentageHeadlineAndScaledWindows()
     {
         var beatmapInfo = new BeatmapInfo();
-        new BmsDifficultyInfo { Rank = 2, ExRank = 200, KeyCount = 8 }.WriteToOsuDifficulty(beatmapInfo);
+        new BmsDifficultyInfo { Rank = 2, ExRank = 200, LayoutVariant = BmsLayoutVariant.Bme7K }.WriteToOsuDifficulty(beatmapInfo);
 
         var attributes = ruleset.GetBeatmapAttributesForDisplay(beatmapInfo, Array.Empty<Mod>());
         var exRankAttr = attributes.SingleOrDefault(a => a.Acronym == "EX");
@@ -255,7 +255,7 @@ public class BmsRulesetTest
     {
         // EXRANK encodes into OD as sentinel + pct (>= 100), kept distinct from RANK OD (0-4).
         var beatmapInfo = new BeatmapInfo();
-        new BmsDifficultyInfo { Rank = 2, ExRank = 200, KeyCount = 8 }.WriteToOsuDifficulty(beatmapInfo);
+        new BmsDifficultyInfo { Rank = 2, ExRank = 200, LayoutVariant = BmsLayoutVariant.Bme7K }.WriteToOsuDifficulty(beatmapInfo);
 
         Assert.That(beatmapInfo.Difficulty.OverallDifficulty, Is.EqualTo(300f).Within(0.001));
 
@@ -270,7 +270,7 @@ public class BmsRulesetTest
     public void TestTotalRoundTripsWithoutConflatingUnspecifiedAndZero(double? total)
     {
         var info = new BeatmapInfo();
-        new BmsDifficultyInfo { Total = total }.WriteToOsuDifficulty(info);
+        new BmsDifficultyInfo { LayoutVariant = BmsLayoutVariant.Bms5K, Total = total }.WriteToOsuDifficulty(info);
         Assert.That(BmsDifficultyInfo.FromOsuDifficulty(info.Difficulty).Total, Is.EqualTo(total));
         if (total == null)
             Assert.That(info.Difficulty.ApproachRate, Is.Zero, "Keep the historical encoding for unspecified BMS TOTAL.");
@@ -414,7 +414,7 @@ public class BmsRulesetTest
     public void TestLnModeDisplayAttributeHiddenWhenUndefined()
     {
         var beatmapInfo = new BeatmapInfo();
-        new BmsDifficultyInfo { Rank = 2, KeyCount = 9, LockedLongNoteMode = BmsLongNoteMode.Undefined }
+        new BmsDifficultyInfo { Rank = 2, LayoutVariant = BmsLayoutVariant.Popn9K, LockedLongNoteMode = BmsLongNoteMode.Undefined }
             .WriteToOsuDifficulty(beatmapInfo);
 
         var attributes = ruleset.GetBeatmapAttributesForDisplay(beatmapInfo, Array.Empty<Mod>());
@@ -427,7 +427,7 @@ public class BmsRulesetTest
     public void TestLnModeDisplayAttributeShowsWhenLocked()
     {
         var beatmapInfo = new BeatmapInfo();
-        new BmsDifficultyInfo { Rank = 2, KeyCount = 9, LockedLongNoteMode = BmsLongNoteMode.ChargeNote }
+        new BmsDifficultyInfo { Rank = 2, LayoutVariant = BmsLayoutVariant.Popn9K, LockedLongNoteMode = BmsLongNoteMode.ChargeNote }
             .WriteToOsuDifficulty(beatmapInfo);
 
         var attributes = ruleset.GetBeatmapAttributesForDisplay(beatmapInfo, Array.Empty<Mod>());
@@ -486,7 +486,7 @@ public class BmsRulesetTest
     public void TestRankAttributeMetricsIncludeScratchAndLongNoteTailWindows()
     {
         var beatmapInfo = new BeatmapInfo();
-        new BmsDifficultyInfo { Rank = 3, KeyCount = 8 }.WriteToOsuDifficulty(beatmapInfo);
+        new BmsDifficultyInfo { Rank = 3, LayoutVariant = BmsLayoutVariant.Bme7K }.WriteToOsuDifficulty(beatmapInfo);
 
         var rank = ruleset.GetBeatmapAttributesForDisplay(beatmapInfo, Array.Empty<Mod>())
             .Single(attribute => attribute.Acronym == "RK");
@@ -503,7 +503,7 @@ public class BmsRulesetTest
     public void TestRankRoundTripsUnchangedThroughOverallDifficulty()
     {
         var beatmapInfo = new BeatmapInfo();
-        new BmsDifficultyInfo { Rank = 0, KeyCount = 8 }.WriteToOsuDifficulty(beatmapInfo);
+        new BmsDifficultyInfo { Rank = 0, LayoutVariant = BmsLayoutVariant.Bme7K }.WriteToOsuDifficulty(beatmapInfo);
 
         Assert.That(beatmapInfo.Difficulty.OverallDifficulty, Is.EqualTo(0f));
         var decoded = BmsDifficultyInfo.FromOsuDifficulty(beatmapInfo.Difficulty);

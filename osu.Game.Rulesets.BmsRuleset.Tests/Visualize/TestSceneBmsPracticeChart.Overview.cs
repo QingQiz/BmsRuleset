@@ -204,7 +204,7 @@ public partial class TestSceneBmsPracticeChart
         var beatmap = new BmsBeatmap
         {
             TotalColumns = keys,
-            LayoutVariant = keys == 18 ? BmsLayoutVariant.Pms9KDouble : keys == 16 ? BmsLayoutVariant.Bme7KDouble : BmsLayoutVariant.Bme7K,
+            LayoutVariant = keys == 18 ? BmsLayoutVariant.Popn9KDouble : keys == 16 ? BmsLayoutVariant.Bme7KDouble : BmsLayoutVariant.Bme7K,
             HitObjects = Enumerable.Range(0, 360).Select(index => (BmsHitObject)new BmsNote { StartTime = index * 1000, Column = index % keys })
                 .Append(new BmsNote { StartTime = 359999, Column = 0 }).ToList(),
         };

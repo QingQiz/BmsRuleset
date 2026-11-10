@@ -158,7 +158,7 @@ public partial class TestSceneBmsCourseSelect
         BmsCourseSession session = null!;
         InheritanceCoursePlayer player = null!;
         BmsGaugeStateSnapshot[] expected = null!;
-        BmsLayoutVariant[] layouts = [BmsLayoutVariant.Bme7K, BmsLayoutVariant.Bms5K, BmsLayoutVariant.Pms9K];
+        BmsLayoutVariant[] layouts = [BmsLayoutVariant.Bme7K, BmsLayoutVariant.Bms5K, BmsLayoutVariant.Popn9K];
         var saved = new Score[layouts.Length];
         var initial = new BmsGaugeStateSnapshot[layouts.Length][];
 

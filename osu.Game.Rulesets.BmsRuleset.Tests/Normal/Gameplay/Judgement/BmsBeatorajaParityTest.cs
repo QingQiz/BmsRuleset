@@ -50,7 +50,7 @@ public class BmsBeatorajaParityTest
     }
 
     [TestCase(BmsLayoutVariant.Bme7K, true)]
-    [TestCase(BmsLayoutVariant.Pms9K, false)]
+    [TestCase(BmsLayoutVariant.Popn9K, false)]
     public void ConsumedNoteCanCauseEmptyPoorExceptInPms(BmsLayoutVariant layout, bool expected)
     {
         var candidate = new BmsJudgementCandidate(1000, 1000, 1, 0.75, false, IsJudged: true);
@@ -62,8 +62,8 @@ public class BmsBeatorajaParityTest
     public void PmsMistakeBlocksRepeatedBadButAllowsSuccessfulRehit()
     {
         var candidate = new BmsJudgementCandidate(1000, 1000, 1, 0.7, false, HasMistake: true);
-        Assert.That(BmsTestJudgementSelector.SelectPress(BmsLayoutVariant.Pms9K, 1, [candidate], 850).Result, Is.EqualTo(HitResult.None));
-        Assert.That(BmsTestJudgementSelector.SelectPress(BmsLayoutVariant.Pms9K, 1, [candidate], 1000).Result, Is.EqualTo(HitResult.Perfect));
+        Assert.That(BmsTestJudgementSelector.SelectPress(BmsLayoutVariant.Popn9K, 1, [candidate], 850).Result, Is.EqualTo(HitResult.None));
+        Assert.That(BmsTestJudgementSelector.SelectPress(BmsLayoutVariant.Popn9K, 1, [candidate], 1000).Result, Is.EqualTo(HitResult.Perfect));
     }
 
     [Test]
@@ -80,7 +80,7 @@ public class BmsBeatorajaParityTest
 
     [TestCase(BmsLayoutVariant.Bme7K, 3)]
     [TestCase(BmsLayoutVariant.Bms5K, 0)]
-    [TestCase(BmsLayoutVariant.Pms9K, 0)]
+    [TestCase(BmsLayoutVariant.Popn9K, 0)]
     public void EmptyPoorComboRuleAndReset(BmsLayoutVariant layout, int expectedCombo)
     {
         var processor = new BmsScoreProcessor();
@@ -96,7 +96,7 @@ public class BmsBeatorajaParityTest
     public void PmsBadDoesNotConsumeScoringJudgement()
     {
         var processor = new BmsScoreProcessor();
-        processor.ApplyBeatmap(new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Pms9K });
+        processor.ApplyBeatmap(new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Popn9K });
         processor.Combo.Value = 3;
         processor.RegisterNonConsumingJudgement(HitResult.Ok, 850, 1000, 1);
         Assert.That(processor.Combo.Value, Is.Zero);
@@ -112,7 +112,7 @@ public class BmsBeatorajaParityTest
     {
         var first = new BmsNote();
         var missed = new BmsNote { StartTime = 1000 };
-        var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Pms9K, HitObjects = { first, missed } };
+        var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Popn9K, HitObjects = { first, missed } };
         var score = new BmsScoreProcessor();
         var health = new BmsHealthProcessor();
         score.ApplyBeatmap(beatmap);

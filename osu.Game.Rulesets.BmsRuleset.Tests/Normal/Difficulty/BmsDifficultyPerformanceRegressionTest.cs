@@ -135,7 +135,7 @@ public class BmsDifficultyPerformanceRegressionTest
     internal static BmsBeatmap CreateBeatmap(int count, int columns = 8)
     {
         var beatmap = new BmsBeatmap { TotalColumns = columns, LayoutVariant = BmsLayout.VariantFromTotalColumns(columns), Rank = 2 };
-        new BmsDifficultyInfo { KeyCount = columns, Rank = 2 }.WriteToOsuDifficulty(beatmap);
+        new BmsDifficultyInfo { LayoutVariant = BmsLayout.VariantFromTotalColumns(columns), Rank = 2 }.WriteToOsuDifficulty(beatmap);
         for (var i = 0; i < count; i++)
         {
             var time = i / 3 * 37.25;

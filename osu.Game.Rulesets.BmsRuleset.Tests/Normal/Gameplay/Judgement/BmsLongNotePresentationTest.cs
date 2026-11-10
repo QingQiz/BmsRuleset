@@ -122,7 +122,7 @@ public class BmsLongNotePresentationTest
     [TestCase(BmsLongNoteMode.ChargeNote, 1250, false)]
     public void ReleaseMarginExpiryPreservesReleaseWindow(BmsLongNoteMode mode, double releaseTime, bool keepBody)
     {
-        var run = new BmsLongNoteTestContext(mode, layout: BmsLayoutVariant.Pms9K);
+        var run = new BmsLongNoteTestContext(mode, layout: BmsLayoutVariant.Popn9K);
         run.Press(1000, HitResult.Perfect);
         run.Release(releaseTime);
         run.Frame(releaseTime + 199, 199, false);

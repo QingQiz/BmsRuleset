@@ -17,8 +17,8 @@ public class BmsJudgementProfileTest
     [TestCase(BmsLayoutVariant.Bme7K, 99.9, .74925)]
     [TestCase(BmsLayoutVariant.Bme7K, 134, 1.005)]
     [TestCase(BmsLayoutVariant.Bme7K, 150.5, 1.12875)]
-    [TestCase(BmsLayoutVariant.Pms9K, 0, 0)]
-    [TestCase(BmsLayoutVariant.Pms9K, 75, .525)]
+    [TestCase(BmsLayoutVariant.Popn9K, 0, 0)]
+    [TestCase(BmsLayoutVariant.Popn9K, 75, .525)]
     public void ExRankUsesContinuousPercentages(BmsLayoutVariant layout, double exRank, double expected)
         => Assert.That(BmsJudgementProfileProvider.RateForExRank(layout, exRank), Is.EqualTo(expected).Within(1e-12));
 
@@ -93,21 +93,21 @@ public class BmsJudgementProfileTest
     [Test]
     public void TestPms9k2pUsesPmsProfile()
     {
-        var pms9k2p = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Pms9K2P, column: 1, rank: 0, tail: false);
+        var pms9k2p = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Popn9K2P, column: 1, rank: 0, tail: false);
         Assert.That(pms9k2p.ResultForOffset(10), Is.EqualTo(HitResult.Perfect));
     }
 
     [Test]
     public void TestPms9kDoubleUsesPmsProfile()
     {
-        var pms9kD = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Pms9KDouble, column: 1, rank: 0, tail: false);
+        var pms9kD = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Popn9KDouble, column: 1, rank: 0, tail: false);
         Assert.That(pms9kD.ResultForOffset(10), Is.EqualTo(HitResult.Perfect));
     }
 
     [Test]
     public void TestPms9kUsesPmsProfile()
     {
-        var pms9k = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Pms9K, column: 1, rank: 0, tail: false);
+        var pms9k = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Popn9K, column: 1, rank: 0, tail: false);
         // PMS PGREAT fixed at 20 -> offset 10 is Perfect
         Assert.That(pms9k.ResultForOffset(10), Is.EqualTo(HitResult.Perfect));
     }
@@ -115,8 +115,8 @@ public class BmsJudgementProfileTest
     [Test]
     public void TestPmsBadAndPoorUseFixedRows()
     {
-        var rank0 = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Pms9K, column: 1, rank: 0, tail: false);
-        var rank4 = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Pms9K, column: 1, rank: 4, tail: false);
+        var rank0 = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Popn9K, column: 1, rank: 0, tail: false);
+        var rank4 = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Popn9K, column: 1, rank: 4, tail: false);
 
         // BAD: (-183, 183) fixed, not rank-scaled
         Assert.That(rank0.ResultForOffset(183), Is.EqualTo(HitResult.Ok));
@@ -135,20 +135,20 @@ public class BmsJudgementProfileTest
     public void TestPmsGreatAndGoodScaleWithPmsRankRates()
     {
         // Rank 0 (pms rate=0.33): GREAT=(-16.5,16.5), GOOD=(-38.61,38.61)
-        var rank0 = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Pms9K, column: 1, rank: 0, tail: false);
+        var rank0 = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Popn9K, column: 1, rank: 0, tail: false);
         // Offset 22 > PGREAT(20) but within GOOD(38.61)
         Assert.That(rank0.ResultForOffset(22), Is.EqualTo(HitResult.Good));
         Assert.That(rank0.ResultForOffset(-22), Is.EqualTo(HitResult.Good));
 
         // Rank 2 (pms rate=0.70): PGREAT=20, GREAT=(-35,35), GOOD=(-81.9,81.9)
-        var rank2 = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Pms9K, column: 1, rank: 2, tail: false);
+        var rank2 = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Popn9K, column: 1, rank: 2, tail: false);
         Assert.That(rank2.ResultForOffset(21), Is.EqualTo(HitResult.Great));
         Assert.That(rank2.ResultForOffset(-21), Is.EqualTo(HitResult.Great));
         Assert.That(rank2.ResultForOffset(36), Is.EqualTo(HitResult.Good));
         Assert.That(rank2.ResultForOffset(-36), Is.EqualTo(HitResult.Good));
 
         // Rank 4 (pms rate=1.33): PGREAT=20, GREAT=(-66.5,66.5), GOOD=(-155.61,155.61)
-        var rank4 = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Pms9K, column: 1, rank: 4, tail: false);
+        var rank4 = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Popn9K, column: 1, rank: 4, tail: false);
         Assert.That(rank4.ResultForOffset(30), Is.EqualTo(HitResult.Great));
         Assert.That(rank4.ResultForOffset(-30), Is.EqualTo(HitResult.Great));
         Assert.That(rank4.ResultForOffset(100), Is.EqualTo(HitResult.Good));
@@ -158,9 +158,9 @@ public class BmsJudgementProfileTest
     [Test]
     public void TestPmsPerfectFixedAt20RegardlessOfRank()
     {
-        var rank0 = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Pms9K, column: 1, rank: 0, tail: false);
-        var rank2 = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Pms9K, column: 1, rank: 2, tail: false);
-        var rank4 = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Pms9K, column: 1, rank: 4, tail: false);
+        var rank0 = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Popn9K, column: 1, rank: 0, tail: false);
+        var rank2 = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Popn9K, column: 1, rank: 2, tail: false);
+        var rank4 = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Popn9K, column: 1, rank: 4, tail: false);
 
         Assert.That(rank0.ResultForOffset(20), Is.EqualTo(HitResult.Perfect));
         Assert.That(rank0.ResultForOffset(-20), Is.EqualTo(HitResult.Perfect));
@@ -173,8 +173,8 @@ public class BmsJudgementProfileTest
     [Test]
     public void TestPmsScratchUsesSameWindowsAsNormal()
     {
-        var normal = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Pms9K, column: 5, rank: 2, tail: false);
-        var scratch = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Pms9K, column: 0, rank: 2, tail: false);
+        var normal = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Popn9K, column: 5, rank: 2, tail: false);
+        var scratch = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Popn9K, column: 0, rank: 2, tail: false);
 
         Assert.That(scratch.ResultForOffset(21), Is.EqualTo(HitResult.Great));
         Assert.That(normal.ResultForOffset(21), Is.EqualTo(HitResult.Great));
@@ -186,8 +186,8 @@ public class BmsJudgementProfileTest
     public void TestPmsTailPerfectIsFixed()
     {
         // PMS fixes PGREAT for both heads and tails.
-        var rank0 = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Pms9K, column: 0, rank: 0, tail: true);
-        var rank4 = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Pms9K, column: 0, rank: 4, tail: true);
+        var rank0 = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Popn9K, column: 0, rank: 0, tail: true);
+        var rank4 = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Popn9K, column: 0, rank: 4, tail: true);
 
         // Both ranks retain the 120ms tail PGREAT window.
         Assert.That(rank0.ResultForOffset(50), Is.EqualTo(HitResult.Perfect));
@@ -199,7 +199,7 @@ public class BmsJudgementProfileTest
     public void TestPmsTailUsesCorrectValues()
     {
         // Rank 2: PGREAT=120, GREAT clamped to 120, GOOD=151.9, BAD=283.
-        var tail = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Pms9K, column: 1, rank: 2, tail: true);
+        var tail = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Popn9K, column: 1, rank: 2, tail: true);
 
         Assert.That(tail.ResultForOffset(120), Is.EqualTo(HitResult.Perfect));
         Assert.That(tail.ResultForOffset(121), Is.EqualTo(HitResult.Good));
@@ -211,7 +211,7 @@ public class BmsJudgementProfileTest
     [Test]
     public void TestPmsUsesDifferentWindowsThanSevenKeys()
     {
-        var pms = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Pms9K, column: 1, rank: 2, tail: false);
+        var pms = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Popn9K, column: 1, rank: 2, tail: false);
         var seven = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, column: 1, rank: 2, tail: false);
 
         // PMS GOOD = 81.9 < 100, 7K GOOD = 112.5 >= 100
@@ -273,7 +273,7 @@ public class BmsJudgementProfileTest
     [TestCase(4, 283.001, HitResult.None)]
     public void TestPmsTailFixedAndClampedBoundaries(int rank, double offset, HitResult expected)
     {
-        var table = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Pms9K, 1, rank, true);
+        var table = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Popn9K, 1, rank, true);
         Assert.That(table.ResultForOffset(offset), Is.EqualTo(expected));
     }
 

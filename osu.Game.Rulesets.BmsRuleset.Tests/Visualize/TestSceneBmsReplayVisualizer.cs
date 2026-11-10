@@ -73,7 +73,7 @@ public partial class TestSceneBmsReplayVisualizer : BmsPlayerTestScene
     [TestCase(BmsLayoutVariant.Bme7K)]
     [TestCase(BmsLayoutVariant.Bme7K2P)]
     [TestCase(BmsLayoutVariant.Bme7KDouble)]
-    [TestCase(BmsLayoutVariant.Pms9KDouble)]
+    [TestCase(BmsLayoutVariant.Popn9KDouble)]
     public void TestGradientReplaySeekingPauseAndSettings(BmsLayoutVariant variant)
     {
         AddStep("set layout and load player", () =>

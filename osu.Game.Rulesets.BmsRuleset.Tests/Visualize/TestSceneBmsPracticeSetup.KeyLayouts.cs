@@ -31,10 +31,10 @@ public partial class TestSceneBmsPracticeSetup
         [
             (BmsLayoutVariant.Bms5K, 6),
             (BmsLayoutVariant.Bme7K, 8),
-            (BmsLayoutVariant.Pms9K, 9),
+            (BmsLayoutVariant.Popn9K, 9),
             (BmsLayoutVariant.Bms5KDouble, 12),
             (BmsLayoutVariant.Bme7KDouble, 16),
-            (BmsLayoutVariant.Pms9KDouble, 18),
+            (BmsLayoutVariant.Popn9KDouble, 18),
         ];
         (int Width, int Height)[] sizes = [(1280, 720), (1024, 900), (760, 900)];
         foreach (var (layout, columns) in layouts)

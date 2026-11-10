@@ -13,8 +13,33 @@ public static class BmsLayout
     public const int BME7_KEY_COLUMNS = 8;
     public const int BMS5_DOUBLE_PLAY_COLUMNS = 12;
     public const int DOUBLE_PLAY_COLUMNS = 16;
-    public const int PMS_COLUMNS = 9;
-    public const int PMS_DOUBLE_PLAY_COLUMNS = 18;
+    public const int POPN9_KEY_COLUMNS = 9;
+    public const int POPN9_DOUBLE_PLAY_COLUMNS = 18;
+
+    public const int MAX_GENERIC_KEYS = 64;
+
+    public static bool IsGeneric(BmsLayoutVariant variant) => (int)variant > (int)BmsLayoutVariant.Generic && (int)variant <= (int)BmsLayoutVariant.Generic + MAX_GENERIC_KEYS;
+
+    public static BmsLayoutVariant GenericLayout(int keys) => keys is >= 1 and <= MAX_GENERIC_KEYS
+        ? (BmsLayoutVariant)((int)BmsLayoutVariant.Generic + keys)
+        : throw new InvalidDataException($"Unsupported keyboard layout: {keys} keys.");
+
+    public static bool IsKeyboard(BmsLayoutVariant variant) => variant is BmsLayoutVariant.Keyboard24K or BmsLayoutVariant.Keyboard24KDouble || IsGeneric(variant);
+
+    internal static BmsLayoutVariant? ParseModeHint(string mode) => mode switch
+    {
+        "beat-5k" => BmsLayoutVariant.Bms5K,
+        "beat-7k" => BmsLayoutVariant.Bme7K,
+        "beat-10k" => BmsLayoutVariant.Bms5KDouble,
+        "beat-14k" => BmsLayoutVariant.Bme7KDouble,
+        "popn-5k" => BmsLayoutVariant.Popn5K,
+        "popn-9k" => BmsLayoutVariant.Popn9K,
+        "keyboard-24k" => BmsLayoutVariant.Keyboard24K,
+        "keyboard-24k-double" => BmsLayoutVariant.Keyboard24KDouble,
+        _ when mode.StartsWith("generic-", StringComparison.Ordinal) && mode.EndsWith("keys", StringComparison.Ordinal)
+                                                                     && int.TryParse(mode.AsSpan(8, mode.Length - 12), out var keys) && keys is >= 1 and <= MAX_GENERIC_KEYS => GenericLayout(keys),
+        _ => null,
+    };
 
     // Encoded channel constants (base-62, uppercase: (hi << 6) | lo).
     private const ushort C11 = (1 << 6) | 1;
@@ -51,7 +76,7 @@ public static class BmsLayout
             extension = pathOrExtension;
 
         if (extension.Equals(".pms", StringComparison.OrdinalIgnoreCase))
-            return visibleChannels.Overlaps(pms_double_play_only_channels) ? BmsLayoutVariant.Pms9KDouble : BmsLayoutVariant.Pms9K;
+            return visibleChannels.Overlaps(pms_double_play_only_channels) ? BmsLayoutVariant.Popn9KDouble : BmsLayoutVariant.Popn9K;
 
         if (visibleChannels.Overlaps(second_player_channels))
             return visibleChannels.Overlaps(seven_key_only_channels) ? BmsLayoutVariant.Bme7KDouble : BmsLayoutVariant.Bms5KDouble;
@@ -63,10 +88,14 @@ public static class BmsLayout
     {
         BmsLayoutVariant.Bms5K or BmsLayoutVariant.Bms5K2P => BMS5_KEY_COLUMNS,
         BmsLayoutVariant.Bme7K or BmsLayoutVariant.Bme7K2P => BME7_KEY_COLUMNS,
-        BmsLayoutVariant.Pms9K => PMS_COLUMNS,
+        BmsLayoutVariant.Popn9K => POPN9_KEY_COLUMNS,
+        BmsLayoutVariant.Popn5K => 5,
+        BmsLayoutVariant.Keyboard24K => 26,
+        BmsLayoutVariant.Keyboard24KDouble => 52,
+        _ when IsGeneric(variant) => (int)variant - (int)BmsLayoutVariant.Generic,
         BmsLayoutVariant.Bms5KDouble => BMS5_DOUBLE_PLAY_COLUMNS,
         BmsLayoutVariant.Bme7KDouble => DOUBLE_PLAY_COLUMNS,
-        BmsLayoutVariant.Pms9KDouble => PMS_DOUBLE_PLAY_COLUMNS,
+        BmsLayoutVariant.Popn9KDouble => POPN9_DOUBLE_PLAY_COLUMNS,
         _ => BMS5_KEY_COLUMNS,
     };
 
@@ -74,15 +103,12 @@ public static class BmsLayout
     {
         BMS5_KEY_COLUMNS => BmsLayoutVariant.Bms5K,
         BME7_KEY_COLUMNS => BmsLayoutVariant.Bme7K,
-        PMS_COLUMNS => BmsLayoutVariant.Pms9K,
+        POPN9_KEY_COLUMNS => BmsLayoutVariant.Popn9K,
         BMS5_DOUBLE_PLAY_COLUMNS => BmsLayoutVariant.Bms5KDouble,
         DOUBLE_PLAY_COLUMNS => BmsLayoutVariant.Bme7KDouble,
-        PMS_DOUBLE_PLAY_COLUMNS => BmsLayoutVariant.Pms9KDouble,
+        POPN9_DOUBLE_PLAY_COLUMNS => BmsLayoutVariant.Popn9KDouble,
         _ => BmsLayoutVariant.Bms5K,
     };
-
-    public static bool IsKnownTotalColumns(int totalColumns) =>
-        totalColumns is BMS5_KEY_COLUMNS or BME7_KEY_COLUMNS or BMS5_DOUBLE_PLAY_COLUMNS or PMS_COLUMNS or DOUBLE_PLAY_COLUMNS or PMS_DOUBLE_PLAY_COLUMNS;
 
     public static bool TryMapPlayableChannel(ushort channel, int totalColumns, out int column)
     {
@@ -90,8 +116,8 @@ public static class BmsLayout
 
         var success = totalColumns switch
         {
-            PMS_COLUMNS => tryMapPmsSingleChannel(visibleChannel, out column),
-            PMS_DOUBLE_PLAY_COLUMNS => tryMapPmsDoubleChannel(visibleChannel, out column),
+            POPN9_KEY_COLUMNS => tryMapPmsSingleChannel(visibleChannel, out column),
+            POPN9_DOUBLE_PLAY_COLUMNS => tryMapPmsDoubleChannel(visibleChannel, out column),
             BMS5_DOUBLE_PLAY_COLUMNS => tryMapBms5DoubleChannel(visibleChannel, out column),
             _ => TryMapBmsChannel(visibleChannel, out column),
         };
@@ -116,8 +142,8 @@ public static class BmsLayout
 
         var success = totalColumns switch
         {
-            PMS_COLUMNS => tryMapPmsSingleChannel(channel, out column),
-            PMS_DOUBLE_PLAY_COLUMNS => tryMapPmsDoubleChannel(channel, out column),
+            POPN9_KEY_COLUMNS => tryMapPmsSingleChannel(channel, out column),
+            POPN9_DOUBLE_PLAY_COLUMNS => tryMapPmsDoubleChannel(channel, out column),
             BMS5_DOUBLE_PLAY_COLUMNS => tryMapBms5DoubleChannel(channel, out column),
             _ => TryMapBmsChannel(channel, out column),
         };
@@ -204,6 +230,8 @@ public static class BmsLayout
         BmsLayoutVariant.Bms5K or BmsLayoutVariant.Bme7K or BmsLayoutVariant.Bms5K2P or BmsLayoutVariant.Bme7K2P => column == 0,
         BmsLayoutVariant.Bms5KDouble => column is 0 or 11,
         BmsLayoutVariant.Bme7KDouble => column is 0 or 15,
+        BmsLayoutVariant.Keyboard24K => column is 24 or 25,
+        BmsLayoutVariant.Keyboard24KDouble => column is 24 or 25 or 50 or 51,
         _ => false,
     };
 
@@ -211,15 +239,21 @@ public static class BmsLayout
     {
         BmsLayoutVariant.Bms5K or BmsLayoutVariant.Bms5K2P => 5,
         BmsLayoutVariant.Bme7K or BmsLayoutVariant.Bme7K2P => 7,
-        BmsLayoutVariant.Pms9K => 9,
+        BmsLayoutVariant.Popn9K => 9,
+        BmsLayoutVariant.Popn5K => 5,
+        BmsLayoutVariant.Keyboard24K => 24,
+        BmsLayoutVariant.Keyboard24KDouble => 48,
+        _ when IsGeneric(layoutVariant) => GetTotalColumns(layoutVariant),
         BmsLayoutVariant.Bms5KDouble => 10,
         BmsLayoutVariant.Bme7KDouble => 14,
-        BmsLayoutVariant.Pms9KDouble => 18,
+        BmsLayoutVariant.Popn9KDouble => 18,
         _ => 7,
     };
 
     public static int MapToManiaColumn(int column, BmsLayoutVariant layoutVariant) => layoutVariant switch
     {
+        BmsLayoutVariant.Keyboard24K => Math.Min(column, 23),
+        BmsLayoutVariant.Keyboard24KDouble => column < 26 ? Math.Min(column, 23) : Math.Min(column - 2, 47),
         BmsLayoutVariant.Bms5K or BmsLayoutVariant.Bms5K2P => Math.Clamp(column - 1, 0, 4),
         BmsLayoutVariant.Bme7K or BmsLayoutVariant.Bme7K2P => Math.Clamp(column - 1, 0, 6),
         BmsLayoutVariant.Bms5KDouble => column switch
@@ -300,7 +334,7 @@ public static class BmsLayout
         var lo = BmsChartParser.Lo(channel);
         if (hi is 1 or 2 && lo is >= 1 and <= 9)
         {
-            column = (hi == 2 ? PMS_COLUMNS : 0) + lo - 1;
+            column = (hi == 2 ? POPN9_KEY_COLUMNS : 0) + lo - 1;
             return true;
         }
 

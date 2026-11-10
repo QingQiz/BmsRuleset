@@ -113,20 +113,22 @@ public partial class BmsRuleset : Ruleset
         BmsLayoutVariant.Bms5K2P => "5K (2P)",
         BmsLayoutVariant.Bme7K => "7K",
         BmsLayoutVariant.Bme7K2P => "7K (2P)",
-        BmsLayoutVariant.Pms9K => "9K",
+        BmsLayoutVariant.Popn9K => BmsStrings.PopnLayout(9),
+        BmsLayoutVariant.Popn5K => BmsStrings.PopnLayout(5),
+        BmsLayoutVariant.Keyboard24K => BmsStrings.KeyboardLayout(24),
+        BmsLayoutVariant.Keyboard24KDouble => BmsStrings.KeyboardDoubleLayout(24),
+        var layout when BmsLayout.IsGeneric(layout) => BmsStrings.GenericLayout(BmsLayout.GetTotalColumns(layout)),
         BmsLayoutVariant.Bms5KDouble => "DP 5K",
         BmsLayoutVariant.Bme7KDouble => "DP 7K",
-        BmsLayoutVariant.Pms9KDouble => "DP 9K",
+        BmsLayoutVariant.Popn9KDouble => BmsStrings.PopnDoubleLayout(9),
         _ => string.Empty,
     };
 
     public override int GetVariantForBeatmap(IBeatmapInfo beatmapInfo, IReadOnlyList<Mod>? mods = null)
     {
-        var keyCount = Mania7KBeatmapConverter.CanConvert(beatmapInfo)
-            ? Mania7KBeatmapConverter.GetConvertedDifficultyInfo(beatmapInfo).KeyCount
-            : BmsDifficultyInfo.GetKeyCount(beatmapInfo.Difficulty);
-
-        return (int)BmsLayout.VariantFromTotalColumns(keyCount);
+        return (int)(Mania7KBeatmapConverter.CanConvert(beatmapInfo)
+            ? Mania7KBeatmapConverter.GetConvertedDifficultyInfo(beatmapInfo).LayoutVariant
+            : BmsDifficultyInfo.GetLayout(beatmapInfo.Difficulty));
     }
 
     public override IEnumerable<KeyBinding> GetDefaultKeyBindings(int variant = 0) =>
@@ -238,7 +240,7 @@ public partial class BmsRuleset : Ruleset
         var adjustedDifficulty = GetAdjustedDisplayDifficulty(beatmapInfo, mods);
         var adjusted = BmsDifficultyInfo.FromOsuDifficulty(adjustedDifficulty);
         var colours = new OsuColour();
-        var layout = BmsLayout.VariantFromTotalColumns(adjusted.KeyCount);
+        var layout = adjusted.LayoutVariant;
 
         if (adjusted.ExRank is { } exRank)
         {
@@ -246,7 +248,7 @@ public partial class BmsRuleset : Ruleset
             yield return new RulesetBeatmapAttribute("EXRANK", "EX", (float)original.ExRank.GetValueOrDefault(exRank), (float)exRank, exrank_display_max)
             {
                 Description = BmsStrings.ExRankDescription(exRank),
-                AdditionalMetrics = createRankMetrics(rate, adjusted.KeyCount),
+                AdditionalMetrics = createRankMetrics(rate, layout),
             };
         }
         else
@@ -255,7 +257,7 @@ public partial class BmsRuleset : Ruleset
             yield return new RulesetBeatmapAttribute("RANK", "RK", original.Rank, adjusted.Rank, 4)
             {
                 Description = BmsStrings.RankDescription(adjusted.Rank),
-                AdditionalMetrics = createRankMetrics(rate, adjusted.KeyCount),
+                AdditionalMetrics = createRankMetrics(rate, layout),
             };
         }
 
@@ -351,9 +353,8 @@ public partial class BmsRuleset : Ruleset
             : $"default TOTAL {calculator.Total:0.###}";
     }
 
-    private static RulesetBeatmapAttribute.AdditionalMetric[] createRankMetrics(double rate, int keyCount)
+    private static RulesetBeatmapAttribute.AdditionalMetric[] createRankMetrics(double rate, BmsLayoutVariant layout)
     {
-        var layout = BmsLayout.VariantFromTotalColumns(keyCount);
         var metrics = new List<RulesetBeatmapAttribute.AdditionalMetric>();
 
         addHeadMetrics("Normal note", BmsJudgementProfileProvider.GetTable(layout, column: 1, judgementRate: rate, tail: false));

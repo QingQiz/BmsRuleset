@@ -43,7 +43,7 @@ internal sealed class BmsLongNoteTestContext
         : this(new BmsLongNote
         {
             StartTime = start, Duration = duration, Column = column,
-            Beatmap = new BmsBeatmap { LayoutVariant = layout, TotalColumns = layout == BmsLayoutVariant.Pms9K ? 9 : 8, Rank = rank, LockedLongNoteMode = mode },
+            Beatmap = new BmsBeatmap { LayoutVariant = layout, TotalColumns = layout == BmsLayoutVariant.Popn9K ? 9 : 8, Rank = rank, LockedLongNoteMode = mode },
         })
     {
     }

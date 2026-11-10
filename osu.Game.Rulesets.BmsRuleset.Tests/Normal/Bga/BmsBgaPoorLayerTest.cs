@@ -190,7 +190,7 @@ public partial class BmsBgaPoorLayerTest
     [Test]
     public void TestPmsNonConsumingBadAndSuppressedPoorDoNotExtendLayer()
     {
-        beatmap.LayoutVariant = BmsLayoutVariant.Pms9K;
+        beatmap.LayoutVariant = BmsLayoutVariant.Popn9K;
         scoreProcessor.ApplyBeatmap(beatmap);
         advanceTo(850);
         scoreProcessor.RegisterNonConsumingJudgement(HitResult.Ok, 850, 1000, 1);

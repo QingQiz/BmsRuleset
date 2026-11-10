@@ -120,7 +120,7 @@ public class BmsJudgementSelectorTest
     [TestCase(BmsLayoutVariant.Bms5K, 1, 100)]
     [TestCase(BmsLayoutVariant.Bme7K, 0, 160)]
     [TestCase(BmsLayoutVariant.Bme7KDouble, 15, 160)]
-    [TestCase(BmsLayoutVariant.Pms9K, 0, 117)]
+    [TestCase(BmsLayoutVariant.Popn9K, 0, 117)]
     public void TestComboUsesLayoutAndScratchWindows(BmsLayoutVariant layout, int column, double goodWindow)
     {
         var first = note(1000) with { Column = column };

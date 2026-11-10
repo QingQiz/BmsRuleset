@@ -60,8 +60,12 @@ public class BmsModMirror : Mod, IApplicableAfterBeatmapConversion
             8 => 15, 9 => 14, 10 => 13, 11 => 12, 12 => 11, 13 => 10, 14 => 9, 15 => 8,
             _ => column,
         },
-        BmsLayoutVariant.Pms9K => 8 - column,
-        BmsLayoutVariant.Pms9KDouble => column <= 8 ? 8 - column : 26 - column,
+        BmsLayoutVariant.Popn9K => 8 - column,
+        BmsLayoutVariant.Popn5K => 4 - column,
+        BmsLayoutVariant.Keyboard24K => column < 24 ? 23 - column : column,
+        BmsLayoutVariant.Keyboard24KDouble => column % 26 < 24 ? column / 26 * 26 + 23 - column % 26 : column,
+        _ when BmsLayout.IsGeneric(layoutVariant) => BmsLayout.GetTotalColumns(layoutVariant) - 1 - column,
+        BmsLayoutVariant.Popn9KDouble => column <= 8 ? 8 - column : 26 - column,
         _ => column,
     };
 }

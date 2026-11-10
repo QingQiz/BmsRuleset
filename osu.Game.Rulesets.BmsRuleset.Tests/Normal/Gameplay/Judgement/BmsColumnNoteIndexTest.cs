@@ -58,7 +58,7 @@ public class BmsColumnNoteIndexTest
     [Test]
     public void StackedPmsHeadsShareTheEmptyPoorMistakeMarker()
     {
-        var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Pms9K, Rank = 3 };
+        var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Popn9K, Rank = 3 };
         var notes = Enumerable.Range(0, 2).Select(_ => new BmsNote { Beatmap = beatmap, Column = 1, StartTime = 1000 }).ToArray();
         var column = new BmsJudgementEngine(notes, beatmap.LayoutVariant, 1, new BmsRecordingJudgementOutput()).GetColumn(1);
         Assert.That(column.HandleNotePress(new BmsPressContext(600, new BmsFrameContext(600, 1))).Kind, Is.EqualTo(PressOutcomeKind.EmptyPoor));

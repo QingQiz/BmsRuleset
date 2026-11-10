@@ -176,11 +176,12 @@ public static class BmsSkinConfigurationDecoder
         {
             "5K" or "BMS5K" => BmsLayoutVariant.Bms5K,
             "7K" or "BME7K" => BmsLayoutVariant.Bme7K,
-            "9K" or "PMS9K" => BmsLayoutVariant.Pms9K,
+            "9K" or "PMS9K" => BmsLayoutVariant.Popn9K,
+            "PMS5K" => BmsLayoutVariant.Popn5K,
             "10K" or "BMS5KDouble" => BmsLayoutVariant.Bms5KDouble,
             "14K" or "BME7KDouble" => BmsLayoutVariant.Bme7KDouble,
-            "18K" or "PMS9KDouble" => BmsLayoutVariant.Pms9KDouble,
-            _ => null,
+            "18K" or "PMS9KDouble" => BmsLayoutVariant.Popn9KDouble,
+            _ => BmsLayout.ParseModeHint(value),
         };
     }
 

@@ -23,7 +23,7 @@ public class BmsBeatorajaReferenceTest
     [Test]
     public void NonConsumingPmsBadRemainsInTimingStatistics()
     {
-        var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Pms9K, TotalColumns = 9 };
+        var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Popn9K, TotalColumns = 9 };
         using var processor = new BmsScoreProcessor();
         processor.ApplyBeatmap(beatmap);
         processor.RegisterNonConsumingJudgement(HitResult.Ok, 850, 1000, 1);
@@ -59,7 +59,7 @@ public class BmsBeatorajaReferenceTest
             foreach (var line in lines)
             {
                 var fields = line.Split(',');
-                var layout = fields[0] switch { "FIVEKEYS" => BmsLayoutVariant.Bms5K, "SEVENKEYS" => BmsLayoutVariant.Bme7K, _ => BmsLayoutVariant.Pms9K };
+                var layout = fields[0] switch { "FIVEKEYS" => BmsLayoutVariant.Bms5K, "SEVENKEYS" => BmsLayoutVariant.Bme7K, _ => BmsLayoutVariant.Popn9K };
                 var column = fields[1].Contains("SCRATCH") ? 0 : 1;
                 var table = BmsJudgementProfileProvider.GetTable(layout, column, int.Parse(fields[2]), fields[1].Contains("END"));
                 var result = results[int.Parse(fields[3])];
@@ -72,7 +72,7 @@ public class BmsBeatorajaReferenceTest
     [Test]
     public void SuppressedPmsPoorKeepsPersonalBestNotePosition()
     {
-        var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Pms9K,
+        var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Popn9K,
             HitObjects = [new BmsNote { StartTime = 1000 }, new BmsNote { StartTime = 2000 }, new BmsNote { StartTime = 3000 }] };
         using var processor = new BmsScoreProcessor();
         processor.ApplyBeatmap(beatmap);
@@ -89,7 +89,7 @@ public class BmsBeatorajaReferenceTest
     [TestCase(BmsLongNoteMode.ChargeNote)]
     public void PmsDeferredReleasePreservesReleaseTiming(BmsLongNoteMode mode)
     {
-        var run = new BmsLongNoteTestContext(mode, duration: 2000, layout: BmsLayoutVariant.Pms9K);
+        var run = new BmsLongNoteTestContext(mode, duration: 2000, layout: BmsLayoutVariant.Popn9K);
         run.Press(1000, HitResult.Perfect);
         run.Release(1500);
         run.Frame(1700, 200, false);
@@ -98,7 +98,7 @@ public class BmsBeatorajaReferenceTest
 
     [Test]
     public void ExactEarlySearchLimitDoesNotCauseEmptyPoor(
-        [Values(BmsLayoutVariant.Bms5K, BmsLayoutVariant.Bme7K, BmsLayoutVariant.Pms9K)] BmsLayoutVariant layout,
+        [Values(BmsLayoutVariant.Bms5K, BmsLayoutVariant.Bme7K, BmsLayoutVariant.Popn9K)] BmsLayoutVariant layout,
         [Values(499.999, 500, 500.001)] double pressTime)
     {
         var candidate = new BmsJudgementCandidate(1000, 1000, 1, BmsJudgementProfileProvider.RateForRank(layout, 2), false);
@@ -153,10 +153,10 @@ public class BmsBeatorajaReferenceTest
     [TestCase(BmsLayoutVariant.Bme7K, 0.56, 11.2)]
     [TestCase(BmsLayoutVariant.Bme7K, 0.74, 14.8)]
     [TestCase(BmsLayoutVariant.Bme7K, 0.99, 19.8)]
-    [TestCase(BmsLayoutVariant.Pms9K, 0.7, 20)]
-    [TestCase(BmsLayoutVariant.Pms9K, 0.52, 20)]
-    [TestCase(BmsLayoutVariant.Pms9K, 0.69, 20)]
-    [TestCase(BmsLayoutVariant.Pms9K, 0.93, 20)]
+    [TestCase(BmsLayoutVariant.Popn9K, 0.7, 20)]
+    [TestCase(BmsLayoutVariant.Popn9K, 0.52, 20)]
+    [TestCase(BmsLayoutVariant.Popn9K, 0.69, 20)]
+    [TestCase(BmsLayoutVariant.Popn9K, 0.93, 20)]
     public void ValidatedJavaRatesMatchPgreatBoundaries(BmsLayoutVariant layout, double rate, double pgreat)
     {
         // Keep checking the executed Java window rows independently of its integer EXRANK conversion.

@@ -86,6 +86,47 @@ public partial class TestSceneBmsSettings : OsuTestScene
     }
 
     [Test]
+    public void TestAdditionalLayoutVisibilitySettings()
+    {
+        BmsRulesetConfigManager config = null!;
+        FormCheckBox popn = null!;
+        FormCheckBox keyboard = null!;
+        FormCheckBox doubleKeyboard = null!;
+        FormCheckBox generic = null!;
+
+        AddStep("find new layout settings", () =>
+        {
+            config = (BmsRulesetConfigManager)RulesetConfigs.GetConfigFor(new BmsRuleset());
+            var checkboxes = settings.ChildrenOfType<FormCheckBox>().ToArray();
+            popn = checkboxes.Single(control => control.Caption.Equals(BmsStrings.ShowPopn5K));
+            keyboard = checkboxes.Single(control => control.Caption.Equals(BmsStrings.ShowKeyboard24K));
+            doubleKeyboard = checkboxes.Single(control => control.Caption.Equals(BmsStrings.ShowKeyboard24KDouble));
+            generic = checkboxes.Single(control => control.Caption.Equals(BmsStrings.ShowGenericKeyboard));
+        });
+        AddAssert("layouts shown by default", () => popn.Current.Value && keyboard.Current.Value && doubleKeyboard.Current.Value && generic.Current.Value);
+        AddStep("hide new layouts", () =>
+        {
+            popn.Current.Value = false;
+            keyboard.Current.Value = false;
+            doubleKeyboard.Current.Value = false;
+            generic.Current.Value = false;
+        });
+        AddAssert("configuration updated", () => !config.Get<bool>(BmsRulesetSetting.ShowPopn5K)
+            && !config.Get<bool>(BmsRulesetSetting.ShowKeyboard24K)
+            && !config.Get<bool>(BmsRulesetSetting.ShowKeyboard24KDouble)
+            && !config.Get<bool>(BmsRulesetSetting.ShowGenericKeyboard));
+        AddStep("search keyboard layouts", () => search.SearchTerm = "keyboard");
+        AddUntilStep("matching controls visible", () => settings.ChildrenOfType<SettingsItemV2>()
+            .Where(item => item.Control == keyboard || item.Control == doubleKeyboard || item.Control == generic).All(item => item.IsPresent)
+            && !settings.ChildrenOfType<SettingsItemV2>().Single(item => item.Control == popn).IsPresent);
+        AddStep("restore defaults", () =>
+        {
+            popn.Current.Value = keyboard.Current.Value = doubleKeyboard.Current.Value = generic.Current.Value = true;
+            search.SearchTerm = string.Empty;
+        });
+    }
+
+    [Test]
     public void TestSoftConstantSliderVisibilityAndValueRetention()
     {
         SettingsItemV2 fadeInItem = null!;

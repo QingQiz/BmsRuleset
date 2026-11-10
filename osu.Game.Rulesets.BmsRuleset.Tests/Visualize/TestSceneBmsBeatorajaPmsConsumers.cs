@@ -34,7 +34,7 @@ public partial class TestSceneBmsBeatorajaPmsConsumers : BmsPlayerTestScene
     {
         var beatmap = new BmsBeatmap
         {
-            LayoutVariant = BmsLayoutVariant.Pms9K, TotalColumns = 9, Rank = 2, Total = 30,
+            LayoutVariant = BmsLayoutVariant.Popn9K, TotalColumns = 9, Rank = 2, Total = 30,
             HitObjects = [new BmsNote { StartTime = 1000, Column = 1 },
                 new BmsNote { StartTime = 2000, Column = 1 }, new BmsNote { StartTime = 3000, Column = 1 }],
         };

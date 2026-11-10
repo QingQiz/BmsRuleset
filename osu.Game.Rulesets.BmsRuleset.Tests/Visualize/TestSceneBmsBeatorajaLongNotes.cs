@@ -33,7 +33,7 @@ public partial class TestSceneBmsBeatorajaLongNotes : BmsPlayerTestScene
         var beatmap = new BmsBeatmap
         {
             LayoutVariant = layout,
-            TotalColumns = layout == BmsLayoutVariant.Pms9K ? 9 : 8,
+            TotalColumns = layout == BmsLayoutVariant.Popn9K ? 9 : 8,
             Rank = 2,
             Total = 12,
             LockedLongNoteMode = mode,
@@ -49,7 +49,7 @@ public partial class TestSceneBmsBeatorajaLongNotes : BmsPlayerTestScene
 
     private IList<ReplayFrame> createReplay(BmsBeatmap beatmap)
     {
-        var action = layout == BmsLayoutVariant.Pms9K ? BmsAction.PmsKey2 : BmsAction.Key1;
+        var action = layout == BmsLayoutVariant.Popn9K ? BmsAction.PmsKey2 : BmsAction.Key1;
         var frames = new List<ReplayFrame> { new BmsReplayFrame(0) };
         if (!double.IsNaN(headOffset))
         {
@@ -105,7 +105,7 @@ public partial class TestSceneBmsBeatorajaLongNotes : BmsPlayerTestScene
     public void TestPmsReleaseRescueThroughRealInput(BmsLongNoteMode noteMode, double repress,
                                                    HitResult tail, double health, int combo)
     {
-        load(BmsLayoutVariant.Pms9K, noteMode, 0, 3500, repress);
+        load(BmsLayoutVariant.Popn9K, noteMode, 0, 3500, repress);
         checkpoint(3550, "pending release", () => assertOutcome(
             noteMode == BmsLongNoteMode.LongNote ? Array.Empty<HitResult>() : new[] { HitResult.Perfect },
             noteMode == BmsLongNoteMode.LongNote ? 0.30 : 0.34, noteMode == BmsLongNoteMode.LongNote ? 0 : 1));
@@ -127,7 +127,7 @@ public partial class TestSceneBmsBeatorajaLongNotes : BmsPlayerTestScene
     [TestCase(BmsLongNoteMode.ChargeNote)]
     public void TestPmsDeferredTimingGaugeAndScoreRewind(BmsLongNoteMode noteMode)
     {
-        load(BmsLayoutVariant.Pms9K, noteMode, 0, 1500, null, 1000);
+        load(BmsLayoutVariant.Popn9K, noteMode, 0, 1500, null, 1000);
         checkpoint(1650, "pending release", pending);
         checkpoint(1700, "expiry", expired);
         checkpoint(1550, "rewind before application", pending);
@@ -156,7 +156,7 @@ public partial class TestSceneBmsBeatorajaLongNotes : BmsPlayerTestScene
     public void TestPmsRepressBeforeExpiryScan(BmsLongNoteMode noteMode, double repress, HitResult result, double health, int combo)
     {
         // JudgeManager 347-585 handles changed keys before the <= release margin scan.
-        load(BmsLayoutVariant.Pms9K, noteMode, 0, 1500, repress, 1000);
+        load(BmsLayoutVariant.Popn9K, noteMode, 0, 1500, repress, 1000);
         checkpoint(1698, "before boundary", () => { });
         if (repress > 1700)
             checkpoint(1700, "expiry before late input", () => { });

@@ -29,7 +29,8 @@ internal struct BmsHoldRuntime
         TailWindow = BmsJudgementProfileProvider.GetTable(note, true);
     }
 
-    internal readonly bool IsScratch => BmsLayout.IsScratchColumn(Note.Column, Note.Beatmap.LayoutVariant);
+    internal readonly bool IsScratch => BmsLayout.IsScratchColumn(Note.Column, Note.Beatmap.LayoutVariant)
+                                        && Note.Beatmap.LayoutVariant is not (BmsLayoutVariant.Keyboard24K or BmsLayoutVariant.Keyboard24KDouble);
 
     internal readonly double ReleaseMargin => BmsJudgementProfileProvider.GetBehaviour(Note.Beatmap.LayoutVariant).LongNoteReleaseMargin;
 
