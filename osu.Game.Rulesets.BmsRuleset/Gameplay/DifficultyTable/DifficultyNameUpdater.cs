@@ -29,7 +29,7 @@ public partial class DifficultyNameUpdater(RealmAccess realm, DifficultyTableSto
             return;
         }
 
-        var markers = BmsRulesetRuntime.DifficultyTableStore.GetMarkers(beatmap.MD5Hash);
+        var markers = BmsRulesetRuntime.DifficultyTableStore.GetMarkers(beatmap.MD5Hash, beatmap.Hash);
 
         markerStr = FormatMarkers(markers);
     }
@@ -51,16 +51,16 @@ public partial class DifficultyNameUpdater(RealmAccess realm, DifficultyTableSto
     private void refreshAllMarkers(ProgressNotification? notification)
     {
         notification?.Text = BmsStrings.Collecting;
-        var markerNames = store.GetMarkerNames();
 
         List<(Guid, string)> collect = [];
 
         realm.Run(r =>
         {
             var allBmsBeatmaps = r.All<BeatmapInfo>().Filter("Ruleset.ShortName == 'bms'");
+            var markerNames = store.GetMarkerNames(allBmsBeatmaps);
             foreach (var beatmap in allBmsBeatmaps)
             {
-                var markerStr = markerNames.GetValueOrDefault(beatmap.MD5Hash, string.Empty);
+                var markerStr = markerNames[beatmap.ID];
                 var clean = ownedMarkerSuffixRegex().Replace(beatmap.DifficultyName, string.Empty);
 
                 var res = markerStr.Length == 0

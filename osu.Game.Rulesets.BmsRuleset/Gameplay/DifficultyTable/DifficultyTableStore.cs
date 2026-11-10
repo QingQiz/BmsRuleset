@@ -5,8 +5,10 @@ using System.Linq;
 using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using osu.Game.Database;
+using osu.Game.Beatmaps;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
@@ -37,9 +39,9 @@ public partial class DifficultyTableStore
 
     private readonly BmsRulesetConfigManager? config;
     private readonly string cacheDirectory;
-    private readonly object indexLock = new();
+    private readonly Lock indexLock = new();
 
-    private readonly Dictionary<string, List<(DifficultyTable table, TableEntry entry)>> md5Index
+    private readonly Dictionary<string, List<(DifficultyTable table, TableEntry entry)>> hashIndex
         = new(StringComparer.OrdinalIgnoreCase);
 
     public DifficultyTableStore(
@@ -68,7 +70,7 @@ public partial class DifficultyTableStore
     {
         tables.Clear();
         lock (indexLock)
-            md5Index.Clear();
+            hashIndex.Clear();
 
         var sources = config?.Get<string>(BmsRulesetSetting.DifficultyTableSources) ?? string.Empty;
         if (string.IsNullOrEmpty(sources))
@@ -308,16 +310,31 @@ public partial class DifficultyTableStore
         persistTableList();
     }
 
-    public List<(DifficultyTable table, TableEntry entry)> GetMarkers(string md5Hash)
+    public List<(DifficultyTable table, TableEntry entry)> GetMarkers(string md5Hash, string? sha256Hash = null)
     {
         lock (indexLock)
-            return md5Index.TryGetValue(md5Hash, out var markers) ? [..markers] : [];
+        {
+            hashIndex.TryGetValue(md5Hash, out var md5Matches);
+            List<(DifficultyTable table, TableEntry entry)>? shaMatches = null;
+            if (sha256Hash != null)
+                hashIndex.TryGetValue(sha256Hash, out shaMatches);
+            if (md5Matches == null)
+                return shaMatches == null ? [] : [..shaMatches];
+            if (shaMatches == null || ReferenceEquals(md5Matches, shaMatches))
+                return [..md5Matches];
+
+            return md5Matches.Concat(shaMatches).Distinct().OrderBy(match => tables.IndexOf(match.table)).ToList();
+        }
     }
 
-    internal Dictionary<string, string> GetMarkerNames()
+    internal Dictionary<Guid, string> GetMarkerNames(IEnumerable<BeatmapInfo> beatmaps)
     {
+        // A refresh publishes one table snapshot even if a table is replaced during its Realm write.
         lock (indexLock)
-            return md5Index.ToDictionary(pair => pair.Key, pair => DifficultyNameUpdater.FormatMarkers(pair.Value), StringComparer.OrdinalIgnoreCase);
+        {
+            return beatmaps.ToDictionary(beatmap => beatmap.ID,
+                beatmap => DifficultyNameUpdater.FormatMarkers(GetMarkers(beatmap.MD5Hash, beatmap.Hash)));
+        }
     }
 
     #endregion
@@ -334,9 +351,12 @@ public partial class DifficultyTableStore
     {
         foreach (var entry in table.Entries)
         {
-            if (!md5Index.TryGetValue(entry.Md5Hash, out var list))
-                md5Index[entry.Md5Hash] = list = [];
-            list.Add((table, entry));
+            foreach (var hash in entry.Hashes)
+            {
+                if (!hashIndex.TryGetValue(hash, out var list))
+                    hashIndex[hash] = list = [];
+                list.Add((table, entry));
+            }
         }
     }
 
@@ -350,11 +370,14 @@ public partial class DifficultyTableStore
     {
         foreach (var entry in table.Entries)
         {
-            if (md5Index.TryGetValue(entry.Md5Hash, out var list))
+            foreach (var hash in entry.Hashes)
             {
-                list.RemoveAll(t => t.table == table);
-                if (list.Count == 0)
-                    md5Index.Remove(entry.Md5Hash);
+                if (hashIndex.TryGetValue(hash, out var list))
+                {
+                    list.RemoveAll(t => t.table == table);
+                    if (list.Count == 0)
+                        hashIndex.Remove(hash);
+                }
             }
         }
     }

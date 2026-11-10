@@ -11,12 +11,12 @@ internal static class UnavailableTableBeatmapFactory
 
     internal static IReadOnlyList<BeatmapSetInfo> Create(DifficultyTableStore store, RulesetInfo ruleset, IEnumerable<BeatmapInfo> localBeatmaps)
     {
-        var localHashes = localBeatmaps.Select(beatmap => beatmap.MD5Hash).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var localHashes = localBeatmaps.SelectMany(beatmap => new[] { beatmap.MD5Hash, beatmap.Hash }).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var sets = new List<BeatmapSetInfo>();
 
         foreach (var table in store.Tables)
         {
-            foreach (var entry in table.Entries.Where(entry => !localHashes.Contains(entry.Md5Hash)))
+            foreach (var entry in table.Entries.Where(entry => !entry.Hashes.Any(localHashes.Contains)))
             {
                 if (!localHashes.Add(entry.Md5Hash))
                     continue;

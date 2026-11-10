@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
 using osu.Game.Collections;
+using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using Realms;
@@ -94,8 +95,11 @@ public class CollectionSyncManager
                 }
             }
 
+            var localMd5Hashes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var beatmap in r.All<BeatmapInfo>().Filter("Ruleset.ShortName == $0 && BeatmapSet.DeletePending == false", Constant.SHORT_NAME))
+                localMd5Hashes.TryAdd(beatmap.Hash, beatmap.MD5Hash);
             foreach (var table in BmsRulesetRuntime.DifficultyTableStore?.Tables ?? [])
-                syncDivideStatus(r, table);
+                syncDivideStatus(r, table, localMd5Hashes);
         });
     }
 
@@ -105,7 +109,7 @@ public class CollectionSyncManager
             JsonSerializer.Serialize(subdividedTables.Order(StringComparer.Ordinal)));
     }
 
-    private void syncDivideStatus(Realm r, DifficultyTable table)
+    private void syncDivideStatus(Realm r, DifficultyTable table, IReadOnlyDictionary<string, string> localMd5Hashes)
     {
         var prefix = $"{COLLECTION_PREFIX}{table.Name} ";
         var baseName = prefix.TrimEnd(' ');
@@ -120,7 +124,7 @@ public class CollectionSyncManager
 
         if (IsSubdivided(table))
         {
-            var hashesByLevel = table.Entries.ToLookup(entry => entry.Level, entry => entry.Md5Hash, StringComparer.OrdinalIgnoreCase);
+            var hashesByLevel = table.Entries.ToLookup(entry => entry.Level, entry => collectionHash(entry), StringComparer.OrdinalIgnoreCase);
             var levelsWithEntries = table.LevelOrder
                 .Where(hashesByLevel.Contains)
                 .ToList();
@@ -142,7 +146,7 @@ public class CollectionSyncManager
         }
         else
         {
-            var allMd5 = table.Entries.Select(e => e.Md5Hash)
+            var allMd5 = table.Entries.Select(collectionHash)
                 .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
 
             if (allMd5.Count > 0)
@@ -150,6 +154,10 @@ public class CollectionSyncManager
         }
 
         reconcileCollections(r, existing, desired);
+        return;
+
+        string collectionHash(TableEntry entry) => entry.Hashes.Select(hash => localMd5Hashes.GetValueOrDefault(hash))
+            .FirstOrDefault(hash => hash != null) ?? entry.Md5Hash;
     }
 
     private static void reconcileCollections(Realm r, List<BeatmapCollection> existing,

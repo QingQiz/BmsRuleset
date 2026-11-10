@@ -381,6 +381,9 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
 
             if (cancelled) return; // drainConsumer already set the notification state
 
+            if (imported > 0)
+                BmsRulesetRuntime.DifficultyTableStore?.NotifyToRebuildTableList(null);
+
             applyCompletionState(notification,
                 new ImportResult(RulesetAvailable: true, TotalSets: groups.Length, Imported: imported, Processed: processed));
         }

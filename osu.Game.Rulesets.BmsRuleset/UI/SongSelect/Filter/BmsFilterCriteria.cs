@@ -99,7 +99,7 @@ public class BmsFilterCriteria : IRulesetFilterCriteria
         var store = BmsRulesetRuntime.DifficultyTableStore;
         if (store != null && (!string.IsNullOrEmpty(selectedTableName) || !string.IsNullOrEmpty(selectedLevel)))
         {
-            var markers = store.GetMarkers(beatmapInfo.MD5Hash);
+            var markers = store.GetMarkers(beatmapInfo.MD5Hash, beatmapInfo.Hash);
 
             if (!string.IsNullOrEmpty(selectedTableName))
             {

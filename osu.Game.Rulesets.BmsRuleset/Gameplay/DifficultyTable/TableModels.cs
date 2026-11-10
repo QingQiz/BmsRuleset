@@ -33,6 +33,17 @@ public class TableEntry
 
     public string? Sha256Hash { get; init; }
 
+    internal IEnumerable<string> Hashes
+    {
+        get
+        {
+            if (!string.IsNullOrEmpty(Md5Hash))
+                yield return Md5Hash;
+            if (!string.IsNullOrEmpty(Sha256Hash) && !string.Equals(Md5Hash, Sha256Hash, System.StringComparison.OrdinalIgnoreCase))
+                yield return Sha256Hash;
+        }
+    }
+
     public string? Title { get; init; }
 
     public string? Artist { get; init; }

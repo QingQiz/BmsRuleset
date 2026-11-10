@@ -1,6 +1,9 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
+using osu.Game.Collections;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.DifficultyTable;
 using NUnit.Framework;
 using osu.Framework.IO.Stores;
 using osu.Game.Beatmaps;
@@ -15,6 +18,45 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.IO;
 
 public partial class BmsFileImporterTest
 {
+    [Test]
+    public void TestBmsonShaOnlyTableAssociatesCollectionsMarkersAndInstalledState()
+    {
+        runImportTest(async (realm, storage) =>
+        {
+            addBmsRuleset(realm);
+            var directory = Path.Combine(storage.GetFullPath(string.Empty), "sha-bmson");
+            Directory.CreateDirectory(directory);
+            var bytes = BmsonParserTest.Chart("""[{"name":"a.wav","notes":[{"x":1,"y":240}]}]""");
+            File.WriteAllBytes(Path.Combine(directory, "chart.bmson"), bytes);
+            var sha = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
+            var sync = new CollectionSyncManager();
+            var store = new DifficultyTableStore(null, Path.Combine(directory, "table-cache"), sync, realm);
+            var table = new global::osu.Game.Rulesets.BmsRuleset.Gameplay.DifficultyTable.DifficultyTable
+            {
+                Name = "BMSON SHA", Symbol = "S",
+                Entries = [new TableEntry { Md5Hash = sha, Sha256Hash = sha, Level = "1" }],
+            };
+            store.RestoreTable(table);
+            var previous = BmsRulesetRuntime.DifficultyTableStore;
+            BmsRulesetRuntime.DifficultyTableStore = store;
+            try
+            {
+                await new BmsFileImporter(realm, storage).Import(directory).ConfigureAwait(false);
+                var info = realm.Run(r => r.All<BeatmapInfo>().Single().Detach());
+                Assert.That(info.DifficultyName, Does.Contain("[S1]"));
+                Assert.That(store.GetMarkers(info.MD5Hash, info.Hash), Has.Count.EqualTo(1));
+                Assert.That(realm.Run(r => r.All<BeatmapCollection>().Single().BeatmapMD5Hashes.Single()), Is.EqualTo(info.MD5Hash));
+                Assert.That(UnavailableTableBeatmapFactory.Create(store, info.Ruleset, [info]), Is.Empty);
+                new DifficultyNameUpdater(realm, store).RefreshAllMarkers();
+                Assert.That(realm.Run(r => r.All<BeatmapInfo>().Single().DifficultyName), Does.Contain("[S1]"));
+            }
+            finally
+            {
+                BmsRulesetRuntime.DifficultyTableStore = previous;
+            }
+        });
+    }
+
     [TestCase("", "chart")]
     [TestCase(",\"chart_name\":\"ANOTHER\"", "ANOTHER")]
     public void TestBmsonImportUsesChartLabelOrFilenameWithoutSplittingSongTitle(string chartName, string expected)
