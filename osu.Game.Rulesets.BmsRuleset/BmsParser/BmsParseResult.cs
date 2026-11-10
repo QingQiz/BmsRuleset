@@ -56,6 +56,7 @@ public readonly record struct BmsParsedHitObject(
 {
     public IReadOnlyList<int> AdditionalSampleKeys { get; init; } = [];
     public IReadOnlyList<int> AdditionalTailSampleKeys { get; init; } = [];
+    public BmsLongNoteMode LongNoteMode { get; init; }
 }
 
 public sealed record BmsSampleEvent(double Time, int SampleKey, int Volume);

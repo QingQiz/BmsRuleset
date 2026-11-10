@@ -53,8 +53,7 @@ internal static class BmsBeatmapExtensions
 {
     internal static int CountScoringNotes(this IBeatmap beatmap) => beatmap.HitObjects
         .Where(note => note is not BmsLandmine and not BmsInvisibleNote)
-        .Sum(note => note is BmsLongNote && beatmap is BmsBeatmap
-            { LockedLongNoteMode: BmsLongNoteMode.ChargeNote or BmsLongNoteMode.HellChargeNote } ? 2 : 1);
+        .Sum(note => note is BmsLongNote { EffectiveMode: BmsLongNoteMode.ChargeNote or BmsLongNoteMode.HellChargeNote } ? 2 : 1);
 
     public static void CopyFrom(this IBmsBeatmap target, BmsParseResult parseResult)
     {

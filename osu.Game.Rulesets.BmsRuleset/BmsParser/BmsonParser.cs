@@ -39,13 +39,12 @@ internal static class BmsonParser
                 throw new InvalidDataException($"Unsupported BMSON extension: {extension}.");
         }
 
-        if (number(info, "ln_type", 0) != 0)
-            throw new InvalidDataException("The BMSON ln_type extension is not supported.");
+        var longNoteMode = readLongNoteMode(info, "ln_type", BmsLongNoteMode.LongNote);
 
         var (bpmEvents, stopEvents) = readTiming(root, initialBpm, tickResolution, cancellationToken);
         var timing = new BmsTickTimeConverter(tickResolution, bpmEvents, stopEvents);
         var sampleDefinitions = new Dictionary<int, BmsSampleDefinition>();
-        var objects = new Dictionary<(int Column, long Pulse), (long EndPulse, List<int> Samples)>();
+        var objects = new Dictionary<(int Column, long Pulse), (long EndPulse, BmsLongNoteMode Mode, List<int> Samples)>();
         var background = new List<BmsSampleEvent>();
         var releases = new Dictionary<(int Column, long Pulse), List<int>>();
         var nextSampleId = 1;
@@ -95,9 +94,12 @@ internal static class BmsonParser
                         continue;
                     }
 
+                    var mode = note.Length > 0 ? note.Mode : BmsLongNoteMode.Undefined;
                     if (objects.TryGetValue(key, out var existing))
                     {
-                        if (existing.EndPulse != endPulse)
+                        if (existing.EndPulse != endPulse
+                            || (existing.Mode == BmsLongNoteMode.Undefined ? longNoteMode : existing.Mode)
+                            != (mode == BmsLongNoteMode.Undefined ? longNoteMode : mode))
                             throw new InvalidDataException($"Conflicting BMSON note lengths at x={note.Lane}, y={note.Pulse}.");
 
                         // IDs increase as channels are read; duplicate uses in this group share the last ID.
@@ -105,7 +107,7 @@ internal static class BmsonParser
                             existing.Samples.Add(sampleId);
                     }
                     else
-                        objects.Add(key, (endPulse, [sampleId]));
+                        objects.Add(key, (endPulse, mode, [sampleId]));
                 }
 
                 if (!hasPlayableNote)
@@ -123,6 +125,7 @@ internal static class BmsonParser
             parsedObjects.Add(new BmsParsedHitObject(key.Pulse, time, timing.ProjectTickToTime(note.EndPulse) - time,
                 key.Column, note.Samples[0], isLongNote, false, 0, tailSamples?[0], JudgementRate: double.NaN)
             {
+                LongNoteMode = note.Mode,
                 AdditionalSampleKeys = note.Samples.Skip(1).ToArray(),
                 AdditionalTailSampleKeys = tailSamples?.Skip(1).ToArray() ?? [],
             });
@@ -160,14 +163,16 @@ internal static class BmsonParser
         }).ToArray();
         var mainBpm = BmsTimingMap.FindMainBpm(bpmEvents, hitObjects.Select(note => note.Tick));
         var timingMap = BmsTimingMap.FromSortedEvents(tickResolution, measures, bpmEvents, stopEvents, [], [], mainBpm, barLines: barLines);
-        var total = BmsGaugeCalculator.CalculateDefaultTotal(hitObjects.Length, BmsGaugeProfileFamilyProvider.FromLayout(layout)) * Math.Abs(number(info, "total", 100)) / 100;
+        var total = BmsGaugeCalculator.CalculateDefaultTotal(hitObjects.Sum(note => note.IsLongNote
+            && (note.LongNoteMode == BmsLongNoteMode.Undefined ? longNoteMode : note.LongNoteMode)
+            is BmsLongNoteMode.ChargeNote or BmsLongNoteMode.HellChargeNote ? 2 : 1), BmsGaugeProfileFamilyProvider.FromLayout(layout)) * Math.Abs(number(info, "total", 100)) / 100;
         var credits = array(info, "subartists").Select(value => value.GetString() ?? string.Empty).ToArray();
         var maker = credits.Select(credit => credit.Split(':', 2, StringSplitOptions.TrimEntries))
             .Where(credit => credit.Length == 2 && credit[0] == "chart").Select(credit => credit[1]);
         return new BmsParseResult(text(info, "title"), text(info, "artist"), (float)pulse(info, "level", 0), 2, total,
             timingMap, layout, BmsLayout.GetTotalColumns(layout), sampleDefinitions, background.OrderBy(evt => evt.Time).ToArray(), hitObjects,
             [], new BmsTextEvents(null, []), bga, resource(info, "preview_music"), text(info, "genre"), text(info, "subtitle"),
-            string.Join(", ", credits), string.Join(", ", maker), LockedLongNoteMode: BmsLongNoteMode.LongNote,
+            string.Join(", ", credits), string.Join(", ", maker), LockedLongNoteMode: longNoteMode,
             StageFile: resource(info, "eyecatch_image"), BackBmp: resource(info, "back_image"), Banner: resource(info, "banner_image"), DefaultExRank: exRank)
         {
             ExplicitDifficultyName = text(info, "chart_name"),
@@ -255,12 +260,20 @@ internal static class BmsonParser
 
     private static Note readNote(JsonElement value)
     {
-        if (number(value, "t", 0) != 0)
-            throw new InvalidDataException("BMSON note type extensions are not supported.");
-
         return new Note(checked((int)pulse(value, "x", 0)), pulse(value, "y"), pulse(value, "l", 0),
             value.TryGetProperty("c", out var continuation) && continuation.GetBoolean(),
-            value.TryGetProperty("up", out var release) && release.GetBoolean());
+            value.TryGetProperty("up", out var release) && release.GetBoolean(), readLongNoteMode(value, "t", BmsLongNoteMode.Undefined));
+    }
+
+    private static BmsLongNoteMode readLongNoteMode(JsonElement parent, string field, BmsLongNoteMode fallback)
+    {
+        var value = pulse(parent, field, 0);
+        return value switch
+        {
+            0 => fallback,
+            >= 1 and <= 3 => (BmsLongNoteMode)value,
+            _ => throw new InvalidDataException($"Invalid BMSON {field}."),
+        };
     }
 
     private static int mapColumn(int lane, BmsLayoutVariant layout) => layout switch
@@ -342,5 +355,5 @@ internal static class BmsonParser
         return path;
     }
 
-    private readonly record struct Note(int Lane, long Pulse, long Length, bool Continue, bool Release);
+    private readonly record struct Note(int Lane, long Pulse, long Length, bool Continue, bool Release, BmsLongNoteMode Mode);
 }

@@ -102,8 +102,7 @@ public class BmsAutoGenerator(BmsBeatmap beatmap, bool scratchOnly = false) : Au
             var releaseTime = calculateReleaseTime(current, nextObject);
             yield return new ActionPoint(releaseTime, action, false);
 
-            if (current is BmsLongNote
-                && Beatmap.LockedLongNoteMode is BmsLongNoteMode.ChargeNote or BmsLongNoteMode.HellChargeNote
+            if (current is BmsLongNote { EffectiveMode: BmsLongNoteMode.ChargeNote or BmsLongNoteMode.HellChargeNote }
                 && BmsKeyBindingConfiguration.ReverseScratchAction(action) is { } reverseAction)
             {
                 yield return new ActionPoint(releaseTime, reverseAction, true);

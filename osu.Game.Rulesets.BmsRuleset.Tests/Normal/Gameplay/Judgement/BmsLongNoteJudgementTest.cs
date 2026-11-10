@@ -69,7 +69,7 @@ public class BmsLongNoteJudgementTest
             HitObjects = { source },
         };
         source.Beatmap = beatmap;
-        processor.ApplyBeatmap(beatmap);
+        processor.ApplyBeatmap(bindNotes(beatmap));
 
         processor.ApplySyntheticLongNoteEndpoint(endpoint(source, BmsLongNoteEndpointKind.Head, 1005, HitResult.Great));
 
@@ -96,7 +96,7 @@ public class BmsLongNoteJudgementTest
             HitObjects = { source },
         };
         source.Beatmap = beatmap;
-        processor.ApplyBeatmap(beatmap);
+        processor.ApplyBeatmap(bindNotes(beatmap));
 
         processor.ApplySyntheticLongNoteEndpoint(endpoint(source, BmsLongNoteEndpointKind.Tail, 1505, HitResult.Ok));
 
@@ -122,7 +122,7 @@ public class BmsLongNoteJudgementTest
             HitObjects = { source },
         };
         source.Beatmap = beatmap;
-        processor.ApplyBeatmap(beatmap);
+        processor.ApplyBeatmap(bindNotes(beatmap));
 
         processor.ApplySyntheticLongNoteEndpoint(endpoint(source, BmsLongNoteEndpointKind.Tail, 1505, HitResult.Perfect));
 
@@ -140,7 +140,7 @@ public class BmsLongNoteJudgementTest
             TotalColumns = 8,
             HitObjects = { new BmsLongNote { StartTime = 1000, Duration = 500, Column = 1 } },
         };
-        processor.ApplyBeatmap(beatmap);
+        processor.ApplyBeatmap(bindNotes(beatmap));
 
         // Create a synthetic endpoint manually and apply it via the public ApplyResult path.
         // The ApplySyntheticLongNoteEndpoint method itself handles null by throwing naturally.
@@ -173,7 +173,7 @@ public class BmsLongNoteJudgementTest
             HitObjects = { source },
         };
         source.Beatmap = beatmap;
-        processor.ApplyBeatmap(beatmap);
+        processor.ApplyBeatmap(bindNotes(beatmap));
 
         var result = processor.ApplySyntheticLongNoteEndpoint(endpoint(source, BmsLongNoteEndpointKind.Tail, 1505, HitResult.Perfect));
 
@@ -285,7 +285,7 @@ public class BmsLongNoteJudgementTest
                 },
             },
         };
-        processor.ApplyBeatmap(beatmap);
+        processor.ApplyBeatmap(bindNotes(beatmap));
 
         processor.Health.Value = 0.5;
         var source = (BmsLongNote)beatmap.HitObjects[0];
@@ -323,7 +323,7 @@ public class BmsLongNoteJudgementTest
                 },
             },
         };
-        processor.ApplyBeatmap(beatmap);
+        processor.ApplyBeatmap(bindNotes(beatmap));
 
         processor.Health.Value = 0.2;
         var source = (BmsLongNote)beatmap.HitObjects[0];
@@ -436,7 +436,7 @@ public class BmsLongNoteJudgementTest
                 },
             },
         };
-        processor.ApplyBeatmap(beatmap);
+        processor.ApplyBeatmap(bindNotes(beatmap));
 
         processor.Health.Value = 0.01;
         processor.ApplyHellChargeTick(false);
@@ -466,7 +466,7 @@ public class BmsLongNoteJudgementTest
                 },
             },
         };
-        processor.ApplyBeatmap(beatmap);
+        processor.ApplyBeatmap(bindNotes(beatmap));
 
         processor.Health.Value = 0.005;
         processor.ApplyHellChargeTick(false);
@@ -496,7 +496,7 @@ public class BmsLongNoteJudgementTest
                 },
             },
         };
-        processor.ApplyBeatmap(beatmap);
+        processor.ApplyBeatmap(bindNotes(beatmap));
 
         processor.Health.Value = 0.5;
         var before = processor.Health.Value;
@@ -525,7 +525,7 @@ public class BmsLongNoteJudgementTest
                 },
             },
         };
-        processor.ApplyBeatmap(beatmap);
+        processor.ApplyBeatmap(bindNotes(beatmap));
 
         processor.Health.Value = 0.2;
         var before = processor.Health.Value;
@@ -559,7 +559,7 @@ public class BmsLongNoteJudgementTest
                 },
             },
         };
-        processor.ApplyBeatmap(beatmap);
+        processor.ApplyBeatmap(bindNotes(beatmap));
 
         processor.Health.Value = 0.5;
         var before = processor.Health.Value;
@@ -592,7 +592,7 @@ public class BmsLongNoteJudgementTest
                 },
             },
         };
-        processor.ApplyBeatmap(beatmap);
+        processor.ApplyBeatmap(bindNotes(beatmap));
 
         processor.Health.Value = 0.5;
         var before = processor.Health.Value;
@@ -675,6 +675,13 @@ public class BmsLongNoteJudgementTest
         Assert.That(tail.IsPastPassivePoorOffset(281), Is.True);
     }
 
+    private static BmsBeatmap bindNotes(BmsBeatmap beatmap)
+    {
+        foreach (var note in beatmap.HitObjects)
+            note.Beatmap = beatmap;
+        return beatmap;
+    }
+
     private static (BmsScoreProcessor processor, BmsLongNote source) createLongNoteProcessor(BmsLongNoteMode mode)
     {
         var source = new BmsLongNote { StartTime = 1000, Duration = 500, Column = 1 };
@@ -687,7 +694,7 @@ public class BmsLongNoteJudgementTest
         };
         source.Beatmap = beatmap;
         var processor = new BmsScoreProcessor();
-        processor.ApplyBeatmap(beatmap);
+        processor.ApplyBeatmap(bindNotes(beatmap));
         return (processor, source);
     }
 

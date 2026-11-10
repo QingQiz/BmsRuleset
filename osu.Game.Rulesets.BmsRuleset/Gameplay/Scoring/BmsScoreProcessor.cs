@@ -287,7 +287,7 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
         {
             yield return hitObject;
 
-            if (hitObject is BmsLongNote longNote && longNote.Beatmap?.LockedLongNoteMode is BmsLongNoteMode.ChargeNote or BmsLongNoteMode.HellChargeNote)
+            if (hitObject is BmsLongNote longNote && longNote.EffectiveMode is BmsLongNoteMode.ChargeNote or BmsLongNoteMode.HellChargeNote)
                 yield return longNote.CreateSyntheticEndpoint(longNote.EndTime);
         }
     }

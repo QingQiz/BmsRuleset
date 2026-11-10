@@ -35,7 +35,7 @@ internal sealed class BmsHoldRegistry
         {
             if (notes[slot] is not BmsLongNote note) continue;
 
-            HoldOperations operations = mode(note) switch
+            HoldOperations operations = note.EffectiveMode switch
             {
                 BmsLongNoteMode.LongNote => normal ??= new LongNoteOperations(rules.LongNote, execution),
                 BmsLongNoteMode.ChargeNote => charge ??= new ChargeOperations(rules.ChargeNote, execution),
@@ -49,10 +49,6 @@ internal sealed class BmsHoldRegistry
         PressOperation = press;
         PassiveOperation = checkPassive;
     }
-
-    private static BmsLongNoteMode mode(BmsLongNote note) => note.Beatmap.LockedLongNoteMode == BmsLongNoteMode.Undefined
-        ? BmsLongNoteMode.LongNote
-        : note.Beatmap.LockedLongNoteMode;
 
     internal BmsLongNote GetNote(int slot) => bindings[bindingIndices[slot]].Note;
 

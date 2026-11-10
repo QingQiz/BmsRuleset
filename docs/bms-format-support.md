@@ -10,7 +10,7 @@ Import BMSON 1.0.0 charts by dropping their files or song folders into the game.
 `beat-5k`, `beat-7k`, `beat-10k`, `beat-14k`, `popn-5k`, `popn-9k`, `keyboard-24k`, `keyboard-24k-double`,
 and `generic-1keys` through `generic-64keys`. Configure each layout's keys in the input settings.
 
-Support includes long notes, layered keysounds, automatic audio slicing, BPM changes, stops, explicit bar lines,
+Support includes LN/CN/HCN types per note, layered keysounds, automatic audio slicing, BPM changes, stops, explicit bar lines,
 BGA, and song previews. `chart_name` supplies the difficulty name; `judge_rank` scales judgement windows and
 `total` scales the default gauge recovery. Judgement percentages retain fractional values.
 

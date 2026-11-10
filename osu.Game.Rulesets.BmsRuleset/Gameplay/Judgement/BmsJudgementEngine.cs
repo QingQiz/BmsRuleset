@@ -60,7 +60,7 @@ internal sealed class BmsJudgementEngine
         }
 
         bodyColumns = columns.Where(column => column.NoteRegistrations.Any(registration =>
-            registration.Object is BmsLongNote { Beatmap.LockedLongNoteMode: BmsLongNoteMode.HellChargeNote })).ToArray();
+            registration.Object is BmsLongNote { EffectiveMode: BmsLongNoteMode.HellChargeNote })).ToArray();
     }
 
     internal BmsJudgementEngine(BmsHitObject[] notes, BmsLayoutVariant layout, int column, IBmsJudgementOutput output)

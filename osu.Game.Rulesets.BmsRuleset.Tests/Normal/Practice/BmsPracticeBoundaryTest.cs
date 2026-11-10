@@ -131,6 +131,8 @@ public class BmsPracticeBoundaryTest
                 new BmsLongNote { StartTime = 2000, Column = 7, Duration = 1000 },
             ],
         };
+        foreach (var note in beatmap.HitObjects)
+            note.Beatmap = beatmap;
         var settings = new BmsPracticeSettings { StartTime = 1000 + offset, EndTime = 2000 + offset };
         var practice = BmsPracticeBeatmap.Create(beatmap, settings);
 

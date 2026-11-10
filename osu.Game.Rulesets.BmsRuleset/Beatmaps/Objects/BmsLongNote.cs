@@ -19,6 +19,11 @@ public class BmsLongNote : BmsHitObject, IHasDuration
     /// </summary>
     public double ScrollPositionAtEndTime { get; set; }
 
+    public BmsLongNoteMode Mode { get; set; }
+
+    public BmsLongNoteMode EffectiveMode => Mode != BmsLongNoteMode.Undefined ? Mode
+        : Beatmap.LockedLongNoteMode != BmsLongNoteMode.Undefined ? Beatmap.LockedLongNoteMode : BmsLongNoteMode.LongNote;
+
     public int? TailSampleKey { get; set; }
 
     public IReadOnlyList<int> AdditionalTailSampleKeys { get; set; } = [];
@@ -55,6 +60,7 @@ public class BmsLongNote : BmsHitObject, IHasDuration
             ln.Duration = Duration;
             ln.ScrollPositionAtEndTime = ScrollPositionAtEndTime;
             ln.VisualScrollPositionAtEndTime = VisualScrollPositionAtEndTime;
+            ln.Mode = Mode;
             ln.TailSampleKey = TailSampleKey;
             ln.AdditionalTailSampleKeys = AdditionalTailSampleKeys;
             ln.TailSampleVolume = TailSampleVolume;

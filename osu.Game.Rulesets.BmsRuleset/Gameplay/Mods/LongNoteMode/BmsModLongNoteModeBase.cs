@@ -28,5 +28,7 @@ public abstract class BmsModLongNoteModeBase : Mod, IApplicableAfterBeatmapConve
             return;
 
         bmsBeatmap.LockedLongNoteMode = TargetMode;
+        foreach (var note in bmsBeatmap.HitObjects.OfType<BmsLongNote>())
+            note.Mode = BmsLongNoteMode.Undefined;
     }
 }

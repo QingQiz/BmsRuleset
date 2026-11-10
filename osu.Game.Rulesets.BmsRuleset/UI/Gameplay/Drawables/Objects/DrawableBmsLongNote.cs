@@ -245,7 +245,7 @@ public sealed partial class DrawableBmsLongNote : DrawableBmsHitObject
 
         if (HitObject != null)
         {
-            mapPresentation = BmsLongNotePresentation.SelectMapping(ln.Beatmap.LockedLongNoteMode);
+            mapPresentation = BmsLongNotePresentation.SelectMapping(ln.EffectiveMode);
             ParentColumn!.JudgementBridge.ObserveLongNoteState(this, stateObserver);
             ParentColumn.JudgementBridge.ObserveVisualTime(this, visualTimeObserver);
             presentation = readPresentation(Time.Current);

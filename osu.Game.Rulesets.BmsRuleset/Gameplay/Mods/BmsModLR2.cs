@@ -1,3 +1,4 @@
+using System.Linq;
 using System;
 using System.Collections.Concurrent;
 using osu.Framework.Graphics.Sprites;
@@ -68,7 +69,11 @@ public class BmsModLr2 : Mod, IApplicableToJudgement,
     public void ApplyToBeatmap(IBeatmap beatmap)
     {
         if (beatmap is BmsBeatmap bmsBeatmap)
+        {
             bmsBeatmap.LockedLongNoteMode = BmsLongNoteMode.LongNote;
+            foreach (var note in bmsBeatmap.HitObjects.OfType<BmsLongNote>())
+                note.Mode = BmsLongNoteMode.Undefined;
+        }
     }
 
     public void ApplyToDifficulty(BeatmapDifficulty difficulty) => difficulty.DrainRate = (float)BmsLongNoteMode.LongNote;

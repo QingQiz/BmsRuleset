@@ -71,6 +71,7 @@ public class BmsModInvert : Mod, IApplicableAfterBeatmapConversion, IHasSeed
                     Beatmap = bmsBeatmap,
                     StartTime = source.StartTime,
                     Duration = duration,
+                    Mode = source is BmsLongNote hold ? hold.Mode : BmsLongNoteMode.Undefined,
                     Column = source.Column,
                     SampleKey = source.SampleKey,
                     SampleVolume = source.SampleVolume,
