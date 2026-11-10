@@ -1,12 +1,10 @@
-﻿using System.Collections.Generic;
-using System.Linq;
+﻿using System.Linq;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
-using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.Mods;
 
@@ -30,20 +28,11 @@ public class BmsModBackgroundKeysound : Mod, IApplicableAfterBeatmapConversion
 
         var notes = b.HitObjects.Where(x => x is not BmsLandmine).ToArray();
 
-        var starts = new List<BmsSampleEvent>();
-        foreach (var note in notes)
-        {
-            if (note.SampleKey is { } key)
-                starts.Add(new BmsSampleEvent(note.StartTime, key, note.SampleVolume));
-            var additional = note.AdditionalSampleKeys;
-            for (var i = 0; i < additional.Count; i++)
-                starts.Add(new BmsSampleEvent(note.StartTime, additional[i], note.SampleVolume));
-        }
+        var starts = notes.SelectMany(note => note.GetSamples());
 
         var tails = notes
             .OfType<BmsLongNote>()
-            .Where(x => x.TailSampleKey.HasValue)
-            .Select(x => new BmsSampleEvent(x.EndTime, x.TailSampleKey!.Value, x.TailSampleVolume));
+            .SelectMany(x => x.GetTailSamples());
 
         b.BackgroundSampleEvents = [.. b.BackgroundSampleEvents, .. starts, .. tails];
 
@@ -54,6 +43,9 @@ public class BmsModBackgroundKeysound : Mod, IApplicableAfterBeatmapConversion
         }
 
         foreach (var n in notes.OfType<BmsLongNote>())
+        {
             n.TailSampleKey = null;
+            n.AdditionalTailSampleKeys = [];
+        }
     }
 }

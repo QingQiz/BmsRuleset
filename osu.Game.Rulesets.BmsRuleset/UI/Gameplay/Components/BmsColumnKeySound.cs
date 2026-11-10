@@ -51,10 +51,8 @@ internal sealed partial class BmsColumnKeySound : CompositeDrawable
         if (cursor.Next(Time.Current, isFinished) is not { } hitObject)
             return;
 
-        PlaySample(hitObject.SampleKey, hitObject.SampleVolume);
-        var additional = hitObject.AdditionalSampleKeys;
-        for (var i = 0; i < additional.Count; i++)
-            PlaySample(additional[i], hitObject.SampleVolume);
+        foreach (var sample in hitObject.GetSamples())
+            PlaySample(sample.SampleKey, sample.Volume);
     }
 
     /// <summary>Triggers the landmine explosion definition (#WAV00).</summary>

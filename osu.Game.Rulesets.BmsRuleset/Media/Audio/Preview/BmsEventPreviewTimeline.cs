@@ -39,13 +39,11 @@ internal sealed record BmsEventPreviewTimeline(
             if (obj is not BmsHitObject hit || hit is BmsLandmine)
                 continue;
 
-            if (hit.SampleKey is { } sampleKey)
-                addEntry(hit.StartTime, sampleKey, hit.SampleVolume, false);
-            var additional = hit.AdditionalSampleKeys;
-            for (var i = 0; i < additional.Count; i++)
-                addEntry(hit.StartTime, additional[i], hit.SampleVolume, false);
-            if (hit is BmsLongNote { TailSampleKey: { } tailKey } hold)
-                addEntry(hold.EndTime, tailKey, hold.TailSampleVolume, false);
+            foreach (var sample in hit.GetSamples())
+                addEntry(sample.Time, sample.SampleKey, sample.Volume, false);
+            if (hit is BmsLongNote hold)
+                foreach (var tail in hold.GetTailSamples())
+                    addEntry(tail.Time, tail.SampleKey, tail.Volume, false);
         }
 
         cancellationToken.ThrowIfCancellationRequested();

@@ -63,6 +63,7 @@ public class BmsBeatmapDecoder(Func<int, int>? randomValueSelector = null) : Dec
         if (hitObject is BmsLongNote ln)
         {
             ln.Duration = parsedObject.Duration;
+            ln.AdditionalTailSampleKeys = parsedObject.AdditionalTailSampleKeys;
             ln.TailSampleKey = parsedObject.TailSampleKey;
             ln.TailSampleVolume = parsedObject.TailSampleVolume;
         }

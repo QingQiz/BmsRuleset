@@ -281,18 +281,20 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
 
     public void PlaySample(BmsHitObject note)
     {
-        if (!playfield.IsRebuildingReplay)
-        {
-            column.PlaySample(note.SampleKey, note.SampleVolume);
-            var additional = note.AdditionalSampleKeys;
-            for (var i = 0; i < additional.Count; i++)
-                column.PlaySample(additional[i], note.SampleVolume);
-        }
+        if (playfield.IsRebuildingReplay)
+            return;
+
+        foreach (var sample in note.GetSamples())
+            column.PlaySample(sample.SampleKey, sample.Volume);
     }
 
     public void PlayTailSample(BmsLongNote note)
     {
-        if (!playfield.IsRebuildingReplay) column.PlaySample(note.TailSampleKey, note.TailSampleVolume);
+        if (playfield.IsRebuildingReplay)
+            return;
+
+        foreach (var tail in note.GetTailSamples())
+            column.PlaySample(tail.SampleKey, tail.Volume);
     }
 
     public void PlayKeySound()

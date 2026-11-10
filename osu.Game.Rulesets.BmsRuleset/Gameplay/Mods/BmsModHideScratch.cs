@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
@@ -51,22 +50,12 @@ public class BmsModHideScratch : Mod, IApplicableToDrawableRuleset<BmsHitObject>
         var scratchNotes = b.HitObjects
             .Where(x => BmsLayout.IsScratchColumn(x.Column, b.LayoutVariant)).ToArray();
 
-        var scratchStartSamples = new List<BmsSampleEvent>();
-        foreach (var note in scratchNotes)
-        {
-            if (note is BmsLandmine)
-                continue;
-            if (note.SampleKey is { } key)
-                scratchStartSamples.Add(new BmsSampleEvent(note.StartTime, key, note.SampleVolume));
-            var additional = note.AdditionalSampleKeys;
-            for (var i = 0; i < additional.Count; i++)
-                scratchStartSamples.Add(new BmsSampleEvent(note.StartTime, additional[i], note.SampleVolume));
-        }
+        var scratchStartSamples = scratchNotes.Where(note => note is not BmsLandmine)
+            .SelectMany(note => note.GetSamples());
 
         var scratchEndSamples = scratchNotes
             .OfType<BmsLongNote>()
-            .Where(x => x.TailSampleKey.HasValue)
-            .Select(x => new BmsSampleEvent(x.EndTime, x.TailSampleKey!.Value, x.TailSampleVolume));
+            .SelectMany(x => x.GetTailSamples());
 
         b.BackgroundSampleEvents = b.BackgroundSampleEvents.Concat(scratchStartSamples).Concat(scratchEndSamples).ToArray();
         b.HitObjects = [.. b.HitObjects.Where(x => !BmsLayout.IsScratchColumn(x.Column, b.LayoutVariant))];

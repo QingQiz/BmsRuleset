@@ -1,4 +1,6 @@
-﻿using osu.Game.Rulesets.Objects.Types;
+﻿using System.Collections.Generic;
+using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.Objects.Types;
 
 namespace osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 
@@ -18,6 +20,16 @@ public class BmsLongNote : BmsHitObject, IHasDuration
     public double ScrollPositionAtEndTime { get; set; }
 
     public int? TailSampleKey { get; set; }
+
+    public IReadOnlyList<int> AdditionalTailSampleKeys { get; set; } = [];
+
+    internal IEnumerable<BmsSampleEvent> GetTailSamples()
+    {
+        if (TailSampleKey is { } key)
+            yield return new BmsSampleEvent(EndTime, key, TailSampleVolume);
+        foreach (var additional in AdditionalTailSampleKeys)
+            yield return new BmsSampleEvent(EndTime, additional, TailSampleVolume);
+    }
 
     public int TailSampleVolume { get; set; } = 100;
 
@@ -44,6 +56,7 @@ public class BmsLongNote : BmsHitObject, IHasDuration
             ln.ScrollPositionAtEndTime = ScrollPositionAtEndTime;
             ln.VisualScrollPositionAtEndTime = VisualScrollPositionAtEndTime;
             ln.TailSampleKey = TailSampleKey;
+            ln.AdditionalTailSampleKeys = AdditionalTailSampleKeys;
             ln.TailSampleVolume = TailSampleVolume;
         }
     }

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 using osu.Game.Rulesets.Judgements;
@@ -18,6 +19,14 @@ public class BmsHitObject : HitObject
     public int SampleVolume { get; set; } = 100;
 
     public IReadOnlyList<int> AdditionalSampleKeys { get; set; } = [];
+
+    internal IEnumerable<BmsSampleEvent> GetSamples()
+    {
+        if (SampleKey is { } key)
+            yield return new BmsSampleEvent(StartTime, key, SampleVolume);
+        foreach (var additional in AdditionalSampleKeys)
+            yield return new BmsSampleEvent(StartTime, additional, SampleVolume);
+    }
 
     public double JudgementRate { get; set; } = double.NaN;
 

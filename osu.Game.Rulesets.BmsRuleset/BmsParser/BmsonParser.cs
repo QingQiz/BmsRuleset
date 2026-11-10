@@ -52,8 +52,9 @@ internal static class BmsonParser
         var (bpmEvents, stopEvents) = readTiming(root, initialBpm, tickResolution, cancellationToken);
         var timing = new BmsTickTimeConverter(tickResolution, bpmEvents, stopEvents);
         var sampleDefinitions = new Dictionary<int, BmsSampleDefinition>();
-        var objects = new Dictionary<(int Column, long Pulse), BmsParsedHitObject>();
+        var objects = new Dictionary<(int Column, long Pulse), (long EndPulse, List<int> Samples)>();
         var background = new List<BmsSampleEvent>();
+        var releases = new Dictionary<(int Column, long Pulse), List<int>>();
         var nextSampleId = 1;
         var judgeRank = number(info, "judge_rank", 100);
         if (judgeRank < 0)
@@ -92,21 +93,26 @@ internal static class BmsonParser
                     hasPlayableNote = true;
                     var column = mapColumn(note.Lane, layout);
                     var key = (column, note.Pulse);
-                    var duration = timing.ProjectTickToTime(endPulse) - time;
+                    if (note.Release)
+                    {
+                        if (!releases.TryGetValue(key, out var releaseSamples))
+                            releases[key] = releaseSamples = [];
+                        if (!releaseSamples.Contains(sampleId))
+                            releaseSamples.Add(sampleId);
+                        continue;
+                    }
+
                     if (objects.TryGetValue(key, out var existing))
                     {
-                        if (existing.IsLongNote != (note.Length > 0)
-                            || existing.Duration != duration)
+                        if (existing.EndPulse != endPulse)
                             throw new InvalidDataException($"Conflicting BMSON note lengths at x={note.Lane}, y={note.Pulse}.");
 
-                        if (existing.SampleKey != sampleId && !existing.AdditionalSampleKeys.Contains(sampleId))
-                            objects[key] = existing with { AdditionalSampleKeys = [.. existing.AdditionalSampleKeys, sampleId] };
+                        // IDs increase as channels are read; duplicate uses in this group share the last ID.
+                        if (existing.Samples[^1] != sampleId)
+                            existing.Samples.Add(sampleId);
                     }
                     else
-                    {
-                        objects.Add(key, new BmsParsedHitObject(note.Pulse, time, duration,
-                            column, sampleId, note.Length > 0, false, 0, null, JudgementRate: double.NaN));
-                    }
+                        objects.Add(key, (endPulse, [sampleId]));
                 }
 
                 if (!hasPlayableNote)
@@ -115,7 +121,24 @@ internal static class BmsonParser
             }
         }
 
-        var hitObjects = objects.Values.OrderBy(note => note.Tick).ThenBy(note => note.Column).ToArray();
+        var parsedObjects = new List<BmsParsedHitObject>(objects.Count);
+        foreach (var (key, note) in objects)
+        {
+            var time = timing.ProjectTickToTime(key.Pulse);
+            var isLongNote = note.EndPulse > key.Pulse;
+            var tailSamples = isLongNote && releases.Remove((key.Column, note.EndPulse), out var samples) ? samples : null;
+            parsedObjects.Add(new BmsParsedHitObject(key.Pulse, time, timing.ProjectTickToTime(note.EndPulse) - time,
+                key.Column, note.Samples[0], isLongNote, false, 0, tailSamples?[0], JudgementRate: double.NaN)
+            {
+                AdditionalSampleKeys = note.Samples.Skip(1).ToArray(),
+                AdditionalTailSampleKeys = tailSamples?.Skip(1).ToArray() ?? [],
+            });
+        }
+
+        if (releases.Count > 0)
+            throw new InvalidDataException("BMSON release sound has no matching long-note endpoint.");
+
+        var hitObjects = parsedObjects.OrderBy(note => note.Tick).ThenBy(note => note.Column).ToArray();
         foreach (var column in hitObjects.GroupBy(note => note.Column))
         {
             double previousEnd = -1;
@@ -239,11 +262,12 @@ internal static class BmsonParser
 
     private static Note readNote(JsonElement value)
     {
-        if ((value.TryGetProperty("up", out var up) && up.GetBoolean()) || number(value, "t", 0) != 0)
-            throw new InvalidDataException("BMSON note type and release-sound extensions are not supported.");
+        if (number(value, "t", 0) != 0)
+            throw new InvalidDataException("BMSON note type extensions are not supported.");
 
         return new Note(checked((int)pulse(value, "x", 0)), pulse(value, "y"), pulse(value, "l", 0),
-            value.TryGetProperty("c", out var continuation) && continuation.GetBoolean());
+            value.TryGetProperty("c", out var continuation) && continuation.GetBoolean(),
+            value.TryGetProperty("up", out var release) && release.GetBoolean());
     }
 
     private static int mapColumn(int lane, BmsLayoutVariant layout) => layout switch
@@ -322,5 +346,5 @@ internal static class BmsonParser
         return path;
     }
 
-    private readonly record struct Note(int Lane, long Pulse, long Length, bool Continue);
+    private readonly record struct Note(int Lane, long Pulse, long Length, bool Continue, bool Release);
 }

@@ -55,6 +55,7 @@ public readonly record struct BmsParsedHitObject(
     double JudgementRate = 0.75)
 {
     public IReadOnlyList<int> AdditionalSampleKeys { get; init; } = [];
+    public IReadOnlyList<int> AdditionalTailSampleKeys { get; init; } = [];
 }
 
 public sealed record BmsSampleEvent(double Time, int SampleKey, int Volume);
