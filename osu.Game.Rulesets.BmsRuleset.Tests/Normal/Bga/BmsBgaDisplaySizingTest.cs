@@ -380,7 +380,7 @@ public class BmsBgaDisplaySizingTest
             typeof(BmsBgaDisplay).GetField("resources", fields)!.SetValue(display, resources);
             typeof(BmsBgaDisplay).GetField("textures", fields)!.SetValue(display, textures);
             typeof(BmsBgaDisplay).GetField("bga", fields)!.SetValue(display,
-                new BmsBgaTimeline(new Dictionary<ushort, string> { [1] = path }, new Dictionary<ushort, BmsBgaDefinition>(), [], [], BmsPoorBgaMode.Replace));
+                new BmsBgaTimeline(new Dictionary<int, string> { [1] = path }, new Dictionary<int, BmsBgaDefinition>(), [], [], BmsPoorBgaMode.Replace));
 
             var create = typeof(BmsBgaDisplay).GetMethod("createDrawable", fields)!;
             using var drawable = (Drawable)create.Invoke(display, [new BmsBgaEvent(0, 0, 1, BmsBgaLayer.Base, 0)])!;

@@ -66,14 +66,14 @@ public sealed record BmsTextEvent(double Time, string Text);
 public sealed record BmsTextEvents(string? MistakeText, BmsTextEvent[] TextEvents);
 
 public sealed record BmsBgaTimeline(
-    IReadOnlyDictionary<ushort, string> BitmapDefinitions,
-    IReadOnlyDictionary<ushort, BmsBgaDefinition> BgaDefinitions,
+    IReadOnlyDictionary<int, string> BitmapDefinitions,
+    IReadOnlyDictionary<int, BmsBgaDefinition> BgaDefinitions,
     IReadOnlyList<BmsBgaEvent> Events,
     IReadOnlyList<BmsBgaOpacityEvent> OpacityEvents,
     BmsPoorBgaMode PoorMode);
 
 public readonly record struct BmsBgaDefinition(
-    ushort BitmapKey,
+    int BitmapKey,
     int SourceX,
     int SourceY,
     int SourceWidth,
@@ -81,7 +81,23 @@ public readonly record struct BmsBgaDefinition(
     int DestinationX,
     int DestinationY);
 
-public sealed record BmsBgaEvent(double Time, long Tick, ushort DefinitionKey, BmsBgaLayer Layer, int Sequence);
+public sealed record BmsBgaEvent(double Time, long Tick, int DefinitionKey, BmsBgaLayer Layer, int Sequence)
+{
+    public double EndTime { get; init; } = double.PositiveInfinity;
+
+    public BmsBgaAnimation? Animation { get; init; }
+}
+
+public sealed record BmsBgaAnimation(IReadOnlyList<BmsBgaFrame[]> Variants, BmsBgaTrigger Trigger, int Interval);
+
+public readonly record struct BmsBgaFrame(double Offset, int? DefinitionKey);
+
+public enum BmsBgaTrigger
+{
+    Always,
+    Play,
+    Miss,
+}
 
 public sealed record BmsBgaOpacityEvent(double Time, long Tick, BmsBgaLayer Layer, float Opacity, int Sequence);
 
@@ -91,6 +107,8 @@ public enum BmsBgaLayer
     Poor,
     Layer1,
     Layer2,
+    Background,
+    Title,
 }
 
 public enum BmsPoorBgaMode

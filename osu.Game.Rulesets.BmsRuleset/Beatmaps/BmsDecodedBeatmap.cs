@@ -30,7 +30,7 @@ internal class BmsDecodedBeatmap : Beatmap, IBmsBeatmap
 
     public BmsTextEvents TextEvents { get; set; } = new(string.Empty, []);
 
-    public BmsBgaTimeline Bga { get; set; } = new(new Dictionary<ushort, string>(), new Dictionary<ushort, BmsBgaDefinition>(), [], [], BmsPoorBgaMode.Replace);
+    public BmsBgaTimeline Bga { get; set; } = new(new Dictionary<int, string>(), new Dictionary<int, BmsBgaDefinition>(), [], [], BmsPoorBgaMode.Replace);
 
     public BmsLongNoteMode LockedLongNoteMode { get; set; }
 

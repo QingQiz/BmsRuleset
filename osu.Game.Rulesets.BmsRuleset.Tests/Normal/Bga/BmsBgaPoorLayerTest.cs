@@ -37,8 +37,8 @@ public partial class BmsBgaPoorLayerTest
                 new BmsNote { StartTime = 1000, Column = 1 },
                 new BmsNote { StartTime = 2000, Column = 1 },
             },
-            Bga = new BmsBgaTimeline(new Dictionary<ushort, string> { [0] = "poor.png" },
-                new Dictionary<ushort, BmsBgaDefinition>(), [], [], BmsPoorBgaMode.Replace),
+            Bga = new BmsBgaTimeline(new Dictionary<int, string> { [0] = "poor.png" },
+                new Dictionary<int, BmsBgaDefinition>(), [], [], BmsPoorBgaMode.Replace),
         };
         ruleset = new TestDrawableRuleset(beatmap);
         scoreProcessor = new BmsScoreProcessor { Clock = ruleset.FrameStableClock };
@@ -63,6 +63,45 @@ public partial class BmsBgaPoorLayerTest
         scoreProcessor.Dispose();
         ruleset.TestClock.Dispose();
         ruleset.Dispose();
+    }
+
+    [Test]
+    public void TestBmsonStaticEventReplacesTriggeredAnimation()
+    {
+        var bytes = osu.Game.Rulesets.BmsRuleset.Tests.Normal.BeatmapTest.Decoding.BmsonParserTest.Chart(events: """
+            ,"bga":{"bga_header":[{"id":1,"name":"layer.png"}],
+            "layer_events":[{"y":0,"id":1,"condition":"play"},{"y":720,"id":1}]}
+            """);
+        setTimeline(BmsonParser.Parse(bytes).Bga);
+        advanceTo(0);
+        advanceTo(1000);
+        applyResult(0, HitResult.Perfect);
+        Assert.That(getDisplayField<Dictionary<BmsBgaLayer, BmsBgaAnimationPlayback>>("animations"), Has.Count.EqualTo(1));
+        advanceTo(1500);
+        Assert.That(getDisplayField<Dictionary<BmsBgaLayer, BmsBgaAnimationPlayback>>("animations"), Is.Empty);
+        advanceTo(1000);
+        Assert.That(getDisplayField<Dictionary<BmsBgaLayer, BmsBgaAnimationPlayback>>("animations"), Has.Count.EqualTo(1));
+        Assert.That(layer(BmsBgaLayer.Poor).Alpha, Is.Zero);
+    }
+
+    [Test]
+    public void TestBmsonPoorSequenceKeepsItsDurationAndClearsOnSeek()
+    {
+        var bytes = osu.Game.Rulesets.BmsRuleset.Tests.Normal.BeatmapTest.Decoding.BmsonParserTest.Chart(events: """
+            ,"bga":{"bga_header":[{"id":1,"name":"poor.png"}],
+            "bga_sequence":[{"id":2,"sequence":[{"time":0,"id":1},{"time":900}]}],
+            "poor_events":[{"y":0,"id":2}]}
+            """);
+        setTimeline(BmsonParser.Parse(bytes).Bga);
+        advanceTo(0);
+        advanceTo(1000);
+        applyResult(0, HitResult.Meh);
+        advanceTo(1501);
+        Assert.That(layer(BmsBgaLayer.Poor).Alpha, Is.EqualTo(1));
+        advanceTo(1901);
+        Assert.That(layer(BmsBgaLayer.Poor).Alpha, Is.Zero);
+        advanceTo(1200);
+        Assert.That(layer(BmsBgaLayer.Poor).Alpha, Is.Zero);
     }
 
     [TestCase(HitResult.Perfect, false, false)]
@@ -120,7 +159,7 @@ public partial class BmsBgaPoorLayerTest
     [Test]
     public void TestNoPoorResourceKeepsNormalLayersVisible()
     {
-        setTimeline(beatmap.Bga with { BitmapDefinitions = new Dictionary<ushort, string>() });
+        setTimeline(beatmap.Bga with { BitmapDefinitions = new Dictionary<int, string>() });
         applyResult(0, HitResult.Meh);
 
         Assert.Multiple(() =>
@@ -268,8 +307,12 @@ public partial class BmsBgaPoorLayerTest
 
     private Container layer(BmsBgaLayer layer) => getDisplayField<Dictionary<BmsBgaLayer, Container>>("layerHosts")[layer];
 
-    private void setTimeline(BmsBgaTimeline timeline) =>
+    private void setTimeline(BmsBgaTimeline timeline)
+    {
         typeof(BmsBgaDisplay).GetField("bga", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(display, timeline);
+        typeof(BmsBgaDisplay).GetField("events", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(display, timeline.Events);
+        typeof(BmsBgaDisplay).GetField("opacityEvents", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(display, timeline.OpacityEvents);
+    }
 
     private void setDisplayProperty(string name, object value) =>
         typeof(BmsBgaDisplay).GetProperty(name, BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(display, value);

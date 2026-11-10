@@ -639,8 +639,8 @@ internal static partial class BmsChartParser
         });
 
         return new BmsBgaTimeline(
-            new Dictionary<ushort, string>(state.BitmapDefinitions),
-            new Dictionary<ushort, BmsBgaDefinition>(state.BgaDefinitions),
+            state.BitmapDefinitions,
+            state.BgaDefinitions,
             events,
             opacityEvents,
             state.PoorBgaMode);
@@ -1387,9 +1387,9 @@ internal static partial class BmsChartParser
 
         public Dictionary<int, BmsSampleDefinition> SampleDefinitions { get; } = new();
 
-        public Dictionary<ushort, string> BitmapDefinitions { get; } = new();
+        public Dictionary<int, string> BitmapDefinitions { get; } = new();
 
-        public Dictionary<ushort, BmsBgaDefinition> BgaDefinitions { get; } = new();
+        public Dictionary<int, BmsBgaDefinition> BgaDefinitions { get; } = new();
 
         public Dictionary<ushort, string> TextDefinitions { get; } = new();
 

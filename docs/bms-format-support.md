@@ -11,7 +11,10 @@ Import BMSON 1.0.0 charts by dropping their files or song folders into the game.
 and `generic-1keys` through `generic-64keys`. Configure each layout's keys in the input settings.
 
 Support includes LN/CN/HCN types per note, layered keysounds, automatic audio slicing, BPM changes, stops, explicit bar lines,
-BGA, and song previews. `chart_name` supplies the difficulty name; `judge_rank` scales judgement windows and
+BGA sequences, and song previews. BGA layers can react to successful judgements or misses.
+Background images stay behind the BGA; the title image appears before the first playable note.
+
+`chart_name` supplies the difficulty name; `judge_rank` scales judgement windows and
 `total` scales the default gauge recovery. Judgement percentages retain fractional values.
 
 Legacy BMSON 0.21 and player extensions such as mines, scroll events, and release sounds require conversion to

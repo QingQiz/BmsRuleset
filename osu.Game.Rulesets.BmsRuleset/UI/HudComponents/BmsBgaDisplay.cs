@@ -77,6 +77,7 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
     private readonly Dictionary<BmsBgaLayer, BmsBgaOpacityEvent> activeOpacityEvents = new();
     private readonly Dictionary<BmsBgaLayer, Container> layerHosts = new();
     private readonly Dictionary<BmsBgaLayer, int> layerGenerations = new();
+    private readonly Dictionary<BmsBgaLayer, BmsBgaAnimationPlayback> animations = new();
 
     private BmsBgaTimeline? bga;
     private BmsBgaResourceStore? resources;
@@ -129,10 +130,12 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
             RelativeSizeAxes = Axes.Both,
             Children =
             [
+                createLayerHost(BmsBgaLayer.Background),
                 createLayerHost(BmsBgaLayer.Base),
                 createLayerHost(BmsBgaLayer.Layer1),
                 createLayerHost(BmsBgaLayer.Layer2),
                 createLayerHost(BmsBgaLayer.Poor),
+                createLayerHost(BmsBgaLayer.Title),
             ],
         };
     }
@@ -172,8 +175,11 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
         if (bga == null || drawableRuleset == null)
             return;
 
-        var time = drawableRuleset.FrameStableClock.CurrentTime;
+        advanceTo(drawableRuleset.FrameStableClock.CurrentTime);
+    }
 
+    private void advanceTo(double time)
+    {
         // Replaying every BGA event after a seek (or a long pause) can create hundreds of
         // textures/video drawables in one update. Rebuild only the final state for each layer;
         // normal frame-sized advances retain the ordered path below.
@@ -202,14 +208,20 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
         {
             var evt = events[nextEventIndex++];
             activeEvents[evt.Layer] = evt;
-            setLayerDrawable(evt);
+            activateEvent(evt);
         }
+
+        updateAnimations(time);
+        foreach (var evt in activeEvents.Values)
+            if (time >= evt.EndTime && layerHosts.TryGetValue(evt.Layer, out var host) && host.Count > 0)
+                host.Clear();
     }
 
     private void rebuildStateAt(double time)
     {
         activeEvents.Clear();
         activeOpacityEvents.Clear();
+        animations.Clear();
         poorLayerVisible = false;
         poorLayerUntil = double.NegativeInfinity;
         clearLayerHosts();
@@ -226,7 +238,7 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
         nextOpacityEventIndex = opacityEnd;
 
         foreach (var evt in activeEvents.Values)
-            setLayerDrawable(evt);
+            activateEvent(evt);
 
         foreach (var layer in activeOpacityEvents.Keys)
             applyLayerOpacity(layer);
@@ -533,13 +545,27 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
             host.Clear();
     }
 
+    private void activateEvent(BmsBgaEvent evt)
+    {
+        if (evt.Animation != null)
+        {
+            var playback = new BmsBgaAnimationPlayback(evt);
+            animations[evt.Layer] = playback;
+            playback.Trigger(BmsBgaTrigger.Always, evt.Time);
+            // A new trigger-only event can stay blank while the previous video's load completes.
+            layerGenerations[evt.Layer] = layerGenerations.GetValueOrDefault(evt.Layer) + 1;
+            layerHosts[evt.Layer].Clear();
+        }
+        else
+        {
+            animations.Remove(evt.Layer);
+            setLayerDrawable(evt);
+        }
+    }
+
     private void setLayerDrawable(BmsBgaEvent evt)
     {
-        if (!layerHosts.TryGetValue(evt.Layer, out var host))
-        {
-            return;
-        }
-
+        var host = layerHosts[evt.Layer];
         var drawable = createDrawable(evt);
         host.Clear();
         var generation = layerGenerations.TryGetValue(evt.Layer, out var previousGeneration)
@@ -559,7 +585,8 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
                     && layerGenerations.TryGetValue(evt.Layer, out var currentGeneration)
                     && currentGeneration == generation
                     && activeEvents.TryGetValue(evt.Layer, out var active)
-                    && active.Sequence == evt.Sequence)
+                    && active.Sequence == evt.Sequence
+                    && (drawableRuleset?.FrameStableClock.CurrentTime ?? Clock.CurrentTime) < evt.EndTime)
                     host.Add(loaded);
                 else
                     loaded.Dispose();
@@ -717,13 +744,50 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
                                   || bytes.AsSpan().StartsWith((ReadOnlySpan<byte>)[255, 216, 255]));
     }
 
-    private void onNewJudgement(JudgementResult result)
+    private void updateAnimations(double time)
     {
-        if (result is not BmsJudgementResult { SuppressPenalty: true })
-            tryShowPoorLayer();
+        foreach (var (layer, playback) in animations)
+        {
+            if (!playback.TryAdvance(time, out var frame))
+                continue;
+
+            if (frame.Key is { } key)
+                setLayerDrawable(activeEvents[layer] with { DefinitionKey = key, Time = frame.StartTime, Animation = null });
+            else if (layerHosts.TryGetValue(layer, out var host))
+            {
+                // Invalidate an in-flight video when its animation advances to a blank frame.
+                layerGenerations[layer] = layerGenerations.GetValueOrDefault(layer) + 1;
+                host.Clear();
+            }
+        }
     }
 
-    private void onNonConsumingJudgementRegistered(BmsTimingObservation observation) => tryShowPoorLayer();
+    private void triggerAnimations(BmsBgaTrigger trigger)
+    {
+        if (drawableRuleset == null)
+            return;
+
+        var time = drawableRuleset.FrameStableClock.CurrentTime;
+        advanceTo(time);
+        foreach (var playback in animations.Values)
+            playback.Trigger(trigger, time);
+        updateAnimations(time);
+    }
+
+    private void onNewJudgement(JudgementResult result)
+    {
+        if (result is BmsJudgementResult { SuppressPenalty: true })
+            return;
+
+        triggerAnimations(result.Type.IsHit() && result.Type != HitResult.Meh ? BmsBgaTrigger.Play : BmsBgaTrigger.Miss);
+        tryShowPoorLayer();
+    }
+
+    private void onNonConsumingJudgementRegistered(BmsTimingObservation observation)
+    {
+        triggerAnimations(BmsBgaTrigger.Miss);
+        tryShowPoorLayer();
+    }
 
     private void tryShowPoorLayer()
     {
@@ -737,13 +801,15 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
             var sequence = activeEvents.Values.Select(e => e.Sequence).DefaultIfEmpty(0).Max() + 1;
             var evt = new BmsBgaEvent(time, 0, 0, BmsBgaLayer.Poor, sequence);
             activeEvents[BmsBgaLayer.Poor] = evt;
-            setLayerDrawable(evt);
+            activateEvent(evt);
         }
 
         if (!activeEvents.ContainsKey(BmsBgaLayer.Poor))
             return;
 
         poorLayerUntil = drawableRuleset.FrameStableClock.CurrentTime + 500;
+        if (animations.TryGetValue(BmsBgaLayer.Poor, out var animation))
+            poorLayerUntil = Math.Max(poorLayerUntil, animation.EndTime);
         poorLayerVisible = true;
         applyLayerVisibility();
     }

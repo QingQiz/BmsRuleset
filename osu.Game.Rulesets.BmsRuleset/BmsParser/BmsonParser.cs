@@ -147,7 +147,7 @@ internal static class BmsonParser
             }
         }
 
-        var bga = readBga(root, timing, cancellationToken);
+        var bga = readBga(root, timing, hitObjects.Where(note => !note.IsMine).Select(note => note.StartTime).DefaultIfEmpty(0).Min(), cancellationToken);
         lastPulse = Math.Max(lastPulse, bga.Events.Select(evt => evt.Tick).DefaultIfEmpty(0).Max());
         var explicitLines = root.TryGetProperty("lines", out var lines) && lines.ValueKind != JsonValueKind.Null;
         var barLines = explicitLines
@@ -226,19 +226,29 @@ internal static class BmsonParser
         return (bpmEvents.ToArray(), stopEvents.ToArray());
     }
 
-    private static BmsBgaTimeline readBga(JsonElement root, BmsTickTimeConverter timing, CancellationToken cancellationToken)
+    private static BmsBgaTimeline readBga(JsonElement root, BmsTickTimeConverter timing, double firstNoteTime, CancellationToken cancellationToken)
     {
-        var definitions = new Dictionary<ushort, string>();
-        var ids = new Dictionary<long, ushort>();
+        var definitions = new Dictionary<int, string>();
+        var ids = new Dictionary<long, int>();
         var events = new List<BmsBgaEvent>();
         if (root.TryGetProperty("bga", out var bga) && bga.ValueKind != JsonValueKind.Null)
         {
             foreach (var header in array(bga, "bga_header"))
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var key = checked((ushort)(definitions.Count + 1));
-                ids.Add(pulse(header, "id"), key);
-                definitions.Add(key, resource(header, "name"));
+                var id = pulse(header, "id");
+                if (!ids.TryGetValue(id, out var key))
+                    ids[id] = key = definitions.Count + 1;
+                definitions[key] = resource(header, "name");
+            }
+
+            var sequences = new Dictionary<long, BmsBgaFrame[]>();
+            foreach (var sequence in array(bga, "bga_sequence"))
+            {
+                sequences[pulse(sequence, "id")] = array(sequence, "sequence", true).Select(frame => new BmsBgaFrame(
+                    pulse(frame, "time"), frame.TryGetProperty("id", out var id) && id.ValueKind != JsonValueKind.Null
+                        ? resolveId(pulse(frame, "id"))
+                        : null)).OrderBy(frame => frame.Offset).ToArray();
             }
 
             foreach (var (name, layer) in new[] { ("bga_events", BmsBgaLayer.Base), ("layer_events", BmsBgaLayer.Layer1), ("poor_events", BmsBgaLayer.Poor) })
@@ -247,15 +257,56 @@ internal static class BmsonParser
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     var position = pulse(evt, "y");
-                    if (!ids.TryGetValue(pulse(evt, "id"), out var key))
-                        throw new InvalidDataException("BMSON BGA event references an undefined image.");
+                    var sourceIds = evt.TryGetProperty("id_set", out var set) && set.ValueKind != JsonValueKind.Null
+                        ? set.EnumerateArray().Select(value => value.GetInt64()).ToArray()
+                        : [pulse(evt, "id")];
+                    if (sourceIds.Length == 0)
+                        throw new InvalidDataException("BMSON BGA id_set must contain an image or sequence.");
 
-                    events.Add(new BmsBgaEvent(timing.ProjectTickToTime(position), position, key, layer, events.Count));
+                    var trigger = text(evt, "condition", layer == BmsBgaLayer.Poor ? "miss" : "") switch
+                    {
+                        "" => BmsBgaTrigger.Always,
+                        "play" => BmsBgaTrigger.Play,
+                        "miss" => BmsBgaTrigger.Miss,
+                        var condition => throw new InvalidDataException($"Unsupported BMSON BGA condition: {condition}."),
+                    };
+                    var extended = sourceIds.Length > 1 || sourceIds.Any(sequences.ContainsKey) || evt.TryGetProperty("condition", out _);
+                    BmsBgaAnimation? animation = null;
+                    var key = 0;
+                    if (extended)
+                    {
+                        var variants = sourceIds.Select(id => sequences.TryGetValue(id, out var frames)
+                            ? frames
+                            : new[] { new BmsBgaFrame(0, resolveId(id)), new BmsBgaFrame(500, null) }).ToArray();
+                        animation = new BmsBgaAnimation(variants, trigger, checked((int)Math.Max(1, pulse(evt, "interval", 1))));
+                    }
+                    else
+                        key = resolveId(sourceIds[0]);
+
+                    events.Add(new BmsBgaEvent(timing.ProjectTickToTime(position), position, key, layer, events.Count) { Animation = animation });
                 }
             }
+
+            int resolveId(long id) => ids.TryGetValue(id, out var key)
+                ? key
+                : throw new InvalidDataException("BMSON BGA event references an undefined image.");
         }
 
-        return new BmsBgaTimeline(definitions, new Dictionary<ushort, BmsBgaDefinition>(), events.OrderBy(evt => evt.Tick).ThenBy(evt => evt.Sequence).ToArray(), [], BmsPoorBgaMode.Replace);
+        var info = root.GetProperty("info");
+        addStaticImage(resource(info, "back_image"), BmsBgaLayer.Background, double.PositiveInfinity);
+        addStaticImage(resource(info, "title_image"), BmsBgaLayer.Title, firstNoteTime);
+
+        void addStaticImage(string path, BmsBgaLayer layer, double until)
+        {
+            if (string.IsNullOrEmpty(path))
+                return;
+
+            var key = definitions.Count + 1;
+            definitions[key] = path;
+            events.Add(new BmsBgaEvent(double.MinValue, 0, key, layer, events.Count) { EndTime = until });
+        }
+
+        return new BmsBgaTimeline(definitions, new Dictionary<int, BmsBgaDefinition>(), events.OrderBy(evt => evt.Time).ThenBy(evt => evt.Sequence).ToArray(), [], BmsPoorBgaMode.Replace);
     }
 
     private static Note readNote(JsonElement value)
