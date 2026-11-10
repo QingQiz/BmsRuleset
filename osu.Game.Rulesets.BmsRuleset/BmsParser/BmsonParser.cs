@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Difficulty;
@@ -19,8 +20,11 @@ internal static class BmsonParser
         cancellationToken.ThrowIfCancellationRequested();
         using var document = JsonDocument.Parse(content.AsMemory(content.AsSpan().StartsWith("\uFEFF"u8) ? 3 : 0));
         var root = document.RootElement;
-        if (text(root, "version") != "1.0.0")
-            throw new InvalidDataException("Only BMSON 1.0.0 is supported; legacy charts must be converted first.");
+        var legacy = !root.TryGetProperty("version", out var version) || version.ValueKind == JsonValueKind.String && version.GetString() == "0.21";
+        if (legacy)
+            root = BmsonLegacyReader.Normalize(root, cancellationToken);
+        else if (version.ValueKind != JsonValueKind.String || !Regex.IsMatch(version.GetString()!, @"^1\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$"))
+            throw new InvalidDataException("Unsupported BMSON version.");
 
         var info = root.GetProperty("info");
         var initialBpm = positive(number(info, "init_bpm"), "init_bpm");
@@ -163,7 +167,11 @@ internal static class BmsonParser
         }).ToArray();
         var mainBpm = BmsTimingMap.FindMainBpm(bpmEvents, hitObjects.Select(note => note.Tick));
         var timingMap = BmsTimingMap.FromSortedEvents(tickResolution, measures, bpmEvents, stopEvents, [], [], mainBpm, barLines: barLines);
-        var total = BmsGaugeCalculator.CalculateDefaultTotal(hitObjects.Sum(note => note.IsLongNote
+        double? total = legacy
+            ? info.TryGetProperty("total", out var legacyTotal) && legacyTotal.ValueKind != JsonValueKind.Null
+                ? Math.Abs(number(info, "total"))
+                : null
+            : BmsGaugeCalculator.CalculateDefaultTotal(hitObjects.Sum(note => note.IsLongNote
             && (note.LongNoteMode == BmsLongNoteMode.Undefined ? longNoteMode : note.LongNoteMode)
             is BmsLongNoteMode.ChargeNote or BmsLongNoteMode.HellChargeNote ? 2 : 1), BmsGaugeProfileFamilyProvider.FromLayout(layout)) * Math.Abs(number(info, "total", 100)) / 100;
         var credits = array(info, "subartists").Select(value => value.GetString() ?? string.Empty).ToArray();
