@@ -298,20 +298,18 @@ internal static class BmsonParser
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     var position = pulse(evt, "y");
-                    var sourceIds = evt.TryGetProperty("id_set", out var set) && set.ValueKind != JsonValueKind.Null
+                    var sourceIds = evt.TryGetProperty("id_set", out var set) && set.ValueKind != JsonValueKind.Null && set.GetArrayLength() > 0
                         ? set.EnumerateArray().Select(value => value.GetInt64()).ToArray()
                         : [pulse(evt, "id")];
-                    if (sourceIds.Length == 0)
-                        throw new InvalidDataException("BMSON BGA id_set must contain an image or sequence.");
-
-                    var trigger = text(evt, "condition", layer == BmsBgaLayer.Poor ? "miss" : "") switch
+                    var condition = text(evt, "condition");
+                    var trigger = condition switch
                     {
-                        "" => BmsBgaTrigger.Always,
+                        "" => layer == BmsBgaLayer.Poor ? BmsBgaTrigger.Miss : BmsBgaTrigger.Always,
                         "play" => BmsBgaTrigger.Play,
                         "miss" => BmsBgaTrigger.Miss,
-                        var condition => throw new InvalidDataException($"Unsupported BMSON BGA condition: {condition}."),
+                        _ => throw new InvalidDataException($"Unsupported BMSON BGA condition: {condition}."),
                     };
-                    var extended = sourceIds.Length > 1 || sourceIds.Any(sequences.ContainsKey) || evt.TryGetProperty("condition", out _);
+                    var extended = sourceIds.Length > 1 || sourceIds.Any(sequences.ContainsKey) || condition.Length > 0;
                     BmsBgaAnimation? animation = null;
                     var key = 0;
                     if (extended)

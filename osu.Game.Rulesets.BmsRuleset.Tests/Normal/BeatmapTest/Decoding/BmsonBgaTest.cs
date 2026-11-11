@@ -8,6 +8,20 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.BeatmapTest.Decoding;
 [TestFixture]
 public class BmsonBgaTest
 {
+    [TestCase("bga_events")]
+    [TestCase("layer_events")]
+    [TestCase("poor_events")]
+    public void EmptyExtensionDefaultsKeepOrdinaryImageEvents(string channel)
+    {
+        var result = BmsonParser.Parse(BmsonParserTest.Chart(events: $$"""
+            ,"bga":{"bga_header":[{"id":1,"name":"bgi.bmp"}],
+            "{{channel}}":[{"y":0,"id":1,"id_set":[],"condition":"","interval":0}]}
+            """));
+        var source = result.Bga.Events.Single();
+        Assert.That(result.Bga.BitmapDefinitions[source.DefinitionKey], Is.EqualTo("bgi.bmp"));
+        Assert.That(source.Animation, Is.Null);
+    }
+
     [Test]
     public void BgaDuplicateHeadersSequencesConditionsAndImageRolesAreRetained()
     {
