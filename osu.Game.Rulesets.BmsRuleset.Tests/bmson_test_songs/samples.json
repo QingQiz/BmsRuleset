@@ -1,0 +1,421 @@
+[
+  {
+    "file": "sparkling-5k.bmson",
+    "title": "",
+    "artist": "",
+    "source": "BMS/Sparkling [wist]/BMS.bmson",
+    "sha256": "6f233726612a31d90d0c3ae57be144dd97a8c249a00903637dd0af69dc412b11",
+    "coverage": "Minimal 5-key export with resolution 4 and empty title/artist.",
+    "expected": {
+      "mode": "beat-5k",
+      "objects": 16,
+      "longNotes": 0,
+      "longNoteModes": [
+        0,
+        0,
+        0
+      ],
+      "releaseSamples": 0,
+      "mines": 0,
+      "invisible": 0,
+      "layeredNotes": 0,
+      "scrollEvents": 0,
+      "bgaEvents": 0,
+      "timing": [
+        {
+          "pulse": 16,
+          "milliseconds": 1500.0
+        },
+        {
+          "pulse": 39,
+          "milliseconds": 3656.25
+        },
+        {
+          "pulse": 47,
+          "milliseconds": 4406.25
+        }
+      ]
+    }
+  },
+  {
+    "file": "chicken-4k.bmson",
+    "title": "Chicken",
+    "artist": "BilliumMoto",
+    "source": "BOF/BOFU2016/TEAM-BMSON/chicken bmson/chicken_4k.bmson",
+    "sha256": "1bc510d97a99db119f6fa36cee98ad73433e91c1a9a1c8da9875cae03940440d",
+    "coverage": "Generic 4-key layout, continuous slicing and long notes.",
+    "expected": {
+      "mode": "generic-4keys",
+      "objects": 2860,
+      "longNotes": 108,
+      "longNoteModes": [
+        108,
+        0,
+        0
+      ],
+      "releaseSamples": 0,
+      "mines": 0,
+      "invisible": 0,
+      "layeredNotes": 0,
+      "scrollEvents": 0,
+      "bgaEvents": 0,
+      "timing": [
+        {
+          "pulse": 960,
+          "milliseconds": 1072.913407
+        },
+        {
+          "pulse": 80020,
+          "milliseconds": 89431.802942
+        },
+        {
+          "pulse": 144960,
+          "milliseconds": 162009.924449
+        }
+      ]
+    }
+  },
+  {
+    "file": "minusone-9k-negative-level.bmson",
+    "title": "minusone",
+    "artist": "foonone (フーノーン)",
+    "source": "BOF/BOFTT/200. minusone [foonone (フーノーン)]/__9IN_tricolore.bmson",
+    "sha256": "3d237b99ad976dcde8710c44bd86af07c317b03aecef3b5d1343828ffbd082ae",
+    "coverage": "Popn 9-key layout with per-note LN/CN/HCN and 621 BGA events.",
+    "error": "BMSON level must be a non-negative integer."
+  },
+  {
+    "file": "child-of-earth-14k.bmson",
+    "title": "Child of Earth",
+    "artist": "Urban Techno Cafe",
+    "source": "BOF/G2R2018/UTC_Child_of_Earth/_Child_of_Earth_DPNormal.bmson",
+    "sha256": "ef598f821e6ce10f985cac2a65dc4de33872aa879c8fd36f3c575fb0b5f3a898",
+    "coverage": "Beat 14-key double play, scratch lanes and long notes.",
+    "expected": {
+      "mode": "beat-14k",
+      "objects": 398,
+      "longNotes": 50,
+      "longNoteModes": [
+        50,
+        0,
+        0
+      ],
+      "releaseSamples": 0,
+      "mines": 0,
+      "invisible": 0,
+      "layeredNotes": 0,
+      "scrollEvents": 0,
+      "bgaEvents": 0,
+      "timing": [
+        {
+          "pulse": 960,
+          "milliseconds": 1875.0
+        },
+        {
+          "pulse": 32160,
+          "milliseconds": 62812.5
+        },
+        {
+          "pulse": 62400,
+          "milliseconds": 121875.0
+        }
+      ]
+    }
+  },
+  {
+    "file": "bikkuriyasai-24k.bmson",
+    "title": "びっくりやさい",
+    "artist": "Ogu",
+    "source": "BMS/びっくりやさい/53_bikkuriyasai_24H.bmson",
+    "sha256": "11317ad9fb2cce29ae92da36936c34924e854b7c9c8c278ce1f3d7926cc636bf",
+    "coverage": "24-key layout, layered samples and keyboard long notes.",
+    "expected": {
+      "mode": "keyboard-24k",
+      "objects": 468,
+      "longNotes": 40,
+      "longNoteModes": [
+        40,
+        0,
+        0
+      ],
+      "releaseSamples": 0,
+      "mines": 0,
+      "invisible": 0,
+      "layeredNotes": 8,
+      "scrollEvents": 0,
+      "bgaEvents": 1,
+      "timing": [
+        {
+          "pulse": 1920,
+          "milliseconds": 3582.089552
+        },
+        {
+          "pulse": 31500,
+          "milliseconds": 58768.656716
+        },
+        {
+          "pulse": 59520,
+          "milliseconds": 111044.776119
+        }
+      ]
+    }
+  },
+  {
+    "file": "nothing-but-seven-48k.bmson",
+    "title": "Nothing But Seven",
+    "artist": "SEPHID",
+    "source": "BOF/BOFXVI/BOFXVI 非公式パッケージ ver3.0/BOFXVI -THE BMS OF FIGHTERS XVI NEO DYSTOPIA-/本群/Nothing But Seven/_48K.bmson",
+    "sha256": "9bf05f1a2165fd15992fba7b44c4cc1ff780ad2cfb3d0b4783428210f228f214",
+    "coverage": "48-key double play and all four image roles.",
+    "expected": {
+      "mode": "keyboard-24k-double",
+      "objects": 1623,
+      "longNotes": 0,
+      "longNoteModes": [
+        0,
+        0,
+        0
+      ],
+      "releaseSamples": 0,
+      "mines": 0,
+      "invisible": 0,
+      "layeredNotes": 0,
+      "scrollEvents": 0,
+      "bgaEvents": 3,
+      "timing": [
+        {
+          "pulse": 480,
+          "milliseconds": 631.578947
+        },
+        {
+          "pulse": 50520,
+          "milliseconds": 66473.684211
+        },
+        {
+          "pulse": 93120,
+          "milliseconds": 122526.315789
+        }
+      ]
+    }
+  },
+  {
+    "file": "rust-memories-hcn.bmson",
+    "title": "rust memories",
+    "artist": "Dinger Box vs celtix",
+    "source": "BOF/BOFET/BOFET 2022/[dinger_vs_celtix]rust_memories_ogg/_05_p7_beatoraja.bmson",
+    "sha256": "6978b55b1ff1f739c1d4a934a9a7a21f8bbdc9a8cde63142e0ff850daa3dc8df",
+    "coverage": "HCN default, 17 release samples and resolution 48.",
+    "expected": {
+      "mode": "beat-7k",
+      "objects": 3127,
+      "longNotes": 156,
+      "longNoteModes": [
+        0,
+        0,
+        156
+      ],
+      "releaseSamples": 17,
+      "mines": 0,
+      "invisible": 0,
+      "layeredNotes": 0,
+      "scrollEvents": 0,
+      "bgaEvents": 1,
+      "timing": [
+        {
+          "pulse": 192,
+          "milliseconds": 1200.0
+        },
+        {
+          "pulse": 14568,
+          "milliseconds": 91050.0
+        },
+        {
+          "pulse": 25920,
+          "milliseconds": 162000.0
+        }
+      ]
+    }
+  },
+  {
+    "file": "lights-of-awakening-negative-level.bmson",
+    "title": "LIGHTS OF AWAKENING",
+    "artist": "shimizushi",
+    "source": "BOF/BOF22/26. LIGHTS OF AWAKENING [shimizushi]/LIGHTS OF AWAKENING[Mine vs Invisible].bmson",
+    "sha256": "5017af8c02ce8a5879b7ae0af5c6aff491bedcd6c09860848ce949486e35e12b",
+    "coverage": "Scroll changes, BPM/STOP, mines and invisible keysounds.",
+    "error": "BMSON level must be a non-negative integer."
+  },
+  {
+    "file": "goto.bmson",
+    "title": "#GOTO",
+    "artist": "NASA",
+    "source": "BMS/#GOTO [NASA]/_21_Re_bmsonize.bmson",
+    "sha256": "f81931468e10209ba5a1a3a28960fe9be9f7a90ef2e70a63895e715ec410e28c",
+    "coverage": "Resolution 384, dense STOP/bar lines, mines and empty BGA extension defaults.",
+    "expected": {
+      "mode": "beat-7k",
+      "objects": 4361,
+      "longNotes": 8,
+      "longNoteModes": [
+        8,
+        0,
+        0
+      ],
+      "releaseSamples": 0,
+      "mines": 4018,
+      "invisible": 0,
+      "layeredNotes": 0,
+      "scrollEvents": 0,
+      "bgaEvents": 1,
+      "timing": [
+        {
+          "pulse": 1536,
+          "milliseconds": 1777.777778
+        },
+        {
+          "pulse": 27264,
+          "milliseconds": 29777.795556
+        },
+        {
+          "pulse": 27648,
+          "milliseconds": 29805.56
+        },
+        {
+          "pulse": 1656192,
+          "milliseconds": 72333.368889
+        },
+        {
+          "pulse": 3716736,
+          "milliseconds": 126194.497778
+        },
+        {
+          "pulse": 3732288,
+          "milliseconds": 142444.497778
+        }
+      ]
+    }
+  },
+  {
+    "file": "danger-zone.bmson",
+    "title": "DANGER ZONE",
+    "artist": "SEIRO",
+    "source": "BOF/BOFET/BOFET 2022/[BMS_WAV] SEIRO - DANGER ZONE/SEIRO - DANGER ZONE/001 - Normal.bmson",
+    "sha256": "eff6aaa67b148e1ed3e832852c57de000bd566985f990b229d1dd3f32c82b95a",
+    "coverage": "Layered playable positions combined with continuous stem slicing.",
+    "expected": {
+      "mode": "beat-7k",
+      "objects": 535,
+      "longNotes": 0,
+      "longNoteModes": [
+        0,
+        0,
+        0
+      ],
+      "releaseSamples": 0,
+      "mines": 0,
+      "invisible": 0,
+      "layeredNotes": 115,
+      "scrollEvents": 0,
+      "bgaEvents": 1,
+      "timing": [
+        {
+          "pulse": 960,
+          "milliseconds": 1600.0
+        },
+        {
+          "pulse": 29640,
+          "milliseconds": 49400.0
+        },
+        {
+          "pulse": 54480,
+          "milliseconds": 90800.0
+        }
+      ]
+    }
+  },
+  {
+    "file": "goliath-9k.bmson",
+    "title": "Goliath",
+    "artist": "exclusion",
+    "source": "BOF/BOFU2016/TEAM-BMSON/[BMSON]Goliath_ogg/Goliath_9kH.bmson",
+    "sha256": "b12424dc8a36ef56920513e2b576a7708b89effe2e1b58cec008f1a1382365af",
+    "coverage": "Popn 9-key long notes, continuous slicing and background/banner images.",
+    "expected": {
+      "mode": "popn-9k",
+      "objects": 849,
+      "longNotes": 23,
+      "longNoteModes": [
+        23,
+        0,
+        0
+      ],
+      "releaseSamples": 0,
+      "mines": 0,
+      "invisible": 0,
+      "layeredNotes": 0,
+      "scrollEvents": 0,
+      "bgaEvents": 1,
+      "timing": [
+        {
+          "pulse": 960,
+          "milliseconds": 1600.0
+        },
+        {
+          "pulse": 36120,
+          "milliseconds": 60200.0
+        },
+        {
+          "pulse": 74880,
+          "milliseconds": 124800.0
+        }
+      ]
+    }
+  },
+  {
+    "file": "grayscale.bmson",
+    "title": "GRAYSCALE",
+    "artist": "えびです",
+    "source": "BOF/BOF21/327. GRAYSCALE [えびです]/GRAYSCALE_7Key_N.bmson",
+    "sha256": "2927292546cd31fe577f92b115fc59abe608ba7987cc88013f88bf25d6d1d120",
+    "coverage": "Invisible keysound, BPM changes and continuous slicing.",
+    "expected": {
+      "mode": "beat-7k",
+      "objects": 290,
+      "longNotes": 3,
+      "longNoteModes": [
+        3,
+        0,
+        0
+      ],
+      "releaseSamples": 0,
+      "mines": 0,
+      "invisible": 1,
+      "layeredNotes": 0,
+      "scrollEvents": 0,
+      "bgaEvents": 2,
+      "timing": [
+        {
+          "pulse": 960,
+          "milliseconds": 1445.783133
+        },
+        {
+          "pulse": 41040,
+          "milliseconds": 61807.228916
+        },
+        {
+          "pulse": 82440,
+          "milliseconds": 134457.831325
+        }
+      ]
+    }
+  },
+  {
+    "file": "yurufuwa-mixed-hcn-negative-mine-damage.bmson",
+    "title": "ゆるふわクランベリー",
+    "artist": "しらす",
+    "source": "BOF/BOFNT/BOFNT 2023/101-200/[TeamIriko][Shirasu]YuruFuwaRaspberry_ogg/__YFC_18_SPL_HCN.bmson",
+    "sha256": "3ba32b499308363fca0debdc554786515bf51d448fdabdbe4e4671b3ba5afc9f",
+    "coverage": "HCN default with per-note CN overrides, mines and resolution 96.",
+    "error": "BMSON mine damage must be non-negative."
+  }
+]

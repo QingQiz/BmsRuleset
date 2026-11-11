@@ -4,3 +4,5 @@
 *.mp4 binary
 *.mpeg binary
 *.zip binary
+# Preserve original chart bytes and whitespace for their recorded hashes.
+osu.Game.Rulesets.BmsRuleset.Tests/bmson_test_songs/*.bmson -text -whitespace

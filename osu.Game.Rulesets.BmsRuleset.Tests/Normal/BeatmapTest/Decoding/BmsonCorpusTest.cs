@@ -4,6 +4,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text.Json;
 using NUnit.Framework;
 using osu.Game.Beatmaps;
 using osu.Game.Models;
@@ -20,9 +22,16 @@ using osu.Game.Scoring;
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.BeatmapTest.Decoding;
 
 [TestFixture]
-public class BmsonLocalCorpusTest
+public class BmsonCorpusTest
 {
-    private static IEnumerable<TestCaseData> charts()
+    private static IEnumerable<TestCaseData> embeddedCharts()
+    {
+        using var manifest = JsonDocument.Parse(readResource("samples.json"));
+        foreach (var sample in manifest.RootElement.EnumerateArray())
+            yield return new TestCaseData(sample.Clone()).SetName($"EmbeddedBmson({sample.GetProperty("file").GetString()})");
+    }
+
+    private static IEnumerable<TestCaseData> localCharts()
     {
         var manifest = Environment.GetEnvironmentVariable("BMS_BMSON_CORPUS");
         if (string.IsNullOrEmpty(manifest))
@@ -35,19 +44,65 @@ public class BmsonLocalCorpusTest
             yield return new TestCaseData(path).SetName($"LocalBmson({Path.GetFileName(Path.GetDirectoryName(path))}/{Path.GetFileName(path)})");
     }
 
-    [TestCaseSource(nameof(charts))]
-    public void ParseConvertPreviewPracticeAndAutoplay(string path)
+    [TestCaseSource(nameof(embeddedCharts))]
+    public void EmbeddedChartMatchesReference(JsonElement sample)
     {
-        var bytes = File.ReadAllBytes(path);
+        var file = sample.GetProperty("file").GetString()!;
+        var bytes = readResource(file);
+        Assert.That(Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant(), Is.EqualTo(sample.GetProperty("sha256").GetString()));
+        if (sample.TryGetProperty("error", out var error))
+        {
+            var exception = Assert.Throws<InvalidDataException>(() => BmsonParser.Parse(bytes));
+            Assert.That(exception!.Message, Is.EqualTo(error.GetString()));
+            return;
+        }
+
+        var beatmap = verifyChart(bytes, file);
+        var expected = sample.GetProperty("expected");
+        var holds = beatmap.HitObjects.OfType<BmsLongNote>().ToArray();
+        Assert.Multiple(() =>
+        {
+            Assert.That(beatmap.LayoutVariant, Is.EqualTo(BmsLayout.ParseModeHint(expected.GetProperty("mode").GetString()!)));
+            Assert.That(beatmap.HitObjects, Has.Count.EqualTo(expected.GetProperty("objects").GetInt32()));
+            Assert.That(holds, Has.Length.EqualTo(expected.GetProperty("longNotes").GetInt32()));
+            Assert.That(new[] { BmsLongNoteMode.LongNote, BmsLongNoteMode.ChargeNote, BmsLongNoteMode.HellChargeNote }
+                .Select(mode => holds.Count(note => note.EffectiveMode == mode)),
+                Is.EqualTo(expected.GetProperty("longNoteModes").EnumerateArray().Select(value => value.GetInt32())));
+            Assert.That(holds.Sum(note => note.GetTailSamples().Count()), Is.EqualTo(expected.GetProperty("releaseSamples").GetInt32()));
+            Assert.That(beatmap.HitObjects.Count(note => note is BmsLandmine), Is.EqualTo(expected.GetProperty("mines").GetInt32()));
+            Assert.That(beatmap.InvisibleNotes, Has.Count.EqualTo(expected.GetProperty("invisible").GetInt32()));
+            Assert.That(beatmap.HitObjects.Count(note => note.AdditionalSampleKeys.Count > 0), Is.EqualTo(expected.GetProperty("layeredNotes").GetInt32()));
+            Assert.That(beatmap.TimingMap!.ScrollEvents, Has.Count.EqualTo(expected.GetProperty("scrollEvents").GetInt32()));
+            Assert.That(beatmap.Bga.Events, Has.Count.EqualTo(expected.GetProperty("bgaEvents").GetInt32()));
+            foreach (var point in expected.GetProperty("timing").EnumerateArray())
+                Assert.That(beatmap.TimingMap.ProjectTickToTime(point.GetProperty("pulse").GetInt64()),
+                    Is.EqualTo(point.GetProperty("milliseconds").GetDouble()).Within(0.001));
+        });
+    }
+
+    [TestCaseSource(nameof(localCharts))]
+    public void LocalChartPassesTheRuntimePipeline(string path) => verifyChart(File.ReadAllBytes(path), Path.GetFileName(path));
+
+    private static byte[] readResource(string name)
+    {
+        using var stream = typeof(BmsonCorpusTest).Assembly.GetManifestResourceStream($"bmson_test_songs/{name}")!;
+        using var memory = new MemoryStream();
+        stream.CopyTo(memory);
+        return memory.ToArray();
+    }
+
+    private static BmsBeatmap verifyChart(byte[] bytes, string fileName)
+    {
         var parsed = BmsonParser.Parse(bytes);
         var summary = BmsonParser.ParseImportSummary(bytes);
         var info = new BeatmapInfo(new BmsRuleset().RulesetInfo)
         {
-            Hash = "local-chart",
+            Hash = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant(),
+            MD5Hash = Convert.ToHexString(MD5.HashData(bytes)).ToLowerInvariant(),
             BeatmapSet = new BeatmapSetInfo(),
         };
-        info.BeatmapSet.Files.Add(new RealmNamedFileUsage(new RealmFile { Hash = info.Hash }, Path.GetFileName(path)));
-        info.Metadata.Source = Path.GetDirectoryName(path)!;
+        info.BeatmapSet.Files.Add(new RealmNamedFileUsage(new RealmFile { Hash = info.Hash }, fileName));
+        BmsDifficultyInfo.FromChartMetadata(summary.Metadata).WriteToOsuDifficulty(info);
         var beatmap = (BmsBeatmap)new BmsBeatmapConverter(BmsBeatmapDecoder.DecodeBytes(bytes, info), new BmsRuleset()).Convert();
 
         Assert.Multiple(() =>
@@ -81,5 +136,6 @@ public class BmsonLocalCorpusTest
         var simulation = BmsReplaySimulation.Run(beatmap, replay, new ScoreInfo { BeatmapInfo = beatmap.BeatmapInfo });
         Assert.That(simulation.Judgements.Count(result => result.Result == HitResult.Perfect), Is.EqualTo(beatmap.CountScoringNotes()));
         TestContext.Out.WriteLine($"{beatmap.LayoutVariant}: {beatmap.HitObjects.Count} objects, {beatmap.SampleDefinitions.Count} slices, {beatmap.Bga.Events.Count} BGA events");
+        return beatmap;
     }
 }

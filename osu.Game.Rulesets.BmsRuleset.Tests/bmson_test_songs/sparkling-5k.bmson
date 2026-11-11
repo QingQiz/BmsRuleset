@@ -1,0 +1,289 @@
+{
+  "version": "1.0.0",
+  "info": {
+    "title": "",
+    "subtitle": "",
+    "genre": "",
+    "artist": "",
+    "subartists": [
+      ""
+    ],
+    "mode_hint": "beat-5k",
+    "chart_name": "",
+    "judge_rank": 75,
+    "total": 80,
+    "init_bpm": 160,
+    "level": 0,
+    "back_image": "",
+    "eyecatch_image": "",
+    "banner_image": "",
+    "preview_music": "",
+    "resolution": 4,
+    "ln_type": 0
+  },
+  "lines": [
+    {
+      "y": 16,
+      "k": 0
+    },
+    {
+      "y": 32,
+      "k": 0
+    },
+    {
+      "y": 48,
+      "k": 0
+    },
+    {
+      "y": 64,
+      "k": 0
+    },
+    {
+      "y": 80,
+      "k": 0
+    }
+  ],
+  "bpm_events": [],
+  "stop_events": [],
+  "scroll_events": [],
+  "sound_channels": [
+    {
+      "name": "Bass_000.wav",
+      "notes": [
+        {
+          "x": 0,
+          "l": 0,
+          "c": false,
+          "t": 0,
+          "up": false,
+          "y": 16
+        },
+        {
+          "x": 0,
+          "l": 0,
+          "c": false,
+          "t": 0,
+          "up": false,
+          "y": 32
+        }
+      ]
+    },
+    {
+      "name": "Pluck_000.wav",
+      "notes": [
+        {
+          "x": 1,
+          "l": 0,
+          "c": false,
+          "t": 0,
+          "up": false,
+          "y": 32
+        }
+      ]
+    },
+    {
+      "name": "Pluck_001.wav",
+      "notes": [
+        {
+          "x": 3,
+          "l": 0,
+          "c": false,
+          "t": 0,
+          "up": false,
+          "y": 33
+        }
+      ]
+    },
+    {
+      "name": "Pluck_002.wav",
+      "notes": [
+        {
+          "x": 1,
+          "l": 0,
+          "c": false,
+          "t": 0,
+          "up": false,
+          "y": 34
+        }
+      ]
+    },
+    {
+      "name": "Pluck_003.wav",
+      "notes": [
+        {
+          "x": 3,
+          "l": 0,
+          "c": false,
+          "t": 0,
+          "up": false,
+          "y": 35
+        }
+      ]
+    },
+    {
+      "name": "Pluck_004.wav",
+      "notes": [
+        {
+          "x": 1,
+          "l": 0,
+          "c": false,
+          "t": 0,
+          "up": false,
+          "y": 36
+        }
+      ]
+    },
+    {
+      "name": "Pluck_005.wav",
+      "notes": [
+        {
+          "x": 3,
+          "l": 0,
+          "c": false,
+          "t": 0,
+          "up": false,
+          "y": 37
+        }
+      ]
+    },
+    {
+      "name": "Pluck_006.wav",
+      "notes": [
+        {
+          "x": 1,
+          "l": 0,
+          "c": false,
+          "t": 0,
+          "up": false,
+          "y": 38
+        },
+        {
+          "x": 3,
+          "l": 0,
+          "c": false,
+          "t": 0,
+          "up": false,
+          "y": 39
+        }
+      ]
+    },
+    {
+      "name": "Pluck_007.wav",
+      "notes": [
+        {
+          "x": 1,
+          "l": 0,
+          "c": false,
+          "t": 0,
+          "up": false,
+          "y": 40
+        }
+      ]
+    },
+    {
+      "name": "Pluck_008.wav",
+      "notes": [
+        {
+          "x": 3,
+          "l": 0,
+          "c": false,
+          "t": 0,
+          "up": false,
+          "y": 41
+        }
+      ]
+    },
+    {
+      "name": "Pluck_009.wav",
+      "notes": [
+        {
+          "x": 1,
+          "l": 0,
+          "c": false,
+          "t": 0,
+          "up": false,
+          "y": 42
+        }
+      ]
+    },
+    {
+      "name": "Pluck_010.wav",
+      "notes": [
+        {
+          "x": 3,
+          "l": 0,
+          "c": false,
+          "t": 0,
+          "up": false,
+          "y": 43
+        }
+      ]
+    },
+    {
+      "name": "Pluck_011.wav",
+      "notes": [
+        {
+          "x": 1,
+          "l": 0,
+          "c": false,
+          "t": 0,
+          "up": false,
+          "y": 44
+        }
+      ]
+    },
+    {
+      "name": "Pluck_012.wav",
+      "notes": [
+        {
+          "x": 3,
+          "l": 0,
+          "c": false,
+          "t": 0,
+          "up": false,
+          "y": 45
+        }
+      ]
+    },
+    {
+      "name": "Pluck_013.wav",
+      "notes": [
+        {
+          "x": 1,
+          "l": 0,
+          "c": false,
+          "t": 0,
+          "up": false,
+          "y": 46
+        }
+      ]
+    },
+    {
+      "name": "Pluck_014.wav",
+      "notes": [
+        {
+          "x": 3,
+          "l": 0,
+          "c": false,
+          "t": 0,
+          "up": false,
+          "y": 47
+        }
+      ]
+    }
+  ],
+  "bga": {
+    "bga_header": [],
+    "bga_sequence": [],
+    "bga_events": [],
+    "layer_events": [],
+    "poor_events": []
+  },
+  "mine_channels": [
+    {
+      "name": "0066 - Melody - Group.wav",
+      "notes": []
+    }
+  ],
+  "key_channels": []
+}
