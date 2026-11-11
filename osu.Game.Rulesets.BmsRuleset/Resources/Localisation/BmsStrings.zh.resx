@@ -566,7 +566,9 @@
     <value>使用 LR2 的判定、长条和血量规则游玩。</value>
   </data>
   <data name="import_skipped_charts" xml:space="preserve">
-    <value>已跳过 {0} 张无法读取或不支持的谱面：{1}。详情见日志。</value>
+    <value>已跳过 {0} 张无法读取或不支持的谱面，以下列出最多 5 张的原因：
+{1}
+点击打开 BMS 日志，查看完整列表及错误详情。</value>
   </data>
   <data name="popn_layout" xml:space="preserve">
     <value>Pop’n {0} 键</value>

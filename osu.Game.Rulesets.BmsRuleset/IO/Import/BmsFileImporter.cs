@@ -363,7 +363,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
 
             using var pool = new BlockingCollection<PreparedDirectory?>(preparation_concurrency * 2);
             var importedBeatmapMd5Hashes = createImportedBeatmapMd5Lookup();
-            var failures = new ConcurrentBag<string>();
+            var failures = new ConcurrentBag<(string Path, string Reason)>();
             var producer = launchProducer(groups, fileStore, pool, importedBeatmapMd5Hashes, failures, cancellation.Token);
             (int imported, int processed, bool cancelled) result;
             try
@@ -383,7 +383,10 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
             if (failures.Count > 0)
                 notifications?.Post(new SimpleNotification
                 {
-                    Text = BmsStrings.ImportSkippedCharts(failures.Count, string.Join(", ", failures.Order(StringComparer.OrdinalIgnoreCase).Take(5))),
+                    Text = BmsStrings.ImportSkippedCharts(failures.Count, string.Join("\n\n", failures
+                        .OrderBy(failure => failure.Path, StringComparer.OrdinalIgnoreCase).Take(5)
+                        .Select(failure => $"{failure.Path}\n{failure.Reason}"))),
+                    Activated = BmsLogger.OpenLog,
                 });
 
             if (cancelled) return; // drainConsumer already set the notification state
@@ -391,6 +394,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
             if (imported == 0 && failures.Count > 0)
             {
                 notification.CompletionText = BmsStrings.ImportFailed;
+                notification.CompletionClickAction = BmsLogger.OpenLog;
                 notification.State = ProgressNotificationState.Cancelled;
                 return;
             }
@@ -421,7 +425,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
         RealmFileStore fileStore,
         BlockingCollection<PreparedDirectory?> pool,
         ConcurrentDictionary<string, byte> importedBeatmapMd5Hashes,
-        ConcurrentBag<string> failures,
+        ConcurrentBag<(string Path, string Reason)> failures,
         CancellationToken cancellationToken)
     {
         return Task.Run(() =>
@@ -455,8 +459,8 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
                             }
                             catch (Exception exception)
                             {
-                                failures.Add(chart.path);
-                                BmsLogger.Error(exception, $"BMS import: failed to read {chart.path}: {exception.Message}");
+                                failures.Add((chart.path, exception.Message));
+                                BmsLogger.Error(exception, $"BMS import: failed to prepare {chart.path}: {exception.Message}");
                             }
                             finally
                             {
@@ -501,7 +505,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
                         }
                         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
                         {
-                            failures.Add(path);
+                            failures.Add((path, exception.Message));
                             BmsLogger.Error(exception, $"BMS import: failed to read {path}: {exception.Message}");
                             completeChart(directory);
                             continue;

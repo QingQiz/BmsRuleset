@@ -82,7 +82,7 @@
     "source": "BOF/BOFTT/200. minusone [foonone (フーノーン)]/__9IN_tricolore.bmson",
     "sha256": "3d237b99ad976dcde8710c44bd86af07c317b03aecef3b5d1343828ffbd082ae",
     "coverage": "Popn 9-key layout with per-note LN/CN/HCN and 621 BGA events.",
-    "error": "BMSON level must be a non-negative integer."
+    "error": "BMSON level must be a non-negative integer; received -1."
   },
   {
     "file": "child-of-earth-14k.bmson",
@@ -243,7 +243,7 @@
     "source": "BOF/BOF22/26. LIGHTS OF AWAKENING [shimizushi]/LIGHTS OF AWAKENING[Mine vs Invisible].bmson",
     "sha256": "5017af8c02ce8a5879b7ae0af5c6aff491bedcd6c09860848ce949486e35e12b",
     "coverage": "Scroll changes, BPM/STOP, mines and invisible keysounds.",
-    "error": "BMSON level must be a non-negative integer."
+    "error": "BMSON level must be a non-negative integer; received -99."
   },
   {
     "file": "goto.bmson",
@@ -416,6 +416,6 @@
     "source": "BOF/BOFNT/BOFNT 2023/101-200/[TeamIriko][Shirasu]YuruFuwaRaspberry_ogg/__YFC_18_SPL_HCN.bmson",
     "sha256": "3ba32b499308363fca0debdc554786515bf51d448fdabdbe4e4671b3ba5afc9f",
     "coverage": "HCN default with per-note CN overrides, mines and resolution 96.",
-    "error": "BMSON mine damage must be non-negative."
+    "error": "BMSON mine_channels.damage must be non-negative; received -2.2 at x=8, y=7776, sample=\"YFC_VA_C.wav\"."
   }
 ]

@@ -566,7 +566,9 @@
     <value>Play with LR2 judgement, long-note and gauge rules.</value>
   </data>
   <data name="import_skipped_charts" xml:space="preserve">
-    <value>Skipped {0} unreadable or unsupported charts: {1}. See the log for details.</value>
+    <value>Skipped {0} unreadable or unsupported charts. Details for up to 5 charts:
+{1}
+Click to open the BMS log for the complete list and error details.</value>
   </data>
   <data name="popn_layout" xml:space="preserve">
     <value>Pop’n {0}K</value>

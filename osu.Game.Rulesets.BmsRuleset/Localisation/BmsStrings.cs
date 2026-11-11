@@ -766,7 +766,7 @@ public static class BmsStrings
 
     public static LocalisableString ImportFailed => get("import_failed");
 
-    public static LocalisableString ImportSkippedCharts(int count, string files) => get("import_skipped_charts", count, files);
+    public static LocalisableString ImportSkippedCharts(int count, string details) => get("import_skipped_charts", count, details);
 
     public static LocalisableString SetAlreadyImported => get("set_already_imported");
 

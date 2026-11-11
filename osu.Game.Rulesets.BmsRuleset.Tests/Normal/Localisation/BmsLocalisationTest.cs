@@ -116,6 +116,20 @@ public class BmsLocalisationTest
             Is.EqualTo("已载入难度表：Satellite（3 张谱面）"));
     }
 
+    [Test]
+    public void TestSkippedChartDiagnosticsRetainDetailsWhenLanguageChanges()
+    {
+        const string details = "chart.bmson\nBMSON level must be a non-negative integer; received -99.";
+        var text = localisation.GetLocalisedBindableString(BmsStrings.ImportSkippedCharts(19, details));
+        Assert.That(text.Value, Does.StartWith("Skipped 19 unreadable or unsupported charts. Details for up to 5 charts:\n"));
+        Assert.That(text.Value, Does.Contain(details));
+
+        config.SetValue(FrameworkSetting.Locale, "zh");
+        Assert.That(text.Value, Does.StartWith("已跳过 19 张无法读取或不支持的谱面，以下列出最多 5 张的原因：\n"));
+        Assert.That(text.Value, Does.Contain(details));
+        Assert.That(text.Value, Does.EndWith("点击打开 BMS 日志，查看完整列表及错误详情。"));
+    }
+
     [TestCase("en", "2.000 s–3.000 s · 12.0 notes/s")]
     [TestCase("zh", "2.000 秒–3.000 秒 · 每秒 12.0 个音符")]
     public void TestPracticeMeasureAndDensityUseLocalisedNotation(string locale, string density)

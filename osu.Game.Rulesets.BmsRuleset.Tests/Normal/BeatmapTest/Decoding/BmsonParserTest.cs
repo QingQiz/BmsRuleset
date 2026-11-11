@@ -24,6 +24,22 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.BeatmapTest.Decoding;
 [TestFixture]
 public class BmsonParserTest
 {
+    [Test]
+    public void InvalidLaneDiagnosticIdentifiesTheNoteAndSample()
+    {
+        var chart = Chart("""[{"name":"stems/piano.ogg","notes":[{"x":21,"y":960}]}]""");
+        var error = Assert.Throws<InvalidDataException>(() => BmsonParser.Parse(chart));
+        Assert.That(error!.Message, Is.EqualTo("Unsupported BMSON lane x=21 at y=960 for Bme7K (8 columns), sample=\"stems/piano.ogg\"."));
+    }
+
+    [Test]
+    public void NegativeMineDiagnosticIdentifiesTheValueNoteAndSample()
+    {
+        var chart = Chart(events: """, "mine_channels":[{"name":"heal.wav","notes":[{"x":3,"y":480,"damage":-2.2}]}]""");
+        var error = Assert.Throws<InvalidDataException>(() => BmsonParser.Parse(chart));
+        Assert.That(error!.Message, Is.EqualTo("BMSON mine_channels.damage must be non-negative; received -2.2 at x=3, y=480, sample=\"heal.wav\"."));
+    }
+
     internal static byte[] Chart(string channels = "[]", string events = "", string info = "") =>
         Encoding.UTF8.GetBytes($$"""
                                  {"version":"1.0.0","info":{"title":"Song [title]","artist":"Artist","init_bpm":120{{info}}},

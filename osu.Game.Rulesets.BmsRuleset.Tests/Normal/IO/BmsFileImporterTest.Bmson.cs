@@ -1,13 +1,19 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using osu.Game.Collections;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.DifficultyTable;
 using NUnit.Framework;
+using osu.Framework.Bindables;
 using osu.Framework.IO.Stores;
+using osu.Framework.Logging;
+using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
+using osu.Game.Overlays;
+using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
@@ -18,6 +24,65 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.IO;
 
 public partial class BmsFileImporterTest
 {
+    [TestCase(false)]
+    [TestCase(true)]
+    [NonParallelizable]
+    public void TestBmsonSkippedNotificationIncludesReasonsAndLimitsDetails(bool validSibling)
+    {
+        runImportTest(async (realm, storage) =>
+        {
+            addBmsRuleset(realm);
+            var root = Path.Combine(storage.GetFullPath(string.Empty), "invalid-bmson");
+            Directory.CreateDirectory(root);
+            for (var index = 0; index < 7; index++)
+                File.WriteAllBytes(Path.Combine(root, $"invalid-{index}.bmson"), BmsonParserTest.Chart(info: $",\"level\":{-index - 1}"));
+            if (validSibling)
+                File.WriteAllBytes(Path.Combine(root, "valid.bmson"), BmsonParserTest.Chart());
+
+            using var notifications = new ImportNotificationOverlay();
+            var logs = new ImportLogStorage(storage.GetFullPath("diagnostic-logs"));
+            var previousLogStorage = Logger.Storage;
+            var previousLoggingEnabled = Logger.Enabled;
+            Logger.Flush();
+            Logger.Storage = logs;
+            Logger.Enabled = true;
+            try
+            {
+                await new BmsFileImporter(realm, storage, notifications).Import(root).ConfigureAwait(false);
+                var skipped = notifications.Posted.OfType<SimpleNotification>().Single();
+                var text = skipped.Text.ToString();
+                var progress = notifications.Posted.OfType<ProgressNotification>().Single();
+                Assert.Multiple(() =>
+                {
+                    Assert.That(text, Does.Contain("Skipped 7 unreadable or unsupported charts"));
+                    Assert.That(text, Does.Contain(Path.Combine(root, "invalid-0.bmson")));
+                    Assert.That(text, Does.Contain("BMSON level must be a non-negative integer; received -1."));
+                    Assert.That(text, Does.Contain("received -5."));
+                    Assert.That(text, Does.Not.Contain("invalid-5.bmson"));
+                    Assert.That(text, Does.Not.Contain("invalid-6.bmson"));
+                    Assert.That(text.IndexOf("invalid-0.bmson", StringComparison.Ordinal), Is.LessThan(text.IndexOf("invalid-4.bmson", StringComparison.Ordinal)));
+                    Assert.That(progress.State, Is.EqualTo(validSibling ? ProgressNotificationState.Completed : ProgressNotificationState.Cancelled));
+                    Assert.That(realm.Run(r => r.All<BeatmapInfo>().Count()), Is.EqualTo(validSibling ? 1 : 0));
+                });
+                Assert.That(skipped.Activated, Is.Not.Null);
+                Assert.That(skipped.Activated!(), Is.True);
+                Assert.That(logs.OpenedFile, Is.EqualTo(Logger.GetLogger("bms").Filename));
+                Assert.That(File.ReadAllText(logs.GetFullPath(logs.OpenedFile)), Does.Contain("invalid-6.bmson"));
+                if (!validSibling)
+                {
+                    Assert.That(progress.CompletionClickAction, Is.Not.Null);
+                    Assert.That(progress.CompletionClickAction!(), Is.True);
+                }
+            }
+            finally
+            {
+                Logger.Flush();
+                Logger.Storage = previousLogStorage;
+                Logger.Enabled = previousLoggingEnabled;
+            }
+        });
+    }
+
     [Test]
     public void TestBmsonLockedFileDoesNotAbortValidSiblings()
     {
@@ -29,12 +94,45 @@ public partial class BmsFileImporterTest
             File.WriteAllBytes(Path.Combine(root, "valid.bmson"), BmsonParserTest.Chart());
             using var locked = new FileStream(Path.Combine(root, "locked.bmson"), FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None);
             locked.Write(BmsonParserTest.Chart(info: ",\"level\":2"));
+            var readError = Assert.Throws<IOException>(() => File.ReadAllBytes(locked.Name));
 
-            await new BmsFileImporter(realm, storage).Import(root).ConfigureAwait(false);
+            using var notifications = new ImportNotificationOverlay();
+            await new BmsFileImporter(realm, storage, notifications).Import(root).ConfigureAwait(false);
 
             Assert.That(realm.Run(r => r.All<BeatmapInfo>().Count()), Is.EqualTo(1));
             Assert.That(realm.Run(r => r.All<BeatmapSetInfo>().Count()), Is.EqualTo(1));
+            var text = notifications.Posted.OfType<SimpleNotification>().Single().Text.ToString();
+            Assert.That(text, Does.Contain("locked.bmson"));
+            Assert.That(text, Does.Contain(readError!.Message));
         });
+    }
+
+    private sealed class ImportNotificationOverlay : INotificationOverlay, IDisposable
+    {
+        public List<Notification> Posted { get; } = [];
+        public IBindable<int> UnreadCount { get; } = new Bindable<int>();
+        public IEnumerable<Notification> AllNotifications => Posted;
+        public void Post(Notification notification) => Posted.Add(notification);
+        public void Hide()
+        {
+        }
+
+        public void Dispose()
+        {
+            foreach (var notification in Posted)
+                notification.Dispose();
+        }
+    }
+
+    private sealed class ImportLogStorage(string path) : NativeStorage(path)
+    {
+        public string OpenedFile { get; private set; }
+
+        public override bool OpenFileExternally(string filename)
+        {
+            OpenedFile = filename;
+            return true;
+        }
     }
 
     [Test]
@@ -51,9 +149,14 @@ public partial class BmsFileImporterTest
                 File.WriteAllBytes(Path.Combine(directory, "valid.bmson"), BmsonParserTest.Chart(info: $",\"level\":{index + 1}"));
                 File.WriteAllText(Path.Combine(directory, "invalid.bmson"), "{ invalid json }");
             }
-            await new BmsFileImporter(realm, storage).Import(root).ConfigureAwait(false);
+            using var notifications = new ImportNotificationOverlay();
+            await new BmsFileImporter(realm, storage, notifications).Import(root).ConfigureAwait(false);
             Assert.That(realm.Run(r => r.All<BeatmapInfo>().Count()), Is.EqualTo(3));
             Assert.That(realm.Run(r => r.All<BeatmapSetInfo>().Count()), Is.EqualTo(3));
+            var text = notifications.Posted.OfType<SimpleNotification>().Single().Text.ToString();
+            Assert.That(text, Does.Contain("invalid.bmson"));
+            Assert.That(text, Does.Contain("LineNumber:"));
+            Assert.That(text, Does.Contain("BytePositionInLine:"));
         });
     }
 

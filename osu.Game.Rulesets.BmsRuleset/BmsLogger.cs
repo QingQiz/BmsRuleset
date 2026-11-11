@@ -18,6 +18,13 @@ internal static class BmsLogger
     public static void Error(Exception exception, string message)
         => logger.Add(message, LogLevel.Error, exception);
 
+    public static bool OpenLog()
+    {
+        // Diagnostics are queued asynchronously, so finish writing before opening the file.
+        Logger.Flush();
+        return Logger.Storage.OpenFileExternally(logger.Filename);
+    }
+
     public static void LogAudioFailure(string message, Exception? exception = null)
     {
         // Audio resources are optional and recoverable, so keep failures below osu!'s notification threshold.

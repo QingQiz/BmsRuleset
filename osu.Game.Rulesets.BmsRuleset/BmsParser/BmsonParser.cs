@@ -24,7 +24,7 @@ internal static class BmsonParser
         if (legacy)
             root = BmsonLegacyReader.Normalize(root, cancellationToken);
         else if (version.ValueKind != JsonValueKind.String || !Regex.IsMatch(version.GetString()!, @"^1\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$"))
-            throw new InvalidDataException("Unsupported BMSON version.");
+            throw new InvalidDataException($"Unsupported BMSON version {version.GetRawText()}; expected a stable 1.x version or legacy 0.21.");
 
         var info = root.GetProperty("info");
         var initialBpm = positive(number(info, "init_bpm"), "init_bpm");
@@ -32,7 +32,7 @@ internal static class BmsonParser
         if (resolution == 0)
             resolution = 240;
         if (resolution != Math.Truncate(resolution) || resolution > int.MaxValue / 4)
-            throw new InvalidDataException("Invalid BMSON resolution.");
+            throw new InvalidDataException($"Invalid BMSON resolution {info.GetProperty("resolution").GetRawText()}; expected an integer with absolute value no greater than {int.MaxValue / 4}.");
 
         var tickResolution = checked((int)resolution * 4);
         var modeHint = text(info, "mode_hint", "beat-7k");
@@ -49,7 +49,7 @@ internal static class BmsonParser
         var nextSampleId = 1;
         var judgeRank = number(info, "judge_rank", 100);
         if (judgeRank < 0)
-            throw new InvalidDataException("BMSON judge_rank must be non-negative.");
+            throw new InvalidDataException($"BMSON judge_rank must be non-negative; received {info.GetProperty("judge_rank").GetRawText()}.");
 
         var exRank = judgeRank / BmsJudgementProfileProvider.RateForRank(layout, 2);
         long lastPulse = 0;
@@ -82,7 +82,7 @@ internal static class BmsonParser
                         continue;
 
                     hasPlayableNote = true;
-                    var column = mapColumn(note.Lane, layout);
+                    var column = mapColumn(note.Lane, layout, note.Pulse, samplePath);
                     var key = (column, note.Pulse);
                     if (note.Release)
                     {
@@ -198,15 +198,16 @@ internal static class BmsonParser
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var sampleId = checked(nextSampleId++);
-                sampleDefinitions.Add(sampleId, new BmsSampleDefinition(resource(channel, "name")));
+                var samplePath = resource(channel, "name");
+                sampleDefinitions.Add(sampleId, new BmsSampleDefinition(samplePath));
                 foreach (var note in array(channel, "notes", true))
                 {
                     var position = pulse(note, "y");
                     var lane = checked((int)pulse(note, "x"));
-                    var column = mapColumn(lane, layout);
+                    var column = mapColumn(lane, layout, position, samplePath);
                     var damage = mine ? number(note, "damage", 0) : 0;
                     if (damage < 0)
-                        throw new InvalidDataException("BMSON mine damage must be non-negative.");
+                        throw new InvalidDataException($"BMSON {field}.damage must be non-negative; received {note.GetProperty("damage").GetRawText()} at x={lane}, y={position}, sample=\"{samplePath}\".");
 
                     var parsed = new BmsParsedHitObject(position, timing.ProjectTickToTime(position), 0, column, sampleId,
                         false, mine, damage, null, JudgementRate: double.NaN);
@@ -362,11 +363,11 @@ internal static class BmsonParser
         {
             0 => fallback,
             >= 1 and <= 3 => (BmsLongNoteMode)value,
-            _ => throw new InvalidDataException($"Invalid BMSON {field}."),
+            _ => throw new InvalidDataException($"Invalid BMSON {field}={value}; expected 0, 1 (LN), 2 (CN), or 3 (HCN)."),
         };
     }
 
-    private static int mapColumn(int lane, BmsLayoutVariant layout) => layout switch
+    private static int mapColumn(int lane, BmsLayoutVariant layout, long position, string samplePath) => layout switch
     {
         BmsLayoutVariant.Popn9K when lane is >= 1 and <= 9 => lane - 1,
         BmsLayoutVariant.Popn5K when lane is >= 1 and <= 5 => lane - 1,
@@ -384,7 +385,7 @@ internal static class BmsonParser
         BmsLayoutVariant.Bme7KDouble when lane == 16 => 15,
         BmsLayoutVariant.Bme7KDouble when lane is >= 1 and <= 7 => lane,
         BmsLayoutVariant.Bme7KDouble when lane is >= 9 and <= 15 => lane - 1,
-        _ => throw new InvalidDataException($"Unsupported BMSON lane {lane} for {layout}."),
+        _ => throw new InvalidDataException($"Unsupported BMSON lane x={lane} at y={position} for {layout} ({BmsLayout.GetTotalColumns(layout)} columns), sample=\"{samplePath}\"."),
     };
 
     private static long[] regularLines(long lastPulse, int resolution)
@@ -418,7 +419,7 @@ internal static class BmsonParser
             return fallback ?? throw new InvalidDataException($"Missing BMSON {name}.");
 
         if (!value.TryGetDouble(out var result) || !double.IsFinite(result))
-            throw new InvalidDataException($"Invalid BMSON {name}.");
+            throw new InvalidDataException($"BMSON {name} must be a finite number; received {value.GetRawText()}.");
 
         return result;
     }
@@ -429,12 +430,12 @@ internal static class BmsonParser
             return fallback ?? throw new InvalidDataException($"Missing BMSON {name}.");
 
         if (!value.TryGetInt64(out var result) || result < 0)
-            throw new InvalidDataException($"BMSON {name} must be a non-negative integer.");
+            throw new InvalidDataException($"BMSON {name} must be a non-negative integer; received {value.GetRawText()}.");
 
         return result;
     }
 
-    private static double positive(double value, string name) => value > 0 ? value : throw new InvalidDataException($"BMSON {name} must be positive.");
+    private static double positive(double value, string name) => value > 0 ? value : throw new InvalidDataException($"BMSON {name} must be positive; received {value}.");
 
     private static string resource(JsonElement parent, string name)
     {
