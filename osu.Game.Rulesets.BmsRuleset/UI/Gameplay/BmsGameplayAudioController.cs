@@ -94,6 +94,12 @@ internal sealed class BmsGameplayAudioController
 
     internal static IEnumerable<BmsSampleUsage> GetSampleUsages(BmsBeatmap beatmap)
     {
+        foreach (var mine in beatmap.HitObjects.OfType<BmsLandmine>())
+        {
+            foreach (var sample in mine.GetSamples())
+                yield return new BmsSampleUsage(sample.SampleKey, sample.Time);
+        }
+
         foreach (var evt in beatmap.BackgroundSampleEvents)
             yield return new BmsSampleUsage(evt.SampleKey, evt.Time, ResumeAfterSeek: true);
 

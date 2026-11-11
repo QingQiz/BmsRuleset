@@ -55,9 +55,6 @@ internal sealed partial class BmsColumnKeySound : CompositeDrawable
             PlaySample(sample.SampleKey, sample.Volume);
     }
 
-    /// <summary>Triggers the landmine explosion definition (#WAV00).</summary>
-    public void PlayLandmineSound(int volume = 100) => PlaySample(0, volume);
-
     [BackgroundDependencyLoader(true)]
     private void load(ISamplePlaybackDisabler? samplePlaybackDisabler)
     {

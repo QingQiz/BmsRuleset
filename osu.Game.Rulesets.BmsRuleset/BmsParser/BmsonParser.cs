@@ -37,12 +37,6 @@ internal static class BmsonParser
         var tickResolution = checked((int)resolution * 4);
         var modeHint = text(info, "mode_hint", "beat-7k");
         var layout = BmsLayout.ParseModeHint(modeHint) ?? throw new InvalidDataException($"Unsupported BMSON mode_hint: {modeHint}.");
-        foreach (var extension in new[] { "scroll_events", "mine_channels", "key_channels" })
-        {
-            if (array(root, extension).Any())
-                throw new InvalidDataException($"Unsupported BMSON extension: {extension}.");
-        }
-
         var longNoteMode = readLongNoteMode(info, "ln_type", BmsLongNoteMode.LongNote);
 
         var (bpmEvents, stopEvents) = readTiming(root, initialBpm, tickResolution, cancellationToken);
@@ -51,6 +45,7 @@ internal static class BmsonParser
         var objects = new Dictionary<(int Column, long Pulse), (long EndPulse, BmsLongNoteMode Mode, List<int> Samples)>();
         var background = new List<BmsSampleEvent>();
         var releases = new Dictionary<(int Column, long Pulse), List<int>>();
+        var invisible = new Dictionary<(int Column, long Pulse), BmsParsedHitObject>();
         var nextSampleId = 1;
         var judgeRank = number(info, "judge_rank", 100);
         if (judgeRank < 0)
@@ -138,16 +133,20 @@ internal static class BmsonParser
         if (releases.Count > 0)
             throw new InvalidDataException("BMSON release sound has no matching long-note endpoint.");
 
+        readAuxiliaryChannels("key_channels", false);
+        readAuxiliaryChannels("mine_channels", true);
         var hitObjects = parsedObjects.OrderBy(note => note.Tick).ThenBy(note => note.Column).ToArray();
         foreach (var column in hitObjects.GroupBy(note => note.Column))
         {
             double previousEnd = -1;
+            long previousPulse = -1;
             foreach (var note in column)
             {
-                if (note.StartTime < previousEnd)
+                if (note.Tick == previousPulse || note.StartTime < previousEnd)
                     throw new InvalidDataException($"Overlapping BMSON long notes in column {note.Column}.");
 
                 previousEnd = note.StartTime + note.Duration;
+                previousPulse = note.Tick;
             }
         }
 
@@ -165,15 +164,21 @@ internal static class BmsonParser
             var length = index + 1 < measureStarts.Length ? measureStarts[index + 1] - start : tickResolution;
             return new BmsMeasureInfo(index, start, length, length / (double)tickResolution);
         }).ToArray();
-        var mainBpm = BmsTimingMap.FindMainBpm(bpmEvents, hitObjects.Select(note => note.Tick));
-        var timingMap = BmsTimingMap.FromSortedEvents(tickResolution, measures, bpmEvents, stopEvents, [], [], mainBpm, barLines: barLines);
+        var mainBpm = BmsTimingMap.FindMainBpm(bpmEvents, hitObjects.Where(note => !note.IsMine).Select(note => note.Tick));
+        var scrollEvents = array(root, "scroll_events").Select((evt, index) => new BmsScrollEvent(pulse(evt, "y"), number(evt, "rate", 1), index))
+            .OrderBy(evt => evt.Tick).ThenBy(evt => evt.Sequence).ToArray();
+        var timingMap = BmsTimingMap.FromSortedEvents(tickResolution, measures, bpmEvents, stopEvents, scrollEvents, [], mainBpm, barLines: barLines);
         double? total = legacy
             ? info.TryGetProperty("total", out var legacyTotal) && legacyTotal.ValueKind != JsonValueKind.Null
                 ? Math.Abs(number(info, "total"))
                 : null
-            : BmsGaugeCalculator.CalculateDefaultTotal(hitObjects.Sum(note => note.IsLongNote
-            && (note.LongNoteMode == BmsLongNoteMode.Undefined ? longNoteMode : note.LongNoteMode)
-            is BmsLongNoteMode.ChargeNote or BmsLongNoteMode.HellChargeNote ? 2 : 1), BmsGaugeProfileFamilyProvider.FromLayout(layout)) * Math.Abs(number(info, "total", 100)) / 100;
+            : BmsGaugeCalculator.CalculateDefaultTotal(hitObjects.Where(note => !note.IsMine)
+                    .Sum(note => note.IsLongNote
+                                 && (note.LongNoteMode == BmsLongNoteMode.Undefined ? longNoteMode : note.LongNoteMode)
+                                 is BmsLongNoteMode.ChargeNote or BmsLongNoteMode.HellChargeNote
+                        ? 2
+                        : 1),
+                BmsGaugeProfileFamilyProvider.FromLayout(layout)) * Math.Abs(number(info, "total", 100)) / 100;
         var credits = array(info, "subartists").Select(value => value.GetString() ?? string.Empty).ToArray();
         var maker = credits.Select(credit => credit.Split(':', 2, StringSplitOptions.TrimEntries))
             .Where(credit => credit.Length == 2 && credit[0] == "chart").Select(credit => credit[1]);
@@ -184,7 +189,35 @@ internal static class BmsonParser
             StageFile: resource(info, "eyecatch_image"), BackBmp: resource(info, "back_image"), Banner: resource(info, "banner_image"), DefaultExRank: exRank)
         {
             ExplicitDifficultyName = text(info, "chart_name"),
+            InvisibleNotes = invisible.Values.OrderBy(note => note.Tick).ThenBy(note => note.Column).ToArray(),
         };
+
+        void readAuxiliaryChannels(string field, bool mine)
+        {
+            foreach (var channel in array(root, field))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var sampleId = checked(nextSampleId++);
+                sampleDefinitions.Add(sampleId, new BmsSampleDefinition(resource(channel, "name")));
+                foreach (var note in array(channel, "notes", true))
+                {
+                    var position = pulse(note, "y");
+                    var lane = checked((int)pulse(note, "x"));
+                    var column = mapColumn(lane, layout);
+                    var damage = mine ? number(note, "damage", 0) : 0;
+                    if (damage < 0)
+                        throw new InvalidDataException("BMSON mine damage must be non-negative.");
+
+                    var parsed = new BmsParsedHitObject(position, timing.ProjectTickToTime(position), 0, column, sampleId,
+                        false, mine, damage, null, JudgementRate: double.NaN);
+                    if (mine)
+                        parsedObjects.Add(parsed);
+                    else
+                        invisible[(column, position)] = parsed;
+                    lastPulse = Math.Max(lastPulse, position);
+                }
+            }
+        }
     }
 
     internal static BmsImportSummary ParseImportSummary(byte[] content, CancellationToken cancellationToken = default)
@@ -196,7 +229,7 @@ internal static class BmsonParser
                 result.LayoutVariant, result.Title ?? string.Empty, result.Rank, result.Total, result.PlayLevel, result.LockedLongNoteMode, result.DefaultExRank),
             result.TimingMap.BpmEvents.First().Bpm, length, result.HitObjects.Count,
             result.HitObjects.Count(note => note.IsLongNote), result.HitObjects.Count(note => BmsLayout.IsScratchColumn(note.Column, result.LayoutVariant)),
-            result.HitObjects.Select(note => new BmsNoteTiming(note.Column, note.StartTime, note.StartTime + note.Duration)).ToArray());
+            result.HitObjects.Where(note => !note.IsMine).Select(note => new BmsNoteTiming(note.Column, note.StartTime, note.StartTime + note.Duration)).ToArray());
     }
 
     private static (BmsBpmEvent[] Bpms, BmsStopEvent[] Stops) readTiming(

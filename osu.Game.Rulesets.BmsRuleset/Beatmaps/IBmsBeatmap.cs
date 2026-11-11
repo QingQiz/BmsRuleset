@@ -72,6 +72,7 @@ internal static class BmsBeatmapExtensions
             Column = n.Column,
             SampleKey = n.SampleKey,
             SampleVolume = n.SampleVolume,
+            AdditionalSampleKeys = n.AdditionalSampleKeys,
         }).ToArray();
         target.BranchDecisions = parseResult.BranchDecisions;
         target.TextEvents = parseResult.TextEvents;

@@ -313,14 +313,12 @@ public partial class BmsColumn : Playfield, IBmsColumn
     public void PlaySample(int? sampleKey, int volume) => keySound?.PlaySample(sampleKey, volume);
 
     /// <summary>
-    /// Plays the landmine explosion sample (#WAV00) when a landmine in this column detonates.
+    /// Plays the landmine's assigned samples when it detonates.
     /// </summary>
     public void DetonateLandmine(BmsHitObject hitObject)
     {
-        if (!hitObject.Beatmap.SampleDefinitions.ContainsKey(0))
-            return;
-
-        keySound?.PlayLandmineSound(hitObject.SampleVolume);
+        foreach (var sample in hitObject.GetSamples())
+            keySound?.PlaySample(sample.SampleKey, sample.Volume);
     }
 
     // Framework Meh counts as a hit, but BMS POOR has no successful hit feedback.
