@@ -363,7 +363,8 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
 
             using var pool = new BlockingCollection<PreparedDirectory?>(preparation_concurrency * 2);
             var importedBeatmapMd5Hashes = createImportedBeatmapMd5Lookup();
-            var producer = launchProducer(groups, fileStore, pool, importedBeatmapMd5Hashes, cancellation.Token);
+            var failures = new ConcurrentBag<string>();
+            var producer = launchProducer(groups, fileStore, pool, importedBeatmapMd5Hashes, failures, cancellation.Token);
             (int imported, int processed, bool cancelled) result;
             try
             {
@@ -379,7 +380,20 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
 
             var (imported, processed, cancelled) = result;
 
+            if (failures.Count > 0)
+                notifications?.Post(new SimpleNotification
+                {
+                    Text = BmsStrings.ImportSkippedCharts(failures.Count, string.Join(", ", failures.Order(StringComparer.OrdinalIgnoreCase).Take(5))),
+                });
+
             if (cancelled) return; // drainConsumer already set the notification state
+
+            if (imported == 0 && failures.Count > 0)
+            {
+                notification.CompletionText = BmsStrings.ImportFailed;
+                notification.State = ProgressNotificationState.Cancelled;
+                return;
+            }
 
             if (imported > 0)
                 BmsRulesetRuntime.DifficultyTableStore?.NotifyToRebuildTableList(null);
@@ -407,6 +421,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
         RealmFileStore fileStore,
         BlockingCollection<PreparedDirectory?> pool,
         ConcurrentDictionary<string, byte> importedBeatmapMd5Hashes,
+        ConcurrentBag<string> failures,
         CancellationToken cancellationToken)
     {
         return Task.Run(() =>
@@ -434,16 +449,21 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
                             {
                                 chart.directory.Charts[chart.index] = readPreparedChart(chart.path, chart.content, chart.md5, workerRealm, fileStore, cancellationToken);
                             }
+                            catch (OperationCanceledException)
+                            {
+                                throw;
+                            }
+                            catch (Exception exception)
+                            {
+                                failures.Add(chart.path);
+                                BmsLogger.Error(exception, $"BMS import: failed to read {chart.path}: {exception.Message}");
+                            }
                             finally
                             {
                                 preparation_slots.Release();
                             }
 
-                            if (Interlocked.Decrement(ref chart.directory.Remaining) == 0)
-                            {
-                                var preparedCharts = chart.directory.Charts.OfType<ChartImport>().ToArray();
-                                pool.Add(preparedCharts.Length == 0 ? null : new PreparedDirectory(chart.directory.Group.Directory, preparedCharts), cancellationToken);
-                            }
+                            completeChart(chart.directory);
                         }
                     }));
                 }
@@ -474,12 +494,33 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
                     {
                         cancellationToken.ThrowIfCancellationRequested();
                         var path = group.ChartPaths[index];
-                        var content = File.ReadAllBytes(path);
+                        byte[] content;
+                        try
+                        {
+                            content = File.ReadAllBytes(path);
+                        }
+                        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+                        {
+                            failures.Add(path);
+                            BmsLogger.Error(exception, $"BMS import: failed to read {path}: {exception.Message}");
+                            completeChart(directory);
+                            continue;
+                        }
+
                         cancellationToken.ThrowIfCancellationRequested();
                         var md5 = Convert.ToHexString(MD5.HashData(content)).ToLowerInvariant();
                         yield return (directory, index, path, importedBeatmapMd5Hashes.TryAdd(md5, 0) ? content : null, md5);
                     }
                 }
+            }
+
+            void completeChart(DirectoryPreparation directory)
+            {
+                if (Interlocked.Decrement(ref directory.Remaining) != 0)
+                    return;
+
+                var preparedCharts = directory.Charts.OfType<ChartImport>().ToArray();
+                pool.Add(preparedCharts.Length == 0 ? null : new PreparedDirectory(directory.Group.Directory, preparedCharts), cancellationToken);
             }
         });
     }

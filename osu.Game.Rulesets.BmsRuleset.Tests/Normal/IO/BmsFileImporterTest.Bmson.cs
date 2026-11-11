@@ -19,6 +19,45 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.IO;
 public partial class BmsFileImporterTest
 {
     [Test]
+    public void TestBmsonLockedFileDoesNotAbortValidSiblings()
+    {
+        runImportTest(async (realm, storage) =>
+        {
+            addBmsRuleset(realm);
+            var root = Path.Combine(storage.GetFullPath(string.Empty), "locked-bmson");
+            Directory.CreateDirectory(root);
+            File.WriteAllBytes(Path.Combine(root, "valid.bmson"), BmsonParserTest.Chart());
+            using var locked = new FileStream(Path.Combine(root, "locked.bmson"), FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None);
+            locked.Write(BmsonParserTest.Chart(info: ",\"level\":2"));
+
+            await new BmsFileImporter(realm, storage).Import(root).ConfigureAwait(false);
+
+            Assert.That(realm.Run(r => r.All<BeatmapInfo>().Count()), Is.EqualTo(1));
+            Assert.That(realm.Run(r => r.All<BeatmapSetInfo>().Count()), Is.EqualTo(1));
+        });
+    }
+
+    [Test]
+    public void TestBmsonInvalidSiblingDoesNotAbortOtherChartsOrDirectories()
+    {
+        runImportTest(async (realm, storage) =>
+        {
+            addBmsRuleset(realm);
+            var root = Path.Combine(storage.GetFullPath(string.Empty), "mixed-bmson");
+            for (var index = 0; index < 3; index++)
+            {
+                var directory = Path.Combine(root, index.ToString());
+                Directory.CreateDirectory(directory);
+                File.WriteAllBytes(Path.Combine(directory, "valid.bmson"), BmsonParserTest.Chart(info: $",\"level\":{index + 1}"));
+                File.WriteAllText(Path.Combine(directory, "invalid.bmson"), "{ invalid json }");
+            }
+            await new BmsFileImporter(realm, storage).Import(root).ConfigureAwait(false);
+            Assert.That(realm.Run(r => r.All<BeatmapInfo>().Count()), Is.EqualTo(3));
+            Assert.That(realm.Run(r => r.All<BeatmapSetInfo>().Count()), Is.EqualTo(3));
+        });
+    }
+
+    [Test]
     public void TestBmsonShaOnlyTableAssociatesCollectionsMarkersAndInstalledState()
     {
         runImportTest(async (realm, storage) =>
