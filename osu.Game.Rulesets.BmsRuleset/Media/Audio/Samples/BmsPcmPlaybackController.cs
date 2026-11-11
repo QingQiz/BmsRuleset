@@ -113,7 +113,7 @@ internal sealed class BmsPcmPlaybackController : IDisposable
             return;
 
         resourceStore = new BmsAudioResourceStore(basePath, cancellationToken);
-        resolveResources();
+        resolveResources(cancellationToken);
         assetCache = new BmsPcmAssetCache((identity, token) => resourceStore.OpenPcmAsync(identity, rate, token));
         clockMapper.Rebase(chartTime, mixer.RenderedFrames);
         mixer.SubmitControl(BmsVoiceCommandType.SetMasterGain, mixer.RenderedFrames, epoch, lastMasterGain);
@@ -450,7 +450,7 @@ internal sealed class BmsPcmPlaybackController : IDisposable
         leaseMaintenancePending = true;
     }
 
-    private void resolveResources()
+    private void resolveResources(CancellationToken cancellationToken)
     {
         if (resourceStore == null)
             return;
@@ -458,6 +458,7 @@ internal sealed class BmsPcmPlaybackController : IDisposable
         var paths = new Dictionary<string, string?>(StringComparer.Ordinal);
         foreach (var (sampleKey, definition) in sampleDefinitions)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrEmpty(definition.Path))
                 continue;
 

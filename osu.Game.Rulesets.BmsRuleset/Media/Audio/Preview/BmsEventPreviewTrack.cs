@@ -13,7 +13,7 @@ internal sealed class BmsEventPreviewTrack : BmsPreviewTrack
     private readonly CancellationTokenSource timelineCancellation = new();
     private readonly IReadOnlyList<Func<CancellationToken, BmsEventPreviewTimeline>> timelineSources;
 
-    private Task<BmsEventPreviewTimeline> timelineTask;
+    private Task<BmsEventPreviewPlayback> preparationTask;
     private BmsEventPreviewPlayback? playback;
     private double? pendingPreviewPosition;
     private bool previewStartPending;
@@ -68,7 +68,7 @@ internal sealed class BmsEventPreviewTrack : BmsPreviewTrack
         this.audioManager = audioManager;
         this.timelineSources = timelineSources;
         Length = BmsEventPreviewTimeline.DEFAULT_LENGTH;
-        timelineTask = prepareTimelineSource();
+        preparationTask = prepareTimelineSource();
     }
 
     protected override void PrepareStart() => consumeTimeline();
@@ -152,11 +152,21 @@ internal sealed class BmsEventPreviewTrack : BmsPreviewTrack
         {
             timelineCancellation.Cancel();
 
-            _ = timelineTask.ContinueWith(
-                task => _ = task.Exception,
+            // A switch may dispose the track before preparation completes. That task owns the
+            // unpublished session until it can hand it to the audio thread, so reclaim it there.
+            if (playback == null)
+            {
+                _ = preparationTask.ContinueWith(task =>
+                {
+                    if (task.Status == TaskStatus.RanToCompletion)
+                        task.Result.Dispose();
+                    else
+                        _ = task.Exception;
+                },
                 CancellationToken.None,
-                TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+                TaskContinuationOptions.None,
                 TaskScheduler.Default);
+            }
 
             timelineCancellation.Dispose();
             playback?.Dispose();
@@ -167,14 +177,12 @@ internal sealed class BmsEventPreviewTrack : BmsPreviewTrack
 
     private void consumeTimeline()
     {
-        if (playback != null || !timelineTask.IsCompleted)
+        if (playback != null || !preparationTask.IsCompleted)
             return;
-
-        BmsEventPreviewTimeline timeline;
 
         try
         {
-            timeline = timelineTask.GetAwaiter().GetResult();
+            playback = preparationTask.GetAwaiter().GetResult();
         }
         catch (OperationCanceledException) when (IsDisposed)
         {
@@ -182,11 +190,12 @@ internal sealed class BmsEventPreviewTrack : BmsPreviewTrack
         }
         catch (Exception exception)
         {
-            BmsLogger.Error(exception, "Failed to prepare BMS event preview timeline.");
-            timeline = new BmsEventPreviewTimeline([], BmsEventPreviewTimeline.DEFAULT_LENGTH);
+            BmsLogger.Error(exception, "Failed to prepare BMS event preview playback.");
+            playback = new BmsEventPreviewPlayback(this, new BmsEventPreviewTimeline([], BmsEventPreviewTimeline.DEFAULT_LENGTH), null, audioManager,
+                timelineCancellation.Token);
         }
 
-        activateTimeline(timeline);
+        activatePlayback();
     }
 
     private bool advanceToNextTimelineSource()
@@ -199,18 +208,25 @@ internal sealed class BmsEventPreviewTrack : BmsPreviewTrack
         timelineSourceIndex++;
         Length = BmsEventPreviewTimeline.DEFAULT_LENGTH;
         pendingPreviewPosition = CurrentTime;
-        timelineTask = prepareTimelineSource();
+        preparationTask = prepareTimelineSource();
         return true;
     }
 
-    private Task<BmsEventPreviewTimeline> prepareTimelineSource() => Task.Run(
-        () => timelineSources[timelineSourceIndex](timelineCancellation.Token),
-        timelineCancellation.Token);
-
-    private void activateTimeline(BmsEventPreviewTimeline timeline)
+    private Task<BmsEventPreviewPlayback> prepareTimelineSource()
     {
-        playback = new BmsEventPreviewPlayback(this, timeline, basePath, audioManager);
-        Length = playback.Length;
+        var token = timelineCancellation.Token;
+        var source = timelineSources[timelineSourceIndex];
+        return Task.Run(() =>
+        {
+            var timeline = source(token);
+            token.ThrowIfCancellationRequested();
+            return new BmsEventPreviewPlayback(this, timeline, basePath, audioManager, token);
+        }, token);
+    }
+
+    private void activatePlayback()
+    {
+        Length = playback!.Length;
         var restorePositionResolved = TryResolvePendingRestorePosition();
         var activationPosition = restorePositionResolved ? CurrentTime : pendingPreviewPosition ?? CurrentTime;
         pendingPreviewPosition = null;

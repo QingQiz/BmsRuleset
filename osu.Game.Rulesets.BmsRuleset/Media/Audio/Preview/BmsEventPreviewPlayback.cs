@@ -23,7 +23,7 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
     private readonly bool deriveLengthFromSamples;
     private readonly bool extendLengthFromSamples;
     private readonly BindableDouble masterGain = new(1);
-    private readonly CancellationTokenSource cancellation = new();
+    private readonly CancellationTokenSource cancellation;
     private readonly Dictionary<int, double> sampleEndTimes = [];
 
     private BmsPcmPlaybackSession? playbackSession;
@@ -43,8 +43,10 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
         BmsPreviewTrack owner,
         BmsEventPreviewTimeline timeline,
         string? basePath,
-        AudioManager audioManager)
+        AudioManager audioManager,
+        CancellationToken cancellationToken)
     {
+        cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         this.owner = owner;
         this.audioManager = audioManager;
         sortedEvents = timeline.Entries;
@@ -76,7 +78,16 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
             audioManager,
             () => owner.CurrentTime,
             masterGain);
-        playbackSession.Initialise(cancellation.Token, owner.CurrentTime, waitForInitialAssets: false);
+        try
+        {
+            playbackSession.Initialise(cancellation.Token, owner.CurrentTime, waitForInitialAssets: false);
+            cancellation.Token.ThrowIfCancellationRequested();
+        }
+        catch
+        {
+            Dispose();
+            throw;
+        }
     }
 
     public void Dispose()
