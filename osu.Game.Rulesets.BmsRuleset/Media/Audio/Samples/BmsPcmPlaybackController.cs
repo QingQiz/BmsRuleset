@@ -114,9 +114,7 @@ internal sealed class BmsPcmPlaybackController : IDisposable
 
         resourceStore = new BmsAudioResourceStore(basePath, cancellationToken);
         resolveResources();
-        assetCache = new BmsPcmAssetCache(
-            async (identity, token) => (byte[]?)await resourceStore.GetAsync(identity, token).ConfigureAwait(false),
-            rate);
+        assetCache = new BmsPcmAssetCache((identity, token) => resourceStore.OpenPcmAsync(identity, rate, token));
         clockMapper.Rebase(chartTime, mixer.RenderedFrames);
         mixer.SubmitControl(BmsVoiceCommandType.SetMasterGain, mixer.RenderedFrames, epoch, lastMasterGain);
 
@@ -457,9 +455,15 @@ internal sealed class BmsPcmPlaybackController : IDisposable
         if (resourceStore == null)
             return;
 
+        var paths = new Dictionary<string, string?>(StringComparer.Ordinal);
         foreach (var (sampleKey, definition) in sampleDefinitions)
         {
-            if (!string.IsNullOrEmpty(definition.Path) && resourceStore.ResolveSamplePath(definition.Path) is { } identity)
+            if (string.IsNullOrEmpty(definition.Path))
+                continue;
+
+            if (!paths.TryGetValue(definition.Path, out var identity))
+                paths[definition.Path] = identity = resourceStore.ResolveSamplePath(definition.Path);
+            if (identity != null)
                 resolvedResources[sampleKey] = identity;
         }
     }

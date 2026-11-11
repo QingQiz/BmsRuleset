@@ -30,6 +30,26 @@ public class BmsBassFixedRatePcmProcessorTest
     [OneTimeTearDown]
     public void FreeBass() => Bass.Free();
 
+    [Test]
+    public async Task UnreadableDeclaredEncodingFallsBackToPlayableStem()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"bmson-fallback-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        try
+        {
+            File.WriteAllText(Path.Combine(directory, "stem.ogg"), "invalid audio");
+            File.WriteAllBytes(Path.Combine(directory, "stem.wav"), createWave(44100, 44100, 440));
+            using var store = new BmsAudioResourceStore(directory);
+            using var processor = await store.OpenPcmAsync("stem.ogg", 1, default);
+            var chunks = BmsPcmTestHelpers.ProcessChunks(processor);
+            Assert.That(chunks.Sum(chunk => chunk.FrameCount), Is.EqualTo(44100));
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
+    }
+
     [TestCase(0.5)]
     [TestCase(0.75)]
     [TestCase(1.0)]
@@ -75,7 +95,7 @@ public class BmsBassFixedRatePcmProcessorTest
     public async Task AssetCacheDeduplicatesAndPublishesStartupBuffer()
     {
         var wave = createWave(44100, 44100, 440);
-        using var cache = new BmsPcmAssetCache((_, _) => Task.FromResult<byte[]?>(wave), 1);
+        using var cache = new BmsPcmAssetCache((_, _) => Task.FromResult(BmsFixedRatePcmProcessor.CreateFromMemory(wave, 1)));
         using var first = cache.Acquire("same.wav");
         using var second = cache.Acquire("same.wav");
 
@@ -100,7 +120,7 @@ public class BmsBassFixedRatePcmProcessorTest
     public async Task CacheCancellationReleasesConcurrentDecodeSources(double rate, bool recreateDevice)
     {
         var wave = createWave(44100, 44100 * 10, 440);
-        var cache = new BmsPcmAssetCache((_, _) => Task.FromResult<byte[]?>(wave), rate);
+        var cache = new BmsPcmAssetCache((_, _) => Task.FromResult(BmsFixedRatePcmProcessor.CreateFromMemory(wave, rate)));
         var leases = Enumerable.Range(0, 64).Select(i => cache.Acquire($"cancellation-{i}.wav")).ToArray();
         try
         {
@@ -131,7 +151,7 @@ public class BmsBassFixedRatePcmProcessorTest
     public async Task ReleasedAssetBecomesEvictableWhenDecodingCompletes()
     {
         var data = new TaskCompletionSource<byte[]?>(TaskCreationOptions.RunContinuationsAsynchronously);
-        using var cache = new BmsPcmAssetCache((_, token) => data.Task.WaitAsync(token), 1);
+        using var cache = new BmsPcmAssetCache(async (_, token) => BmsFixedRatePcmProcessor.CreateFromMemory((await data.Task.WaitAsync(token))!, 1));
         using var lease = cache.Acquire("delayed.wav");
         typeof(BmsPcmAssetCache).GetField("residentPcmBytes", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
             .SetValue(cache, 513L * 1024 * 1024);

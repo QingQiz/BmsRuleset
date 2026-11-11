@@ -40,6 +40,9 @@ internal partial class BmsPracticeSamplePlayback(BmsBeatmap beatmap, IReadOnlyLi
             plan.SetDurations(candidates.ToDictionary(pair => pair.Key, pair =>
             {
                 var duration = result[pair.Value];
+                if (duration.State == BmsSampleDurationState.Failed)
+                    return new BmsSampleDuration(BmsSampleDurationState.Unknown);
+
                 return duration.State == BmsSampleDurationState.Known
                     ? duration with { Milliseconds = beatmap.SampleDefinitions[pair.Key].GetLength(duration.Milliseconds) }
                     : duration;

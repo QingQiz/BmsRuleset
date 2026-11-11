@@ -12,8 +12,7 @@ internal sealed class BmsPcmAssetCache : IDisposable
     private const long default_soft_budget = 512L * 1024 * 1024;
     private const int default_startup_frames = BmsFixedRatePcmProcessor.DEFAULT_CHUNK_FRAMES * 2;
 
-    private readonly Func<string, CancellationToken, Task<byte[]?>> resourceLoader;
-    private readonly double rate;
+    private readonly Func<string, CancellationToken, Task<BmsFixedRatePcmProcessor>> sourceFactory;
     private readonly SemaphoreSlim processingSlots;
     private readonly CancellationTokenSource disposalCancellation = new();
     private readonly ConcurrentDictionary<string, CacheEntry> entries = new();
@@ -24,16 +23,10 @@ internal sealed class BmsPcmAssetCache : IDisposable
     private bool disposed;
 
     internal BmsPcmAssetCache(
-        Func<string, CancellationToken, Task<byte[]?>> resourceLoader,
-        double rate)
+        Func<string, CancellationToken, Task<BmsFixedRatePcmProcessor>> sourceFactory)
     {
-        ArgumentNullException.ThrowIfNull(resourceLoader);
-
-        if (!double.IsFinite(rate) || rate < 0.05 || rate > 2)
-            throw new ArgumentOutOfRangeException(nameof(rate));
-
-        this.resourceLoader = resourceLoader;
-        this.rate = rate;
+        ArgumentNullException.ThrowIfNull(sourceFactory);
+        this.sourceFactory = sourceFactory;
         processingSlots = new SemaphoreSlim(2, 2);
     }
 
@@ -136,11 +129,7 @@ internal sealed class BmsPcmAssetCache : IDisposable
             await processingSlots.WaitAsync(disposalCancellation.Token).ConfigureAwait(false);
             acquiredSlot = true;
 
-            var data = await resourceLoader(resourceIdentity, disposalCancellation.Token).ConfigureAwait(false);
-            if (data == null || data.Length == 0)
-                throw new InvalidOperationException($"BMS audio resource '{resourceIdentity}' is unavailable.");
-
-            using var processor = BmsFixedRatePcmProcessor.CreateFromMemory(data, rate);
+            using var processor = await sourceFactory(resourceIdentity, disposalCancellation.Token).ConfigureAwait(false);
             entry.Asset.SetOriginalDuration(processor.OriginalDurationMilliseconds);
 
             foreach (var chunk in processor.ProcessChunks(disposalCancellation.Token))

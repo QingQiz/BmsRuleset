@@ -259,7 +259,7 @@ public class BmsPcmMaintenanceTest
 
     internal static (BmsPcmAssetCache Cache, BmsPcmAssetLease[] Leases) CreatePinnedCache(int count)
     {
-        var cache = new BmsPcmAssetCache((_, _) => throw new InvalidOperationException("Unexpected resource load"), 1);
+        var cache = new BmsPcmAssetCache((_, _) => throw new InvalidOperationException("Unexpected resource load"));
         var entries = Field<IDictionary>(cache, "entries");
         var entryType = entries.GetType().GenericTypeArguments[1];
         var leases = new BmsPcmAssetLease[count];

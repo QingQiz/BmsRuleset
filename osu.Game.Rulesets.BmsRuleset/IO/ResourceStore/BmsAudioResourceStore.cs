@@ -3,10 +3,12 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using osu.Framework.IO.Stores;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Decoding;
+using osu.Game.Rulesets.BmsRuleset.Media.Audio.Processing;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 
 namespace osu.Game.Rulesets.BmsRuleset.IO.ResourceStore;
@@ -15,7 +17,7 @@ internal sealed class BmsAudioResourceStore(string basePath, CancellationToken c
 {
     private const int max_concurrent_flac_decodes = 4;
 
-    private static readonly string[] fallback_extensions = ["wav", "flac", "ogg", "mp3"];
+    private static readonly string[] fallback_extensions = ["wav", "flac", "ogg", "mp3", "m4a"];
 
     // Limit native decoder pressure when multiple samples are prefetched at once.
     private static readonly SemaphoreSlim flac_decode_semaphore = new(max_concurrent_flac_decodes, max_concurrent_flac_decodes);
@@ -63,21 +65,44 @@ internal sealed class BmsAudioResourceStore(string basePath, CancellationToken c
 
     internal bool TryResolve(string? name, [NotNullWhen(true)] out string? path) => fileStore.TryResolve(name, out path);
 
-    internal string? ResolveSamplePath(string definition)
+    internal string? ResolveSamplePath(string definition) => ResolveSamplePaths(definition).FirstOrDefault();
+
+    private IEnumerable<string> ResolveSamplePaths(string definition)
     {
+        var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var lookup in new BmsSampleInfo(definition).LookupNames)
         {
-            if (TryResolve(lookup, out var path))
-                return path;
-
+            if (TryResolve(lookup, out var path) && seen.Add(path))
+                yield return path;
             var stem = Path.ChangeExtension(lookup, null);
             foreach (var extension in fallback_extensions)
+                if (TryResolve($"{stem}.{extension}", out path) && seen.Add(path))
+                    yield return path;
+        }
+    }
+
+    internal async Task<BmsFixedRatePcmProcessor> OpenPcmAsync(string definition, double rate, CancellationToken token)
+    {
+        Exception? failure = null;
+        foreach (var path in ResolveSamplePaths(definition))
+        {
+            token.ThrowIfCancellationRequested();
+            try
             {
-                if (TryResolve($"{stem}.{extension}", out path))
-                    return path;
+                var bytes = await GetAsync(path, token).ConfigureAwait(false);
+                if (bytes is { Length: > 0 })
+                    return BmsFixedRatePcmProcessor.CreateFromMemory(bytes, rate);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                failure = exception;
             }
         }
-        return null;
+        throw new InvalidDataException($"No playable audio resource for '{definition}'.", failure);
     }
 
     public void Dispose()
