@@ -22,6 +22,9 @@
     <ItemGroup Label="Embedded BMSON Test Charts">
         <EmbeddedResource Include="bmson_test_songs\*.bmson;bmson_test_songs\samples.json" LogicalName="bmson_test_songs/%(Filename)%(Extension)"/>
     </ItemGroup>
+    <ItemGroup Label="Embedded Mania Test Charts">
+        <EmbeddedResource Include="mania_test_songs\*.osu" LogicalName="mania_test_songs/%(Filename)%(Extension)"/>
+    </ItemGroup>
     <ItemGroup Label="Independent beatoraja reference">
         <EmbeddedResource Include="reference_fixtures\beatoraja_windows.csv"/>
         <EmbeddedResource Include="reference_fixtures\column_judgement_p1_trace.json"/>

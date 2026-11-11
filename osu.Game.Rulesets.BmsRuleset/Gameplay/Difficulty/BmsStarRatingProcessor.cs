@@ -1474,7 +1474,9 @@ public class BmsStarRatingProcessor
 
         Array.Sort(events, 0, eventCount, event_time_comparer);
 
-        pointCandidates[0] = 0;
+        // Converted charts may have negative-time heads before the first LN body event.
+        // Cover every head-to-head query, including the initial interval with no active bodies.
+        pointCandidates[0] = noteSeq.Length == 0 ? 0 : Math.Min(0, noteSeq[0].Head);
         pointCandidates[1] = TotalTimeT;
         for (var i = 0; i < eventCount; i++)
             pointCandidates[i + 2] = events[i].time;
