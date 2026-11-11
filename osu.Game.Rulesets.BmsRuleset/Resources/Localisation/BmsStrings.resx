@@ -600,4 +600,16 @@ Click to open the BMS log for the complete list and error details.</value>
   <data name="show_generic_keyboard" xml:space="preserve">
     <value>Show generic keyboard layouts</value>
   </data>
+  <data name="difficulty_refresh_running" xml:space="preserve">
+    <value>Updating BMS difficulties for Hide Scratch and converted charts...</value>
+  </data>
+  <data name="difficulty_refresh_complete" xml:space="preserve">
+    <value>BMS difficulties have been updated.</value>
+  </data>
+  <data name="difficulty_refresh_cancelled" xml:space="preserve">
+    <value>BMS difficulty update cancelled.</value>
+  </data>
+  <data name="difficulty_refresh_failed" xml:space="preserve">
+    <value>BMS difficulty update finished with {0} failed charts.</value>
+  </data>
 </root>

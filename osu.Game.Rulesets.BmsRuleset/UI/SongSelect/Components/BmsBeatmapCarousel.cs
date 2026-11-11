@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
+using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Pooling;
@@ -9,7 +11,11 @@ using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.Graphics.Carousel;
+using osu.Game.Overlays;
+using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.DifficultyTable;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Difficulty;
+using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Filter;
 using osu.Game.Screens.Select;
 
@@ -27,13 +33,33 @@ internal partial class BmsBeatmapCarousel : BeatmapCarousel
     private readonly List<BeatmapSetInfo> unavailableSets = [];
     private bool subscribed;
     private bool replacingUnavailableEntries;
+    private BmsSongSelectDifficultyCache difficultyCache = null!;
+    private ProgressNotification? difficultyProgress;
+
+    internal BmsDifficultyRefresh DifficultyRefresh { get; private set; } = null!;
 
     public BmsBeatmapCarousel()
     {
-        Filters = Filters.Select(filter => filter is BeatmapCarouselFilterMatching
+        var filters = Filters.Select(filter => filter is BeatmapCarouselFilterMatching
             ? new BmsBeatmapCarouselFilterMatching(() => Criteria!)
             : filter).ToArray();
+        Filters = [new BmsBeatmapCarouselDifficultyFilter(() => Criteria!, () => difficultyCache, filters)];
     }
+
+    [BackgroundDependencyLoader]
+    private void load(BeatmapManager beatmaps)
+    {
+        difficultyCache = new BmsSongSelectDifficultyCache(Path.Combine(host.Storage.GetFullPath(string.Empty), "bms-song-select-difficulty.bin"));
+        var ruleset = new BmsRuleset().RulesetInfo;
+        // The shared BeatmapDifficultyCache has one worker; background refresh needs independent
+        // calculators, while its completed ratings are already persisted in our own cache.
+        DifficultyRefresh = new BmsDifficultyRefresh(difficultyCache, (beatmap, mods, token) => Task.Run<double?>(() =>
+            new BmsDifficultyCalculator(ruleset, beatmaps.GetWorkingBeatmap(beatmap)).Calculate(mods, token).StarRating, token));
+        DifficultyRefresh.ProgressChanged += progress => Schedule(() => updateDifficultyProgress(progress));
+    }
+
+    [Resolved]
+    private INotificationOverlay? notifications { get; set; }
 
     [Resolved]
     private GameHost host { get; set; } = null!;
@@ -50,6 +76,7 @@ internal partial class BmsBeatmapCarousel : BeatmapCarousel
         Schedule(syncUnavailableEntries);
         BmsRulesetRuntime.DifficultyTablesChanged += difficultyTablesChanged;
         subscribed = true;
+        Items.BindCollectionChanged((_, _) => Scheduler.AddOnce(refreshDifficulties), true);
     }
 
     protected override Drawable GetDrawableForDisplay(CarouselItem item)
@@ -69,6 +96,9 @@ internal partial class BmsBeatmapCarousel : BeatmapCarousel
 
     protected override void Dispose(bool isDisposing)
     {
+        DifficultyRefresh?.Dispose();
+        if (difficultyProgress?.Ongoing == true)
+            difficultyProgress.State = ProgressNotificationState.Cancelled;
         if (subscribed)
             BmsRulesetRuntime.DifficultyTablesChanged -= difficultyTablesChanged;
 
@@ -79,6 +109,65 @@ internal partial class BmsBeatmapCarousel : BeatmapCarousel
 
     protected override bool HandleItemsChanged(NotifyCollectionChangedEventArgs args) =>
         replacingUnavailableEntries || base.HandleItemsChanged(args);
+
+    private void refreshDifficulties() => DifficultyRefresh.Refresh(Items);
+
+    private void refilterDifficulties()
+    {
+        if (Criteria != null && BmsBeatmapCarouselDifficultyFilter.UsesDifficulty(Criteria))
+            Filter(Criteria);
+    }
+
+    private void updateDifficultyProgress(BmsDifficultyRefresh.Progress progress)
+    {
+        if (!DifficultyRefresh.IsCurrent(progress.RequestToken))
+            return;
+
+        if (progress.RequestToken.IsCancellationRequested && !progress.Finished)
+            return;
+
+        if (progress.Processed > 0)
+            refilterDifficulties();
+
+        if (progress.RequestToken.IsCancellationRequested || progress.Total == 0)
+        {
+            if (difficultyProgress?.Ongoing == true)
+            {
+                difficultyProgress.Text = BmsStrings.DifficultyRefreshCancelled;
+                difficultyProgress.State = ProgressNotificationState.Cancelled;
+            }
+
+            return;
+        }
+
+        if (progress.Processed == 0 && !progress.Finished)
+        {
+            if (difficultyProgress?.Ongoing == true)
+                difficultyProgress.State = ProgressNotificationState.Cancelled;
+            var notification = new ProgressNotification
+            {
+                Text = BmsStrings.DifficultyRefreshRunning,
+                CompletionText = BmsStrings.DifficultyRefreshComplete,
+                State = ProgressNotificationState.Active,
+            };
+            notification.CancelRequested = () =>
+            {
+                DifficultyRefresh.Cancel(progress.RequestToken);
+                notification.Text = BmsStrings.DifficultyRefreshCancelled;
+                return true;
+            };
+            difficultyProgress = notification;
+            notifications?.Post(notification);
+        }
+
+        difficultyProgress!.Progress = (float)progress.Processed / progress.Total;
+        if (progress.Finished)
+        {
+            if (progress.Failed > 0)
+                difficultyProgress.Text = BmsStrings.DifficultyRefreshFailed(progress.Failed);
+            difficultyProgress.State = progress.Failed == 0 ? ProgressNotificationState.Completed : ProgressNotificationState.Cancelled;
+        }
+    }
 
     internal bool TryQueueMetadataUpdate(NotifyCollectionChangedEventArgs change)
     {

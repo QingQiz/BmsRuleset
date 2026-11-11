@@ -600,4 +600,16 @@
   <data name="show_generic_keyboard" xml:space="preserve">
     <value>显示通用键盘布局</value>
   </data>
+  <data name="difficulty_refresh_running" xml:space="preserve">
+    <value>正在更新隐藏皿键和转谱的 BMS 难度…</value>
+  </data>
+  <data name="difficulty_refresh_complete" xml:space="preserve">
+    <value>BMS 难度更新完成。</value>
+  </data>
+  <data name="difficulty_refresh_cancelled" xml:space="preserve">
+    <value>已取消 BMS 难度更新。</value>
+  </data>
+  <data name="difficulty_refresh_failed" xml:space="preserve">
+    <value>BMS 难度更新结束，{0} 张谱面计算失败。</value>
+  </data>
 </root>

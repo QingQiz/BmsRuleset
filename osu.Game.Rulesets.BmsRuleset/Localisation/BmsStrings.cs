@@ -962,6 +962,14 @@ public static class BmsStrings
         return new BmsLocalisableString(key, template.English, template.Chinese, args);
     }
 
+    public static LocalisableString DifficultyRefreshRunning => get("difficulty_refresh_running");
+
+    public static LocalisableString DifficultyRefreshComplete => get("difficulty_refresh_complete");
+
+    public static LocalisableString DifficultyRefreshCancelled => get("difficulty_refresh_cancelled");
+
+    public static LocalisableString DifficultyRefreshFailed(int count) => get("difficulty_refresh_failed", count);
+
     private static FrozenDictionary<string, (string English, string Chinese)> loadTemplates()
     {
         var english = new ResourceManager(resource_prefix, typeof(BmsStrings).Assembly);

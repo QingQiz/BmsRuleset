@@ -9,6 +9,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps.Conversion;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.DifficultyTable;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 using osu.Game.Rulesets.Filter;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Screens.Select;
@@ -135,7 +136,9 @@ public class BmsFilterCriteria : IRulesetFilterCriteria
         return false;
     }
 
-    public bool FilterMayChangeFromMods(FilterCriteria criteria, ValueChangedEvent<IReadOnlyList<Mod>> mods) => false;
+    public bool FilterMayChangeFromMods(FilterCriteria criteria, ValueChangedEvent<IReadOnlyList<Mod>> mods) =>
+        BmsBeatmapCarouselDifficultyFilter.UsesDifficulty(criteria)
+        && mods.OldValue.OfType<BmsModHideScratch>().Any() != mods.NewValue.OfType<BmsModHideScratch>().Any();
 
     private static float calculatePercentage(int matchingObjectCount, int totalObjectCount) =>
         matchingObjectCount / (float)Math.Max(1, totalObjectCount) * 100;

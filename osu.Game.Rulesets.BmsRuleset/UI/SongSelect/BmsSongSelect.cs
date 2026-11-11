@@ -841,6 +841,7 @@ public abstract partial class BmsSongSelect : ScreenWithBeatmapBackground, IKeyB
 
     private void onArrivingAtScreen()
     {
+        Carousel.DifficultyRefresh.Resume();
         ModSelectOverlay.Beatmap.BindTo(Beatmap);
         ModSelectOverlay.Ruleset.BindTo(Ruleset);
         // required due to https://github.com/ppy/osu-framework/issues/3218
@@ -885,6 +886,7 @@ public abstract partial class BmsSongSelect : ScreenWithBeatmapBackground, IKeyB
 
     private void onLeavingScreen()
     {
+        Carousel.DifficultyRefresh.Pause();
         ModSelectOverlay.Hide();
         CancelBeatmapSelection();
         backgroundMetadataCancellation?.Cancel();

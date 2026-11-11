@@ -18,6 +18,11 @@ namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Difficulty;
 
 public class BmsDifficultyCalculator(IRulesetInfo ruleset, IWorkingBeatmap beatmap) : DifficultyCalculator(ruleset, beatmap)
 {
+    // Increment when model, conversion or mod changes affect calculated star ratings.
+    public const int DIFFICULTY_VERSION = 1;
+
+    public override int Version => DIFFICULTY_VERSION;
+
     public BmsStarRatingProcessor StarRatingProcessor { get; } = new();
 
     internal CancellationToken CalculationCancellationToken { get; set; }
