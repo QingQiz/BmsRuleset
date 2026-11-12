@@ -13,6 +13,9 @@
 
 - use `var` for local variables when possible
 - avoid unnecessary testing and over-defensive coding
+- Follow the C# naming rules in `osu.Game.Rulesets.BmsRuleset.sln.DotSettings`; automatic naming-rule detection is disabled. Private methods (including static and async methods), private properties, and local functions use `camelCase`; internal/protected/public methods and properties use `PascalCase`. Preserve names required by overrides and interface implementations.
+- Private instance fields use `camelCase` (the settings also permit `_camelCase`; follow the surrounding file). Private mutable static fields use `camelCase`; private static readonly fields, private constants, and local constants use `snake_case`. Non-private constants and static readonly fields use `UPPER_SNAKE_CASE`. Type parameters use `PascalCase`.
+- Before finishing, check naming and unused-member inspections in the files you changed. Remove unused methods after checking normal calls, reflection, framework callbacks, and interface contracts.
 
 ## Implementation Design
 

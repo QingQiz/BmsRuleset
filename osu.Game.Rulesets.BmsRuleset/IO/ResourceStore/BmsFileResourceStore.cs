@@ -12,25 +12,12 @@ namespace osu.Game.Rulesets.BmsRuleset.IO.ResourceStore;
 
 public class BmsFileResourceStore(string basePath) : IResourceStore<byte[]>
 {
-    private static readonly Encoding shift_jis_encoding =
-        CodePagesEncodingProvider.Instance.GetEncoding(932)
-        ?? throw new InvalidOperationException("Shift-JIS encoding is not available.");
-
-    private static readonly Encoding gbk_encoding = createStrictEncoding(936, "GBK");
-
-    private static readonly ConcurrentDictionary<string, WeakReference<Lazy<MojibakeAliasIndex>>> shared_alias_indexes =
+    private static readonly ConcurrentDictionary<string, WeakReference<Lazy<BmsResourcePathIndex>>> shared_alias_indexes =
         new(StringComparer.Ordinal);
-
-    private static readonly EnumerationOptions alias_enumeration_options = new()
-    {
-        RecurseSubdirectories = true,
-        IgnoreInaccessible = true,
-        AttributesToSkip = FileAttributes.ReparsePoint,
-    };
 
     // In-memory working beatmaps may use an empty source; resolve it as the current directory.
     private readonly string basePath = Path.GetFullPath(string.IsNullOrEmpty(basePath) ? "." : basePath);
-    private Lazy<MojibakeAliasIndex>? aliasIndex;
+    private Lazy<BmsResourcePathIndex>? aliasIndex;
 
     public void Dispose()
     {
@@ -39,13 +26,10 @@ public class BmsFileResourceStore(string basePath) : IResourceStore<byte[]>
 
     public byte[]? Get(string? name) => TryResolve(name, out var path) ? File.ReadAllBytes(path) : null;
 
-    public Task<byte[]?> GetAsync(string? name, CancellationToken cancellationToken = default)
-        => Task.Run(() => Get(name), cancellationToken);
-
     // The framework's generic store contract omits nullability for missing resources.
     byte[] IResourceStore<byte[]>.Get(string name) => Get(name)!;
 
-    Task<byte[]> IResourceStore<byte[]>.GetAsync(string name, CancellationToken cancellationToken) => GetAsync(name, cancellationToken)!;
+    Task<byte[]> IResourceStore<byte[]>.GetAsync(string name, CancellationToken cancellationToken) => Task.Run(() => Get(name)!, cancellationToken);
 
     public Stream? GetStream(string? name)
     {
@@ -77,6 +61,25 @@ public class BmsFileResourceStore(string basePath) : IResourceStore<byte[]>
     /// </summary>
     internal bool TryResolve(string? name, [NotNullWhen(true)] out string? path)
     {
+        if (!TryGetFullPath(basePath, name, out path))
+            return false;
+
+        if (File.Exists(path))
+            return true;
+
+        var relativePath = Path.GetRelativePath(basePath, path);
+
+        // Reinterpreting a GBK filename as Shift-JIS cannot produce an ASCII-only alias.
+        if (!Ascii.IsValid(relativePath)
+            && getAliasIndex().TryResolveAlias(relativePath, out path) && File.Exists(path))
+            return true;
+
+        path = null;
+        return false;
+    }
+
+    internal static bool TryGetFullPath(string basePath, string? name, [NotNullWhen(true)] out string? path)
+    {
         path = null;
 
         if (string.IsNullOrEmpty(name))
@@ -99,19 +102,10 @@ public class BmsFileResourceStore(string basePath) : IResourceStore<byte[]>
             return false;
         }
 
-        if (File.Exists(path))
-            return true;
-
-        var relativePath = normaliseSeparators(Path.GetRelativePath(basePath, path));
-
-        if (getAliasIndex().TryResolve(relativePath, out path) && File.Exists(path))
-            return true;
-
-        path = null;
-        return false;
+        return true;
     }
 
-    private MojibakeAliasIndex getAliasIndex()
+    private BmsResourcePathIndex getAliasIndex()
     {
         var lazy = aliasIndex;
 
@@ -125,7 +119,7 @@ public class BmsFileResourceStore(string basePath) : IResourceStore<byte[]>
         return lazy.Value;
     }
 
-    private static Lazy<MojibakeAliasIndex> getSharedAliasIndex(string directory)
+    private static Lazy<BmsResourcePathIndex> getSharedAliasIndex(string directory)
     {
         while (true)
         {
@@ -133,10 +127,10 @@ public class BmsFileResourceStore(string basePath) : IResourceStore<byte[]>
                 && existing.TryGetTarget(out var cached))
                 return cached;
 
-            var created = new Lazy<MojibakeAliasIndex>(
-                () => new MojibakeAliasIndex(directory),
+            var created = new Lazy<BmsResourcePathIndex>(
+                () => new BmsResourcePathIndex(directory),
                 LazyThreadSafetyMode.ExecutionAndPublication);
-            var replacement = new WeakReference<Lazy<MojibakeAliasIndex>>(created);
+            var replacement = new WeakReference<Lazy<BmsResourcePathIndex>>(created);
 
             var stored = existing == null
                 ? shared_alias_indexes.TryAdd(directory, replacement)
@@ -155,79 +149,7 @@ public class BmsFileResourceStore(string basePath) : IResourceStore<byte[]>
         foreach (var pair in shared_alias_indexes)
         {
             if (!pair.Value.TryGetTarget(out _))
-                ((ICollection<KeyValuePair<string, WeakReference<Lazy<MojibakeAliasIndex>>>>)shared_alias_indexes).Remove(pair);
-        }
-    }
-
-    private static Encoding createStrictEncoding(int codePage, string name)
-    {
-        var encoding = CodePagesEncodingProvider.Instance.GetEncoding(codePage)
-                       ?? throw new InvalidOperationException($"{name} encoding is not available.");
-        encoding = (Encoding)encoding.Clone();
-        encoding.EncoderFallback = EncoderFallback.ExceptionFallback;
-        encoding.DecoderFallback = DecoderFallback.ExceptionFallback;
-        return encoding;
-    }
-
-    private static string normaliseSeparators(string path) =>
-        path.Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
-
-    private sealed class MojibakeAliasIndex
-    {
-        private readonly Dictionary<string, string?> aliases = new(StringComparer.Ordinal);
-
-        public MojibakeAliasIndex(string directory)
-        {
-            try
-            {
-                // Some editors write GBK resource paths into otherwise Shift-JIS charts. Building
-                // aliases from real filenames remains deterministic even when decoding lost bytes.
-                foreach (var file in Directory.EnumerateFiles(directory, "*", alias_enumeration_options))
-                    addAlias(directory, file);
-            }
-            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-            {
-                // An incomplete index remains safe because only unique, existing paths are returned.
-            }
-        }
-
-        public bool TryResolve(string alias, [NotNullWhen(true)] out string? path)
-        {
-            if (aliases.TryGetValue(alias, out var candidate) && candidate != null)
-            {
-                path = candidate;
-                return true;
-            }
-
-            path = null;
-            return false;
-        }
-
-        private void addAlias(string directory, string file)
-        {
-            var relativePath = normaliseSeparators(Path.GetRelativePath(directory, file));
-            string alias;
-
-            try
-            {
-                alias = shift_jis_encoding.GetString(gbk_encoding.GetBytes(relativePath));
-            }
-            catch (EncoderFallbackException)
-            {
-                return;
-            }
-
-            if (alias == relativePath)
-                return;
-
-            if (!aliases.TryGetValue(alias, out var existing))
-            {
-                aliases.Add(alias, file);
-                return;
-            }
-
-            if (!string.Equals(existing, file, StringComparison.Ordinal))
-                aliases[alias] = null;
+                ((ICollection<KeyValuePair<string, WeakReference<Lazy<BmsResourcePathIndex>>>>)shared_alias_indexes).Remove(pair);
         }
     }
 }
