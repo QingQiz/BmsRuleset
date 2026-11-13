@@ -90,7 +90,7 @@ public class BmsBeatorajaReferenceTest
     public void PmsDeferredReleasePreservesReleaseTiming(BmsLongNoteMode mode)
     {
         var run = new BmsLongNoteTestContext(mode, duration: 2000, layout: BmsLayoutVariant.Popn9K);
-        run.Press(1000, HitResult.Perfect);
+        run.Press(1000);
         run.Release(1500);
         run.Frame(1700, 200, false);
         Assert.That((mode == BmsLongNoteMode.LongNote ? run.MainResults.Last().Endpoints.Last() : run.Output.SyntheticEndpoints.Last()).TimeOffset, Is.EqualTo(-1500), "JudgeManager uses tailTime - releasetime when the grace period expires.");
@@ -111,11 +111,11 @@ public class BmsBeatorajaReferenceTest
     public void HcnBodySettlesElapsedTimeThroughTheTail(bool holding)
     {
         var run = new BmsLongNoteTestContext(BmsLongNoteMode.HellChargeNote, duration: 201, layout: BmsLayoutVariant.Bme7K);
-        run.Press(1000, HitResult.Perfect);
+        run.Press(1000);
         run.Frame(1200, 200, holding);
         Assert.That(run.Output.BodyTicks, Is.Empty);
         run.Frame(1201, 1, holding);
-        Assert.That(run.Output.BodyTicks.Single().Time, Is.EqualTo(System.Math.BitIncrement(1200)));
+        Assert.That(run.Output.BodyTicks.Single().Time, Is.EqualTo(1200.001));
         run.Frame(1400, 199, holding);
         Assert.That(run.Output.BodyTicks, Has.Count.EqualTo(1));
     }
@@ -124,11 +124,11 @@ public class BmsBeatorajaReferenceTest
     public void HcnDelayedFrameSettlesAllElapsedTicks()
     {
         var run = new BmsLongNoteTestContext(BmsLongNoteMode.HellChargeNote, duration: 2000, layout: BmsLayoutVariant.Bme7K);
-        run.Press(1000, HitResult.Perfect);
+        run.Press(1000);
         run.Frame(1650, 650, true);
         Assert.That(run.Output.BodyTicks.Select(tick => tick.Time), Is.EqualTo(new[]
         {
-            System.Math.BitIncrement(1200), System.Math.BitIncrement(1400), System.Math.BitIncrement(1600),
+            1200.001, 1400.001, 1600.001,
         }));
     }
 
@@ -139,7 +139,7 @@ public class BmsBeatorajaReferenceTest
         var note = new BmsLongNote { StartTime = 1000, Duration = 1000, Column = 0,
             Beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, Rank = 2, LockedLongNoteMode = mode } };
         var run = new BmsLongNoteTestContext(note);
-        run.Press(1000, HitResult.Perfect);
+        run.Press(1000);
         run.Release(2000);
         Assert.That(run.State.TailJudged, Is.False,
             "JudgeManager ignores scratch key-up inside tail hit windows; the reverse-direction key-down judges the tail.");

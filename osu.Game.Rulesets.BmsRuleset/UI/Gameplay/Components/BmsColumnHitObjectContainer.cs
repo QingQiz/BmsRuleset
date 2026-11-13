@@ -25,7 +25,7 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
 
     private bool coreOrderDirty = true;
 
-    internal BmsColumnJudgementRuntime Judgements { get; set; } = null!;
+    internal BmsJudgementView Judgements { get; set; } = null!;
 
     internal BmsJudgementBridge JudgementBridge { get; set; } = null!;
 

@@ -1,29 +1,60 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+using osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
+using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests;
 
+internal readonly record struct BmsJudgementCandidate(double StartTime, double EndTime, int Column, double JudgementRate,
+    bool IsLongNote, bool IsJudged = false, bool HasMistake = false);
+internal readonly record struct BmsJudgementSelection(BmsJudgementCandidate? Candidate, HitResult Result, bool IsEmptyPoor);
+
 internal static class BmsTestJudgementSelector
 {
-    internal static BmsJudgementSelection SelectPress(
-        BmsLayoutVariant layout,
-        int column,
-        IEnumerable<BmsJudgementCandidate> candidates,
-        double inputTime,
-        BmsJudgementAlgorithm? algorithm = BmsJudgementAlgorithm.Combo)
+    internal static BmsJudgementSelection SelectPress(BmsLayoutVariant layout, int column,
+        IEnumerable<BmsJudgementCandidate> candidates, double inputTime, BmsJudgementAlgorithm? algorithm = BmsJudgementAlgorithm.Combo)
     {
-        // Fixtures may list notes in arbitrary order; gameplay supplies its ordered index.
-        var ordered = candidates.OrderBy(candidate => candidate.StartTime).ThenBy(candidate => candidate.Column).ToArray();
-        var search = new BmsJudgementSelector.PressSearch(layout, column, inputTime, algorithm);
-        for (var i = 0; i < ordered.Length; i++)
+        var ordered = candidates.OrderBy(c => c.StartTime).ThenBy(c => c.Column).ToArray();
+        var beatmap = new BmsBeatmap { LayoutVariant = layout };
+        var objects = ordered.Select(c =>
         {
-            if (!search.Consider(ordered[i], i))
-                break;
+            BmsHitObject note = c.IsLongNote ? new BmsLongNote { Duration = c.EndTime - c.StartTime } : new BmsNote();
+            note.StartTime = c.StartTime;
+            note.Column = c.Column;
+            note.JudgementRate = c.JudgementRate;
+            note.Beatmap = beatmap;
+            return note;
+        }).ToArray();
+        var output = new BmsRecordingJudgementOutput();
+        var engine = new BmsJudgementEngine(objects, layout, column, output);
+        foreach (var candidate in ordered.Where(c => c.Column == column && (c.IsJudged || c.HasMistake)))
+        {
+            var time = candidate.IsJudged ? candidate.StartTime : candidate.StartTime - 180;
+            engine.QueueInput(time, column, true, false);
+            engine.QueueInput(time + .001, column, false, false);
+            engine.ProcessFrame(new BmsFrameContext(time + .001, 1), 0, algorithm);
         }
-
-        return search.Selection;
+        var selection = new BmsJudgementSelection(null, HitResult.None, false);
+        output.AfterResultApplied = (note, frame) =>
+        {
+            if (Math.Abs(frame.SimulationTime - inputTime) < .0005)
+                selection = new BmsJudgementSelection(ordered[Array.IndexOf(objects, note)], output.GetMainResult(note).Type, false);
+        };
+        output.NonConsumingJudgement = (expected, lane, result) =>
+            selection = new BmsJudgementSelection(ordered.First(c => c.StartTime == expected && c.Column == lane), result, result == HitResult.Miss);
+        output.StatePublished = (note, state, _) =>
+        {
+            if (note.EffectiveMode == BmsLongNoteMode.LongNote && engine.GetColumn(column).GetNote(note).Parts[0].Time / 1000.0 == inputTime && !state.TailJudged)
+                selection = new BmsJudgementSelection(ordered[Array.IndexOf(objects, note)], state.HeadResult, false);
+        };
+        engine.QueueInput(inputTime, column, true, false);
+        engine.ProcessFrame(new BmsFrameContext(inputTime, 1), 0, algorithm);
+        return selection;
     }
 }

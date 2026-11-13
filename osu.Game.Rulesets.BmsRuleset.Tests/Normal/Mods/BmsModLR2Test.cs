@@ -131,6 +131,7 @@ public class BmsModLr2Test
         var offset = (firstPerfect + secondPerfect) / 2;
         engine.QueueInput(first.StartTime + offset, first.Column, true, false);
         engine.ProcessFrame(new BmsFrameContext(first.StartTime + offset, 1), 0);
+        engine.QueueInput(first.StartTime + offset + .001, first.Column, false, false);
         engine.QueueInput(second.StartTime + offset, second.Column, true, false);
         engine.ProcessFrame(new BmsFrameContext(second.StartTime + offset, 1), 0);
         Assert.That(output.GetMainResult(first).Type, Is.EqualTo(HitResult.Great));
@@ -301,7 +302,7 @@ public class BmsModLr2Test
     {
         using var scope = BmsJudgementProfileProvider.UseWindowMods([new BmsModLr2()]);
         var context = createLongNoteContext(layout);
-        context.Press(1000, HitResult.Perfect);
+        context.Press(1000);
         context.Release(release);
         Assert.That(context.Results, Is.EqualTo([expected]));
     }
@@ -311,7 +312,7 @@ public class BmsModLr2Test
     {
         using var scope = BmsJudgementProfileProvider.UseWindowMods([new BmsModLr2()]);
         var context = createLongNoteContext();
-        context.Press(850, HitResult.Ok);
+        context.Press(850);
         Assert.That(context.Results, Is.EqualTo([HitResult.Ok]));
         var late = createLongNoteContext();
         late.Passive(1100.001);
@@ -343,7 +344,7 @@ public class BmsModLr2Test
         var engine = new BmsJudgementEngine([note], beatmap.LayoutVariant, 1, output);
         engine.ProcessFrame(new BmsFrameContext(2000, 1), 2000);
         Assert.That(output.GetMainResult(note).Type, Is.EqualTo(HitResult.Meh));
-        Assert.That(engine.NextEventTime, Is.EqualTo(double.PositiveInfinity));
+        Assert.That(engine.GetColumn(note.Column).GetNote(note).Completed, Is.True);
     }
 
     [Test]
@@ -618,7 +619,8 @@ public class BmsModLr2Test
         var gauges = new List<BmsGaugeStateSnapshot[]>();
         var output = new BmsReplaySimulation.SimulationOutput(score, health, _ => gauges.Add(health.CurrentGaugeStates.ToArray()));
         var engine = new BmsJudgementEngine(Enumerable.Range(1, 3).Select(column => new BmsJudgementColumnDefinition(
-            beatmap.HitObjects.Where(note => note.Column == column).ToArray(), beatmap.LayoutVariant, column, output)).ToArray());
+            beatmap.HitObjects.Where(note => note.Column == column).ToArray(), beatmap.LayoutVariant, column, output)).ToArray(),
+            notes => (RhythmEngine.Profiles.BmsProfiles.CreateScore(score.EmptyPoorBreaksCombo ?? BmsJudgementProfileProvider.EmptyPoorBreaksCombo(layout)), health.CreateEngineHealth(notes)));
         (double Time, int Column, bool Pressed)[] inputs = [(100, 1, true), (110, 1, false), (1017, 1, true), (1025, 1, false), (1500, 2, true), (1900, 2, false)];
         var replay = new osu.Game.Replays.Replay { HasReceivedAllFrames = true };
         foreach (var input in inputs)

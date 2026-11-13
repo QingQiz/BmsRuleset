@@ -58,14 +58,14 @@ public class BmsBeatorajaFrameHistoryTest
         using var run = new Run();
         run.Head();
         run.Frame(1150, 150, true); run.Expect(0.24);
-        run.Frame(1250, 100, false); run.Expect(0.24);
-        run.Frame(1400, 150, true); run.Expect(0.24);
-        run.Frame(1401, 1, true); run.Expect(0.26);
-        run.Frame(1602, 201, false); run.Expect(0.26);
-        run.Frame(1603, 1, false); run.Expect(0.245);
-        run.Rewind(1250); run.Expect(0.24);
+        run.Frame(1250, 100, false); run.Expect(0.18);
+        run.Frame(1400, 150, true); run.Expect(0.18);
+        run.Frame(1401, 1, true); run.Expect(0.20);
+        run.Frame(1602, 201, false); run.Expect(0.20);
+        run.Frame(1603, 1, false); run.Expect(0.185);
+        run.Rewind(1250); run.Expect(0.18);
         run.Frame(1400, 150, true); run.Frame(1401, 1, true);
-        run.Frame(1602, 201, false); run.Frame(1603, 1, false); run.Expect(0.245);
+        run.Frame(1602, 201, false); run.Frame(1603, 1, false); run.Expect(0.185);
     }
 
     [Test]
@@ -125,7 +125,7 @@ public class BmsBeatorajaFrameHistoryTest
             context = new BmsLongNoteTestContext(note);
             context.BeforeRebuild = health.ResetReplayState;
             context.BeforeOperation = time;
-            context.Output.BeforeResultCheckpoint += (_, _) => health.ApplyResult(new BmsLongNoteJudgementResult(note, note.CreateJudgement(), context.Output.GetEndpoints(note)) { Type = context.Output.GetMainResult(note).Type });
+            context.Output.ResultApplied += (_, _) => health.ApplyResult(new BmsLongNoteJudgementResult(note, note.CreateJudgement(), context.Output.GetEndpoints(note)) { Type = context.Output.GetMainResult(note).Type });
             context.Output.SyntheticEndpoint += (endpoint, applied) =>
             {
                 if (applied) health.ApplySyntheticLongNoteEndpoint(new BmsLongNoteJudgementResult(note.CreateSyntheticEndpoint(endpoint.ExpectedTime), note.CreateJudgement(), [endpoint]) { Type = endpoint.Result });
@@ -134,7 +134,7 @@ public class BmsBeatorajaFrameHistoryTest
         }
 
         private void time(double t) { clock.CurrentTime = t; framed.ProcessFrame(); }
-        public void Head() { time(1000); context.Press(1000, HitResult.Perfect); Expect(0.24); }
+        public void Head() { time(1000); context.Press(1000); Expect(0.24); }
         public void Frame(double t, double elapsed, bool holding) { time(t); context.Frame(t, elapsed, holding); }
         public void Release(double t)
         {

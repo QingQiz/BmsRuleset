@@ -132,12 +132,17 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
     public void RegisterEmptyPoor(double eventTime, double expectedTime, int column)
         => RegisterNonConsumingJudgement(HitResult.Miss, eventTime, expectedTime, column);
 
-    public void RegisterNonConsumingJudgement(HitResult result, double eventTime, double expectedTime, int column)
+    public void RegisterNonConsumingJudgement(HitResult result, double eventTime, double expectedTime, int column, RhythmEngine.ScoreState? engineScore = null)
     {
-        ScoreResultCounts[result] = ScoreResultCounts.GetValueOrDefault(result) + 1;
+        if (engineScore != null)
+            applyEngineScore(engineScore);
+        else
+        {
+            ScoreResultCounts[result] = ScoreResultCounts.GetValueOrDefault(result) + 1;
+            if (result == HitResult.Ok || (EmptyPoorBreaksCombo ?? BmsJudgementProfileProvider.EmptyPoorBreaksCombo(layout)))
+                Combo.Value = 0;
+        }
         StatisticsVersion++;
-        var comboChange = result == HitResult.Ok || (EmptyPoorBreaksCombo ?? BmsJudgementProfileProvider.EmptyPoorBreaksCombo(layout)) ? -Combo.Value : 0;
-        Combo.Value += comboChange;
         var source = new BmsJudgementSource(eventTime, column,
             result == HitResult.Ok ? BmsJudgementSourceKind.NonConsumingBad : BmsJudgementSourceKind.EmptyPoor);
         var observation = new BmsTimingObservation(BmsTimingObservationKind.Note, expectedTime, eventTime, 1, result);
@@ -154,13 +159,15 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
     /// <summary>
     ///     Applies a separate CN/HCN endpoint without requiring the source drawable to complete.
     /// </summary>
-    public BmsLongNoteJudgementResult ApplySyntheticLongNoteEndpoint(BmsLongNoteEndpointResult endpointResult, bool suppressPenalty = false)
+    public BmsLongNoteJudgementResult ApplySyntheticLongNoteEndpoint(BmsLongNoteEndpointResult endpointResult, bool suppressPenalty = false,
+        RhythmEngine.JudgementResult? engineResult = null)
     {
         var endpoint = endpointResult.Source.CreateSyntheticEndpoint(endpointResult.ExpectedTime);
         var result = new BmsLongNoteJudgementResult(endpoint, endpoint.CreateJudgement(), [endpointResult])
         {
             Type = endpointResult.Result,
             SuppressPenalty = suppressPenalty,
+            EngineResult = engineResult,
         };
         result.SetTiming(endpointResult.ApplicationTime ?? endpointResult.EventTime, endpointResult.GameplayRate);
         ApplyResult(result);
@@ -230,6 +237,14 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
         if (result.HitObject is BmsHitObject and not BmsLandmine)
             ScoringJudgementEventCount++;
 
+        if (result is BmsJudgementResult { EngineResult: { } engine })
+        {
+            applyEngineScore(engine.Score);
+            set_combo_after(result, engine.Score.Combo);
+            set_highest_combo_after(result, engine.Score.MaximumCombo);
+            return;
+        }
+
         if (result is BmsJudgementResult { SuppressPenalty: true })
         {
             ScoreResultCounts[result.Type]--;
@@ -247,6 +262,25 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
             HighestCombo.Value = result.HighestComboAtJudgement;
             set_combo_after(result, 0);
             set_highest_combo_after(result, result.HighestComboAtJudgement);
+        }
+    }
+
+    private void applyEngineScore(RhythmEngine.ScoreState state)
+    {
+        Combo.Value = state.Combo;
+        HighestCombo.Value = state.MaximumCombo;
+        SetScoreProcessorStatistics(new ScoreProcessorStatistics
+        {
+            BaseScore = state.Score,
+            MaximumBaseScore = state.AccuracyMaximum,
+            // Stored ruleset scores include detonated mines in osu!'s progress count, with zero EX potential.
+            AccuracyJudgementCount = (int)(state.AccuracyMaximum / 2 + state.Counters.GetValueOrDefault("mine-hit")),
+        });
+        ScoreResultCounts.Clear();
+        foreach (var (key, count) in state.Counters)
+        {
+            var result = BmsEngineChart.HitResultFor(key);
+            ScoreResultCounts[result] = ScoreResultCounts.GetValueOrDefault(result) + (int)count;
         }
     }
 

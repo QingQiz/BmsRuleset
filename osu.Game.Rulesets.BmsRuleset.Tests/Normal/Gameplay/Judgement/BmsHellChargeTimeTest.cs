@@ -5,7 +5,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.State;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.Presentation;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 
@@ -23,7 +23,7 @@ public class BmsHellChargeTimeTest
         engine.ProcessFrame(new BmsFrameContext(1201, 1), 1);
         Assert.That(output.BodyTicks, Has.Count.EqualTo(1));
         engine.ProcessFrame(new BmsFrameContext(1500, 1), 299);
-        Assert.That(output.BodyTicks.Select(tick => tick.Time), Is.EqualTo(new[] { Math.BitIncrement(1200), Math.BitIncrement(1400) }));
+        Assert.That(output.BodyTicks.Select(tick => tick.Time), Is.EqualTo(new[] { 1200.001, 1400.001 }));
         Assert.That(output.BodyTicks.All(tick => tick.Holding), Is.True);
     }
 
@@ -47,7 +47,7 @@ public class BmsHellChargeTimeTest
         engine.ProcessFrame(new BmsFrameContext(2000, 1), 1000);
         Assert.That(output.BodyTicks.Select(tick => (tick.Holding, tick.Time)), Is.EqualTo(new[]
         {
-            (true, Math.BitIncrement(1200)), (true, Math.BitIncrement(1400)), (false, Math.BitIncrement(1800)),
+            (true, 1200.001), (true, 1400.001), (false, 1800.001),
         }));
     }
 
@@ -82,17 +82,6 @@ public class BmsHellChargeTimeTest
     }
 
     [Test]
-    public void SignedAccumulatorCancelsHundredMillisecondIntervals()
-    {
-        var tracker = new BmsHellChargeBodyTracker();
-        var ticks = 0;
-        for (var i = 0; i < 4; i++) tracker.Update(100, i % 2 == 0, (_, _) => ticks++);
-        Assert.That(ticks, Is.Zero);
-        tracker.Update(500, true, (_, _) => ticks++);
-        Assert.That(ticks, Is.EqualTo(2));
-    }
-
-    [Test]
     public void DelayedUpdateInterleavesColumnsInGaugeOrder()
     {
         var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, Rank = 2, LockedLongNoteMode = BmsLongNoteMode.HellChargeNote };
@@ -102,8 +91,8 @@ public class BmsHellChargeTimeTest
         var health = createHealth();
         output.BodyTick = (_, holding, scale, frame) => health.ApplyHellChargeTick(holding, scale);
         var engine = new BmsJudgementEngine(
-            new([released], beatmap.LayoutVariant, 1, output),
-            new([held], beatmap.LayoutVariant, 2, output));
+            new BmsJudgementColumnDefinition([released], beatmap.LayoutVariant, 1, output),
+            new BmsJudgementColumnDefinition([held], beatmap.LayoutVariant, 2, output));
 
 
         engine.QueueInput(1000, 1, true, false);
@@ -114,10 +103,10 @@ public class BmsHellChargeTimeTest
 
         (int Column, bool Holding, double Time)[] expected =
         [
-            (2, true, Math.BitIncrement(1200)),
-            (1, false, Math.BitIncrement(1400)), (2, true, Math.BitIncrement(1400)),
-            (1, false, Math.BitIncrement(1600)), (2, true, Math.BitIncrement(1600)),
-            (1, false, Math.BitIncrement(1800)), (2, true, Math.BitIncrement(1800)),
+            (2, true, 1200.001),
+            (1, false, 1400.001), (2, true, 1400.001),
+            (1, false, 1600.001), (2, true, 1600.001),
+            (1, false, 1800.001), (2, true, 1800.001),
         ];
         Assert.That(output.BodyTicks.Select(tick => (tick.Note.Column, tick.Holding, tick.Time)), Is.EqualTo(expected));
         var expectedHealth = createHealth();

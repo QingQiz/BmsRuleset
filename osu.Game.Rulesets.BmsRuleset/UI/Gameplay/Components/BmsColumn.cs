@@ -96,7 +96,7 @@ public partial class BmsColumn : Playfield, IBmsColumn
 
     internal BmsInvisibleNoteLayer? InvisibleNoteLayer { get; private set; }
 
-    internal BmsColumnJudgementRuntime Judgements
+    internal BmsJudgementView Judgements
     {
         get;
         set

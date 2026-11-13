@@ -12,9 +12,12 @@ public sealed record TapConfiguration(
     TimingWindows? ResolvedWindows = null,
     Func<string, int>? CandidatePriority = null,
     Func<string, long, bool>? ShareInput = null,
-    bool BlockResolvedUntilStart = false);
+    bool BlockResolvedUntilStart = false,
+    bool SuppressRepeatedMistakes = false,
+    ImmutableHashSet<string>? RecoveringResults = null,
+    TimerOrder PassiveOrder = TimerOrder.BeforeInput);
 
-public sealed record TapState(NoteTimer? Timer, bool Done, bool Resolved) : NoteState
+public sealed record TapState(NoteTimer? Timer, bool Done, bool Resolved, bool Mistake = false) : NoteState
 {
     public override NoteTimer? NextTimer => Timer;
 
@@ -36,7 +39,7 @@ public sealed class TapRule : INoteRule
         Configuration = configuration;
     }
 
-    public NoteState CreateState(ChartNote note) => new TapState(new NoteTimer(checked(note.StartTime + Configuration.LateDeadline + 1), TimerOrder.BeforeInput), false, false);
+    public NoteState CreateState(ChartNote note) => new TapState(new NoteTimer(checked(note.StartTime + Configuration.LateDeadline + 1), Configuration.PassiveOrder), false, false);
 
     public IEnumerable<ScoringOpportunity> GetScoringOpportunities(ChartNote note)
     {
@@ -53,6 +56,8 @@ public sealed class TapRule : INoteRule
         if (state.Resolved && Configuration.BlockResolvedUntilStart && offset < 0)
             return new InputCandidate(noteIndex, context.Note.StartTime, offset, 0);
         var result = (state.Resolved ? Configuration.ResolvedWindows : Configuration.Windows)?.ResultFor(offset);
+        if (Configuration.SuppressRepeatedMistakes && (state.Resolved || (state.Mistake && (result == null || Configuration.RecoveringResults?.Contains(result) != true))))
+            return null;
         return result == null
             ? null
             : new InputCandidate(noteIndex, context.Note.StartTime, offset, Configuration.CandidatePriority?.Invoke(result) ?? 1,
@@ -69,6 +74,8 @@ public sealed class TapRule : INoteRule
         var nonResolving = state.Resolved || Configuration.NonResolvingResults?.Contains(result) == true;
         if (!nonResolving)
             state = resolvedState(context.Note, context.Time);
+        else if (Configuration.SuppressRepeatedMistakes)
+            state = state with { Mistake = true };
 
         return new NoteUpdate(state, [new NoteEmission(nonResolving ? "empty" : "tap", result, context.Note.StartTime, offset)]);
     }
@@ -79,7 +86,8 @@ public sealed class TapRule : INoteRule
         if (state.Resolved)
             return NoteUpdate.Silent(new TapState(null, true, true));
 
-        return new NoteUpdate(resolvedState(context.Note, context.Time), [new NoteEmission("tap", Configuration.MissResult, context.Note.StartTime)]);
+        return new NoteUpdate(resolvedState(context.Note, context.Time), [new NoteEmission("tap", Configuration.MissResult, context.Note.StartTime,
+            SuppressPenalty: state.Mistake && Configuration.SuppressRepeatedMistakes)]);
     }
 
     private TapState resolvedState(ChartNote note, long time)

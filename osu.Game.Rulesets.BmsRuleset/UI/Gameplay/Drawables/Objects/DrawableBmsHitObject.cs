@@ -188,6 +188,7 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
     {
         judgementFrame = frame;
         ((BmsJudgementResult)Result).SuppressPenalty = suppressPenalty;
+        ((BmsJudgementResult)Result).EngineResult = frame?.EngineResult;
         ApplyResult(result);
     }
 

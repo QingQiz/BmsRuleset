@@ -13,6 +13,8 @@ public sealed record JudgementEvent(
     long? Offset)
 {
     public string OriginalResult { get; init; } = Result;
+
+    public bool SuppressPenalty { get; init; }
 }
 
 public sealed record ScoreState
@@ -42,7 +44,10 @@ public sealed record ScoreConfiguration(
     Func<ScorePlan, double> MaximumScore,
     Func<ScoreState, JudgementEvent, JudgementEvent>? TransformResult = null);
 
-public readonly record struct HealthState(double Value, bool HasFailed);
+public readonly record struct HealthState(double Value, bool HasFailed)
+{
+    public ImmutableArray<HealthState> Layers { get; init; } = [];
+}
 
 public readonly record struct HealthContext(JudgementEvent Event, HealthState Health, ScoreState Score, ScorePlan Plan);
 

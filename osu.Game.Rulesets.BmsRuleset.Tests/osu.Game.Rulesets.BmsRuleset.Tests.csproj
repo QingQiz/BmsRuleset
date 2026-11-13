@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <StartupObject>osu.Game.Rulesets.BmsRuleset.Tests.VisualTestRunner</StartupObject>
     </PropertyGroup>
@@ -16,6 +16,14 @@
     <ItemGroup>
         <ProjectReference Include="..\osu.Game.Rulesets.BmsRuleset\osu.Game.Rulesets.BmsRuleset.csproj"/>
     </ItemGroup>
+    <!-- Tests exercise the engine embedded in the shipped DLL; importing its source assemblies
+         again would give the same contracts two different assembly identities. -->
+    <Target Name="UseEmbeddedRhythmEngine" BeforeTargets="CoreCompile">
+        <ItemGroup>
+            <ReferencePath Remove="@(ReferencePath)" Condition="'%(ReferencePath.Filename)' == 'RhythmEngine' Or '%(ReferencePath.Filename)' == 'RhythmEngine.Profiles'" />
+            <ReferencePathWithRefAssemblies Remove="@(ReferencePathWithRefAssemblies)" Condition="'%(ReferencePathWithRefAssemblies.Filename)' == 'RhythmEngine' Or '%(ReferencePathWithRefAssemblies.Filename)' == 'RhythmEngine.Profiles'" />
+        </ItemGroup>
+    </Target>
     <ItemGroup Label="Embedded BMS Test Songs">
         <EmbeddedResource Include="bms_test_songs\**\*" Link="Resources\bms_test_songs\%(RecursiveDir)%(Filename)%(Extension)"/>
     </ItemGroup>
@@ -29,8 +37,6 @@
         <EmbeddedResource Include="reference_fixtures\beatoraja_windows.csv"/>
         <EmbeddedResource Include="reference_fixtures\column_judgement_p1_trace.json"/>
         <EmbeddedResource Include="reference_fixtures\long_note_p2_trace.json"/>
-        <EmbeddedResource Include="reference_fixtures\judgement_p3_checkpoints.json"/>
-        <EmbeddedResource Include="reference_fixtures\judgement_p3a07_core.json"/>
     </ItemGroup>
     <ItemGroup Label="BGA Video Routing Fixtures">
         <!-- Copied to the output dir so BmsBgaVideoFactoryTest can hand real file paths to the

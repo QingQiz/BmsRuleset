@@ -1,8 +1,8 @@
+using System.Linq;
 using NUnit.Framework;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.State;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.Presentation;
 using osu.Game.Rulesets.Scoring;
 
@@ -11,7 +11,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
 [TestFixture]
 public class BmsLongNotePresentationTest
 {
-    private static readonly BmsLongNoteState held = new(true, true, false, HitResult.Perfect, 1000, HitResult.None, null, null);
+    private static readonly BmsLongNoteState held = new(true, true, false, HitResult.Perfect, HitResult.None);
 
     [TestCase(BmsLongNoteMode.LongNote)]
     [TestCase(BmsLongNoteMode.ChargeNote)]
@@ -43,7 +43,7 @@ public class BmsLongNotePresentationTest
     public void LnHeadCanDrivePresentationBeforeTheMainResult()
     {
         var run = new BmsLongNoteTestContext(BmsLongNoteMode.LongNote);
-        run.Press(1000, HitResult.Perfect);
+        run.Press(1000);
         Assert.That(run.Output.GetMainResult(run.Note).HasResult, Is.False);
         var current = BmsLongNotePresentation.SelectMapping(BmsLongNoteMode.LongNote)(run.Note, run.State,
             new BmsLongNotePresentationContext(1100, true));
@@ -57,7 +57,7 @@ public class BmsLongNotePresentationTest
     public void OutOfWindowReleaseKeepsBodyUntilEnd(BmsLongNoteMode mode, double releaseTime, HitResult expected)
     {
         var run = new BmsLongNoteTestContext(mode);
-        run.Press(1000, HitResult.Perfect);
+        run.Press(1000);
         run.Release(releaseTime);
 
         Assert.That(run.State.TailJudged, Is.True);
@@ -88,7 +88,7 @@ public class BmsLongNotePresentationTest
     public void InWindowTailHidesImmediately(BmsLongNoteMode mode, double releaseTime, HitResult expected)
     {
         var run = new BmsLongNoteTestContext(mode);
-        run.Press(1000, HitResult.Perfect);
+        run.Press(1000);
         run.Release(releaseTime);
 
         Assert.That(run.State.TailJudged, Is.True);
@@ -106,10 +106,10 @@ public class BmsLongNotePresentationTest
     public void DelayedFrameUsesReleaseWindowInsteadOfApplicationTime(BmsLongNoteMode mode, double releaseTime, bool keepBody)
     {
         var run = new BmsLongNoteTestContext(mode);
-        run.Press(1000, HitResult.Perfect);
+        run.Press(1000);
         run.Release(releaseTime, 1499);
 
-        Assert.That(run.State.TailTime, Is.EqualTo(1499));
+        Assert.That(run.Column.GetNote(run.Note).Parts[2].Time / 1000.0, Is.EqualTo(releaseTime));
         Assert.That(run.State.EarlyReleaseOutsideWindow, Is.EqualTo(keepBody));
         var current = run.Presentation(false, 1499);
         Assert.That(current.Retired, Is.EqualTo(!keepBody));
@@ -123,7 +123,7 @@ public class BmsLongNotePresentationTest
     public void ReleaseMarginExpiryPreservesReleaseWindow(BmsLongNoteMode mode, double releaseTime, bool keepBody)
     {
         var run = new BmsLongNoteTestContext(mode, layout: BmsLayoutVariant.Popn9K);
-        run.Press(1000, HitResult.Perfect);
+        run.Press(1000);
         run.Release(releaseTime);
         run.Frame(releaseTime + 199, 199, false);
         Assert.That(run.State.TailJudged, Is.False);
@@ -143,7 +143,7 @@ public class BmsLongNotePresentationTest
     public void RewindClearsOutOfWindowBreakBeforeInWindowRelease(BmsLongNoteMode mode)
     {
         var run = new BmsLongNoteTestContext(mode);
-        run.Press(1000, HitResult.Perfect);
+        run.Press(1000);
         run.Release(1100);
         Assert.That(run.State.EarlyReleaseOutsideWindow, Is.True);
 
@@ -159,10 +159,11 @@ public class BmsLongNotePresentationTest
     public void HeadBadDoesNotKeepAnInWindowTailVisible()
     {
         var run = new BmsLongNoteTestContext(BmsLongNoteMode.LongNote);
-        run.Press(1150, HitResult.Ok);
+        run.Press(1150);
         run.Release(1490);
 
-        Assert.That(run.State.TailResult, Is.EqualTo(HitResult.Ok));
+        Assert.That(run.State.TailResult, Is.EqualTo(HitResult.Perfect));
+        Assert.That(run.Results.Single(), Is.EqualTo(HitResult.Ok));
         Assert.That(run.State.EarlyReleaseOutsideWindow, Is.False);
         Assert.That(run.Presentation(false, 1490).Retired, Is.True);
     }
@@ -171,7 +172,7 @@ public class BmsLongNotePresentationTest
     public void SuccessfulHcnTailKeepsBodyUntilItsOwnExpiry()
     {
         var run = new BmsLongNoteTestContext(BmsLongNoteMode.HellChargeNote);
-        run.Press(1000, HitResult.Perfect);
+        run.Press(1000);
         run.Release(1490);
         var before = run.Presentation(false, 1490);
         Assert.That(run.State.TailJudged, Is.True);

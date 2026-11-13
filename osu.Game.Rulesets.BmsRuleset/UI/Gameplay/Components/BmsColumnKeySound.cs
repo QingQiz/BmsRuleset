@@ -16,10 +16,10 @@ internal sealed partial class BmsColumnKeySound : CompositeDrawable
     public override bool IsPresent => false;
 
     private readonly BmsKeySoundCursor cursor;
-    internal BmsColumnJudgementRuntime Judgements { get; set; }
+    internal BmsJudgementView Judgements { get; set; }
     private readonly Func<BmsHitObject, bool> isFinished;
 
-    internal BmsColumnKeySound(IReadOnlyList<BmsHitObject> hitObjects, BmsColumnJudgementRuntime judgements,
+    internal BmsColumnKeySound(IReadOnlyList<BmsHitObject> hitObjects, BmsJudgementView judgements,
                               IReadOnlyList<BmsInvisibleNote>? invisibleNotes = null)
     {
         Judgements = judgements;

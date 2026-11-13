@@ -3,7 +3,7 @@
 `RhythmEngine.sln` builds independently of the parent solution. The local
 `Directory.Build.props` intentionally stops inheritance of osu! build settings.
 Core and Hosting reference only .NET; Profiles references Core. None references
-BmsRuleset, osu! or osu!framework. Existing gameplay has not been migrated.
+BmsRuleset, osu! or osu!framework. BmsRuleset imports the engine through its own chart and output adapters; live play and replay reconstruction share that session.
 
 ```sh
 dotnet build RhythmEngine/RhythmEngine.sln -c Release
@@ -114,10 +114,7 @@ with independent configurations and existing presets, including within-batch
 release/regrab, timing boundaries, custom scoring, recovery, seek and cloning.
 
 The implemented input contract remains fixed lanes with digital controls.
-Analog trajectories, moving lanes, session timers for continuous drain and
-multiple concurrent gauges require additional contracts; no host-side judgement
-fallback is provided for those unsupported models. Actual ruleset integration
-and audiovisual timing remain unverified in this standalone phase.
+Analog trajectories, moving lanes, session timers for continuous drain require additional contracts. Concurrent gauges can be expressed by immutable `HealthState.Layers` and a single configured reducer/outcome function. Original-client audiovisual timing remains outside the standalone fixtures.
 
 The session is single-threaded, owns no external resources and requires no dispose
 callback. A returned frame can be read elsewhere as an immutable snapshot.
@@ -139,3 +136,28 @@ callback. A returned frame can be read elsewhere as an immutable snapshot.
 Each compiled profile exposes revision, source links and limitations through
 `ProfileDescriptor`. These are source-backed implementations and compatibility
 models, not a claim that all original clients have passed differential testing.
+
+## BmsRuleset integration
+
+`BmsEngineChart` freezes imported timing windows, note modes, scratch controls and
+mod policies into engine rules. `BmsJudgementEngine` submits physical edges and
+projects ordered results into osu! score/health processors. Those processors use
+the engine accumulators during play and replay; their framework simulation hooks
+remain available for score calibration and direct framework results.
+
+`BmsJudgementView` exposes read-only note snapshots and input state. The UI owns
+`BmsLongNoteState`, drawable bindings, animation retirement and object pooling.
+Binding, reading or discarding presentation never writes into the session.
+Endpoint metadata preserves the observed grade/offset independently of the
+aggregate score; `NoteSnapshot.Held` records the physical state for that event.
+
+`JudgementSession.AdvanceTo` returns input dispatch ranges, so unmatched inputs
+retain their audio position even when identical press/release/press edges share
+a timestamp. `AppendInputs` accepts another batch only at the closed timestamp;
+already dispatched timers are not rerun. `EndAt` asks active rules to settle an
+attempt at its recorded endpoint. Backward replay seeks reconstruct a session
+from physical inputs and the configured initial gauge layers.
+
+Time is rounded once to signed integer microseconds at the host boundary.
+Strict deadlines occur one microsecond after their inclusive window. The shipped
+ruleset DLL embeds Core and Profiles; neither engine assembly references osu!.

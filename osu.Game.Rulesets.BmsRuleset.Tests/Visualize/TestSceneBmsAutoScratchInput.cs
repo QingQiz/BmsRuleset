@@ -138,7 +138,7 @@ public partial class TestSceneBmsAutoScratchInput : BmsPlayerTestScene
         AddAssert("single successful tail after rewind", () => observations().Count(o => o.Kind == BmsTimingObservationKind.LongNoteTail && o.Result.IsHit()), () => Is.EqualTo(1));
     }
 
-    private Gameplay.Judgement.BmsColumnJudgementRuntime scratch => ((BmsColumn)Playfield.Stage.Columns[0]).Judgements;
+    private Gameplay.Judgement.BmsJudgementView scratch => ((BmsColumn)Playfield.Stage.Columns[0]).Judgements;
 
     private BmsTimingObservation[] observations() => ((BmsScoreProcessor)Player.ScoreProcessor).JudgementEvents
         .Where(e => e.Source.Column == 0 && e.Source.Kind != BmsJudgementSourceKind.Landmine).SelectMany(e => e.TimingObservations).ToArray();

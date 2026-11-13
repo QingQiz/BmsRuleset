@@ -120,7 +120,6 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
             advanceTo($"before {index + 1:00}: {cases[index].Text}", startTime - text_lead_time - 50);
             AddStep($"capture baseline {index + 1:00}", () =>
             {
-                Player.HealthProcessor.Health.Value = 0.5;
                 before = takeSnapshot();
             });
 
@@ -403,6 +402,9 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
             new RelativeInput(long_note_duration + after_bad_slow_edge, false),
         ]));
 
+        // Exercise recovery before earlier misses can leave the gauge at its damage floor.
+        var recoveryIndex = longNoteVisualCases.FindIndex(testCase => testCase.TestsHellChargeReleaseRecovery);
+        (longNoteVisualCases[0], longNoteVisualCases[recoveryIndex]) = (longNoteVisualCases[recoveryIndex], longNoteVisualCases[0]);
         return longNoteVisualCases;
     }
 

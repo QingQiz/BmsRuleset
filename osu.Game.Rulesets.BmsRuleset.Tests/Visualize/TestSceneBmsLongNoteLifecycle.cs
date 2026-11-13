@@ -96,11 +96,16 @@ public partial class TestSceneBmsLongNoteLifecycle : BmsPlayerTestScene
         {
             first = (DrawableBmsHitObject)Playfield.GetAliveObjectAtTime(5000)!;
             note = (BmsLongNote)first.HitObject;
-            first.OnNewResult += (source, _) => Assert.That(((BmsColumn)Playfield.Stage.Columns[1]).Judgements.GetLongNoteState((BmsLongNote)source.HitObject).IsHolding, Is.True,
-                "The head is pinned, and the normal-LN tail is not marked judged, when the main result is submitted.");
+            first.OnNewResult += (source, _) =>
+            {
+                var state = ((BmsColumn)Playfield.Stage.Columns[1]).Judgements.GetLongNoteState((BmsLongNote)source.HitObject);
+                Assert.That(state.HeadJudged, Is.True);
+                Assert.That(state.TailJudged, Is.EqualTo(longNoteMode == BmsLongNoteMode.LongNote),
+                    "Framework observers see the committed snapshot even before its presentation callback.");
+            };
         });
         seek(5000);
-        AddStep("capture head time", () => originalHeadTime = ((BmsColumn)Playfield.Stage.Columns[1]).Judgements.GetLongNoteState(note).HeadTime);
+        AddStep("capture head time", () => originalHeadTime = ((BmsColumn)Playfield.Stage.Columns[1]).Judgements.GetNote(note).Parts[0].Time / 1000.0);
         capture("head");
         seek(5501);
         capture("body and mine");
@@ -114,7 +119,7 @@ public partial class TestSceneBmsLongNoteLifecycle : BmsPlayerTestScene
         {
             var context = ((BmsColumn)Playfield.Stage.Columns[1]).Judgements;
             Assert.Throws<InvalidOperationException>(() => ((BmsColumn)Playfield.Stage.Columns[1]).JudgementBridge.GetRepresentation(note));
-            Assert.That(context.GetLongNoteState(note).HeadTime, Is.EqualTo(originalHeadTime));
+            Assert.That(context.GetNote(note).Parts[0].Time / 1000.0, Is.EqualTo(originalHeadTime));
         });
         seek(9000);
         capture("second head");
@@ -122,7 +127,7 @@ public partial class TestSceneBmsLongNoteLifecycle : BmsPlayerTestScene
         AddAssert("first head restored inside body", () =>
             Playfield.GetAliveObjectAtTime(5000) != null && ((BmsColumn)Playfield.Stage.Columns[1]).Judgements.GetLongNoteState(note).IsHolding);
         AddAssert("engine restores the stored head", () =>
-            ((BmsColumn)Playfield.Stage.Columns[1]).Judgements.GetLongNoteState(note).HeadTime == originalHeadTime);
+            ((BmsColumn)Playfield.Stage.Columns[1]).Judgements.GetNote(note).Parts[0].Time / 1000.0 == originalHeadTime);
         capture("rewound body");
         seek(6900);
         capture("replayed tail");
@@ -216,7 +221,7 @@ public partial class TestSceneBmsLongNoteLifecycle : BmsPlayerTestScene
             var notes = Playfield.AllColumnAliveObjects().OfType<DrawableBmsHitObject>().Where(d => d.HitObject is BmsLongNote).ToArray();
             Assert.That(notes, Has.Length.EqualTo(2));
             var context = ((BmsColumn)Playfield.Stage.Columns[1]).Judgements;
-            context.TryPressRegisteredNote(notes[0].HitObject, HitResult.Perfect,
+            context.HandleNotePress(
                 new BmsPressContext(Playfield.Time.Current, new BmsFrameContext(Playfield.Time.Current, 1)));
             Assert.That(context.GetLongNoteState((BmsLongNote)notes[0].HitObject).HeadJudged, Is.True);
             Assert.That(context.GetLongNoteState((BmsLongNote)notes[1].HitObject).HeadJudged, Is.False);
@@ -231,7 +236,7 @@ public partial class TestSceneBmsLongNoteLifecycle : BmsPlayerTestScene
         AddStep("load long notes", () => { mode = longNoteMode; includeMine = false; duplicateHeads = false; LoadPlayer(); });
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
         seek(5003);
-        AddStep("hold head", () => PressColumn(Playfield.Stage.Columns[1], 5000));
+        AddStep("hold head", () => PressColumn(Playfield.Stage.Columns[1], 5003));
         seek(5204);
         AddStep("reapply active defaults twice", () =>
         {
@@ -289,7 +294,7 @@ public partial class TestSceneBmsLongNoteLifecycle : BmsPlayerTestScene
             Assert.That(((BmsColumn)Playfield.Stage.Columns[1]).JudgementBridge.GetRepresentation(mine), Is.SameAs(drawable));
             Assert.That(context.GetLandmineState(mine), Is.EqualTo(state));
             Assert.That(drawable.Result, Is.SameAs(result));
-            context.UpdateLandmines(new BmsFrameContext(Playfield.Time.Current, 1), true);
+            context.Engine().ProcessFrame(new BmsFrameContext(Playfield.Time.Current, 1), 0);
             Assert.That(Player.Results.Count, Is.EqualTo(count));
         });
     }

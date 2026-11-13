@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using osu.Framework.Bindables;
 using osu.Game.Beatmaps;
@@ -16,6 +17,35 @@ namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 
 public partial class BmsHealthProcessor : HealthProcessor
 {
+    internal RhythmEngine.HealthConfiguration CreateEngineHealth(BmsHitObject[] objects)
+    {
+        ensureInitialized();
+        syncActiveStateFromHealth();
+        captureInitialGaugeStates();
+        var calculators = gaugeStates.Select(state => new BmsGaugeCalculator(
+            state.Profile with { GutsRules = state.Profile.GutsRules.ToImmutableArray() }, state.Calculator!.Total,
+            state.Calculator.NoteCount, effectiveProfileFamily)).ToImmutableArray();
+        return BmsEngineGauge.Create(objects, calculators,
+            gaugeStates.Select(state => new RhythmEngine.HealthState(state.CurrentHp, state.IsHpFailed)).ToImmutableArray());
+    }
+
+    internal void ApplyEngineHealth(RhythmEngine.HealthState health)
+    {
+        for (var i = 0; i < gaugeStates.Count; i++)
+        {
+            gaugeStates[i].CurrentHp = health.Layers[i].Value;
+            gaugeStates[i].IsHpFailed = health.Layers[i].HasFailed;
+        }
+        resolveActiveState();
+        HasEverFailed |= health.HasFailed;
+    }
+
+    internal void ApplyEngineTick(RhythmEngine.HealthState health)
+    {
+        ApplyEngineHealth(health);
+        markEverFailedIfEmpty();
+    }
+
     public Bindable<BmsGaugeDisplayProfile> DisplayProfile { get; } =
         new(BmsGaugeProfileFactory.Create(BmsGaugeType.Normal).Display);
 
@@ -348,6 +378,12 @@ public partial class BmsHealthProcessor : HealthProcessor
 
     protected override double GetHealthIncreaseFor(JudgementResult result)
     {
+        if (result is BmsJudgementResult { EngineResult: { } engine })
+        {
+            var previous = Health.Value;
+            ApplyEngineHealth(engine.Health);
+            return Health.Value - previous;
+        }
         if (result is BmsJudgementResult { SuppressPenalty: true })
             return 0;
 

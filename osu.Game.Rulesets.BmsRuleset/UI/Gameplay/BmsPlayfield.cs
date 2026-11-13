@@ -15,6 +15,7 @@ using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables;
@@ -89,7 +90,9 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         var judgementColumns = Stage.Columns.Cast<BmsColumn>().ToArray();
         var judgementObjects = Beatmap.HitObjects.ToArray();
         judgementEngine = new BmsJudgementEngine(judgementColumns.Select(column => new BmsJudgementColumnDefinition(
-            judgementObjects, LayoutVariant, column.Index, column.JudgementBridge)).ToArray());
+            judgementObjects, LayoutVariant, column.Index, column.JudgementBridge)).ToArray(), objects =>
+            (RhythmEngine.Profiles.BmsProfiles.CreateScore(scoreProcessor?.EmptyPoorBreaksCombo ?? BmsJudgementProfileProvider.EmptyPoorBreaksCombo(LayoutVariant)),
+             healthProcessor?.CreateEngineHealth(objects) ?? BmsEngineGauge.CreateDefault(objects)));
         foreach (var column in judgementColumns)
         {
             column.Judgements = judgementEngine.GetColumn(column.Index);
@@ -498,19 +501,14 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         requestJudgementDisplay(result.Type);
     }
 
-    internal void RegisterEmptyPoor(double expectedTime, int column, double? eventTime = null)
+    internal void RegisterNonConsumingJudgement(HitResult type, double expectedTime, int column, in BmsFrameContext frame)
     {
-        scoreProcessor?.RegisterEmptyPoor(eventTime ?? Time.Current, expectedTime, column);
-        healthProcessor?.RegisterEmptyPoor();
-        requestJudgementDisplay(HitResult.Miss);
+        scoreProcessor?.RegisterNonConsumingJudgement(type, frame.SimulationTime, expectedTime, column, frame.EngineResult!.Score);
+        ApplyEngineHealth(frame.EngineResult!.Health);
+        requestJudgementDisplay(type);
     }
 
-    internal void RegisterNonConsumingBad(double expectedTime, int column, double? eventTime = null)
-    {
-        scoreProcessor?.RegisterNonConsumingJudgement(HitResult.Ok, eventTime ?? Time.Current, expectedTime, column);
-        healthProcessor?.RegisterNonConsumingJudgement(HitResult.Ok);
-        requestJudgementDisplay(HitResult.Ok);
-    }
+    internal void ApplyEngineHealth(RhythmEngine.HealthState state) => healthProcessor?.ApplyEngineTick(state);
 
     private void requestJudgementDisplay(HitResult result)
     {
@@ -527,10 +525,11 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     /// <summary>
     ///     Registers a separate CN/HCN endpoint through the score and health processors.
     /// </summary>
-    internal void ApplySyntheticLongNoteEndpoint(BmsLongNoteEndpointResult endpoint, bool suppressPenalty)
+    internal void ApplySyntheticLongNoteEndpoint(BmsLongNoteEndpointResult endpoint, bool suppressPenalty,
+        RhythmEngine.JudgementResult? engineResult = null)
     {
         var note = endpoint.Source;
-        var scoreResult = scoreProcessor?.ApplySyntheticLongNoteEndpoint(endpoint, suppressPenalty);
+        var scoreResult = scoreProcessor?.ApplySyntheticLongNoteEndpoint(endpoint, suppressPenalty, engineResult);
 
         if (scoreResult != null)
         {
@@ -546,11 +545,6 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         if (!suppressPenalty)
             requestJudgementDisplay(endpoint.Result);
     }
-
-    /// <summary>
-    ///     Applies a HellChargeNote body gauge tick for the currently pressed column.
-    /// </summary>
-    public void ApplyHellChargeTick(bool holding, double scale = 0.5) => healthProcessor?.ApplyHellChargeTick(holding, scale);
 
     #endregion
 

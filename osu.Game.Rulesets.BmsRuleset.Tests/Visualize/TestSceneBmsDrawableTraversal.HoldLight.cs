@@ -72,11 +72,7 @@ public partial class TestSceneBmsDrawableTraversal
                 Assert.That(column.Judgements.GetLongNoteState(note).IsHolding, Is.True);
                 runTimeline("held", [5000, 5000, 5001, 5079, 5080, 5080, 5081, 5159, 5160, 5200, 5240, 5241]);
 
-                // Held input can change without publishing a new hold snapshot.
-                column.Judgements.PressedDirections = 0;
-                runTimeline("same state released input", [5242, 5319, 5320, 5320, 5400]);
-                column.Judgements.PressedDirections = 1;
-                runTimeline("same state repressed input", [5401, 5479, 5480, 6980]);
+                runTimeline("held continuation", [5242, 5319, 5320, 5320, 5400, 5401, 5479, 5480, 6980]);
                 advance(6980);
                 ReleaseColumn(column, 6980);
                 Assert.That(column.Judgements.GetLongNoteState(note).TailJudged, Is.True);

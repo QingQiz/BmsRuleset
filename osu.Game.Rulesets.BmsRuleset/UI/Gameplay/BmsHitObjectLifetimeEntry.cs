@@ -6,7 +6,6 @@ using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 using osu.Game.Rulesets.Judgements;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Rules;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
 
@@ -79,7 +78,7 @@ internal sealed class BmsHitObjectLifetimeEntry(
     ///     Mines only need a single frame to check whether the column is pressed; after that they
     ///     can die shortly afterwards. A 100 ms past-lifetime keeps the check reliable across frame boundaries.
     /// </summary>
-    internal const double MINE_PAST_LIFETIME = BmsLandmineJudgementRule.PASSING_LIFETIME;
+    internal const double MINE_PAST_LIFETIME = 100;
 
     /// <summary>
     ///     Step-size used when probing backwards from StartTime to find the earliest visible frame.

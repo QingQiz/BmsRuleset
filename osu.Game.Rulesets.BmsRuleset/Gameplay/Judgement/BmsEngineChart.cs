@@ -1,0 +1,67 @@
+using System;
+using System.Linq;
+using RhythmEngine;
+using RhythmEngine.Profiles;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
+using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.Scoring;
+
+namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+
+/// <summary>Freezes imported chart and mod values into the standalone engine's contracts.</summary>
+internal static class BmsEngineChart
+{
+    internal static Chart Compile(BmsHitObject[] notes, int columns)
+        => new(columns, notes.Select((note, id) =>
+        {
+            var head = BmsJudgementProfileProvider.GetTable(note, false);
+            var tail = BmsJudgementProfileProvider.GetTable(note, true);
+            var behaviour = BmsJudgementProfileProvider.GetBehaviour(note.Beatmap.LayoutVariant);
+            var longNote = note as BmsLongNote;
+            var kind = note switch
+            {
+                BmsLandmine => KeyNoteKind.Mine,
+                BmsLongNote hold => hold.EffectiveMode switch
+                {
+                    BmsLongNoteMode.ChargeNote => KeyNoteKind.ReleaseHold,
+                    BmsLongNoteMode.HellChargeNote => KeyNoteKind.SustainHold,
+                    _ => KeyNoteKind.Hold,
+                },
+                _ => KeyNoteKind.Tap,
+            };
+            var source = new KeyNote(id, note.Column, Time.FromMilliseconds(note.StartTime),
+                Time.FromMilliseconds(longNote?.EndTime ?? note.StartTime), kind,
+                Directional: BmsLayout.IsScratchColumn(note.Column, note.Beatmap.LayoutVariant)
+                             && note.Beatmap.LayoutVariant is not (BmsLayoutVariant.Keyboard24K or BmsLayoutVariant.Keyboard24KDouble));
+            var headDeadline = kind == KeyNoteKind.Hold && head.LongNoteHeadPoorOffset is { } deadline
+                ? Math.Min(deadline, longNote!.Duration) : head.SlowWindowFor(HitResult.Ok);
+            var options = new BmsRuleOptions(ImmediateBadHead: behaviour.LongNoteBadIsImmediate,
+                NonConsumingBad: behaviour.NonConsumingBad, HeadDeadline: Time.FromMilliseconds(headDeadline),
+                TailDeadline: Time.FromMilliseconds(head.SlowWindowFor(HitResult.Ok)),
+                ReleaseGrace: Time.FromMilliseconds(behaviour.LongNoteReleaseMargin), MineOrder: TimerOrder.AfterInput,
+                PassiveOrder: TimerOrder.AfterInput);
+            return new ChartNote(id, source.Lane, source.StartTime, source.EndTime,
+                BmsProfiles.CreateRule(source, windows(head, behaviour.SearchWindow), windows(tail, behaviour.SearchWindow), options));
+        }));
+
+    private static TimingWindows windows(BmsJudgementWindowTable table, double search)
+        => new(table.HitWindows.Select(row => new TimingWindow(ResultId(row.Result),
+                Time.FromMilliseconds(-row.FastDTime), Time.FromMilliseconds(-row.SlowDTime)))
+            .Concat(table.EPoorWindow is { } empty
+                ? [new TimingWindow("empty-poor", Math.Max(Time.FromMilliseconds(-empty.FastDTime), -Time.FromMilliseconds(search) + 1),
+                    Time.FromMilliseconds(-empty.SlowDTime))] : []));
+
+    internal static string ResultId(HitResult result) => result switch
+    {
+        HitResult.Perfect => "pgreat", HitResult.Great => "great", HitResult.Good => "good",
+        HitResult.Ok => "bad", HitResult.Meh => "poor", HitResult.Miss => "empty-poor",
+        _ => throw new ArgumentOutOfRangeException(nameof(result)),
+    };
+
+    internal static HitResult HitResultFor(string? result) => result switch
+    {
+        "pgreat" => HitResult.Perfect, "great" => HitResult.Great, "good" => HitResult.Good,
+        "bad" => HitResult.Ok, "poor" or "mine-hit" => HitResult.Meh, "empty-poor" => HitResult.Miss,
+        _ => HitResult.None,
+    };
+}

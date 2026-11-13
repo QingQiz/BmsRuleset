@@ -2,28 +2,26 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using RhythmEngine;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Rules;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.State;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.Presentation;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
 
 /// <summary>
-/// A test authority for main results. All candidate maintenance stays in the real column context.
+/// Records engine output without feeding framework or presentation state back into judgement.
 /// </summary>
 internal sealed class BmsRecordingJudgementOutput : IBmsJudgementOutput
 {
     private readonly Dictionary<BmsHitObject, BmsMainResultState> results = new(ReferenceEqualityComparer.Instance);
-    private readonly Dictionary<BmsHitObject, double?> rawTimes = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<BmsLongNote, IReadOnlyList<BmsLongNoteEndpointResult>> endpoints = new(ReferenceEqualityComparer.Instance);
-    private Action<BmsHitObject> checkpoint = null!;
-    private Action<BmsHitObject> stateCheckpoint = null!;
-    internal Action<BmsHitObject, BmsFrameContext>? BeforeResultCheckpoint;
-    internal Action<BmsHitObject, BmsFrameContext>? AfterResultCheckpoint;
+    internal Action<BmsHitObject, BmsFrameContext>? ResultApplied;
+    internal Action<BmsHitObject, BmsFrameContext>? AfterResultApplied;
     internal Action<string>? Feedback;
+    internal Action<double, int, HitResult>? NonConsumingJudgement;
     internal Action<BmsLongNote, BmsLongNoteState, BmsFrameContext>? StatePublished;
     internal Action<BmsLongNoteEndpointResult, bool>? SyntheticEndpoint;
     internal List<BmsLongNoteEndpointResult> SyntheticEndpoints { get; } = [];
@@ -37,7 +35,6 @@ internal sealed class BmsRecordingJudgementOutput : IBmsJudgementOutput
     internal void Reset()
     {
         results.Clear();
-        rawTimes.Clear();
         endpoints.Clear();
         SyntheticEndpoints.Clear();
         SyntheticApplicationTimes.Clear();
@@ -49,28 +46,18 @@ internal sealed class BmsRecordingJudgementOutput : IBmsJudgementOutput
     public BmsMainResultState GetMainResult(BmsHitObject note)
         => results.TryGetValue(note, out var result) ? result : new BmsMainResultState(HitResult.None, note.GetEndTime(), 0, null, false);
 
-    internal double? GetRawTime(BmsHitObject note) => rawTimes.GetValueOrDefault(note);
     internal IReadOnlyList<BmsLongNoteEndpointResult> GetEndpoints(BmsLongNote note) => endpoints.GetValueOrDefault(note) ?? [];
-
-    public void SetResultCheckpoints(Action<BmsHitObject> recordState, Action<BmsHitObject> refreshIndexes)
-    {
-        stateCheckpoint = recordState;
-        checkpoint = refreshIndexes;
-    }
 
     public void ApplyMainResult(BmsHitObject note, HitResult result, in BmsFrameContext frame, bool suppressPenalty)
     {
         if (GetMainResult(note).HasResult)
             throw new InvalidOperationException("The main result already exists.");
 
-        rawTimes[note] = frame.SimulationTime;
         results[note] = new BmsMainResultState(result, Math.Min(frame.SimulationTime, note.GetEndTime() + note.MaximumJudgementOffset),
             Math.Min(frame.SimulationTime - note.GetEndTime(), note.MaximumJudgementOffset), frame.GameplayRate, suppressPenalty);
         MainResults++;
-        BeforeResultCheckpoint?.Invoke(note, frame);
-        stateCheckpoint(note);
-        checkpoint(note);
-        AfterResultCheckpoint?.Invoke(note, frame);
+        ResultApplied?.Invoke(note, frame);
+        AfterResultApplied?.Invoke(note, frame);
     }
 
     public void ApplyMainResult(BmsLongNote note, HitResult result, IReadOnlyList<BmsLongNoteEndpointResult> endpointResults, in BmsFrameContext frame, bool suppressPenalty)
@@ -79,8 +66,8 @@ internal sealed class BmsRecordingJudgementOutput : IBmsJudgementOutput
         ApplyMainResult(note, result, frame, suppressPenalty);
     }
 
-    public void PublishState(BmsLongNote note, in BmsLongNoteState state, in BmsFrameContext frame)
-        => StatePublished?.Invoke(note, state, frame);
+    public void PublishState(BmsLongNote note, NoteSnapshot state, in BmsFrameContext frame)
+        => StatePublished?.Invoke(note, BmsLongNoteState.From(note, state, frame.SimulationTime), frame);
 
 
     public void ApplySyntheticEndpoint(BmsLongNoteEndpointResult endpoint, in BmsFrameContext frame, bool suppressPenalty)
@@ -98,24 +85,21 @@ internal sealed class BmsRecordingJudgementOutput : IBmsJudgementOutput
         BodyTick?.Invoke(note, holding, scale, frame);
     }
 
-    internal void Reapply(BmsHitObject note)
-    {
-        // DrawableHitObject.onDefaultsApplied assigns TimeOffset after Apply, preserving the existing result object.
-        var result = GetMainResult(note);
-        results[note] = result with { TimeAbsolute = note.GetEndTime(), TimeOffset = 0 };
-        rawTimes[note] = note.GetEndTime();
-    }
-
     public void ApplyNonConsumingBad(BmsHitObject note, in BmsFrameContext frame)
     {
         NonConsumingResults++;
+        NonConsumingJudgement?.Invoke(note.StartTime, note.Column, HitResult.Ok);
         Feedback?.Invoke($"bad:{note.StartTime}:{note.Column}");
     }
 
     public void PlaySample(BmsHitObject note) => Feedback?.Invoke($"sample:{note.SampleKey}:{note.SampleVolume}");
     public void PlayTailSample(BmsLongNote note) => Feedback?.Invoke($"sample:{note.TailSampleKey}:{note.TailSampleVolume}");
     public void PlayKeySound() => Feedback?.Invoke("keysound");
-    public void ApplyEmptyPoor(double expectedTime, int column, in BmsFrameContext frame) => Feedback?.Invoke($"empty-poor:{expectedTime}:{column}");
+    public void ApplyEmptyPoor(double expectedTime, int column, in BmsFrameContext frame)
+    {
+        NonConsumingJudgement?.Invoke(expectedTime, column, HitResult.Miss);
+        Feedback?.Invoke($"empty-poor:{expectedTime}:{column}");
+    }
     public void PlayLandmineSample(BmsLandmine note) => Feedback?.Invoke("landmine");
     public void PublishState(BmsLandmine note, in BmsLandmineState state, in BmsFrameContext frame) { }
 }

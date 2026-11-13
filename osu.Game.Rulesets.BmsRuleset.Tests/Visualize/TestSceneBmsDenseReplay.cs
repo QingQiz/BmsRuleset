@@ -49,7 +49,6 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
     private static readonly FrameTraversalCounter columnTraversals = new();
     private static readonly FrameTraversalCounter noteMaskingTraversals = new();
     private static readonly FrameTraversalCounter explosionMaskingTraversals = new();
-    private static int passiveDeadlineReads;
     private bool allNotesVisible;
     private ScopedMethodProbe? probe;
     private ScopedMethodProbe? maskingProbe;
@@ -387,29 +386,6 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
     }
 
     [Test]
-    public void UnchangedTapDeadlinesAreNotScannedEveryFrame()
-    {
-        AddStep("load player", () => LoadPlayer());
-        AddUntilStep("player loaded", () => Player.IsLoaded && Player.LoadedBeatmapSuccessfully);
-        seek(2999);
-        AddStep("measure repeated frames with unchanged pending notes", () =>
-        {
-            var column = (BmsColumnHitObjectContainer)Playfield.Stage.Columns[1].HitObjectContainer;
-            var note = column.AliveEntries.Values.OfType<DrawableBmsHitObject>().First().HitObject;
-            using var counter = new ScopedMethodProbe(typeof(BmsColumnJudgementRuntime).GetMethod("refreshAutomaticEvent", BindingFlags.Instance | BindingFlags.NonPublic),
-                typeof(TestSceneBmsDenseReplay).GetMethod(nameof(countPassiveDeadline), BindingFlags.Static | BindingFlags.NonPublic));
-            passiveDeadlineReads = 0;
-            for (var i = 0; i < 20; i++)
-                column.UpdateSubTree();
-            Assert.That(passiveDeadlineReads, Is.Zero, "deadlines change on judgement, not on every visual frame");
-            Assert.That(((BmsColumn)Playfield.Stage.Columns[1]).Judgements.TryPressRegisteredNote(note, HitResult.Perfect,
-                new BmsPressContext(note.StartTime, new BmsFrameContext(note.StartTime, Playfield.Clock.Rate))), Is.True);
-            column.UpdateSubTree();
-            Assert.That(passiveDeadlineReads, Is.GreaterThan(0), "The probe must observe a real judgement.");
-        });
-    }
-
-    [Test]
     public void DenseReplayPreloadsEveryOverlappingHitPulse()
     {
         AddStep("load player", () => LoadPlayer());
@@ -534,7 +510,6 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
     // ReSharper disable once InconsistentNaming
     private static void countColumnTraversal(BmsColumnHitObjectContainer __instance) => columnTraversals.Count(__instance);
 
-    private static void countPassiveDeadline() => passiveDeadlineReads++;
 
     // ReSharper disable once InconsistentNaming
     private static void countMasking(CompositeDrawable __instance)

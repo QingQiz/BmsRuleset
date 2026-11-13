@@ -16,7 +16,8 @@ public sealed class MineRule(
     string avoidedResult,
     TimerOrder order = TimerOrder.AfterInput,
     bool shareInput = true,
-    long? expiryWindow = null) : INoteRule
+    long? expiryWindow = null,
+    bool acceptsInput = true) : INoteRule
 {
     public ImmutableArray<NotePartState> GetParts(NoteContext context)
         => [new("mine", context.State.Completed)];
@@ -32,7 +33,7 @@ public sealed class MineRule(
     public IEnumerable<ScoringOpportunity> GetScoringOpportunities(ChartNote note) => [];
 
     public InputCandidate? GetCandidate(NoteContext context, InputEvent input, int noteIndex)
-        => input.Pressed && context.Time >= context.Note.StartTime - earlyWindow && context.Time <= context.Note.StartTime + lateWindow
+        => acceptsInput && input.Pressed && context.Time >= context.Note.StartTime - earlyWindow && context.Time <= context.Note.StartTime + lateWindow
             ? new InputCandidate(noteIndex, context.Note.StartTime, context.Time - context.Note.StartTime, shareInput ? 0 : 1, shareInput)
             : null;
 

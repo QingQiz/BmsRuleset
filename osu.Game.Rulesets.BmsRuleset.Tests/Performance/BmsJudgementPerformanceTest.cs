@@ -5,51 +5,11 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using NUnit.Framework;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.State;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Performance;
 
-[TestFixture, NonParallelizable, Explicit("Opt-in judgement measurements; select with a FullyQualifiedName filter."), Category("Performance")]
-public class BmsJudgementPerformanceTest
+internal static class BmsJudgementPerformanceTest
 {
-    [TestCase("steady")]
-    [TestCase("fractional")]
-    [TestCase("jitter")]
-    [TestCase("backlog")]
-    public void RecordHcnHistory(string profile)
-    {
-        const int count = 100000;
-        var random = new Random(4139);
-        var elapsed = Enumerable.Range(0, count).Select(i => profile switch
-        {
-            "fractional" => 1000.0 / 240,
-            "jitter" => .5 + random.NextDouble(),
-            "backlog" => i % 100 == 0 ? 650 : 1,
-            _ => 1,
-        }).ToArray();
-        Measure("HCN-" + profile, count, () =>
-        {
-            var tracker = new BmsHellChargeBodyTracker();
-            var ticks = 0;
-            var signedTicks = 0;
-            Action<bool, double> tick = (holding, _) => { ticks++; signedTicks += holding ? 1 : -1; };
-            return new Measurement(() =>
-            {
-                var time = 0d;
-                for (var i = 0; i < count; i++)
-                {
-                    time += elapsed[i];
-                    tracker.Update(elapsed[i], profile != "backlog" || i % 1000 < 700, tick, time);
-                }
-            }, () =>
-            {
-                Assert.That(ticks, Is.GreaterThan(0));
-                return new { Ticks = ticks, SignedTicks = signedTicks };
-            });
-        });
-    }
-
-
     internal static void Measure(string name, int operations, Func<Measurement> setup)
     {
         var elapsed = new double[7];

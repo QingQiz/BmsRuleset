@@ -19,7 +19,7 @@ public partial class TestSceneBmsJudgementIndexes
         {
             var container = (BmsColumnHitObjectContainer)Playfield.Stage.Columns[1].HitObjectContainer;
             var candidates = container.Judgements.GetNoteCandidates().ToArray();
-            var pending = container.Judgements.FirstPendingNote;
+            var pending = container.Judgements.FirstPendingNote();
             var entries = container.AliveEntries.Keys.ToArray();
             Assert.That(entries.Length, Is.GreaterThan(128));
             for (var round = 0; round < 3; round++)
@@ -29,13 +29,13 @@ public partial class TestSceneBmsJudgementIndexes
                 else
                     foreach (var entry in entries) Assert.That(container.Remove(entry), Is.True);
                 Assert.That(container.Judgements.GetNoteCandidates(), Is.EqualTo(candidates));
-                Assert.That(container.Judgements.FirstPendingNote, Is.SameAs(pending));
+                Assert.That(container.Judgements.FirstPendingNote(), Is.SameAs(pending));
                 foreach (var entry in entries)
                 {
                     container.Add(entry);
                     container.UpdateSubTree();
                     Assert.That(container.Judgements.GetNoteCandidates(), Is.EqualTo(candidates));
-                    Assert.That(container.Judgements.FirstPendingNote, Is.SameAs(pending));
+                    Assert.That(container.Judgements.FirstPendingNote(), Is.SameAs(pending));
                 }
             }
         });

@@ -143,7 +143,9 @@ public class BmsAutoScratchActionsTest
     {
         var mod = new BmsModAutoScratch();
         var recorder = new ActionRecorder(mod);
-        mod.PrepareActions(new BmsBeatmap { LayoutVariant = layout, LockedLongNoteMode = mode, HitObjects = notes },
+        var beatmap = new BmsBeatmap { LayoutVariant = layout, LockedLongNoteMode = mode, HitObjects = notes };
+        foreach (var note in notes) note.Beatmap = beatmap;
+        mod.PrepareActions(beatmap,
             action => recorder.Changes.Add(new ActionChange(action, true)),
             action => recorder.Changes.Add(new ActionChange(action, false)));
         return recorder;

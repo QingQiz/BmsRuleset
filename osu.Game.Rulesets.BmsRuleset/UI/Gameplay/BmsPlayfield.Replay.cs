@@ -20,6 +20,14 @@ public sealed partial class BmsPlayfield
     private bool replayVisualsPending;
     private bool restoringReplayInput;
 
+    internal void RewindLiveInputs(Replay replay, IReadOnlyList<Mod> mods, double time)
+    {
+        if (time >= judgementEngine.CurrentTime || !double.IsFinite(judgementEngine.CurrentTime)) return;
+        SeekReplay(replay, mods, time);
+        // Live controls resume immediately; only a replay handler has a seek-completion callback.
+        FinishReplaySeekInput();
+    }
+
     internal bool SeekReplay(Replay replay, IReadOnlyList<Mod> mods, double time, Func<bool>? allowFailure = null)
     {
         if (scoreProcessor is not { } score || healthProcessor is not { } health)

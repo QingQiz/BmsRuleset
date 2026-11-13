@@ -133,7 +133,7 @@ public sealed class JudgementSession
     /// Inputs must be sorted by timestamp, preserving source order for ties, and be later than the
     /// previous closed timestamp. Validate the entire batch before changing the session.
     /// </summary>
-    public void AdvanceTo(long time, ReadOnlySpan<InputEvent> inputs = default)
+    public ImmutableArray<InputDispatch> AdvanceTo(long time, ReadOnlySpan<InputEvent> inputs = default)
     {
         if (CurrentTime is { } current && time < current)
             throw new ArgumentOutOfRangeException(nameof(time), "Rewind using Reset and replay, or restore an independent clone.");
@@ -149,6 +149,7 @@ public sealed class JudgementSession
             previous = input.Time;
         }
 
+        var dispatched = ImmutableArray.CreateBuilder<InputDispatch>();
         var index = 0;
 
         while (index < inputs.Length)
@@ -166,13 +167,14 @@ public sealed class JudgementSession
             // Sampled hazards observe the physical state for this instant before note judgements mutate scores or health.
             runTimers(inputTime, TimerOrder.AfterInputState);
             foreach (var input in changedInputs)
-                applyInput(input.Event, input.State);
+                dispatched.Add(applyInput(input.Event, input.State));
 
             runTimers(inputTime, TimerOrder.AfterInput);
         }
 
         runTimers(time, TimerOrder.AfterInput);
         CurrentTime = time;
+        return dispatched.ToImmutable();
     }
 
     private LaneInput? updateInputState(InputEvent input)
@@ -186,8 +188,39 @@ public sealed class JudgementSession
         return new LaneInput(controls.Count > 0, previouslyHeld);
     }
 
-    private void applyInput(InputEvent input, LaneInput laneInput)
+    public void EndAt(long time)
     {
+        AdvanceTo(time);
+        for (var i = 0; i < states.Length; i++)
+        {
+            if (states[i].Completed) continue;
+            var note = chart.Notes[i];
+            var held = heldControls[note.Lane].Count > 0;
+            var context = new NoteContext(note, states[i], time, new LaneInput(held, held));
+            var update = note.Rule.ApplyEnd(context);
+            if (update.State != states[i] || !update.Emissions.IsEmpty)
+                applyUpdate(i, context, null, update);
+        }
+    }
+
+    /// <summary>
+    /// Appends a later host batch at the current timestamp. Already dispatched timers keep their order;
+    /// replay must retain this batch boundary when callbacks produce more input at the same instant.
+    /// </summary>
+    public ImmutableArray<InputDispatch> AppendInputs(ReadOnlySpan<InputEvent> inputs)
+    {
+        foreach (var input in inputs)
+            if (input.Time != CurrentTime || input.Lane < 0 || input.Lane >= chart.LaneCount)
+                throw new ArgumentException("Appended inputs must belong to the current timestamp and a valid lane.", nameof(inputs));
+        var dispatched = ImmutableArray.CreateBuilder<InputDispatch>();
+        foreach (var input in inputs)
+            if (updateInputState(input) is { } state) dispatched.Add(applyInput(input, state));
+        return dispatched.ToImmutable();
+    }
+
+    private InputDispatch applyInput(InputEvent input, LaneInput laneInput)
+    {
+        var firstTransition = TransitionCount;
         var candidates = ImmutableArray.CreateBuilder<InputCandidate>();
 
         foreach (var index in laneNotes[input.Lane])
@@ -202,6 +235,7 @@ public sealed class JudgementSession
 
         foreach (var candidate in configuration.SelectCandidates(new InputArbitrationContext(input, candidates.ToImmutable(), laneInput)))
             applyCandidate(candidate.NoteIndex, input, laneInput);
+        return new InputDispatch(input, firstTransition, TransitionCount - firstTransition);
     }
 
     private void applyCandidate(int index, InputEvent input, LaneInput laneInput)
@@ -246,7 +280,7 @@ public sealed class JudgementSession
         foreach (var emission in update.Emissions)
         {
             var judgement = new JudgementEvent(EventCount, note.Id, note.Lane, emission.Part, emission.Result,
-                time, emission.ExpectedTime, emission.Offset);
+                time, emission.ExpectedTime, emission.Offset) { SuppressPenalty = emission.SuppressPenalty };
             judgement = configuration.Score.TransformResult?.Invoke(Score, judgement) ?? judgement;
             opportunities.TryGetValue((note.Id, emission.Part), out var opportunity);
             Score = configuration.Score.Reduce(Score, new ScoreContext(judgement, opportunity, chart.ScorePlan));
@@ -267,7 +301,7 @@ public sealed class JudgementSession
     }
 
     private static NoteSnapshot snapshot(NoteContext context)
-        => new(context.Note.Id, context.Note.Lane, context.State.Completed, context.Note.Rule.GetParts(context));
+        => new(context.Note.Id, context.Note.Lane, context.State.Completed, context.Note.Rule.GetParts(context), context.Input.Held);
 
     private void schedule(int index)
     {

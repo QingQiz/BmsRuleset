@@ -11,7 +11,13 @@ public sealed class HoldRule : INoteRule
             ? hold.HeadResult != null && hold.BalanceTime < context.Note.EndTime && (hold.TailSustains || context.Input.Held)
             : !hold.TailResolved && hold.Holding);
         var resolved = Configuration.Balance == null ? hold.TailResolved : hold.Done || hold.BalanceTime >= context.Note.EndTime;
-        return [new("head", hold.HeadResult != null), new("body", resolved, active), new("tail", hold.TailResolved)];
+        return
+        [
+            new("head", hold.HeadResult != null, Time: hold.HeadTime, Offset: hold.HeadOffset, Result: hold.HeadResult),
+            new("body", resolved || hold.Ended, active && !hold.Ended, Reason: hold.Ended ? "End" : null),
+            new("tail", hold.TailResolved, Time: hold.TailTime, Offset: hold.TailOffset, Result: hold.TailResult,
+                PendingTime: hold.PendingRelease, Reason: hold.Resolution?.ToString()),
+        ];
     }
 
     public HoldConfiguration Configuration { get; }
@@ -19,7 +25,7 @@ public sealed class HoldRule : INoteRule
     public HoldRule(HoldConfiguration configuration)
     {
         if (configuration.HeadDeadline < 0 || configuration.TailDeadline < 0 || configuration.Grace < 0
-            || configuration.AutomaticEndOffset < 0
+            || configuration.AutomaticEndOffset < 0 || configuration.ReleaseGrace < 0
             || configuration.Balance is { Threshold: <= 0 } || (configuration.RequiresRetrigger && configuration.Grace == 0))
             throw new ArgumentOutOfRangeException(nameof(configuration));
 
@@ -28,9 +34,6 @@ public sealed class HoldRule : INoteRule
 
     public NoteState CreateState(ChartNote note)
     {
-        if (note.EndTime <= note.StartTime)
-            throw new ArgumentException("A hold requires a positive duration.", nameof(note));
-
         var state = new HoldState(null, false, null, null, false, false, 0, null, 0, note.StartTime);
         return schedule(note, state, long.MinValue, false);
     }
@@ -70,6 +73,8 @@ public sealed class HoldRule : INoteRule
 
         var offset = context.Time - context.Note.StartTime;
         var result = input.Pressed ? Configuration.HeadWindows.ResultFor(offset) : null;
+        if (state.Mistake && Configuration.SuppressRepeatedMistakes && (result == null || !Configuration.RecoveringHeadResults.Contains(result)))
+            return null;
         return result == null ? null : new InputCandidate(noteIndex, context.Note.StartTime, offset, Configuration.CandidatePriority?.Invoke(result) ?? 1);
     }
 
@@ -95,12 +100,13 @@ public sealed class HoldRule : INoteRule
             var offset = context.Time - context.Note.StartTime;
             var result = Configuration.HeadWindows.ResultFor(offset)!;
             if (Configuration.NonResolvingHeadResults.Contains(result))
-                return new NoteUpdate(schedule(context.Note, state, context.Time, context.Input.Held), [new NoteEmission("empty", result, context.Note.StartTime, offset)]);
+                return new NoteUpdate(schedule(context.Note, state with { Mistake = true }, context.Time, context.Input.Held), [new NoteEmission("empty", result, context.Note.StartTime, offset)]);
 
             state = state with
             {
                 HeadResult = result,
                 HeadOffset = offset,
+                HeadTime = context.Time,
                 Holding = true,
                 Control = input.Control,
                 Broken = false,
@@ -119,7 +125,7 @@ public sealed class HoldRule : INoteRule
                 return resolve(context, state, result, offset, HoldResolution.Release, emissions);
             }
 
-            state = state with { Holding = true, DropDeadline = Configuration.RequiresRetrigger ? Math.Max(context.Time, context.Note.StartTime) + Configuration.Grace : null };
+            state = state with { Holding = true, PendingRelease = null, DropDeadline = Configuration.RequiresRetrigger ? Math.Max(context.Time, context.Note.StartTime) + Configuration.Grace : null };
         }
         else if (Configuration.ReleaseByOwner ? input.Control == state.Control : !context.Input.Held)
         {
@@ -127,6 +133,9 @@ public sealed class HoldRule : INoteRule
             var result = Configuration.TailWindows.ResultFor(offset);
             if (Configuration.TailOnOppositeControl && result != null)
                 return new NoteUpdate(schedule(context.Note, state with { Holding = false }, context.Time, context.Input.Held), emissions.ToImmutable());
+
+            if (offset < 0 && Configuration.ReleaseGrace > 0 && (result == null || Configuration.DeferredReleaseResults.Contains(result)))
+                return new NoteUpdate(schedule(context.Note, state with { PendingRelease = context.Time }, context.Time, context.Input.Held), emissions.ToImmutable());
 
             if (Configuration.EndMode != HoldEndMode.Automatic && !Configuration.TailOnOppositeControl && result != null)
                 return resolve(context, state, result, offset, HoldResolution.Release, emissions);
@@ -165,6 +174,14 @@ public sealed class HoldRule : INoteRule
         var state = integrate(context, (HoldState)context.State);
         var emissions = ImmutableArray.CreateBuilder<NoteEmission>();
 
+        if (state.PendingRelease is { } released && context.Time >= released + Configuration.ReleaseGrace)
+        {
+            var offset = released - context.Note.EndTime;
+            var result = Configuration.TailWindows.ResultFor(offset);
+            return resolve(context, state with { PendingRelease = null }, result ?? Configuration.DropResult, offset,
+                result == null ? HoldResolution.Drop : HoldResolution.Release, emissions);
+        }
+
         if (state.TailResolved)
         {
             state = emitBalance(context, state, emissions);
@@ -173,8 +190,9 @@ public sealed class HoldRule : INoteRule
 
         if (state.HeadResult == null && context.Time > context.Note.StartTime + Configuration.HeadDeadline)
         {
-            state = state with { HeadResult = Configuration.MissResult, Holding = false };
-            emissions.Add(new NoteEmission("head", Configuration.MissResult, context.Note.StartTime));
+            state = state with { HeadResult = Configuration.MissResult, HeadTime = context.Time, Holding = false };
+            emissions.Add(new NoteEmission("head", Configuration.MissResult, context.Note.StartTime,
+                SuppressPenalty: state.Mistake && Configuration.SuppressRepeatedMistakes));
             if (!Configuration.ContinueAfterMissedHead && !Configuration.RecoverMissedHead)
                 return resolve(context, state, Configuration.MissResult, null, HoldResolution.MissedHead, emissions);
         }
@@ -222,11 +240,19 @@ public sealed class HoldRule : INoteRule
     private NoteUpdate resolve(NoteContext context, HoldState state, string tailResult, long? offset, HoldResolution reason,
                                ImmutableArray<NoteEmission>.Builder emissions)
     {
+        if (reason == HoldResolution.Automatic && Configuration.AutomaticTailUsesHeadOffset)
+        {
+            offset = state.HeadOffset;
+            tailResult = offset is { } headOffset ? Configuration.TailWindows.ResultFor(headOffset) ?? Configuration.MissResult : Configuration.MissResult;
+        }
         var evaluation = new HoldEvaluation(context.Note, state.HeadResult ?? Configuration.MissResult, state.HeadOffset,
             tailResult, offset, state.Broken, reason);
         var result = Configuration.ResolveResult(evaluation);
         if (result is { } emission)
-            emissions.Add(emission);
+            emissions.Add(emission with { SuppressPenalty = reason == HoldResolution.MissedHead && Configuration.HeadAccuracy == 0
+                && state.Mistake && Configuration.SuppressRepeatedMistakes });
+
+        state = state with { TailTime = context.Time, TailOffset = offset, TailResult = tailResult, Resolution = reason, PendingRelease = null };
 
         if (tailResult == Configuration.MissResult && !state.Broken && Configuration.BreakResult is { } bodyResult)
         {
@@ -262,7 +288,7 @@ public sealed class HoldRule : INoteRule
         {
             var until = Configuration.ResolvedHeadWindows?.Entries.Max(w => note.StartTime + w.Late + 1) ?? now;
             if (Configuration.Balance != null)
-                until = Math.Max(until, note.EndTime + Configuration.AutomaticEndOffset);
+                until = Math.Max(until, note.EndTime);
             if (now >= until)
                 return state with { Timer = null, Done = true };
             if (Configuration.Balance == null || now >= note.EndTime)
@@ -285,9 +311,11 @@ public sealed class HoldRule : INoteRule
         else if (state.HeadResult != null)
             consider(note.EndTime + Configuration.AutomaticEndOffset);
         consider(state.DropDeadline);
+        consider(state.PendingRelease + Configuration.ReleaseGrace);
 
         if (Configuration.Balance is { } balance && state.HeadResult != null && now < note.EndTime)
         {
+            consider(note.EndTime);
             var from = Math.Max(now, note.StartTime);
             consider(from + (held || state.TailSustains ? balance.Threshold - state.Balance : balance.Threshold + state.Balance) + 1);
         }
@@ -295,6 +323,19 @@ public sealed class HoldRule : INoteRule
         var beforeInput = (next == note.StartTime + Configuration.HeadDeadline + 1 && state.HeadResult == null)
                           || next == state.DropDeadline
                           || (next == note.EndTime + Configuration.TailDeadline + 1 && Configuration.EndMode == HoldEndMode.Release);
-        return state with { Timer = next is { } time ? new NoteTimer(time, beforeInput ? TimerOrder.BeforeInput : TimerOrder.AfterInput) : null };
+        return state with { Timer = next is { } time ? new NoteTimer(time, beforeInput ? Configuration.PassiveOrder : TimerOrder.AfterInput) : null };
+    }
+
+    public NoteUpdate ApplyEnd(NoteContext context)
+    {
+        var state = (HoldState)context.State;
+        if (state.TailResolved)
+            return NoteUpdate.Silent(state with { Done = true, Timer = null, Ended = true });
+        if (!state.Holding) return NoteUpdate.Silent(state);
+        var offset = (state.PendingRelease ?? context.Time) - context.Note.EndTime;
+        var result = Configuration.TailWindows.ResultFor(offset);
+        var update = resolve(context, state, result ?? Configuration.DropResult, offset,
+            result == null ? HoldResolution.Drop : HoldResolution.Release, ImmutableArray.CreateBuilder<NoteEmission>());
+        return update with { State = ((HoldState)update.State) with { Done = true, Timer = null, Ended = true } };
     }
 }

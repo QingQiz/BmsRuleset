@@ -76,8 +76,7 @@ public partial class TestSceneBmsJudgementPerformance : BmsPlayerTestScene
             });
             measurePhases(container, count, "idle", operations);
             measureFrame(count, "idle", operations);
-            var head = Playfield.Beatmap.HitObjects.Single(n => n.Column == 1 && n.StartTime == 3000);
-            Assert.That(container.Judgements.TryPressRegisteredNote(head, HitResult.Perfect, new BmsPressContext(3000, frame)), Is.True);
+            Assert.That(container.Judgements.HandleNotePress(new BmsPressContext(3000, frame)) == PressOutcome.Hit, Is.True);
             measurePhases(container, count, "active", operations);
             measureFrame(count, "active", operations);
         });
@@ -146,8 +145,7 @@ public partial class TestSceneBmsJudgementPerformance : BmsPlayerTestScene
             {
                 for (var i = 0; i < operations; i++)
                 {
-                    container.Judgements.UpdateLandmines(currentFrame(container), false);
-                    container.Judgements.UpdateRegisteredBodies(currentFrame(container), container.Time.Elapsed, false);
+                    container.Judgements.Engine().ProcessFrame(currentFrame(container), container.Time.Elapsed);
                 }
             }, () => new { Alive = container.AliveEntries.Count, Active = container.AliveEntries.Values.Count(d => d.HitObject.StartTime == 3000 && d.Judged) }));
 

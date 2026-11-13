@@ -173,6 +173,62 @@ public class EngineContractTest
         Assert.That(session.GetEventsSince(0).Single().Result, Is.EqualTo("hit"));
     }
 
+    [Test]
+    public void InputDispatchPreservesUnmatchedRepeatedEdgesAndTimerOrder()
+    {
+        var session = new JudgementSession(new Chart(1,
+            [new ChartNote(0, 0, 1000000, 1000000, tapRule()), new ChartNote(1, 0, 2000000, 2000000, tapRule())]), configuration());
+        var dispatched = session.AdvanceTo(3000000,
+        [
+            new InputEvent(1000000, 0, true), new InputEvent(1000000, 0, false),
+            new InputEvent(1000000, 0, true), new InputEvent(1000000, 0, true),
+            new InputEvent(1000000, 0, false), new InputEvent(2500000, 0, true),
+        ]);
+        Assert.That(dispatched.Select(d => (d.FirstTransitionIndex, d.TransitionCount)),
+            Is.EqualTo(new[] { (0, 1), (1, 0), (1, 0), (1, 0), (2, 0) }));
+        Assert.That(session.GetEventsSince(0).Select(e => e.Result), Is.EqualTo(new[] { "hit", "miss" }));
+        Assert.That(session.GetNote(0).Held, Is.True);
+    }
+
+    [Test]
+    public void AppendedBatchKeepsClosedTimersAndValidatesBeforeMutation()
+    {
+        var session = new JudgementSession(new Chart(1,
+        [
+            new ChartNote(0, 0, 1000000, 1000000, tapRule()),
+            new ChartNote(1, 0, 1000000, 1000000, tapRule()),
+            new ChartNote(2, 0, 1000000, 1000000, new MineRule(0, 0, "mine", "avoided", TimerOrder.AfterInput, acceptsInput: false)),
+        ]), configuration());
+        session.AdvanceTo(1000000, [new InputEvent(1000000, 0, true)]);
+        Assert.Throws<ArgumentException>(() => session.AppendInputs([new InputEvent(1000000, 0, false), new InputEvent(999999, 0, true)]));
+        Assert.That(session.GetNote(0).Held, Is.True);
+        var dispatched = session.AppendInputs([new InputEvent(1000000, 0, false), new InputEvent(1000000, 0, true)]);
+        Assert.That(dispatched.Select(d => d.TransitionCount), Is.EqualTo(new[] { 0, 1 }));
+        Assert.That(session.GetEventsSince(0).Select(e => e.Result), Is.EqualTo(new[] { "hit", "mine", "hit" }));
+    }
+
+    [Test]
+    public void LayeredHealthSnapshotsRemainIndependentAcrossCloneAndReset()
+    {
+        var initial = new HealthState(.5, false) { Layers = [new(.5, false), new(.8, false)] };
+        var config = configuration() with
+        {
+            Health = new HealthConfiguration(initial, c => c.Health with
+            {
+                Layers = [.. c.Health.Layers.Select(layer => layer with { Value = layer.Value + (c.Event.Result == "hit" ? .1 : -.2) })],
+            }, _ => SessionOutcome.InProgress),
+        };
+        var session = new JudgementSession(new Chart(1, [new ChartNote(0, 0, 1000000, 1000000, tapRule())]), config);
+        var clone = session.Clone();
+        session.AdvanceTo(2000000, [new InputEvent(1000000, 0, true)]);
+        var snapshot = session.Health;
+        clone.AdvanceTo(2000000);
+        session.Reset();
+        Assert.That(snapshot.Layers.Select(layer => layer.Value), Is.EqualTo(new[] { .6, .9 }).Within(1e-9));
+        Assert.That(clone.Health.Layers.Select(layer => layer.Value), Is.EqualTo(new[] { .3, .6 }).Within(1e-9));
+        Assert.That(session.Health, Is.EqualTo(initial));
+    }
+
     [TestCase(double.NaN)]
     [TestCase(double.PositiveInfinity)]
     public void InvalidClockInputIsRejected(double time) => Assert.Throws<ArgumentOutOfRangeException>(() => Time.FromMilliseconds(time));

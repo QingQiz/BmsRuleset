@@ -20,10 +20,10 @@ public partial class TestSceneBmsJudgementIndexes
             var context = container.Judgements;
             var drawables = container.AliveEntries.Values.OfType<DrawableBmsHitObject>().ToArray();
             var generations = drawables.Select(d => d.BindingGeneration).ToArray();
-            var states = context.NoteRegistrations.Select(r => context.GetNoteResult(r.Object)).ToArray();
+            var states = context.Notes().Select(context.GetNote).ToArray();
             for (var i = 0; i < 32; i++) container.UpdateSubTree();
             Assert.That(drawables.Select(d => d.BindingGeneration), Is.EqualTo(generations));
-            Assert.That(context.NoteRegistrations.Select(r => context.GetNoteResult(r.Object)), Is.EqualTo(states));
+            Assert.That(context.Notes().Select(context.GetNote), Is.EqualTo(states));
         });
     }
 }

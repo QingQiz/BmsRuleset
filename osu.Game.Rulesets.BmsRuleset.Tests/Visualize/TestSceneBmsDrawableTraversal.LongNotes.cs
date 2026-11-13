@@ -88,11 +88,9 @@ public partial class TestSceneBmsDrawableTraversal
 
                 var body = (Drawable)drawable.GetType().GetField("longNoteBody", flags)!.GetValue(drawable)!;
                 var heldState = column.Judgements.GetLongNoteState(note);
-                foreach (var directions in new[] { 0, 1, 0, 1 })
+                for (var i = 0; i < 4; i++)
                 {
-                    column.Judgements.PressedDirections = directions;
                     container.UpdateSubTree();
-                    Assert.That(body.Alpha, Is.EqualTo(directions == 0 ? 0.4f : 1f), "Same-time held input is read again without state publication.");
                     Assert.That(column.Judgements.GetLongNoteState(note), Is.EqualTo(heldState));
                 }
                 historyObservations = 0;
@@ -111,14 +109,12 @@ public partial class TestSceneBmsDrawableTraversal
                 // Unpinning only the visual history lets both endpoints exercise culling while the rule remains held.
                 drawable.GetType().GetField("visualState", flags)!.FieldType.GetMethod("Reset")!
                     .Invoke(drawable.GetType().GetField("visualState", flags)!.GetValue(drawable), null);
-                column.Judgements.PressedDirections = 0;
                 container.UpdateSubTree();
                 Assert.That(drawable.VisualsSuppressed, Is.True);
                 verifyStableTraversal("culled");
 
                 note.ScrollPositionAtStartTime = oldHeadPosition;
                 note.VisualScrollPositionAtEndTime = oldTailPosition;
-                column.Judgements.PressedDirections = 1;
                 var generation = drawable.BindingGeneration;
                 note.ApplyDefaults(Playfield.Beatmap.ControlPointInfo, Playfield.Beatmap.Difficulty);
                 Assert.That(drawable.BindingGeneration, Is.EqualTo(generation + 1));

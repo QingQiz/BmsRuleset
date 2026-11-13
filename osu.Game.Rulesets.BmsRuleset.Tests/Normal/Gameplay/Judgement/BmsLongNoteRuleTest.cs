@@ -4,7 +4,7 @@ using NUnit.Framework;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.State;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.Presentation;
 using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
@@ -18,21 +18,21 @@ public class BmsLongNoteRuleTest
         [Values] bool poorTail)
     {
         var run = new BmsLongNoteTestContext(mode);
-        run.Press(1000, HitResult.Perfect);
-        run.Release(poorTail ? 2000 : 1500, 1500);
+        run.Press(1000);
+        run.Release(poorTail ? 1100 : 1500);
         run.Frame(1601, 101, false);
 
-        Assert.That(run.State.TailResult, Is.EqualTo(poorTail ? HitResult.Meh : HitResult.Perfect));
+        Assert.That(run.State.TailResult, Is.EqualTo(poorTail ? mode == BmsLongNoteMode.LongNote ? HitResult.Ok : HitResult.Meh : HitResult.Perfect));
         Assert.That(run.Presentation(time: 1601).Retired, Is.True);
         Assert.That(run.Presentation(time: 1601).ClearBodyOnRetire,
-            Is.EqualTo(mode != BmsLongNoteMode.HellChargeNote && !poorTail));
+            Is.EqualTo(mode == BmsLongNoteMode.LongNote || (mode == BmsLongNoteMode.ChargeNote && !poorTail)));
     }
 
     [Test]
     public void TestNormalTailCannotImproveGreatHead()
     {
         var run = new BmsLongNoteTestContext(BmsLongNoteMode.LongNote, 1000, 500);
-        run.Press(1040, HitResult.Great);
+        run.Press(1040);
         run.Release(1500);
         Assert.That(run.Results, Is.EqualTo([HitResult.Great]));
     }
@@ -42,7 +42,7 @@ public class BmsLongNoteRuleTest
     public void TestPmsEarlyReleaseCanBeRescuedWithinMargin(BmsLongNoteMode mode)
     {
         var run = new BmsLongNoteTestContext(mode, 1000, 2000, layout: BmsLayoutVariant.Popn9K);
-        run.Press(1000, HitResult.Perfect);
+        run.Press(1000);
         run.Release(1500);
         run.Frame(1699, 199, false);
         Assert.That(run.State.TailJudged, Is.False);
@@ -58,7 +58,7 @@ public class BmsLongNoteRuleTest
     public void TestPmsReleaseMarginRestoresAfterRewind()
     {
         var run = new BmsLongNoteTestContext(BmsLongNoteMode.LongNote, 1000, 2000, layout: BmsLayoutVariant.Popn9K);
-        run.Press(1000, HitResult.Perfect);
+        run.Press(1000);
         run.Release(1500);
         run.Repress(1600);
         run.Rewind(1550);
@@ -70,7 +70,7 @@ public class BmsLongNoteRuleTest
     public void TestHellChargeSuccessfulEarlyTailKeepsRecovering()
     {
         var run = new BmsLongNoteTestContext(BmsLongNoteMode.HellChargeNote, 1000, 1000, rank: 3);
-        run.Press(1000, HitResult.Perfect);
+        run.Press(1000);
         run.Frame(1800, 800, true);
         run.Release(1890);
         Assert.That(run.Output.BodyTicks, Has.Count.EqualTo(4));
@@ -89,7 +89,7 @@ public class BmsLongNoteRuleTest
     public void TestHellChargeReleasedVisualFollowsTailResult(double offset, HitResult result, bool heldVisual)
     {
         var run = new BmsLongNoteTestContext(BmsLongNoteMode.HellChargeNote, 1000, 1000);
-        run.Press(1000, HitResult.Perfect);
+        run.Press(1000);
         run.Release(2000 + offset);
 
         Assert.That(run.Output.SyntheticEndpoints.Single().Result, Is.EqualTo(result));
@@ -101,7 +101,7 @@ public class BmsLongNoteRuleTest
     public void TestHellChargeCompletedVisualEndsAtTailAcrossRewind()
     {
         var run = new BmsLongNoteTestContext(BmsLongNoteMode.HellChargeNote, 1000, 1000);
-        run.Press(1000, HitResult.Perfect);
+        run.Press(1000);
         run.Release(1910);
         run.Frame(1999, 89, false);
         Assert.That(run.FinishedPublications, Is.Zero);
@@ -130,7 +130,7 @@ public class BmsLongNoteRuleTest
     public void TestHellChargeLateTailRemainsJudgeableAcrossRewind()
     {
         var run = new BmsLongNoteTestContext(BmsLongNoteMode.HellChargeNote, 1000, 1000);
-        run.Press(1000, HitResult.Perfect);
+        run.Press(1000);
         run.Frame(2100, 100, true);
         Assert.That(run.State.TailJudged, Is.False);
         Assert.That(run.FinishedPublications, Is.Zero);
@@ -151,7 +151,7 @@ public class BmsLongNoteRuleTest
     public void TestPmsReleaseExpiresAtExactlyTwoHundredMilliseconds(double time, bool expired)
     {
         var run = new BmsLongNoteTestContext(BmsLongNoteMode.LongNote, 1000, 2000, layout: BmsLayoutVariant.Popn9K);
-        run.Press(1000, HitResult.Perfect);
+        run.Press(1000);
         run.Release(1500);
         run.Frame(time, time - 1500, false);
         Assert.That(run.State.TailJudged, Is.EqualTo(expired));
@@ -169,7 +169,7 @@ public class BmsLongNoteRuleTest
     public void TestPmsChargeTailTimeoutUsesHeadWindow(double time, bool expired)
     {
         var run = new BmsLongNoteTestContext(BmsLongNoteMode.ChargeNote, 1000, 500, layout: BmsLayoutVariant.Popn9K);
-        run.Press(1000, HitResult.Perfect);
+        run.Press(1000);
         run.Passive(time);
         Assert.That(run.State.TailJudged, Is.EqualTo(expired));
         Assert.That(run.Output.SyntheticEndpoints.Select(j => j.Result),
@@ -179,37 +179,38 @@ public class BmsLongNoteRuleTest
     [TestCase(BmsLongNoteMode.LongNote)]
     [TestCase(BmsLongNoteMode.ChargeNote)]
     [TestCase(BmsLongNoteMode.HellChargeNote)]
-    public void TestSynchronousOutputsObserveHeadBeforeResultAndTailBeforeCommit(BmsLongNoteMode mode)
+    public void ResultObserversSeeTheCommittedEngineSnapshot(BmsLongNoteMode mode)
     {
         var run = new BmsLongNoteTestContext(mode, 1000, 500);
-        var observed = new List<(string Event, bool Head, bool Tail, bool Started)>();
-        run.Output.StatePublished += (_, state, _) => observed.Add(("state", state.HeadJudged, state.TailJudged, state.LongNoteStarted));
-        run.Output.BeforeResultCheckpoint += (_, _) => observed.Add(("main", run.State.HeadJudged, run.State.TailJudged, run.State.LongNoteStarted));
+        var observed = new List<(string Event, bool Head, bool Tail)>();
+        run.Output.StatePublished += (_, state, _) =>
+        {
+            Assert.That(state.HeadJudged, Is.EqualTo(run.State.HeadJudged));
+            Assert.That(state.TailJudged, Is.EqualTo(run.State.TailJudged));
+        };
+        run.Output.ResultApplied += (_, _) => observed.Add(("main", run.State.HeadJudged, run.State.TailJudged));
         run.Output.SyntheticEndpoint += (endpoint, applied) =>
         {
-            if (!applied) observed.Add(("synthetic " + endpoint.Kind, run.State.HeadJudged, run.State.TailJudged, run.State.LongNoteStarted));
+            if (!applied) observed.Add(("synthetic " + endpoint.Kind, run.State.HeadJudged, run.State.TailJudged));
         };
 
-        run.Press(1000, HitResult.Perfect);
+        run.Press(1000);
+        var headSnapshot = run.Column.GetNote(run.Note);
         run.Release(1500);
 
-        var expected = new List<(string, bool, bool, bool)> { ("state", true, false, true), ("main", true, false, true) };
-        if (mode == BmsLongNoteMode.HellChargeNote)
-            expected.Add(("state", true, false, true));
-        if (mode != BmsLongNoteMode.LongNote)
-            expected.Add(("synthetic Tail", true, false, true));
-        expected.Add(("state", true, true, mode == BmsLongNoteMode.HellChargeNote));
-        Assert.That(observed, Is.EqualTo(expected));
+        Assert.That(observed, Is.EqualTo(mode == BmsLongNoteMode.LongNote
+            ? new[] { ("main", true, true) }
+            : new[] { ("main", true, false), ("synthetic Tail", true, true) }));
+        Assert.That(headSnapshot.Parts.Single(p => p.Part == "tail").Resolved, Is.False);
         Assert.That(run.State.TailJudged, Is.True);
     }
 
     [Test]
-    public void TestHellChargeHeadPoorNotifiesIndexBeforeBothSyntheticEndpoints()
+    public void MissedHellChargeHeadPublishesBothEndpointsWithTheSameSnapshot()
     {
         var run = new BmsLongNoteTestContext(BmsLongNoteMode.HellChargeNote, 1000, 1000);
         var observed = new List<(string Event, bool Head, bool Tail, bool Started)>();
-        run.Output.StatePublished += (_, state, _) => observed.Add(("state", state.HeadJudged, state.TailJudged, state.LongNoteStarted));
-        run.Output.BeforeResultCheckpoint += (_, _) => observed.Add(("main", run.State.HeadJudged, run.State.TailJudged, run.State.LongNoteStarted));
+        run.Output.ResultApplied += (_, _) => observed.Add(("main", run.State.HeadJudged, run.State.TailJudged, run.State.LongNoteStarted));
         run.Output.SyntheticEndpoint += (endpoint, applied) =>
         {
             if (!applied) observed.Add(("synthetic " + endpoint.Kind, run.State.HeadJudged, run.State.TailJudged, run.State.LongNoteStarted));
@@ -217,12 +218,12 @@ public class BmsLongNoteRuleTest
 
         run.Passive(1600);
 
-        Assert.That(observed, Is.EqualTo(new[]
-        {
-            ("state", true, false, true), ("synthetic Head", true, false, true), ("synthetic Tail", true, false, true), ("state", true, true, true),
-        }));
-        Assert.That(run.State.TailJudged, Is.True);
-        Assert.That(run.State.LongNoteStarted, Is.True);
+        Assert.That(observed, Is.EqualTo(new[] { ("main", true, true, true), ("synthetic Tail", true, true, true) }));
+        Assert.That(run.Column.GetNote(run.Note).Parts[1].Resolved, Is.False);
+        Assert.That(run.MainEndpoints.Single().result, Is.EqualTo(HitResult.Meh));
+        Assert.That(run.SyntheticEndpoints.Single().result, Is.EqualTo(HitResult.Meh));
+        run.Frame(2000, 400, false);
+        Assert.That(run.Column.GetNote(run.Note).Parts[1].Resolved, Is.True);
     }
 
     [TestCase(BmsLongNoteMode.LongNote, false)]
@@ -231,7 +232,7 @@ public class BmsLongNoteRuleTest
     public void TestFailedTailHeldVisualDependsOnMode(BmsLongNoteMode mode, bool expected)
     {
         var run = new BmsLongNoteTestContext(mode, 1000, 500);
-        run.Press(1000, HitResult.Perfect);
+        run.Press(1000);
 
         run.Release(1100);
 
@@ -243,7 +244,7 @@ public class BmsLongNoteRuleTest
     public void TestAutomaticNormalTailDoesNotBecomePoorAfterEndTime()
     {
         var run = new BmsLongNoteTestContext(BmsLongNoteMode.LongNote, 1000, 500);
-        run.Press(1000, HitResult.Perfect);
+        run.Press(1000);
 
         // A delayed update must preserve beatoraja's stored head judgement instead of using
         // the elapsed time past the tail as a release offset.
@@ -257,7 +258,7 @@ public class BmsLongNoteRuleTest
     public void TestAutomaticNormalTailUsesHeadJudgementOffsetAndWindow()
     {
         var run = new BmsLongNoteTestContext(BmsLongNoteMode.LongNote, 1000, 500);
-        run.Press(1080, HitResult.Good);
+        run.Press(1080);
 
         run.Passive(2000);
 
@@ -275,9 +276,9 @@ public class BmsLongNoteRuleTest
     {
         var run = new BmsLongNoteTestContext(BmsLongNoteMode.ChargeNote, 1000, 500);
 
-        run.Press(987, HitResult.Great);
+        run.Press(970);
 
-        Assert.That(run.MainEndpoints, Is.EqualTo([(1000d, 987d, HitResult.Great)]));
+        Assert.That(run.MainEndpoints, Is.EqualTo([(1000d, 970d, HitResult.Great)]));
     }
 
     [Test]
@@ -294,7 +295,7 @@ public class BmsLongNoteRuleTest
     {
         var run = new BmsLongNoteTestContext(BmsLongNoteMode.ChargeNote, 1000, 500);
 
-        run.Press(987, HitResult.Great, 1.5);
+        run.Press(987, 1.5);
 
         Assert.That(run.MainResults.Single().Endpoints.Single().GameplayRate, Is.EqualTo(1.5));
     }
@@ -303,7 +304,7 @@ public class BmsLongNoteRuleTest
     public void TestFastHeadBeforeStartIsNotTreatedAsRewind()
     {
         var run = new BmsLongNoteTestContext(BmsLongNoteMode.LongNote, 1000, 500);
-        run.Press(987, HitResult.Great);
+        run.Press(987);
 
         run.Frame(990, 1, true);
 
@@ -315,7 +316,7 @@ public class BmsLongNoteRuleTest
     public void TestFastReleaseBeforeTailWindowRecordsFastBadOffset()
     {
         var run = new BmsLongNoteTestContext(BmsLongNoteMode.LongNote, 1000, 500);
-        run.Press(1000, HitResult.Perfect);
+        run.Press(1000);
 
         run.Release(1200);
 
@@ -330,17 +331,17 @@ public class BmsLongNoteRuleTest
     }
 
     [Test]
-    public void TestHcnHeadPoorStartsBodyAndRegistersHeadScoringEvent()
+    public void TestHcnHeadStartsBodyAndRegistersHeadScoringEvent()
     {
         var run = new BmsLongNoteTestContext(BmsLongNoteMode.HellChargeNote, 1000, 500);
 
-        // HCN head hit with POOR starts the body instead of ending the drawable.
-        var ok = run.Press(1000, HitResult.Meh);
+        // The body remains alive after the independently scored head.
+        var ok = run.Press(1000);
 
         Assert.That(ok, Is.True);
         Assert.That(run.State.LongNoteStarted, Is.True);
         Assert.That(run.Publications.Count(p => p.State.HeadJudged && !p.State.TailJudged), Is.EqualTo(1));
-        Assert.That(run.State.HeadTime, Is.EqualTo(1000));
+        Assert.That(run.Column.GetNote(run.Note).Parts[0].Time / 1000.0, Is.EqualTo(1000));
         // lifetimeEnd extends past EndTime by the tail Ok slow window + margin.
         Assert.That(run.Presentation().LifetimeEnd, Is.GreaterThan(1500));
     }
@@ -352,14 +353,14 @@ public class BmsLongNoteRuleTest
         var originalTicks = new List<(bool Holding, double Scale)>();
         var replacementTicks = new List<(bool Holding, double Scale)>();
         run.Output.BodyTick = (_, held, scale, _) => originalTicks.Add((held, scale));
-        run.Press(1000, HitResult.Perfect);
+        run.Press(1000);
         run.Frame(1250, 250, true);
         run.Output.BodyTick = (_, held, scale, _) => replacementTicks.Add((held, scale));
 
         run.Frame(1500, 250, true);
 
         Assert.That(originalTicks, Has.Count.EqualTo(1));
-        Assert.That(replacementTicks.Single(), Is.EqualTo((true, BmsHellChargeBodyTracker.DEFAULT_TICK_SCALE)));
+        Assert.That(replacementTicks.Single(), Is.EqualTo((true, 0.5)));
     }
 
     [TestCase(BmsLongNoteMode.LongNote)]
@@ -368,19 +369,19 @@ public class BmsLongNoteRuleTest
     public void TestRewindIntoBodyRetainsHeadAndReplaysTail(BmsLongNoteMode mode)
     {
         var run = new BmsLongNoteTestContext(mode, 1000, 1000);
-        run.Press(987, HitResult.Great);
+        run.Press(987);
         run.Release(2000);
         run.Rewind(1500);
 
         Assert.That(run.State.LongNoteStarted, Is.True);
         Assert.That(run.State.TailJudged, Is.False);
-        Assert.That(run.Press(1500, HitResult.Perfect), Is.False);
+        Assert.That(run.Press(1500), Is.False);
         Assert.That(run.Release(2000), Is.True);
         Assert.That(run.HeadPublications, Is.EqualTo(1));
 
         run.Rewind(980);
         Assert.That(run.State.LongNoteStarted, Is.False);
-        Assert.That(run.Press(1000, HitResult.Perfect), Is.True);
+        Assert.That(run.Press(1000), Is.True);
     }
 
     [TestCase(BmsLongNoteMode.LongNote)]
@@ -389,7 +390,7 @@ public class BmsLongNoteRuleTest
     public void TestEndSettlesActiveLongNote(BmsLongNoteMode mode)
     {
         var run = new BmsLongNoteTestContext(mode, 1000, 1000);
-        run.Press(1000, HitResult.Perfect);
+        run.Press(1000);
 
         run.End(1200);
         Assert.Multiple(() =>
@@ -412,14 +413,14 @@ public class BmsLongNoteRuleTest
     public void TestHcnTickAccruesWhileHoldingWithinBody()
     {
         var run = new BmsLongNoteTestContext(BmsLongNoteMode.HellChargeNote, 1000, 500);
-        run.Press(1000, HitResult.Meh); // start body
+        run.Press(1000); // start body
 
         // 250ms of holding inside [1000,1500]: tracker tick interval is 200ms -> one tick of scale 0.5.
         run.Frame(1250, 250, true);
 
         Assert.That(run.Output.BodyTicks, Has.Count.EqualTo(1));
         Assert.That(run.Output.BodyTicks[0].Holding, Is.True);
-        Assert.That(run.Output.BodyTicks[0].Scale, Is.EqualTo(BmsHellChargeBodyTracker.DEFAULT_TICK_SCALE));
+        Assert.That(run.Output.BodyTicks[0].Scale, Is.EqualTo(0.5));
     }
 
     [Test]
@@ -429,19 +430,19 @@ public class BmsLongNoteRuleTest
 
         run.Passive(1281);
 
-        Assert.That(run.MainEndpoints, Is.EqualTo([(1000d, 1281d, HitResult.Meh)]));
-        Assert.That(run.SyntheticEndpoints.ToArray(), Is.EqualTo([(11_000d, 1281d, HitResult.Meh)]));
+        Assert.That(run.MainEndpoints, Is.EqualTo([(1000d, 1210.001d, HitResult.Meh)]));
+        Assert.That(run.SyntheticEndpoints.ToArray(), Is.EqualTo([(11_000d, 1210.001d, HitResult.Meh)]));
 
         run.Frame(11_281, 16, false);
 
-        Assert.That(run.SyntheticEndpoints.ToArray(), Is.EqualTo([(11_000d, 1281d, HitResult.Meh)]));
+        Assert.That(run.SyntheticEndpoints.ToArray(), Is.EqualTo([(11_000d, 1210.001d, HitResult.Meh)]));
     }
 
     [Test]
     public void TestNonPoorTailDoesNotPublishCompletionTwice()
     {
         var run = new BmsLongNoteTestContext(BmsLongNoteMode.LongNote, 1000, 500);
-        run.Press(1000, HitResult.Perfect);
+        run.Press(1000);
         run.Release(1500);
 
         var publications = run.Publications.Count;
@@ -455,7 +456,7 @@ public class BmsLongNoteRuleTest
     public void TestNonPoorTailReleaseStopsHoldImmediately()
     {
         var run = new BmsLongNoteTestContext(BmsLongNoteMode.LongNote, 1000, 500);
-        run.Press(1000, HitResult.Perfect);
+        run.Press(1000);
 
         run.Release(1500); // PERFECT tail
 
@@ -467,7 +468,7 @@ public class BmsLongNoteRuleTest
     {
         var run = new BmsLongNoteTestContext(BmsLongNoteMode.LongNote, 1000, 500);
 
-        run.Press(1013, HitResult.Great);
+        run.Press(1013);
 
         Assert.That(run.MainResults, Is.Empty);
     }
@@ -476,7 +477,7 @@ public class BmsLongNoteRuleTest
     public void TestNormalTailAppliesTailEndpoint()
     {
         var run = new BmsLongNoteTestContext(BmsLongNoteMode.LongNote, 1000, 500);
-        run.Press(1004, HitResult.Perfect);
+        run.Press(1004);
 
         run.Release(1518);
 
@@ -485,7 +486,7 @@ public class BmsLongNoteRuleTest
             Assert.That(run.MainResults.Single().Endpoints.Select(e => e.Kind),
                 Is.EqualTo([BmsLongNoteEndpointKind.Head, BmsLongNoteEndpointKind.Tail]));
             Assert.That(run.MainEndpoints.Last().endpointTime, Is.EqualTo(1500));
-            Assert.That(run.MainEndpoints.Last().eventTime, Is.EqualTo(1518));
+            Assert.That(run.MainEndpoints.Last().eventTime, Is.EqualTo(1504));
         });
     }
 
@@ -493,7 +494,7 @@ public class BmsLongNoteRuleTest
     public void TestPassiveChargeTailMissFiresSyntheticMeh()
     {
         var run = new BmsLongNoteTestContext(BmsLongNoteMode.ChargeNote, 1000, 500);
-        run.Press(1000, HitResult.Perfect);
+        run.Press(1000);
 
         run.Passive(1500 + 600);
 
@@ -523,12 +524,12 @@ public class BmsLongNoteRuleTest
         run.Passive(1000 + 600);
 
         Assert.That(run.Results, Is.EqualTo([HitResult.Meh]));
-        Assert.That(run.SyntheticEndpoints.ToArray(), Is.EqualTo([(1500d, 1600d, HitResult.Meh)]));
+        Assert.That(run.SyntheticEndpoints.ToArray(), Is.EqualTo([(1500d, 1210.001d, HitResult.Meh)]));
         Assert.That(run.State.TailJudged, Is.True);
 
         run.Frame(1500 + 600, 16, false);
 
-        Assert.That(run.SyntheticEndpoints.ToArray(), Is.EqualTo([(1500d, 1600d, HitResult.Meh)]));
+        Assert.That(run.SyntheticEndpoints.ToArray(), Is.EqualTo([(1500d, 1210.001d, HitResult.Meh)]));
         Assert.That(run.State.TailJudged, Is.True);
     }
 
@@ -550,17 +551,17 @@ public class BmsLongNoteRuleTest
 
         run.Passive(1600);
 
-        Assert.That(run.MainEndpoints, Is.EqualTo([(1000d, 1600d, HitResult.Meh)]));
+        Assert.That(run.MainEndpoints, Is.EqualTo([(1000d, 1210.001d, HitResult.Meh)]));
         Assert.That(run.SyntheticEndpoints.ToArray(), Is.Empty);
     }
 
     [Test]
     public void TestPoorTailReleaseKeepsHoldUntilRetire()
     {
-        var run = new BmsLongNoteTestContext(BmsLongNoteMode.LongNote, 1000, 500);
-        run.Press(1000, HitResult.Perfect);
+        var run = new BmsLongNoteTestContext(BmsLongNoteMode.ChargeNote, 1000, 500);
+        run.Press(1000);
 
-        run.Release(2000, 1500); // POOR tail
+        run.Release(1100); // POOR tail
 
         Assert.That(run.State.LongNoteStarted, Is.True); // body stays visible until retire
     }
@@ -569,14 +570,14 @@ public class BmsLongNoteRuleTest
     public void TestReplayAfterRewindCommitsOnlyReplayedHeadEndpoint()
     {
         var run = new BmsLongNoteTestContext(BmsLongNoteMode.LongNote, 1000, 500);
-        run.Press(1013, HitResult.Great);
+        run.Press(1013);
         run.Frame(1005, 1, false);
 
-        run.Press(1017, HitResult.Great);
+        run.Press(1017);
         run.Release(1510);
 
         Assert.That(run.MainResults.Single().Endpoints.Select(e => e.TimeOffset),
-            Is.EqualTo([17, 10]));
+            Is.EqualTo([17, 17]));
     }
 
     [Test]
@@ -592,14 +593,14 @@ public class BmsLongNoteRuleTest
     [Test]
     public void TestRetireFiresAfterTailGraceForPoorTail()
     {
-        var run = new BmsLongNoteTestContext(BmsLongNoteMode.LongNote, 1000, 500);
-        run.Press(1000, HitResult.Perfect);
-        run.Release(2000, 1500);
+        var run = new BmsLongNoteTestContext(BmsLongNoteMode.ChargeNote, 1000, 500);
+        run.Press(1000);
+        run.Release(1100);
 
         // EndTime=1500; grace=50; retire once past 1550 and tail judged.
         run.Frame(1601, 16, false);
 
-        Assert.That(run.FinishedPublications, Is.EqualTo(1));
+        Assert.That(run.Presentation(time: 1601).Retired, Is.True);
         Assert.That(run.State.LongNoteStarted, Is.False);
     }
 
@@ -607,7 +608,7 @@ public class BmsLongNoteRuleTest
     public void TestRewindBeforeFastHeadDiscardsPendingEndpoint()
     {
         var run = new BmsLongNoteTestContext(BmsLongNoteMode.LongNote, 1000, 500);
-        run.Press(987, HitResult.Great);
+        run.Press(987);
 
         run.Frame(986, 1, false);
 
@@ -619,7 +620,7 @@ public class BmsLongNoteRuleTest
     public void TestRewindBeforeHeadDiscardsPendingEndpoint()
     {
         var run = new BmsLongNoteTestContext(BmsLongNoteMode.LongNote, 1000, 500);
-        run.Press(1013, HitResult.Great);
+        run.Press(1013);
 
         run.Frame(1005, 1, false);
 
@@ -632,7 +633,7 @@ public class BmsLongNoteRuleTest
     {
         var run = new BmsLongNoteTestContext(BmsLongNoteMode.ChargeNote, 1000, 500);
 
-        var ok = run.Press(1000, HitResult.Perfect);
+        var ok = run.Press(1000);
 
         Assert.That(ok, Is.True);
         Assert.That(run.Results, Is.EqualTo([HitResult.Perfect]));
@@ -644,7 +645,7 @@ public class BmsLongNoteRuleTest
     {
         var run = new BmsLongNoteTestContext(BmsLongNoteMode.LongNote, 1000, 500);
 
-        var ok = run.Press(1000, HitResult.Perfect);
+        var ok = run.Press(1000);
 
         Assert.That(ok, Is.True);
         Assert.That(run.State.LongNoteStarted, Is.True);
@@ -658,9 +659,9 @@ public class BmsLongNoteRuleTest
     public void TestTryHitRejectsAfterHeadAlreadyJudged()
     {
         var run = new BmsLongNoteTestContext(BmsLongNoteMode.LongNote, 1000, 500);
-        run.Press(1000, HitResult.Perfect);
+        run.Press(1000);
 
-        var ok = run.Press(1010, HitResult.Perfect);
+        var ok = run.Press(1010);
 
         Assert.That(ok, Is.False);
         Assert.That(run.HeadPublications, Is.EqualTo(1));
@@ -670,7 +671,7 @@ public class BmsLongNoteRuleTest
     public void TestTryReleaseChargeAppliesSyntheticTailEndpoint()
     {
         var run = new BmsLongNoteTestContext(BmsLongNoteMode.ChargeNote, 1000, 500);
-        run.Press(1000, HitResult.Perfect);
+        run.Press(1000);
 
 
         var ok = run.Release(1500);
@@ -687,7 +688,7 @@ public class BmsLongNoteRuleTest
     public void TestTryReleaseNormalAppliesTailResultAndClearsOnNonPoor()
     {
         var run = new BmsLongNoteTestContext(BmsLongNoteMode.LongNote, 1000, 500);
-        run.Press(1000, HitResult.Perfect);
+        run.Press(1000);
 
 
         var ok = run.Release(1500);
@@ -702,15 +703,15 @@ public class BmsLongNoteRuleTest
     [Test]
     public void TestTryReleaseNormalPoorTailDoesNotClearVisuals()
     {
-        var run = new BmsLongNoteTestContext(BmsLongNoteMode.LongNote, 1000, 500);
-        run.Press(1000, HitResult.Perfect);
+        var run = new BmsLongNoteTestContext(BmsLongNoteMode.ChargeNote, 1000, 500);
+        run.Press(1000);
 
 
-        run.Release(2000, 1500);
+        run.Release(1100);
 
         // POOR tail -> visuals kept (the body stays for the miss animation).
         Assert.That(run.Presentation().Retired, Is.False);
-        Assert.That(run.Results, Is.EqualTo([HitResult.Meh]));
+        Assert.That(run.SyntheticEndpoints.Single().result, Is.EqualTo(HitResult.Meh));
     }
 
     [Test]

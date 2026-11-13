@@ -72,6 +72,10 @@ public sealed record HoldConfiguration(
 
     public long AutomaticEndOffset { get; init; }
 
+    public bool AutomaticTailUsesHeadOffset { get; init; }
+
+    public TimerOrder PassiveOrder { get; init; } = TimerOrder.BeforeInput;
+
     public ImmutableHashSet<string> NonResolvingHeadResults { get; init; } = ImmutableHashSet<string>.Empty;
 
     public ImmutableHashSet<string> TerminalHeadResults { get; init; } = ImmutableHashSet<string>.Empty;
@@ -81,6 +85,15 @@ public sealed record HoldConfiguration(
     public Func<string, int>? CandidatePriority { get; init; }
 
     public TimingWindows? ResolvedHeadWindows { get; init; }
+
+    public long ReleaseGrace { get; init; }
+
+    public ImmutableHashSet<string> DeferredReleaseResults { get; init; } = ImmutableHashSet<string>.Empty;
+
+    public bool SuppressRepeatedMistakes { get; init; }
+
+    public ImmutableHashSet<string> RecoveringHeadResults { get; init; } = ImmutableHashSet<string>.Empty;
+
 }
 
 public sealed record HoldState(
@@ -95,7 +108,15 @@ public sealed record HoldState(
     long Balance,
     long BalanceTime,
     bool TailResolved = false,
-    bool TailSustains = false) : NoteState
+    bool TailSustains = false,
+    long? HeadTime = null,
+    long? TailTime = null,
+    long? TailOffset = null,
+    string? TailResult = null,
+    long? PendingRelease = null,
+    bool Mistake = false,
+    HoldResolution? Resolution = null,
+    bool Ended = false) : NoteState
 {
     public override NoteTimer? NextTimer => Timer;
 

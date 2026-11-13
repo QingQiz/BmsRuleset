@@ -9,8 +9,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Rules;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.State;
+using RhythmEngine;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
@@ -71,7 +70,8 @@ internal static class BmsReplaySimulation
         {
             var notes = objects.Where(note => note.Column == index).ToArray();
             return new BmsJudgementColumnDefinition(notes, beatmap.LayoutVariant, index, new SimulationOutput(score, health, recordGauge));
-        }).ToArray());
+        }).ToArray(), notes => (RhythmEngine.Profiles.BmsProfiles.CreateScore(score.EmptyPoorBreaksCombo
+            ?? BmsJudgementProfileProvider.EmptyPoorBreaksCombo(beatmap.LayoutVariant)), health.CreateEngineHealth(notes)));
 
         AdvanceTo(beatmap, replay, mods, engine, columnCount, frames[^1].Time, time =>
         {
@@ -116,8 +116,7 @@ internal static class BmsReplaySimulation
         {
             cancellationToken.ThrowIfCancellationRequested();
             updateClock(time);
-            var rate = rates.Aggregate(1.0, (value, mod) => mod.ApplyToRate(time, value));
-            var frame = new BmsFrameContext(time, rate, time < previousTime);
+            var frame = frameAt(time);
             while (nextInput < frames.Length && frames[nextInput].Time == time)
             {
                 var input = frames[nextInput++];
@@ -138,17 +137,25 @@ internal static class BmsReplaySimulation
                 pressed = actions;
             }
 
-            engine.ProcessFrame(frame, time - previousTime, algorithm);
+            engine.ProcessFrame(frame, time - previousTime, algorithm, frameAt);
             // Aborted attempts also settle held tails at their recorded endpoint.
             if (replay.HasReceivedAllFrames && frames.Length > 0 && nextInput == frames.Length && time == frames[^1].Time)
-                engine.CompleteLongNotesAtEnd(frame);
+                engine.CompleteLongNotesAtEnd(frame, frameAt);
             if (time == targetTime)
+            {
+                updateClock(targetTime);
                 return;
+            }
 
             previousTime = time;
             var nextTime = nextInput < frames.Length ? frames[nextInput].Time : double.PositiveInfinity;
-            nextTime = Math.Min(nextTime, engine.NextEventTime);
-            time = Math.Max(Math.BitIncrement(time), Math.Min(nextTime, targetTime));
+            time = Math.Min(nextTime, targetTime);
+        }
+
+        BmsFrameContext frameAt(double eventTime)
+        {
+            updateClock(eventTime);
+            return new BmsFrameContext(eventTime, rates.Aggregate(1.0, (value, mod) => mod.ApplyToRate(eventTime, value)));
         }
 
         void queue(BmsAction action, bool down, double inputTime)
@@ -160,50 +167,33 @@ internal static class BmsReplaySimulation
 
     internal sealed class SimulationOutput(BmsScoreProcessor score, BmsHealthProcessor health, Action<double> recordGauge) : IBmsJudgementOutput
     {
-        private readonly Dictionary<BmsHitObject, BmsJudgementResult> results = new(ReferenceEqualityComparer.Instance);
-        private Action<BmsHitObject> stateCheckpoint = null!;
-        private Action<BmsHitObject> checkpoint = null!;
-
-        public BmsMainResultState GetMainResult(BmsHitObject note)
-            => results.TryGetValue(note, out var result)
-                ? new BmsMainResultState(result.Type, result.EventTime, result.EventTime - note.GetEndTime(), result.GameplayRate, result.SuppressPenalty)
-                : new BmsMainResultState(HitResult.None, note.GetEndTime(), 0, null, false);
-
-        public void SetResultCheckpoints(Action<BmsHitObject> recordState, Action<BmsHitObject> refreshIndexes)
-        {
-            stateCheckpoint = recordState;
-            checkpoint = refreshIndexes;
-        }
-
         public void ApplyMainResult(BmsHitObject note, HitResult type, in BmsFrameContext frame, bool suppressPenalty)
-            => apply(note, new BmsJudgementResult(note, note.CreateJudgement()) { Type = type, SuppressPenalty = suppressPenalty }, frame);
+            => apply(new BmsJudgementResult(note, note.CreateJudgement()) { Type = type, SuppressPenalty = suppressPenalty }, frame);
 
         public void ApplyMainResult(BmsLongNote note, HitResult type, IReadOnlyList<BmsLongNoteEndpointResult> endpoints, in BmsFrameContext frame, bool suppressPenalty)
-            => apply(note, new BmsLongNoteJudgementResult(note, note.CreateJudgement(), endpoints) { Type = type, SuppressPenalty = suppressPenalty }, frame);
+            => apply(new BmsLongNoteJudgementResult(note, note.CreateJudgement(), endpoints) { Type = type, SuppressPenalty = suppressPenalty }, frame);
 
-        private void apply(BmsHitObject note, BmsJudgementResult result, in BmsFrameContext frame)
+        private void apply(BmsJudgementResult result, in BmsFrameContext frame)
         {
             result.SetTiming(frame.SimulationTime, frame.GameplayRate);
-            results.Add(note, result);
+            result.EngineResult = frame.EngineResult;
             score.ApplyResult(result);
             health.ApplyResult(result);
             recordGauge(result is BmsLongNoteJudgementResult longNoteResult
                 ? longNoteResult.EndpointResults[^1].ApplicationTime ?? result.TimeAbsolute
                 : result.EventTime);
-            stateCheckpoint(note);
-            checkpoint(note);
         }
 
         public void ApplySyntheticEndpoint(BmsLongNoteEndpointResult endpoint, in BmsFrameContext frame, bool suppressPenalty)
         {
-            health.ApplySyntheticLongNoteEndpoint(score.ApplySyntheticLongNoteEndpoint(endpoint, suppressPenalty));
+            health.ApplySyntheticLongNoteEndpoint(score.ApplySyntheticLongNoteEndpoint(endpoint, suppressPenalty, frame.EngineResult));
             // PMS releases apply after their grace period while retaining the key-up judgement time.
             recordGauge(endpoint.ApplicationTime ?? endpoint.EventTime);
         }
 
         public void ApplyBodyTick(BmsLongNote note, bool holding, double scale, in BmsFrameContext frame)
         {
-            health.ApplyHellChargeTick(holding, scale);
+            health.ApplyEngineTick(frame.EngineResult!.Health);
             recordGauge(frame.SimulationTime);
         }
 
@@ -215,12 +205,12 @@ internal static class BmsReplaySimulation
 
         private void nonConsuming(HitResult type, double expectedTime, int column, in BmsFrameContext frame)
         {
-            score.RegisterNonConsumingJudgement(type, frame.SimulationTime, expectedTime, column);
-            health.RegisterNonConsumingJudgement(type);
+            score.RegisterNonConsumingJudgement(type, frame.SimulationTime, expectedTime, column, frame.EngineResult!.Score);
+            health.ApplyEngineTick(frame.EngineResult.Health);
             recordGauge(frame.SimulationTime);
         }
 
-        public void PublishState(BmsLongNote note, in BmsLongNoteState state, in BmsFrameContext frame)
+        public void PublishState(BmsLongNote note, NoteSnapshot state, in BmsFrameContext frame)
         {
         }
 

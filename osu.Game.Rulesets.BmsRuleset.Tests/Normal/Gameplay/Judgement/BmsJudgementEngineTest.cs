@@ -56,7 +56,7 @@ public class BmsJudgementEngineTest
         var outputs = Enumerable.Range(1, 3).Select(_ => new BmsRecordingJudgementOutput()).ToArray();
         foreach (var output in outputs)
         {
-            output.BeforeResultCheckpoint = (source, _) => events.Add($"result:{source.Column}");
+            output.ResultApplied = (source, _) => events.Add($"result:{source.Column}");
             output.BodyTick = (source, _, _, _) => events.Add($"body:{source.Column}");
         }
         var engine = new BmsJudgementEngine(Enumerable.Range(1, 3).Select(i =>
@@ -73,7 +73,6 @@ public class BmsJudgementEngineTest
         Assert.That(events, Is.EqualTo(new[] { "body:1", "result:3", "result:2" }));
         Assert.That(outputs[0].BodyTicks.Single().Holding, Is.True);
         Assert.That(engine.GetColumn(2).GetLandmineState(mine).Detonated, Is.True);
-        Assert.That(engine.GetColumn(1).Rules, Is.SameAs(engine.GetColumn(3).Rules));
     }
 
     [TestCase(-0.001, true, false, false)]
@@ -95,7 +94,6 @@ public class BmsJudgementEngineTest
         Assert.That(column.GetLandmineState(mine).HandledTime.HasValue, Is.EqualTo(handled));
         Assert.That(column.GetLandmineState(mine).Detonated, Is.EqualTo(detonated));
         Assert.That(output.MainResults, Is.EqualTo(detonated ? 1 : 0));
-        Assert.That(column.NoteRegistrations, Is.Empty);
         Assert.That(column.GetNoteCandidates(), Is.Empty);
         engine.ProcessFrame(new BmsFrameContext(1000 + offset, 1), 1);
         Assert.That(output.MainResults, Is.EqualTo(detonated ? 1 : 0));
@@ -111,7 +109,8 @@ public class BmsJudgementEngineTest
         var engine = new BmsJudgementEngine([mine], beatmap.LayoutVariant, 1, output);
         var column = engine.GetColumn(1);
 
-        column.UpdateLandmines(new BmsFrameContext(1007, 1), held);
+        if (held) engine.QueueInput(1000, 1, true, false);
+        engine.ProcessFrame(new BmsFrameContext(1007, 1), 7);
 
         Assert.That(column.GetLandmineState(mine).HandledTime, Is.EqualTo(1000));
         output = new BmsRecordingJudgementOutput();
@@ -119,7 +118,8 @@ public class BmsJudgementEngineTest
         column = engine.GetColumn(1);
         Assert.That(column.GetLandmineState(mine).HandledTime, Is.Null);
 
-        column.UpdateLandmines(new BmsFrameContext(1007, 1), true);
+        engine.QueueInput(1000, 1, true, false);
+        engine.ProcessFrame(new BmsFrameContext(1007, 1), 7);
         Assert.That(column.GetLandmineState(mine).Detonated, Is.True);
         Assert.That(output.MainResults, Is.EqualTo(1));
     }
@@ -135,10 +135,13 @@ public class BmsJudgementEngineTest
         var column = engine.GetColumn(1);
 
 
-        output.BeforeResultCheckpoint = (note, _) =>
+        output.ResultApplied = (note, _) =>
         {
             if (ReferenceEquals(note, first))
+            {
+                engine.QueueInput(1000, 1, false, false);
                 engine.QueueInput(1000, 1, true, false);
+            }
         };
         engine.QueueInput(1000, 1, true, false);
         engine.ProcessFrame(new BmsFrameContext(1000, 1), 1);
@@ -191,5 +194,75 @@ public class BmsJudgementEngineTest
         Assert.That(output.BodyTicks, Is.Empty);
         Assert.That(column.GetLongNoteState(note).TailJudged, Is.True);
         Assert.That(column.PressedDirections, Is.Zero);
+    }
+
+    [Test]
+    public void UnmatchedAudioKeepsItsPlaceBetweenIdenticalInputEdges()
+    {
+        var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Popn9K, Rank = 2 };
+        var note = new BmsNote { Beatmap = beatmap, Column = 1, StartTime = 1000, SampleKey = 7 };
+        var feedback = new List<string>();
+        var output = new BmsRecordingJudgementOutput { Feedback = feedback.Add };
+        var engine = new BmsJudgementEngine([note], beatmap.LayoutVariant, 1, output);
+        engine.QueueInput(0, 1, true, false);
+        engine.QueueInput(0, 1, false, false);
+        engine.QueueInput(1000, 1, true, false);
+        engine.QueueInput(1000, 1, false, false);
+        engine.QueueInput(1000, 1, true, false);
+        engine.QueueInput(1000, 1, true, false);
+        engine.ProcessFrame(new BmsFrameContext(2000, 1), 2000);
+        Assert.That(feedback, Is.EqualTo(new[] { "keysound", "sample:7:100", "keysound" }));
+        Assert.That(output.MainResults, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void PresentationReadsAndReplacementCannotChangeJudgement()
+    {
+        var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, Rank = 2, LockedLongNoteMode = BmsLongNoteMode.HellChargeNote };
+        var note = new BmsLongNote { Beatmap = beatmap, Column = 1, StartTime = 1000, Duration = 1000 };
+        var output = new BmsRecordingJudgementOutput();
+        var engine = new BmsJudgementEngine([note], beatmap.LayoutVariant, 1, output);
+        var view = engine.GetColumn(1);
+        var observed = new List<(bool Head, bool Tail, bool Held)>();
+        output.StatePublished = (_, _, _) =>
+        {
+            var snapshot = view.GetNote(note);
+            observed.Add((snapshot.Parts[0].Resolved, snapshot.Parts[2].Resolved, snapshot.Held));
+            for (var i = 0; i < 10; i++)
+            {
+                var detached = snapshot with { Completed = true, Parts = [] };
+                Assert.That(detached.Completed, Is.True);
+                Assert.That(view.GetNote(note), Is.SameAs(snapshot));
+            }
+            output.StatePublished = null;
+        };
+        engine.QueueInput(1000, 1, true, false);
+        engine.QueueInput(2000, 1, false, false);
+        engine.ProcessFrame(new BmsFrameContext(3000, 1), 3000);
+        Assert.That(observed, Is.EqualTo(new[] { (true, false, true) }));
+        Assert.That(view.GetNote(note).Completed, Is.True);
+        Assert.That(output.MainResults, Is.EqualTo(1));
+        Assert.That(output.SyntheticEndpoints, Has.Count.EqualTo(1));
+        Assert.That(engine.Session().Score.Score, Is.EqualTo(4));
+    }
+
+    [Test]
+    public void CoincidentHoldEndpointsRetainBothDecisions(
+        [Values(BmsLongNoteMode.LongNote, BmsLongNoteMode.ChargeNote, BmsLongNoteMode.HellChargeNote)] BmsLongNoteMode mode,
+        [Values(0, .0001)] double duration)
+    {
+        var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, Rank = 2, LockedLongNoteMode = mode };
+        var note = new BmsLongNote { Beatmap = beatmap, Column = 1, StartTime = 1000, Duration = duration };
+        var output = new BmsRecordingJudgementOutput();
+        var engine = new BmsJudgementEngine([note], beatmap.LayoutVariant, 1, output);
+        engine.QueueInput(1000, 1, true, false);
+        engine.QueueInput(1000 + duration, 1, false, false);
+        engine.ProcessFrame(new BmsFrameContext(2000, 1), 2000);
+        Assert.That(engine.Session().GetEventsSince(0).Select(e => e.Part), Is.EqualTo(new[] { "head", "tail" }));
+        Assert.That(engine.Session().Score.Score, Is.EqualTo(mode == BmsLongNoteMode.LongNote ? 2 : 4));
+        Assert.That(engine.GetColumn(1).GetNote(note).Completed, Is.True);
+        if (mode == BmsLongNoteMode.LongNote)
+            Assert.That(output.GetEndpoints(note).Select(endpoint => endpoint.Kind),
+                Is.EqualTo(new[] { BmsLongNoteEndpointKind.Head, BmsLongNoteEndpointKind.Tail }));
     }
 }

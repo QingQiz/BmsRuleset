@@ -40,7 +40,7 @@ public sealed record BmsOptions(
     double Total = 260,
     BmsSelection Selection = BmsSelection.Default);
 
-public static class BmsProfiles
+public static partial class BmsProfiles
 {
     private const int empty_poor_priority = 2;
 
@@ -82,13 +82,7 @@ public static class BmsProfiles
         return new CompiledProfile(chart, new SessionConfiguration(id, score, health,
             context =>
             {
-                var candidates = context.Candidates;
-                var activeHold = candidates.FirstOrDefault(c => c.Priority == 0 && !c.Shared);
-                if (candidates.Any(c => c.Priority == 0 && !c.Shared))
-                    return [activeHold, .. candidates.Where(c => c.Shared && chart.Notes[c.NoteIndex].Rule is HoldRule)];
-
-                var selected = selectCandidate(candidates, options.Selection, chart);
-                return selected is { } target ? [.. candidates.Where(c => c.Shared), target] : [..candidates.Where(c => c.Shared)];
+                return SelectCandidates(context, chart, options.Selection);
             }), descriptor);
     }
 
@@ -133,9 +127,9 @@ public static class BmsProfiles
             if (selection is not (BmsSelection.Combo or BmsSelection.Score))
                 continue;
 
-            var boundary = selection == BmsSelection.Combo ? 2 : 1;
-            var currentWindow = headWindows(current).Entries[boundary];
-            var candidateWindow = headWindows(candidate).Entries[boundary];
+            var boundary = selection == BmsSelection.Combo ? "good" : "great";
+            var currentWindow = headWindows(current).Entries.FirstOrDefault(w => w.Result == boundary);
+            var candidateWindow = headWindows(candidate).Entries.FirstOrDefault(w => w.Result == boundary);
             // The original policy walks notes in time order and can replace one late BAD with another.
             if (current.Offset > currentWindow.Late && candidate.Offset >= candidateWindow.Early)
                 selected = candidate;
@@ -152,28 +146,39 @@ public static class BmsProfiles
 
     private static INoteRule createRule(KeyNote note, BmsRank rank, bool lr2)
     {
+        if (lr2 && note.Kind is KeyNoteKind.ReleaseHold or KeyNoteKind.SustainHold)
+            throw ProfileSupport.Unsupported("LR2", note.Kind);
         var windows = createWindows(rank, note.Directional, false, lr2);
         var tailWindows = createWindows(rank, note.Directional, true, lr2);
-        var empty = windows.Entries[^1];
-        var bad = windows.Entries[^2];
-        var ghosts = new TimingWindows([empty]);
+        return CreateRule(note, windows, tailWindows, new BmsRuleOptions(
+            RetainResolvedHeads: !lr2, ImmediateBadHead: lr2, ShareLateBad: lr2));
+    }
+
+    public static INoteRule CreateRule(KeyNote note, TimingWindows windows, TimingWindows tailWindows, BmsRuleOptions options)
+    {
+        var empty = windows.Entries.FirstOrDefault(w => w.Result == "empty-poor");
+        var bad = windows.Entries.Single(w => w.Result == "bad");
+        var ghosts = options.RetainResolvedHeads && !options.NonConsumingBad && empty.Result != null ? new TimingWindows([empty]) : null;
         var priority = new Func<string, int>(result => result == "empty-poor" ? empty_poor_priority : 1);
+        var nonResolving = options.NonConsumingBad ? ImmutableHashSet.Create("empty-poor", "bad") : ImmutableHashSet.Create("empty-poor");
+        var recovery = ImmutableHashSet.Create("pgreat", "great", "good");
 
         if (note.Kind == KeyNoteKind.Mine)
-            return new MineRule(0, 0, "mine-hit", "mine-avoided", TimerOrder.AfterInputState);
+            return new MineRule(0, 0, "mine-hit", "mine-avoided", options.MineOrder, acceptsInput: false);
 
         if (note.Kind == KeyNoteKind.Tap)
         {
             return new TapRule(new TapConfiguration(windows, bad.Late, "poor", 2,
-                NonResolvingResults: ImmutableHashSet.Create("empty-poor"), ResolvedWindows: lr2 ? null : ghosts, CandidatePriority: priority,
-                ShareInput: lr2 ? (result, offset) => result == "bad" && offset > 0 : null));
+                NonResolvingResults: nonResolving, ResolvedWindows: ghosts, CandidatePriority: priority,
+                ShareInput: options.ShareLateBad ? (result, offset) => result == "bad" && offset > 0 : null,
+                SuppressRepeatedMistakes: options.NonConsumingBad, RecoveringResults: recovery, PassiveOrder: options.PassiveOrder));
         }
 
-        if (note.Kind is not (KeyNoteKind.Hold or KeyNoteKind.ReleaseHold or KeyNoteKind.SustainHold) || (lr2 && note.Kind != KeyNoteKind.Hold))
-            throw ProfileSupport.Unsupported(lr2 ? "LR2" : "beatoraja", note.Kind);
+        if (note.Kind is not (KeyNoteKind.Hold or KeyNoteKind.ReleaseHold or KeyNoteKind.SustainHold))
+            throw ProfileSupport.Unsupported("BMS", note.Kind);
 
         var aggregate = note.Kind == KeyNoteKind.Hold;
-        var config = new HoldConfiguration(windows, tailWindows, bad.Late, tailWindows.Entries[^1].Late,
+        var config = new HoldConfiguration(windows, tailWindows, options.HeadDeadline ?? bad.Late, options.TailDeadline ?? tailWindows.Entries[^1].Late,
             "poor", "pgreat", aggregate ? "bad" : "poor", aggregate ? 0 : 2, 2,
             aggregate ? HoldEndMode.ReleaseOrAutomatic : HoldEndMode.Release, HoldDropMode.Resolve,
             evaluation =>
@@ -194,13 +199,19 @@ public static class BmsProfiles
                 return new NoteEmission("tail", result, aggregate ? evaluation.Note.StartTime : evaluation.Note.EndTime, offset);
             })
         {
-            NonResolvingHeadResults = ImmutableHashSet.Create("empty-poor"),
-            TerminalHeadResults = lr2 ? ImmutableHashSet.Create("bad") : ImmutableHashSet<string>.Empty,
+            NonResolvingHeadResults = nonResolving,
+            TerminalHeadResults = options.ImmediateBadHead ? ImmutableHashSet.Create("bad") : ImmutableHashSet<string>.Empty,
             TailOnOppositeControl = note.Directional && !aggregate,
             ReleaseByOwner = note.Directional,
             CandidatePriority = priority,
-            ResolvedHeadWindows = lr2 ? null : ghosts,
+            ResolvedHeadWindows = ghosts,
+            ReleaseGrace = options.ReleaseGrace,
+            DeferredReleaseResults = ImmutableHashSet.Create("bad"),
+            SuppressRepeatedMistakes = options.NonConsumingBad,
+            RecoveringHeadResults = recovery,
             AutomaticEndOffset = 1,
+            AutomaticTailUsesHeadOffset = aggregate,
+            PassiveOrder = options.PassiveOrder,
             Balance = note.Kind == KeyNoteKind.SustainHold
                 ? new HoldBalance(Time.FromMilliseconds(200), "sustain-gain", "sustain-loss", ImmutableHashSet.Create("pgreat", "great", "good"))
                 : null,

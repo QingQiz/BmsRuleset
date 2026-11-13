@@ -6,7 +6,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.State;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.Presentation;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.LnHelper;
@@ -369,50 +369,6 @@ public class BmsLongNoteJudgementTest
             Assert.That(BmsLongNoteGeometry.BodyCentreOffset(headOffset, noteHeight), Is.EqualTo(expectedHeadCentre));
             Assert.That(BmsLongNoteGeometry.BodyCentreOffset(tailOffset, noteHeight), Is.EqualTo(expectedTailCentre));
         });
-    }
-
-    [Test]
-    public void TestHellChargeBodyTrackerDoesNotEmitRepressRecoveryPulse()
-    {
-        var tracker = new BmsHellChargeBodyTracker();
-        var ticks = new List<(bool Holding, double Scale)>();
-        tracker.Update(elapsed: 1, holding: true, (holding, scale) => ticks.Add((holding, scale)));
-
-        Assert.That(ticks, Is.Empty);
-    }
-
-    [Test]
-    public void TestHellChargeBodyTrackerEmitsTicksFromAccumulatedBodyTime()
-    {
-        var tracker = new BmsHellChargeBodyTracker();
-        var ticks = new List<(bool Holding, double Scale)>();
-
-        tracker.Update(elapsed: 199, holding: true, (holding, scale) => ticks.Add((holding, scale)));
-        Assert.That(ticks, Is.Empty);
-
-        tracker.Update(elapsed: 2, holding: true, (holding, scale) => ticks.Add((holding, scale)));
-
-        Assert.That(ticks, Has.Count.EqualTo(1));
-        Assert.That(ticks[0], Is.EqualTo((true, BmsHellChargeBodyTracker.DEFAULT_TICK_SCALE)));
-    }
-
-    [TestCase(true)]
-    [TestCase(false)]
-    public void TestHellChargeStrictTickBoundaryAndSignedCancellation(bool holding)
-    {
-        var tracker = new BmsHellChargeBodyTracker();
-        var ticks = new List<(bool Holding, double Scale)>();
-        void apply(bool held, double scale) => ticks.Add((held, scale));
-
-        // JudgeManager uses >200000/<-200000 microseconds, not >=/<=.
-        tracker.Update(200, holding, apply);
-        Assert.That(ticks, Is.Empty, "exactly 200ms is still pending");
-        tracker.Update(200, !holding, apply);
-        Assert.That(ticks, Is.Empty, "opposite holding cancels the pending time");
-        tracker.Update(200, !holding, apply);
-        Assert.That(ticks, Is.Empty);
-        tracker.Update(0.001, !holding, apply);
-        Assert.That(ticks, Is.EqualTo(new[] { (!holding, 0.5) }));
     }
 
     [Test]

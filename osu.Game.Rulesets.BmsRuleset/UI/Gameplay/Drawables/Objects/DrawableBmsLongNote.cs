@@ -4,7 +4,7 @@ using osu.Framework.Graphics;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.State;
+using NoteSnapshot = RhythmEngine.NoteSnapshot;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.LnHelper;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.Presentation;
@@ -308,15 +308,15 @@ public sealed partial class DrawableBmsLongNote : DrawableBmsHitObject
     }
 
     private BmsLongNotePresentation readPresentation(double time)
-        => mapPresentation(ln, ParentColumn!.Judgements.GetLongNoteState(ln), presentationContext(time));
+        => mapPresentation(ln, BmsLongNoteState.From(ln, ParentColumn!.Judgements.GetNote(ln), time), presentationContext(time));
 
     private BmsLongNotePresentationContext presentationContext(double time)
         => new(time, ParentColumn?.Judgements.PressedDirections is > 0);
 
-    private void applyPresentation(in BmsLongNoteState snapshot, in BmsFrameContext frame)
+    private void applyPresentation(NoteSnapshot snapshot, in BmsFrameContext frame)
     {
         var previous = presentation;
-        presentation = mapPresentation(ln, snapshot, presentationContext(frame.SimulationTime));
+        presentation = mapPresentation(ln, BmsLongNoteState.From(ln, snapshot, frame.SimulationTime), new BmsLongNotePresentationContext(frame.SimulationTime, snapshot.Held));
         if (!previous.HeadJudged && presentation.PrepareHeadPin)
         {
             visualState.PrepareHeadPin();

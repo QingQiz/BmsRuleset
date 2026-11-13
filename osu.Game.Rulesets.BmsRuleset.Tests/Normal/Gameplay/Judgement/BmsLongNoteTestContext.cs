@@ -6,7 +6,6 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.State;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.Presentation;
 using osu.Game.Rulesets.Scoring;
 
@@ -18,7 +17,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
 internal sealed class BmsLongNoteTestContext
 {
     internal BmsLongNote Note { get; }
-    internal BmsColumnJudgementRuntime Column { get; private set; }
+    internal BmsJudgementView Column { get; private set; }
     internal BmsRecordingJudgementOutput Output { get; } = new();
     internal BmsLongNoteState State => Column.GetLongNoteState(Note);
     internal List<(HitResult Result, IReadOnlyList<BmsLongNoteEndpointResult> Endpoints)> MainResults { get; } = [];
@@ -53,7 +52,7 @@ internal sealed class BmsLongNoteTestContext
         Note = note;
         Column = new BmsJudgementEngine([note], note.Beatmap.LayoutVariant, note.Column, Output).GetColumn(note.Column);
 
-        Output.BeforeResultCheckpoint = (_, _) => MainResults.Add((Output.GetMainResult(Note).Type, Output.GetEndpoints(Note).ToArray()));
+        Output.ResultApplied = (_, _) => MainResults.Add((Output.GetMainResult(Note).Type, Output.GetEndpoints(Note).ToArray()));
         Output.StatePublished = (_, state, frame) =>
         {
             Publications.Add((state, frame));
@@ -67,11 +66,12 @@ internal sealed class BmsLongNoteTestContext
         };
     }
 
-    internal bool Press(double time, HitResult result, double rate = 1)
+    internal bool Press(double time, double rate = 1)
     {
-        record(time, () => Press(time, result, rate));
-        Column.PressedDirections = 1;
-        return Column.TryPressRegisteredNote(Note, result, new BmsPressContext(time, new BmsFrameContext(time, rate)));
+        record(time, () => Press(time, rate));
+        var previous = State.HeadJudged;
+        Column.HandleNotePress(new BmsPressContext(time, new BmsFrameContext(time, rate)));
+        return !previous && State.HeadJudged;
     }
 
     internal bool Repress(double time)
@@ -83,8 +83,6 @@ internal sealed class BmsLongNoteTestContext
     internal bool Release(double inputTime, double? simulationTime = null)
     {
         record(simulationTime ?? inputTime, () => Release(inputTime, simulationTime));
-        // These rule cases specify a physical release independently of earlier input batches.
-        Column.PressedDirections = 1;
         var before = sampleCount;
         Column.HandleExecutionRelease(inputTime, new BmsFrameContext(simulationTime ?? inputTime, 1));
         return sampleCount != before;
@@ -98,19 +96,21 @@ internal sealed class BmsLongNoteTestContext
             return;
         }
         record(time, () => Frame(time, elapsed, holding), holding, time - elapsed);
-        Column.UpdateRegisteredLongNote(Note, new BmsFrameContext(time, 1), elapsed, holding);
+        if ((Column.PressedDirections != 0) != holding)
+            Column.Engine().QueueInput(time - elapsed, Note.Column, holding, false);
+        Column.Engine().ProcessFrame(new BmsFrameContext(time, 1), elapsed);
     }
 
     internal void Passive(double time)
     {
         record(time, () => Passive(time));
-        Column.CheckRegisteredNotePassive(Note, new BmsFrameContext(time, 1));
+        Column.Engine().ProcessFrame(new BmsFrameContext(time, 1), 0);
     }
 
     internal void End(double time)
     {
         record(time, () => End(time));
-        Column.CompleteLongNotesAtEnd(new BmsFrameContext(time, 1));
+        Column.Engine().CompleteLongNotesAtEnd(new BmsFrameContext(time, 1));
     }
 
     internal void Rewind(double time)

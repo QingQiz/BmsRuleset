@@ -13,6 +13,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
@@ -331,9 +332,9 @@ public sealed partial class BmsReplayVisualizer : BmsHudComponent
 
         // Normal LN heads are committed to the score ledger with the tail. Reading the
         // current state lets this independent HUD colour a held note immediately.
-        var state = columns[note.Column].Judgements.GetLongNoteState(longNote);
-        var actualTime = tail ? state.TailTime : state.HeadTime;
-        var result = tail ? state.TailResult : state.HeadResult;
+        var part = columns[note.Column].Judgements.GetNote(longNote).Parts.Single(p => p.Part == (tail ? "tail" : "head"));
+        var actualTime = part.Time / 1000.0;
+        var result = BmsEngineChart.HitResultFor(part.Result);
         return actualTime is { } time && time <= now && result != HitResult.None
             ? new BmsTimingObservation(tail ? BmsTimingObservationKind.LongNoteTail : BmsTimingObservationKind.LongNoteHead,
                 expectedTime, time, null, result)

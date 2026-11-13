@@ -143,10 +143,14 @@ ordered retirement, source-order timers, lane identity, frame partitioning,
 immutable snapshots, reconstruction, reset and clone isolation. The consumer
 imports Hosting and uses no profile types, grade names or timing rules.
 
-These checks establish the standalone presentation contract, not actual osu!
-ruleset integration, audio-resource behavior or complete client parity. Fixed
-digital lanes remain the supported input model; analog/cross-lane input, global
-session timers and concurrent multiple gauges are not implemented by this step.
+These checks establish the standalone presentation contract; they do not establish complete client parity or audio-resource behavior. Fixed digital lanes remain the supported input model; analog/cross-lane input and global session timers are outside this contract. Immutable health layers support configured concurrent gauges.
+
+The BmsRuleset adapter has separate integration tests for physical input ordering,
+replay reconstruction, strict microsecond boundaries, delayed frames, layered
+gauge/score accumulation and presentation detachment. Core contract tests cover
+input dispatch ranges, appended batches and layered health clone/reset isolation.
+These integration tests validate the host boundary; they are not source evidence
+for the independent profiles above.
 
 Evidence boundaries before complete original-client parity can be claimed:
 

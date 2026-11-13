@@ -14,27 +14,17 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
 [TestFixture]
 public class BmsJudgementSelectorTest
 {
-    private static int tableQueries;
-
     [TestCase(BmsJudgementAlgorithm.Combo)]
     [TestCase(BmsJudgementAlgorithm.Duration)]
     [TestCase(BmsJudgementAlgorithm.Lowest)]
     [TestCase(BmsJudgementAlgorithm.Score)]
-    [TestCase(null)]
-    [NonParallelizable]
-    public void ExactPerfectDoesNotInspectEveryFutureCandidate(BmsJudgementAlgorithm? algorithm)
+    public void ExactPerfectWinsAgainstFutureCandidates(BmsJudgementAlgorithm algorithm)
     {
-        using var probe = new ScopedMethodProbe(typeof(BmsJudgementProfileProvider).GetMethod("getTable", BindingFlags.NonPublic | BindingFlags.Static),
-            typeof(BmsJudgementSelectorTest).GetMethod(nameof(countTableQuery), BindingFlags.NonPublic | BindingFlags.Static));
-        var candidates = Enumerable.Range(0, 1000).Select(i => note(1000 + i * 0.0001)).Reverse().ToArray();
-        tableQueries = 0;
+        var candidates = Enumerable.Range(0, 1000).Select(i => note(1000 + i * .001)).Reverse().ToArray();
         var selection = BmsTestJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, candidates, 1000, algorithm);
         Assert.That(selection.Candidate?.StartTime, Is.EqualTo(1000));
         Assert.That(selection.Result, Is.EqualTo(HitResult.Perfect));
-        Assert.That(tableQueries, Is.LessThan(10));
     }
-
-    private static void countTableQuery() => tableQueries++;
 
     private static double rankRate(int rank) => BmsJudgementProfileProvider.RateForRank(rank);
 

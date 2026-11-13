@@ -6,7 +6,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.State;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.Presentation;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.Judgements;
@@ -64,18 +64,6 @@ public class BmsBeatorajaParityTest
         var candidate = new BmsJudgementCandidate(1000, 1000, 1, 0.7, false, HasMistake: true);
         Assert.That(BmsTestJudgementSelector.SelectPress(BmsLayoutVariant.Popn9K, 1, [candidate], 850).Result, Is.EqualTo(HitResult.None));
         Assert.That(BmsTestJudgementSelector.SelectPress(BmsLayoutVariant.Popn9K, 1, [candidate], 1000).Result, Is.EqualTo(HitResult.Perfect));
-    }
-
-    [Test]
-    public void NonConsumingMistakeAndConsumedStateAccumulateIndependently()
-    {
-        var history = new BmsNotePressState();
-        var note = new BmsNote();
-        history.Record(note, false, true);
-        Assert.That(history.Get(note), Is.EqualTo((false, true)));
-        history.Record(note, true);
-        Assert.That(history.Get(note), Is.EqualTo((true, true)));
-        Assert.That(new BmsNotePressState().Get(note), Is.EqualTo((false, false)));
     }
 
     [TestCase(BmsLayoutVariant.Bme7K, 3)]

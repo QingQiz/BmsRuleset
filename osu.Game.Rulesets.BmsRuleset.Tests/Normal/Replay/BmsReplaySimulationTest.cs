@@ -71,7 +71,7 @@ public class BmsReplaySimulationTest
         Assert.That(restoredGauges.SelectMany(entry => entry.States), Is.EqualTo(gauges.SelectMany(entry => entry.States)));
         Assert.That(gauges.Select(entry => entry.Time), Is.EqualTo(new[]
         {
-            1000d, Math.BitIncrement(1200), Math.BitIncrement(1400), Math.BitIncrement(1600), Math.BitIncrement(1800), 2000,
+            1000d, 1200.001, 1400.001, 1600.001, 1800.001, 2000,
         }));
     }
 
@@ -101,8 +101,8 @@ public class BmsReplaySimulationTest
         Assert.That(sparseResult.Gauges.SelectMany(entry => entry.States), Is.EqualTo(denseResult.Gauges.SelectMany(entry => entry.States)));
         Assert.That(sparseResult.Gauges.Select(entry => entry.Time), Is.EqualTo(new[]
         {
-            1000d, 1100, Math.BitIncrement(1600), Math.BitIncrement(1800), Math.BitIncrement(2000),
-            Math.BitIncrement(2200), Math.BitIncrement(2400), Math.BitIncrement(2600), Math.BitIncrement(2800),
+            1000d, 1100, 1600.001, 1800.001, 2000.001,
+            2200.001, 2400.001, 2600.001, 2800.001,
         }));
     }
 
@@ -113,7 +113,7 @@ public class BmsReplaySimulationTest
         beatmap.HitObjects.Add(new BmsLongNote { Beatmap = beatmap, Column = 1, StartTime = 1000, Duration = 1000 });
         beatmap.HitObjects.Add(new BmsNote { Beatmap = beatmap, Column = 2, StartTime = 1000 });
         var result = simulate(beatmap, createReplay(new BmsReplayFrame(0), new BmsReplayFrame(1000), new BmsReplayFrame(1500)));
-        var deadline = Math.BitIncrement(1000 + BmsJudgementProfileProvider.GetTable(beatmap.LayoutVariant, 1, beatmap.Rank, false).SlowWindowFor(HitResult.Ok));
+        var deadline = 1000.001 + BmsJudgementProfileProvider.GetTable(beatmap.LayoutVariant, 1, beatmap.Rank, false).SlowWindowFor(HitResult.Ok);
         Assert.That(result.Judgements.SelectMany(entry => entry.TimingObservations).Single(observation => observation.Kind == BmsTimingObservationKind.LongNoteHead).ActualTime,
             Is.EqualTo(deadline));
     }

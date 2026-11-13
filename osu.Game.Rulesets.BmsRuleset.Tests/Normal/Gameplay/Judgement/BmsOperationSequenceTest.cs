@@ -26,11 +26,12 @@ public class BmsOperationSequenceTest
         Assert.That(actual.Events, Is.EqualTo(expected.Events));
         Assert.That(actual.Gauges, Is.EqualTo(expected.Gauges));
         Assert.That(actual.Failed, Is.EqualTo(expected.Failed));
+        Assert.That(actual.Score, Is.EqualTo(expected.Score));
         Assert.That(actual.Events.Select(item => item.Time), Is.Ordered);
     }
 
     [Test]
-    public void PassiveHeadsKeepTheirStrictSubtractionBoundary(
+    public void PassiveHeadsUseStrictMicrosecondBoundaries(
         [Values(null, BmsLongNoteMode.LongNote, BmsLongNoteMode.ChargeNote, BmsLongNoteMode.HellChargeNote)] BmsLongNoteMode? mode,
         [Values(-1000.1, -.1, 1000, 1000.1, 1073741824.1)] double start,
         [Values(.25, .75, 1.33)] double rate)
@@ -45,12 +46,12 @@ public class BmsOperationSequenceTest
         var engine = new BmsJudgementEngine([note], beatmap.LayoutVariant, 1, output);
         var offset = BmsJudgementProfileProvider.GetTable(beatmap.LayoutVariant, 1, rate, false).SlowWindowFor(HitResult.Ok);
         var deadline = start + offset;
-        double[] times = [Math.BitDecrement(deadline), deadline, Math.BitIncrement(deadline), deadline + 1];
+        double[] times = [deadline - .001, deadline, deadline + .001, deadline + 1];
         foreach (var time in times)
         {
             engine.ProcessFrame(new BmsFrameContext(time, 1), 0);
             var judged = note is BmsLongNote hold ? engine.GetColumn(1).GetLongNoteState(hold).HeadJudged : output.GetMainResult(note).HasResult;
-            Assert.That(judged, Is.EqualTo(time - start > offset), $"at {time:R}");
+            Assert.That(judged, Is.EqualTo(RhythmEngine.Time.FromMilliseconds(time) > RhythmEngine.Time.FromMilliseconds(start) + RhythmEngine.Time.FromMilliseconds(offset)), $"at {time:R}");
         }
     }
 
@@ -89,15 +90,14 @@ public class BmsOperationSequenceTest
         var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, Rank = 2 };
         var first = new BmsNote { Beatmap = beatmap, Column = 1, StartTime = 1000 };
         var second = new BmsNote { Beatmap = beatmap, Column = 1, StartTime = 1000 };
-        var inputTime = BmsJudgementWindowTable.TimeAfter(1000,
-            BmsJudgementProfileProvider.GetTable(beatmap.LayoutVariant, 1, 2, false).SlowWindowFor(HitResult.Ok));
+        var inputTime = 1000.001 + BmsJudgementProfileProvider.GetTable(beatmap.LayoutVariant, 1, 2, false).SlowWindowFor(HitResult.Ok);
         var third = new BmsNote { Beatmap = beatmap, Column = 2, StartTime = inputTime };
         var mine = new BmsLandmine { Beatmap = beatmap, Column = 1, StartTime = inputTime };
         var events = new List<string>();
-        var left = new BmsRecordingJudgementOutput { AfterResultCheckpoint = (note, _) => events.Add(note == first ? "first" : note == second ? "second" : "mine") };
-        var right = new BmsRecordingJudgementOutput { AfterResultCheckpoint = (_, _) => events.Add("input") };
-        var engine = new BmsJudgementEngine(new([third], beatmap.LayoutVariant, 2, right),
-            new([first, second, mine], beatmap.LayoutVariant, 1, left));
+        var left = new BmsRecordingJudgementOutput { AfterResultApplied = (note, _) => events.Add(note == first ? "first" : note == second ? "second" : "mine") };
+        var right = new BmsRecordingJudgementOutput { AfterResultApplied = (_, _) => events.Add("input") };
+        var engine = new BmsJudgementEngine(new BmsJudgementColumnDefinition([third], beatmap.LayoutVariant, 2, right),
+            new BmsJudgementColumnDefinition([first, second, mine], beatmap.LayoutVariant, 1, left));
         engine.QueueInput(inputTime, 2, true, false);
         engine.QueueInput(inputTime, 1, true, false);
         engine.ProcessFrame(new BmsFrameContext(2000, 1), 2000);
@@ -117,7 +117,7 @@ public class BmsOperationSequenceTest
         engine.QueueInput(1700, 1, true, false);
         engine.ProcessFrame(new BmsFrameContext(1700, 1), 1700);
         Assert.That(engine.GetColumn(1).GetLongNoteState(hold).TailJudged, Is.False);
-        Assert.That(engine.GetColumn(1).GetLongNoteState(hold).PendingReleaseTime, Is.Null);
+        Assert.That(engine.GetColumn(1).GetNote(hold).Parts[2].PendingTime, Is.Null);
         engine.QueueInput(3000, 1, false, false);
         engine.ProcessFrame(new BmsFrameContext(5000, 1), 3300);
         Assert.That(engine.GetColumn(1).GetLongNoteState(hold).TailResult, Is.EqualTo(HitResult.Perfect));
@@ -133,19 +133,25 @@ public class BmsOperationSequenceTest
         engine.QueueInput(1005, 1, true, false);
         engine.ProcessFrame(new BmsFrameContext(1500, 1), 1500);
         var state = engine.GetColumn(1).GetLongNoteState(hold);
-        Assert.That(state.HeadTime, Is.EqualTo(1005));
+        Assert.That(engine.GetColumn(1).GetNote(hold).Parts[0].Time / 1000.0, Is.EqualTo(1005));
         Assert.That(state.HeadResult, Is.EqualTo(HitResult.Perfect));
     }
 
     [Test]
-    public void DeadlineHandlesCancellationAtZero()
+    public void PassiveDeadlineCrossesZeroInCanonicalTime()
     {
-        var time = BmsJudgementWindowTable.TimeAfter(-280, 280);
-        Assert.That(time + 280, Is.GreaterThan(280));
-        Assert.That(Math.BitDecrement(time) + 280, Is.EqualTo(280));
+        var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, Rank = 2 };
+        var note = new BmsNote { Beatmap = beatmap, Column = 1, StartTime = -210 };
+        var output = new BmsRecordingJudgementOutput();
+        var engine = new BmsJudgementEngine([note], beatmap.LayoutVariant, 1, output);
+        engine.ProcessFrame(new BmsFrameContext(0, 1), 0);
+        Assert.That(output.MainResults, Is.Zero);
+        engine.ProcessFrame(new BmsFrameContext(.001, 1), 0);
+        Assert.That(output.GetMainResult(note).Type, Is.EqualTo(HitResult.Meh));
     }
 
-    private static (List<Event> Events, BmsGaugeStateSnapshot[] Gauges, bool Failed) run(BmsLongNoteMode mode, BmsLayoutVariant layout, double interval)
+    private static (List<Event> Events, RhythmEngine.HealthState[] Gauges, bool Failed, (double Score, int Combo, int MaximumCombo) Score)
+        run(BmsLongNoteMode mode, BmsLayoutVariant layout, double interval)
     {
         var beatmap = new BmsBeatmap { LayoutVariant = layout, Rank = 2, LockedLongNoteMode = mode };
         BmsHitObject[] objects =
@@ -158,7 +164,9 @@ public class BmsOperationSequenceTest
         ];
         foreach (var note in objects) note.Beatmap = beatmap;
         var events = new List<Event>();
-        var health = new BmsHealthProcessor();
+        beatmap.HitObjects.AddRange(objects);
+        using var health = new BmsHealthProcessor();
+        health.ApplyBeatmap(beatmap);
         health.SetGaugeTypes([BmsGaugeType.Hard, BmsGaugeType.Normal], initialStates:
         [
             new(BmsGaugeType.Hard, .08, false), new(BmsGaugeType.Normal, .99, false),
@@ -166,27 +174,25 @@ public class BmsOperationSequenceTest
         var definitions = Enumerable.Range(1, 4).Select(column =>
         {
             var output = new BmsRecordingJudgementOutput();
-            output.AfterResultCheckpoint = (note, frame) =>
+            output.AfterResultApplied = (note, frame) =>
             {
                 var result = output.GetMainResult(note);
                 events.Add(new("main", frame.SimulationTime, column, result.Type, result.TimeOffset));
-                health.RegisterNonConsumingJudgement(result.Type);
             };
             output.SyntheticEndpoint = (endpoint, applied) =>
             {
                 if (!applied) return;
                 var time = endpoint.ApplicationTime ?? endpoint.EventTime;
                 events.Add(new("endpoint", time, column, endpoint.Result, endpoint.TimeOffset));
-                health.RegisterNonConsumingJudgement(endpoint.Result);
             };
             output.BodyTick = (_, held, scale, frame) =>
             {
                 events.Add(new(held ? "recovery" : "damage", frame.SimulationTime, column, HitResult.None, 0));
-                health.ApplyHellChargeTick(held, scale);
             };
             return new BmsJudgementColumnDefinition(objects, layout, column, output);
         }).ToArray();
-        var engine = new BmsJudgementEngine(definitions);
+        var engine = new BmsJudgementEngine(definitions, notes =>
+            (RhythmEngine.Profiles.BmsProfiles.CreateScore(BmsJudgementProfileProvider.EmptyPoorBreaksCombo(layout)), health.CreateEngineHealth(notes)));
         (double Time, int Column, bool Pressed)[] inputs =
         [
             (1000, 1, true), (1025, 2, true), (1026, 2, false), (1100, 3, true),
@@ -206,8 +212,9 @@ public class BmsOperationSequenceTest
             engine.ProcessFrame(new BmsFrameContext(end, 1), end - previous);
             previous = end;
         }
-        Assert.That(engine.NextEventTime, Is.EqualTo(double.PositiveInfinity));
-        return (events, health.CurrentGaugeStates.ToArray(), health.HasEverFailed);
+        var session = engine.Session();
+        Assert.That(session.Completed, Is.True);
+        return (events, session.Health.Layers.ToArray(), session.Health.HasFailed, (session.Score.Score, session.Score.Combo, session.Score.MaximumCombo));
     }
 
     private readonly record struct Event(string Kind, double Time, int Column, HitResult Result, double Offset);

@@ -26,6 +26,8 @@ public partial class BmsDrawableRuleset
     {
         if (FrameStableClock is FrameStabilityContainer { ReplayInputHandler: BmsFramedReplayInputHandler handler })
             handler.RequestSeek();
+        else if (gameplayState != null && gameplayClockContainer != null)
+            ((BmsPlayfield)Playfield).RewindLiveInputs(gameplayState.Score.Replay, Mods, gameplayClockContainer.CurrentTime);
     }
 
     protected override ReplayInputHandler CreateReplayInputHandler(Replay replay)

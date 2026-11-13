@@ -6,8 +6,8 @@ using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Rules;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.State;
+using NoteSnapshot = RhythmEngine.NoteSnapshot;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.Presentation;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
@@ -25,11 +25,8 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
     private readonly Dictionary<BmsHitObject, Binding> representations = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<BmsLandmine, DrawableBmsHitObject> landmineRepresentations = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<DrawableBmsHitObject, Binding> boundObjects = new(ReferenceEqualityComparer.Instance);
-    private readonly Dictionary<BmsHitObject, BmsJudgementResult> results = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<DrawableBmsHitObject, (long Generation, BmsLongNoteStateObserver Observer)> presentationObservers = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<DrawableBmsHitObject, (long Generation, BmsLandmineStateObserver Observer)> landmineObservers = new(ReferenceEqualityComparer.Instance);
-    private Action<BmsHitObject> resultCheckpoint = null!;
-    private Action<BmsHitObject> resultStateCheckpoint = null!;
     private Dictionary<BmsHitObject, BmsHitObjectLifetimeEntry>? replayEntries;
 
     internal void PrepareReplayResults()
@@ -44,12 +41,9 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
         // apply stale deltas to the freshly reset processors.
         judgedEntries(column).Clear();
         PrepareReplayResults();
-        results.Clear();
-        foreach (var (note, entry) in replayEntries!)
+        foreach (var entry in replayEntries!.Values)
         {
             entry.ResetReplayResult();
-            if (entry.ReplayResult is { } result)
-                results[note] = result;
         }
     }
 
@@ -67,11 +61,9 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
         if (boundObjects.TryGetValue(drawable, out var previous) && isCurrent(previous))
             return;
 
-        var binding = new Binding(drawable.HitObject, drawable, drawable.BindingGeneration, this);
+        var binding = new Binding(drawable.HitObject, drawable, drawable.BindingGeneration);
         representations.Add(binding.Note, binding);
         boundObjects.Add(drawable, binding);
-        results[drawable.HitObject] = (BmsJudgementResult)drawable.Result;
-        drawable.OnNewResult += binding.ResultHandler;
     }
 
     internal void ObserveLongNoteState(DrawableBmsHitObject drawable, BmsLongNoteStateObserver observer)
@@ -106,7 +98,6 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
         binding.Bound = false;
         boundObjects.Remove(drawable);
         representations.Remove(binding.Note);
-        drawable.OnNewResult -= binding.ResultHandler;
     }
 
     internal DrawableBmsHitObject GetRepresentation(BmsHitObject note)
@@ -125,37 +116,17 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
         internal readonly BmsHitObject Note;
         internal readonly DrawableBmsHitObject Drawable;
         internal readonly long Generation;
-        internal readonly Action<DrawableHitObject, JudgementResult> ResultHandler;
 
         // Captured callbacks retain their own binding identity even if the same drawable
         // is rebound without advancing its local generation.
         internal bool Bound = true;
 
-        internal Binding(BmsHitObject note, DrawableBmsHitObject drawable, long generation, BmsJudgementBridge output)
+        internal Binding(BmsHitObject note, DrawableBmsHitObject drawable, long generation)
         {
             Note = note;
             Drawable = drawable;
             Generation = generation;
-            // A captured callback can outlive OnFree when the same drawable already represents another object.
-            ResultHandler = (_, _) =>
-            {
-                if (output.isCurrent(this)) output.resultCheckpoint(Note);
-            };
         }
-    }
-
-    public BmsMainResultState GetMainResult(BmsHitObject note)
-    {
-        if (!results.TryGetValue(note, out var result))
-            return new BmsMainResultState(HitResult.None, note.GetEndTime(), 0, null, false);
-
-        return new BmsMainResultState(result.Type, result.EventTime, result.EventTime - note.GetEndTime(), result.GameplayRate, result.SuppressPenalty);
-    }
-
-    public void SetResultCheckpoints(Action<BmsHitObject> recordState, Action<BmsHitObject> refreshIndexes)
-    {
-        resultStateCheckpoint = recordState;
-        resultCheckpoint = refreshIndexes;
     }
 
     internal void OnFrameworkNewResult(DrawableHitObject drawable, JudgementResult result)
@@ -163,9 +134,6 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
         if (drawable is not DrawableBmsHitObject || result.HitObject is not BmsHitObject note || note is BmsLandmine)
             return;
 
-        // The column notification precedes the bound result callback; retain both observation boundaries.
-        // An earlier observer may have returned the drawable to its pool, so the result owns the identity.
-        resultStateCheckpoint(note);
         if (BmsColumn.ShouldTriggerHitExplosion(result.Type))
             column.TriggerHitExplosion(note is BmsLongNote ? BmsHitLightStyle.Hold : BmsHitLightStyle.Note);
     }
@@ -180,15 +148,13 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
         {
             var entry = replayEntries![note];
             var rebuilt = entry.GetReplayResult();
-            results[note] = rebuilt;
             if (endpoints != null)
                 ((BmsLongNoteJudgementResult)rebuilt).SetEndpointResults(endpoints);
             rebuilt.Type = result;
             rebuilt.SuppressPenalty = suppressPenalty;
+            rebuilt.EngineResult = frame.EngineResult;
             rebuilt.SetTiming(frame.SimulationTime, frame.GameplayRate);
             playfield.ApplyRebuiltResult(rebuilt);
-            resultStateCheckpoint(note);
-            resultCheckpoint(note);
             if (note is not BmsLongNote)
                 entry.LifetimeEnd = frame.SimulationTime;
             return;
@@ -209,8 +175,6 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
         if (temporary)
         {
             Bind(drawable);
-            var resultHandler = boundObjects[drawable].ResultHandler;
-            drawable.OnNewResult -= resultHandler;
             // Framework notification must capture the entry before an index observer can return it.
             temporaryNotification = (sender, judgement) =>
             {
@@ -218,7 +182,6 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
                     notifyNewResult(column, sender, judgement);
             };
             drawable.OnNewResult += temporaryNotification;
-            drawable.OnNewResult += resultHandler;
         }
 
         try
@@ -245,7 +208,7 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
     public void ApplyMainResult(BmsLongNote note, HitResult result, IReadOnlyList<BmsLongNoteEndpointResult> endpoints, in BmsFrameContext frame, bool suppressPenalty)
         => applyMainResult(note, result, frame, suppressPenalty, endpoints);
 
-    public void PublishState(BmsLongNote note, in BmsLongNoteState state, in BmsFrameContext frame)
+    public void PublishState(BmsLongNote note, NoteSnapshot state, in BmsFrameContext frame)
     {
         if (playfield.IsRebuildingReplay) return;
         if (!representations.TryGetValue(note, out var binding) || !isCurrent(binding)) return;
@@ -257,7 +220,7 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
 
     public void ApplySyntheticEndpoint(BmsLongNoteEndpointResult endpoint, in BmsFrameContext frame, bool suppressPenalty)
     {
-        playfield.ApplySyntheticLongNoteEndpoint(endpoint, suppressPenalty);
+        playfield.ApplySyntheticLongNoteEndpoint(endpoint, suppressPenalty, frame.EngineResult);
     }
 
     public void PublishState(BmsLandmine note, in BmsLandmineState state, in BmsFrameContext frame)
@@ -272,11 +235,11 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
     }
 
     public void ApplyBodyTick(BmsLongNote note, bool holding, double scale, in BmsFrameContext frame)
-        => playfield.ApplyHellChargeTick(holding, scale);
+        => playfield.ApplyEngineHealth(frame.EngineResult!.Health);
 
     public void ApplyNonConsumingBad(BmsHitObject note, in BmsFrameContext frame)
     {
-        playfield.RegisterNonConsumingBad(note.StartTime, note.Column, frame.SimulationTime);
+        playfield.RegisterNonConsumingJudgement(HitResult.Ok, note.StartTime, note.Column, frame);
     }
 
     public void PlaySample(BmsHitObject note)
@@ -302,7 +265,8 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
         if (!playfield.IsRebuildingReplay) column.PlayKeySound();
     }
 
-    public void ApplyEmptyPoor(double expectedTime, int columnIndex, in BmsFrameContext frame) => playfield.RegisterEmptyPoor(expectedTime, columnIndex, frame.SimulationTime);
+    public void ApplyEmptyPoor(double expectedTime, int columnIndex, in BmsFrameContext frame)
+        => playfield.RegisterNonConsumingJudgement(HitResult.Miss, expectedTime, columnIndex, frame);
 
     public void PlayLandmineSample(BmsLandmine note)
     {

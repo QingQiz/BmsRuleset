@@ -57,25 +57,6 @@ public sealed class BmsJudgementWindowTable
         EPoorWindow = epoor;
     }
 
-    internal static double TimeAfter(double origin, double offset)
-    {
-        var lower = origin + offset;
-        if (lower - origin > offset) return lower;
-
-        var upper = Math.BitIncrement(origin + Math.BitIncrement(offset));
-        while (upper - origin <= offset) upper = Math.BitIncrement(upper);
-        // Cancellation near zero can span many representable timestamps. Bisect rather than
-        // walking every float, retaining the rule's subtraction and strict comparison.
-        while (true)
-        {
-            var middle = lower + (upper - lower) / 2;
-            if (middle == lower || middle == upper) return upper;
-
-            if (middle - origin > offset) upper = middle;
-            else lower = middle;
-        }
-    }
-
     public HitResult ResultForOffset(double timeOffset)
     {
         foreach (var row in hitWindows)

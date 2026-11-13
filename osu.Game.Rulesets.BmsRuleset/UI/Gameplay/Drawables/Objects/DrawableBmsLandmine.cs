@@ -2,11 +2,12 @@ using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Framework.Allocation;
 using osuTK;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Rules;
 using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Components;
 using osu.Game.Rulesets.Objects.Drawables;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
+
+internal delegate void BmsLandmineStateObserver(in BmsLandmineState state, in BmsFrameContext frame);
 
 public sealed partial class DrawableBmsLandmine : DrawableBmsHitObject
 {
@@ -53,14 +54,14 @@ public sealed partial class DrawableBmsLandmine : DrawableBmsHitObject
     {
         Alpha = state.HandledTime.HasValue ? 0 : 1;
         if (state.Detonated)
-            LifetimeEnd = HitObject.StartTime + BmsLandmineJudgementRule.PASSING_LIFETIME;
+            LifetimeEnd = HitObject.StartTime + BmsHitObjectLifetimeEntry.MINE_PAST_LIFETIME;
     }
 
     private void applyPresentation(in BmsLandmineState snapshot, in BmsFrameContext frame)
     {
         if (snapshot.Detonated)
             // Retain the result through the same traversal's lifetime pass.
-            LifetimeEnd = HitObject.StartTime + BmsLandmineJudgementRule.PASSING_LIFETIME;
+            LifetimeEnd = HitObject.StartTime + BmsHitObjectLifetimeEntry.MINE_PAST_LIFETIME;
         else if (snapshot.HandledTime.HasValue)
             Alpha = 0;
     }
