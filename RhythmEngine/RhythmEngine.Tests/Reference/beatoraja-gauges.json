@@ -1,0 +1,1838 @@
+[
+  {
+    "lr2": false,
+    "gauge": 0,
+    "total": 130.0,
+    "count": 2,
+    "minimum": 2.0,
+    "initial": 20.0,
+    "border": 60.0,
+    "changes": [
+      65.0,
+      65.0,
+      32.5,
+      -1.5,
+      -3.0,
+      -0.5
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 0,
+    "total": 130.0,
+    "count": 100,
+    "minimum": 2.0,
+    "initial": 20.0,
+    "border": 60.0,
+    "changes": [
+      1.3,
+      1.3,
+      0.65,
+      -1.5,
+      -3.0,
+      -0.5
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 0,
+    "total": 130.0,
+    "count": 1000,
+    "minimum": 2.0,
+    "initial": 20.0,
+    "border": 60.0,
+    "changes": [
+      0.13,
+      0.13,
+      0.065,
+      -1.5,
+      -3.0,
+      -0.5
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 0,
+    "total": 260.0,
+    "count": 2,
+    "minimum": 2.0,
+    "initial": 20.0,
+    "border": 60.0,
+    "changes": [
+      130.0,
+      130.0,
+      65.0,
+      -1.5,
+      -3.0,
+      -0.5
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 0,
+    "total": 260.0,
+    "count": 100,
+    "minimum": 2.0,
+    "initial": 20.0,
+    "border": 60.0,
+    "changes": [
+      2.6,
+      2.6,
+      1.3,
+      -1.5,
+      -3.0,
+      -0.5
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 0,
+    "total": 260.0,
+    "count": 1000,
+    "minimum": 2.0,
+    "initial": 20.0,
+    "border": 60.0,
+    "changes": [
+      0.26,
+      0.26,
+      0.13,
+      -1.5,
+      -3.0,
+      -0.5
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 1,
+    "total": 130.0,
+    "count": 2,
+    "minimum": 2.0,
+    "initial": 20.0,
+    "border": 80.0,
+    "changes": [
+      65.0,
+      65.0,
+      32.5,
+      -1.5,
+      -4.5,
+      -1.0
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 1,
+    "total": 130.0,
+    "count": 100,
+    "minimum": 2.0,
+    "initial": 20.0,
+    "border": 80.0,
+    "changes": [
+      1.3,
+      1.3,
+      0.65,
+      -1.5,
+      -4.5,
+      -1.0
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 1,
+    "total": 130.0,
+    "count": 1000,
+    "minimum": 2.0,
+    "initial": 20.0,
+    "border": 80.0,
+    "changes": [
+      0.13,
+      0.13,
+      0.065,
+      -1.5,
+      -4.5,
+      -1.0
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 1,
+    "total": 260.0,
+    "count": 2,
+    "minimum": 2.0,
+    "initial": 20.0,
+    "border": 80.0,
+    "changes": [
+      130.0,
+      130.0,
+      65.0,
+      -1.5,
+      -4.5,
+      -1.0
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 1,
+    "total": 260.0,
+    "count": 100,
+    "minimum": 2.0,
+    "initial": 20.0,
+    "border": 80.0,
+    "changes": [
+      2.6,
+      2.6,
+      1.3,
+      -1.5,
+      -4.5,
+      -1.0
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 1,
+    "total": 260.0,
+    "count": 1000,
+    "minimum": 2.0,
+    "initial": 20.0,
+    "border": 80.0,
+    "changes": [
+      0.26,
+      0.26,
+      0.13,
+      -1.5,
+      -4.5,
+      -1.0
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 2,
+    "total": 130.0,
+    "count": 2,
+    "minimum": 2.0,
+    "initial": 20.0,
+    "border": 80.0,
+    "changes": [
+      65.0,
+      65.0,
+      32.5,
+      -3.0,
+      -6.0,
+      -2.0
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 2,
+    "total": 130.0,
+    "count": 100,
+    "minimum": 2.0,
+    "initial": 20.0,
+    "border": 80.0,
+    "changes": [
+      1.3,
+      1.3,
+      0.65,
+      -3.0,
+      -6.0,
+      -2.0
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 2,
+    "total": 130.0,
+    "count": 1000,
+    "minimum": 2.0,
+    "initial": 20.0,
+    "border": 80.0,
+    "changes": [
+      0.13,
+      0.13,
+      0.065,
+      -3.0,
+      -6.0,
+      -2.0
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 2,
+    "total": 260.0,
+    "count": 2,
+    "minimum": 2.0,
+    "initial": 20.0,
+    "border": 80.0,
+    "changes": [
+      130.0,
+      130.0,
+      65.0,
+      -3.0,
+      -6.0,
+      -2.0
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 2,
+    "total": 260.0,
+    "count": 100,
+    "minimum": 2.0,
+    "initial": 20.0,
+    "border": 80.0,
+    "changes": [
+      2.6,
+      2.6,
+      1.3,
+      -3.0,
+      -6.0,
+      -2.0
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 2,
+    "total": 260.0,
+    "count": 1000,
+    "minimum": 2.0,
+    "initial": 20.0,
+    "border": 80.0,
+    "changes": [
+      0.26,
+      0.26,
+      0.13,
+      -3.0,
+      -6.0,
+      -2.0
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 3,
+    "total": 130.0,
+    "count": 2,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.0,
+      0.0,
+      0.0,
+      -5.0,
+      -10.0,
+      -5.0
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 3,
+    "total": 130.0,
+    "count": 100,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.0,
+      0.0,
+      0.0,
+      -5.0,
+      -10.0,
+      -5.0
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 3,
+    "total": 130.0,
+    "count": 1000,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.0,
+      0.0,
+      0.0,
+      -5.0,
+      -10.0,
+      -5.0
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 3,
+    "total": 260.0,
+    "count": 2,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.15,
+      0.12,
+      0.03,
+      -5.0,
+      -10.0,
+      -5.0
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 3,
+    "total": 260.0,
+    "count": 100,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.15,
+      0.12,
+      0.03,
+      -5.0,
+      -10.0,
+      -5.0
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 3,
+    "total": 260.0,
+    "count": 1000,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.15,
+      0.12,
+      0.03,
+      -5.0,
+      -10.0,
+      -5.0
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 4,
+    "total": 130.0,
+    "count": 2,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.0,
+      0.0,
+      0.0,
+      -8.0,
+      -16.0,
+      -8.0
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 4,
+    "total": 130.0,
+    "count": 100,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.0,
+      0.0,
+      0.0,
+      -8.0,
+      -16.0,
+      -8.0
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 4,
+    "total": 130.0,
+    "count": 1000,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.0,
+      0.0,
+      0.0,
+      -8.0,
+      -16.0,
+      -8.0
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 4,
+    "total": 260.0,
+    "count": 2,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.15,
+      0.06,
+      0.0,
+      -8.0,
+      -16.0,
+      -8.0
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 4,
+    "total": 260.0,
+    "count": 100,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.15,
+      0.06,
+      0.0,
+      -8.0,
+      -16.0,
+      -8.0
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 4,
+    "total": 260.0,
+    "count": 1000,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.15,
+      0.06,
+      0.0,
+      -8.0,
+      -16.0,
+      -8.0
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 5,
+    "total": 130.0,
+    "count": 2,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.15,
+      0.06,
+      0.0,
+      -100.0,
+      -100.0,
+      -10.0
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 5,
+    "total": 130.0,
+    "count": 100,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.15,
+      0.06,
+      0.0,
+      -100.0,
+      -100.0,
+      -10.0
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 5,
+    "total": 130.0,
+    "count": 1000,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.15,
+      0.06,
+      0.0,
+      -100.0,
+      -100.0,
+      -10.0
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 5,
+    "total": 260.0,
+    "count": 2,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.15,
+      0.06,
+      0.0,
+      -100.0,
+      -100.0,
+      -10.0
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 5,
+    "total": 260.0,
+    "count": 100,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.15,
+      0.06,
+      0.0,
+      -100.0,
+      -100.0,
+      -10.0
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 5,
+    "total": 260.0,
+    "count": 1000,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.15,
+      0.06,
+      0.0,
+      -100.0,
+      -100.0,
+      -10.0
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 6,
+    "total": 130.0,
+    "count": 2,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.15,
+      0.12,
+      0.06,
+      -1.5,
+      -3.0,
+      -1.5
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 6,
+    "total": 130.0,
+    "count": 100,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.15,
+      0.12,
+      0.06,
+      -1.5,
+      -3.0,
+      -1.5
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 6,
+    "total": 130.0,
+    "count": 1000,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.15,
+      0.12,
+      0.06,
+      -1.5,
+      -3.0,
+      -1.5
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 6,
+    "total": 260.0,
+    "count": 2,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.15,
+      0.12,
+      0.06,
+      -1.5,
+      -3.0,
+      -1.5
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 6,
+    "total": 260.0,
+    "count": 100,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.15,
+      0.12,
+      0.06,
+      -1.5,
+      -3.0,
+      -1.5
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 6,
+    "total": 260.0,
+    "count": 1000,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.15,
+      0.12,
+      0.06,
+      -1.5,
+      -3.0,
+      -1.5
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 7,
+    "total": 130.0,
+    "count": 2,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.15,
+      0.12,
+      0.03,
+      -3.0,
+      -6.0,
+      -3.0
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 7,
+    "total": 130.0,
+    "count": 100,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.15,
+      0.12,
+      0.03,
+      -3.0,
+      -6.0,
+      -3.0
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 7,
+    "total": 130.0,
+    "count": 1000,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.15,
+      0.12,
+      0.03,
+      -3.0,
+      -6.0,
+      -3.0
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 7,
+    "total": 260.0,
+    "count": 2,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.15,
+      0.12,
+      0.03,
+      -3.0,
+      -6.0,
+      -3.0
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 7,
+    "total": 260.0,
+    "count": 100,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.15,
+      0.12,
+      0.03,
+      -3.0,
+      -6.0,
+      -3.0
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 7,
+    "total": 260.0,
+    "count": 1000,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.15,
+      0.12,
+      0.03,
+      -3.0,
+      -6.0,
+      -3.0
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 8,
+    "total": 130.0,
+    "count": 2,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.15,
+      0.06,
+      0.0,
+      -5.0,
+      -10.0,
+      -5.0
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 8,
+    "total": 130.0,
+    "count": 100,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.15,
+      0.06,
+      0.0,
+      -5.0,
+      -10.0,
+      -5.0
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 8,
+    "total": 130.0,
+    "count": 1000,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.15,
+      0.06,
+      0.0,
+      -5.0,
+      -10.0,
+      -5.0
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 8,
+    "total": 260.0,
+    "count": 2,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.15,
+      0.06,
+      0.0,
+      -5.0,
+      -10.0,
+      -5.0
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 8,
+    "total": 260.0,
+    "count": 100,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.15,
+      0.06,
+      0.0,
+      -5.0,
+      -10.0,
+      -5.0
+    ]
+  },
+  {
+    "lr2": false,
+    "gauge": 8,
+    "total": 260.0,
+    "count": 1000,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.15,
+      0.06,
+      0.0,
+      -5.0,
+      -10.0,
+      -5.0
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 0,
+    "total": 130.0,
+    "count": 2,
+    "minimum": 2.0,
+    "initial": 20.0,
+    "border": 60.0,
+    "changes": [
+      78.0,
+      78.0,
+      39.0,
+      -3.2,
+      -4.8,
+      -1.6
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 0,
+    "total": 130.0,
+    "count": 100,
+    "minimum": 2.0,
+    "initial": 20.0,
+    "border": 60.0,
+    "changes": [
+      1.5600001,
+      1.5600001,
+      0.78000003,
+      -3.2,
+      -4.8,
+      -1.6
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 0,
+    "total": 130.0,
+    "count": 1000,
+    "minimum": 2.0,
+    "initial": 20.0,
+    "border": 60.0,
+    "changes": [
+      0.156,
+      0.156,
+      0.078,
+      -3.2,
+      -4.8,
+      -1.6
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 0,
+    "total": 260.0,
+    "count": 2,
+    "minimum": 2.0,
+    "initial": 20.0,
+    "border": 60.0,
+    "changes": [
+      156.0,
+      156.0,
+      78.0,
+      -3.2,
+      -4.8,
+      -1.6
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 0,
+    "total": 260.0,
+    "count": 100,
+    "minimum": 2.0,
+    "initial": 20.0,
+    "border": 60.0,
+    "changes": [
+      3.1200001,
+      3.1200001,
+      1.5600001,
+      -3.2,
+      -4.8,
+      -1.6
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 0,
+    "total": 260.0,
+    "count": 1000,
+    "minimum": 2.0,
+    "initial": 20.0,
+    "border": 60.0,
+    "changes": [
+      0.312,
+      0.312,
+      0.156,
+      -3.2,
+      -4.8,
+      -1.6
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 1,
+    "total": 130.0,
+    "count": 2,
+    "minimum": 2.0,
+    "initial": 20.0,
+    "border": 80.0,
+    "changes": [
+      78.0,
+      78.0,
+      39.0,
+      -3.2,
+      -4.8,
+      -1.6
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 1,
+    "total": 130.0,
+    "count": 100,
+    "minimum": 2.0,
+    "initial": 20.0,
+    "border": 80.0,
+    "changes": [
+      1.5600001,
+      1.5600001,
+      0.78000003,
+      -3.2,
+      -4.8,
+      -1.6
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 1,
+    "total": 130.0,
+    "count": 1000,
+    "minimum": 2.0,
+    "initial": 20.0,
+    "border": 80.0,
+    "changes": [
+      0.156,
+      0.156,
+      0.078,
+      -3.2,
+      -4.8,
+      -1.6
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 1,
+    "total": 260.0,
+    "count": 2,
+    "minimum": 2.0,
+    "initial": 20.0,
+    "border": 80.0,
+    "changes": [
+      156.0,
+      156.0,
+      78.0,
+      -3.2,
+      -4.8,
+      -1.6
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 1,
+    "total": 260.0,
+    "count": 100,
+    "minimum": 2.0,
+    "initial": 20.0,
+    "border": 80.0,
+    "changes": [
+      3.1200001,
+      3.1200001,
+      1.5600001,
+      -3.2,
+      -4.8,
+      -1.6
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 1,
+    "total": 260.0,
+    "count": 1000,
+    "minimum": 2.0,
+    "initial": 20.0,
+    "border": 80.0,
+    "changes": [
+      0.312,
+      0.312,
+      0.156,
+      -3.2,
+      -4.8,
+      -1.6
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 2,
+    "total": 130.0,
+    "count": 2,
+    "minimum": 2.0,
+    "initial": 20.0,
+    "border": 80.0,
+    "changes": [
+      65.0,
+      65.0,
+      32.5,
+      -4.0,
+      -6.0,
+      -2.0
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 2,
+    "total": 130.0,
+    "count": 100,
+    "minimum": 2.0,
+    "initial": 20.0,
+    "border": 80.0,
+    "changes": [
+      1.3,
+      1.3,
+      0.65,
+      -4.0,
+      -6.0,
+      -2.0
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 2,
+    "total": 130.0,
+    "count": 1000,
+    "minimum": 2.0,
+    "initial": 20.0,
+    "border": 80.0,
+    "changes": [
+      0.13,
+      0.13,
+      0.065,
+      -4.0,
+      -6.0,
+      -2.0
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 2,
+    "total": 260.0,
+    "count": 2,
+    "minimum": 2.0,
+    "initial": 20.0,
+    "border": 80.0,
+    "changes": [
+      130.0,
+      130.0,
+      65.0,
+      -4.0,
+      -6.0,
+      -2.0
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 2,
+    "total": 260.0,
+    "count": 100,
+    "minimum": 2.0,
+    "initial": 20.0,
+    "border": 80.0,
+    "changes": [
+      2.6,
+      2.6,
+      1.3,
+      -4.0,
+      -6.0,
+      -2.0
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 2,
+    "total": 260.0,
+    "count": 1000,
+    "minimum": 2.0,
+    "initial": 20.0,
+    "border": 80.0,
+    "changes": [
+      0.26,
+      0.26,
+      0.13,
+      -4.0,
+      -6.0,
+      -2.0
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 3,
+    "total": 130.0,
+    "count": 2,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.1,
+      0.1,
+      0.05,
+      -57.504005,
+      -95.840004,
+      -19.168001
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 3,
+    "total": 130.0,
+    "count": 100,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.1,
+      0.1,
+      0.05,
+      -19.998,
+      -33.329998,
+      -6.666
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 3,
+    "total": 130.0,
+    "count": 1000,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.1,
+      0.1,
+      0.05,
+      -19.998,
+      -33.329998,
+      -6.666
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 3,
+    "total": 260.0,
+    "count": 2,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.1,
+      0.1,
+      0.05,
+      -57.504005,
+      -95.840004,
+      -19.168001
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 3,
+    "total": 260.0,
+    "count": 100,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.1,
+      0.1,
+      0.05,
+      -6.0,
+      -10.0,
+      -2.0
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 3,
+    "total": 260.0,
+    "count": 1000,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.1,
+      0.1,
+      0.05,
+      -6.0,
+      -10.0,
+      -2.0
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 4,
+    "total": 130.0,
+    "count": 2,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.1,
+      0.1,
+      0.05,
+      -115.00801,
+      -191.68001,
+      -19.168001
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 4,
+    "total": 130.0,
+    "count": 100,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.1,
+      0.1,
+      0.05,
+      -39.996,
+      -66.659996,
+      -6.666
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 4,
+    "total": 130.0,
+    "count": 1000,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.1,
+      0.1,
+      0.05,
+      -39.996,
+      -66.659996,
+      -6.666
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 4,
+    "total": 260.0,
+    "count": 2,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.1,
+      0.1,
+      0.05,
+      -115.00801,
+      -191.68001,
+      -19.168001
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 4,
+    "total": 260.0,
+    "count": 100,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.1,
+      0.1,
+      0.05,
+      -12.0,
+      -20.0,
+      -2.0
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 4,
+    "total": 260.0,
+    "count": 1000,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.1,
+      0.1,
+      0.05,
+      -12.0,
+      -20.0,
+      -2.0
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 5,
+    "total": 130.0,
+    "count": 2,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.15,
+      0.06,
+      0.0,
+      -100.0,
+      -100.0,
+      -10.0
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 5,
+    "total": 130.0,
+    "count": 100,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.15,
+      0.06,
+      0.0,
+      -100.0,
+      -100.0,
+      -10.0
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 5,
+    "total": 130.0,
+    "count": 1000,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.15,
+      0.06,
+      0.0,
+      -100.0,
+      -100.0,
+      -10.0
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 5,
+    "total": 260.0,
+    "count": 2,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.15,
+      0.06,
+      0.0,
+      -100.0,
+      -100.0,
+      -10.0
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 5,
+    "total": 260.0,
+    "count": 100,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.15,
+      0.06,
+      0.0,
+      -100.0,
+      -100.0,
+      -10.0
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 5,
+    "total": 260.0,
+    "count": 1000,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.15,
+      0.06,
+      0.0,
+      -100.0,
+      -100.0,
+      -10.0
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 6,
+    "total": 130.0,
+    "count": 2,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.1,
+      0.1,
+      0.05,
+      -2.0,
+      -3.0,
+      -2.0
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 6,
+    "total": 130.0,
+    "count": 100,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.1,
+      0.1,
+      0.05,
+      -2.0,
+      -3.0,
+      -2.0
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 6,
+    "total": 130.0,
+    "count": 1000,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.1,
+      0.1,
+      0.05,
+      -2.0,
+      -3.0,
+      -2.0
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 6,
+    "total": 260.0,
+    "count": 2,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.1,
+      0.1,
+      0.05,
+      -2.0,
+      -3.0,
+      -2.0
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 6,
+    "total": 260.0,
+    "count": 100,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.1,
+      0.1,
+      0.05,
+      -2.0,
+      -3.0,
+      -2.0
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 6,
+    "total": 260.0,
+    "count": 1000,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.1,
+      0.1,
+      0.05,
+      -2.0,
+      -3.0,
+      -2.0
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 7,
+    "total": 130.0,
+    "count": 2,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.1,
+      0.1,
+      0.05,
+      -6.0,
+      -10.0,
+      -2.0
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 7,
+    "total": 130.0,
+    "count": 100,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.1,
+      0.1,
+      0.05,
+      -6.0,
+      -10.0,
+      -2.0
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 7,
+    "total": 130.0,
+    "count": 1000,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.1,
+      0.1,
+      0.05,
+      -6.0,
+      -10.0,
+      -2.0
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 7,
+    "total": 260.0,
+    "count": 2,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.1,
+      0.1,
+      0.05,
+      -6.0,
+      -10.0,
+      -2.0
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 7,
+    "total": 260.0,
+    "count": 100,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.1,
+      0.1,
+      0.05,
+      -6.0,
+      -10.0,
+      -2.0
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 7,
+    "total": 260.0,
+    "count": 1000,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.1,
+      0.1,
+      0.05,
+      -6.0,
+      -10.0,
+      -2.0
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 8,
+    "total": 130.0,
+    "count": 2,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.1,
+      0.1,
+      0.05,
+      -12.0,
+      -20.0,
+      -2.0
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 8,
+    "total": 130.0,
+    "count": 100,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.1,
+      0.1,
+      0.05,
+      -12.0,
+      -20.0,
+      -2.0
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 8,
+    "total": 130.0,
+    "count": 1000,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.1,
+      0.1,
+      0.05,
+      -12.0,
+      -20.0,
+      -2.0
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 8,
+    "total": 260.0,
+    "count": 2,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.1,
+      0.1,
+      0.05,
+      -12.0,
+      -20.0,
+      -2.0
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 8,
+    "total": 260.0,
+    "count": 100,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.1,
+      0.1,
+      0.05,
+      -12.0,
+      -20.0,
+      -2.0
+    ]
+  },
+  {
+    "lr2": true,
+    "gauge": 8,
+    "total": 260.0,
+    "count": 1000,
+    "minimum": 0.0,
+    "initial": 100.0,
+    "border": 0.0,
+    "changes": [
+      0.1,
+      0.1,
+      0.05,
+      -12.0,
+      -20.0,
+      -2.0
+    ]
+  }
+]

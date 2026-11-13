@@ -1,0 +1,2162 @@
+[
+  {
+    "classic": false,
+    "convert": false,
+    "od": 0,
+    "rate": 0.75,
+    "difficulty": 1,
+    "windows": [
+      16.5,
+      48.5,
+      72.5,
+      95.5,
+      113.5,
+      141.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": false,
+    "od": 0,
+    "rate": 0.75,
+    "difficulty": 1.4,
+    "windows": [
+      11.5,
+      34.5,
+      51.5,
+      68.5,
+      80.5,
+      100.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": false,
+    "od": 0,
+    "rate": 1,
+    "difficulty": 1,
+    "windows": [
+      22.5,
+      64.5,
+      97.5,
+      127.5,
+      151.5,
+      188.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": false,
+    "od": 0,
+    "rate": 1,
+    "difficulty": 1.4,
+    "windows": [
+      16.5,
+      45.5,
+      69.5,
+      90.5,
+      107.5,
+      134.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": false,
+    "od": 0,
+    "rate": 1.5,
+    "difficulty": 1,
+    "windows": [
+      33.5,
+      96.5,
+      145.5,
+      190.5,
+      226.5,
+      282.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": false,
+    "od": 0,
+    "rate": 1.5,
+    "difficulty": 1.4,
+    "windows": [
+      23.5,
+      68.5,
+      103.5,
+      136.5,
+      161.5,
+      201.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": false,
+    "od": 4,
+    "rate": 0.75,
+    "difficulty": 1,
+    "windows": [
+      15.5,
+      39.5,
+      63.5,
+      86.5,
+      104.5,
+      132.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": false,
+    "od": 4,
+    "rate": 0.75,
+    "difficulty": 1.4,
+    "windows": [
+      10.5,
+      27.5,
+      45.5,
+      61.5,
+      74.5,
+      94.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": false,
+    "od": 4,
+    "rate": 1,
+    "difficulty": 1,
+    "windows": [
+      20.5,
+      52.5,
+      85.5,
+      115.5,
+      139.5,
+      176.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": false,
+    "od": 4,
+    "rate": 1,
+    "difficulty": 1.4,
+    "windows": [
+      14.5,
+      37.5,
+      60.5,
+      82.5,
+      99.5,
+      125.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": false,
+    "od": 4,
+    "rate": 1.5,
+    "difficulty": 1,
+    "windows": [
+      30.5,
+      78.5,
+      127.5,
+      172.5,
+      208.5,
+      264.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": false,
+    "od": 4,
+    "rate": 1.5,
+    "difficulty": 1.4,
+    "windows": [
+      21.5,
+      55.5,
+      91.5,
+      123.5,
+      148.5,
+      188.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": false,
+    "od": 4.5,
+    "rate": 0.75,
+    "difficulty": 1,
+    "windows": [
+      14.5,
+      37.5,
+      62.5,
+      85.5,
+      103.5,
+      130.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": false,
+    "od": 4.5,
+    "rate": 0.75,
+    "difficulty": 1.4,
+    "windows": [
+      10.5,
+      27.5,
+      44.5,
+      60.5,
+      73.5,
+      93.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": false,
+    "od": 4.5,
+    "rate": 1,
+    "difficulty": 1,
+    "windows": [
+      19.5,
+      50.5,
+      83.5,
+      113.5,
+      137.5,
+      174.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": false,
+    "od": 4.5,
+    "rate": 1,
+    "difficulty": 1.4,
+    "windows": [
+      14.5,
+      36.5,
+      59.5,
+      81.5,
+      98.5,
+      124.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": false,
+    "od": 4.5,
+    "rate": 1.5,
+    "difficulty": 1,
+    "windows": [
+      29.5,
+      75.5,
+      125.5,
+      170.5,
+      206.5,
+      261.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": false,
+    "od": 4.5,
+    "rate": 1.5,
+    "difficulty": 1.4,
+    "windows": [
+      21.5,
+      54.5,
+      89.5,
+      121.5,
+      147.5,
+      186.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": false,
+    "od": 5,
+    "rate": 0.75,
+    "difficulty": 1,
+    "windows": [
+      14.5,
+      36.5,
+      61.5,
+      84.5,
+      102.5,
+      129.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": false,
+    "od": 5,
+    "rate": 0.75,
+    "difficulty": 1.4,
+    "windows": [
+      10.5,
+      26.5,
+      43.5,
+      60.5,
+      72.5,
+      92.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": false,
+    "od": 5,
+    "rate": 1,
+    "difficulty": 1,
+    "windows": [
+      19.5,
+      49.5,
+      82.5,
+      112.5,
+      136.5,
+      173.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": false,
+    "od": 5,
+    "rate": 1,
+    "difficulty": 1.4,
+    "windows": [
+      13.5,
+      35.5,
+      58.5,
+      80.5,
+      97.5,
+      123.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": false,
+    "od": 5,
+    "rate": 1.5,
+    "difficulty": 1,
+    "windows": [
+      29.5,
+      73.5,
+      123.5,
+      168.5,
+      204.5,
+      259.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": false,
+    "od": 5,
+    "rate": 1.5,
+    "difficulty": 1.4,
+    "windows": [
+      20.5,
+      52.5,
+      87.5,
+      120.5,
+      145.5,
+      185.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": false,
+    "od": 8,
+    "rate": 0.75,
+    "difficulty": 1,
+    "windows": [
+      12.5,
+      30.5,
+      54.5,
+      77.5,
+      95.5,
+      123.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": false,
+    "od": 8,
+    "rate": 0.75,
+    "difficulty": 1.4,
+    "windows": [
+      8.5,
+      21.5,
+      39.5,
+      55.5,
+      68.5,
+      87.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": false,
+    "od": 8,
+    "rate": 1,
+    "difficulty": 1,
+    "windows": [
+      16.5,
+      40.5,
+      73.5,
+      103.5,
+      127.5,
+      164.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": false,
+    "od": 8,
+    "rate": 1,
+    "difficulty": 1.4,
+    "windows": [
+      11.5,
+      28.5,
+      52.5,
+      73.5,
+      90.5,
+      117.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": false,
+    "od": 8,
+    "rate": 1.5,
+    "difficulty": 1,
+    "windows": [
+      24.5,
+      60.5,
+      109.5,
+      154.5,
+      190.5,
+      246.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": false,
+    "od": 8,
+    "rate": 1.5,
+    "difficulty": 1.4,
+    "windows": [
+      17.5,
+      42.5,
+      78.5,
+      110.5,
+      136.5,
+      175.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": false,
+    "od": 10,
+    "rate": 0.75,
+    "difficulty": 1,
+    "windows": [
+      10.5,
+      25.5,
+      50.5,
+      72.5,
+      90.5,
+      118.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": false,
+    "od": 10,
+    "rate": 0.75,
+    "difficulty": 1.4,
+    "windows": [
+      7.5,
+      18.5,
+      35.5,
+      51.5,
+      64.5,
+      84.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": false,
+    "od": 10,
+    "rate": 1,
+    "difficulty": 1,
+    "windows": [
+      13.5,
+      34.5,
+      67.5,
+      97.5,
+      121.5,
+      158.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": false,
+    "od": 10,
+    "rate": 1,
+    "difficulty": 1.4,
+    "windows": [
+      9.5,
+      24.5,
+      47.5,
+      69.5,
+      86.5,
+      112.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": false,
+    "od": 10,
+    "rate": 1.5,
+    "difficulty": 1,
+    "windows": [
+      20.5,
+      51.5,
+      100.5,
+      145.5,
+      181.5,
+      237.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": false,
+    "od": 10,
+    "rate": 1.5,
+    "difficulty": 1.4,
+    "windows": [
+      14.5,
+      36.5,
+      71.5,
+      103.5,
+      129.5,
+      169.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": true,
+    "od": 0,
+    "rate": 0.75,
+    "difficulty": 1,
+    "windows": [
+      16.5,
+      48.5,
+      72.5,
+      95.5,
+      113.5,
+      141.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": true,
+    "od": 0,
+    "rate": 0.75,
+    "difficulty": 1.4,
+    "windows": [
+      11.5,
+      34.5,
+      51.5,
+      68.5,
+      80.5,
+      100.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": true,
+    "od": 0,
+    "rate": 1,
+    "difficulty": 1,
+    "windows": [
+      22.5,
+      64.5,
+      97.5,
+      127.5,
+      151.5,
+      188.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": true,
+    "od": 0,
+    "rate": 1,
+    "difficulty": 1.4,
+    "windows": [
+      16.5,
+      45.5,
+      69.5,
+      90.5,
+      107.5,
+      134.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": true,
+    "od": 0,
+    "rate": 1.5,
+    "difficulty": 1,
+    "windows": [
+      33.5,
+      96.5,
+      145.5,
+      190.5,
+      226.5,
+      282.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": true,
+    "od": 0,
+    "rate": 1.5,
+    "difficulty": 1.4,
+    "windows": [
+      23.5,
+      68.5,
+      103.5,
+      136.5,
+      161.5,
+      201.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": true,
+    "od": 4,
+    "rate": 0.75,
+    "difficulty": 1,
+    "windows": [
+      15.5,
+      39.5,
+      63.5,
+      86.5,
+      104.5,
+      132.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": true,
+    "od": 4,
+    "rate": 0.75,
+    "difficulty": 1.4,
+    "windows": [
+      10.5,
+      27.5,
+      45.5,
+      61.5,
+      74.5,
+      94.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": true,
+    "od": 4,
+    "rate": 1,
+    "difficulty": 1,
+    "windows": [
+      20.5,
+      52.5,
+      85.5,
+      115.5,
+      139.5,
+      176.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": true,
+    "od": 4,
+    "rate": 1,
+    "difficulty": 1.4,
+    "windows": [
+      14.5,
+      37.5,
+      60.5,
+      82.5,
+      99.5,
+      125.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": true,
+    "od": 4,
+    "rate": 1.5,
+    "difficulty": 1,
+    "windows": [
+      30.5,
+      78.5,
+      127.5,
+      172.5,
+      208.5,
+      264.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": true,
+    "od": 4,
+    "rate": 1.5,
+    "difficulty": 1.4,
+    "windows": [
+      21.5,
+      55.5,
+      91.5,
+      123.5,
+      148.5,
+      188.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": true,
+    "od": 4.5,
+    "rate": 0.75,
+    "difficulty": 1,
+    "windows": [
+      14.5,
+      37.5,
+      62.5,
+      85.5,
+      103.5,
+      130.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": true,
+    "od": 4.5,
+    "rate": 0.75,
+    "difficulty": 1.4,
+    "windows": [
+      10.5,
+      27.5,
+      44.5,
+      60.5,
+      73.5,
+      93.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": true,
+    "od": 4.5,
+    "rate": 1,
+    "difficulty": 1,
+    "windows": [
+      19.5,
+      50.5,
+      83.5,
+      113.5,
+      137.5,
+      174.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": true,
+    "od": 4.5,
+    "rate": 1,
+    "difficulty": 1.4,
+    "windows": [
+      14.5,
+      36.5,
+      59.5,
+      81.5,
+      98.5,
+      124.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": true,
+    "od": 4.5,
+    "rate": 1.5,
+    "difficulty": 1,
+    "windows": [
+      29.5,
+      75.5,
+      125.5,
+      170.5,
+      206.5,
+      261.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": true,
+    "od": 4.5,
+    "rate": 1.5,
+    "difficulty": 1.4,
+    "windows": [
+      21.5,
+      54.5,
+      89.5,
+      121.5,
+      147.5,
+      186.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": true,
+    "od": 5,
+    "rate": 0.75,
+    "difficulty": 1,
+    "windows": [
+      14.5,
+      36.5,
+      61.5,
+      84.5,
+      102.5,
+      129.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": true,
+    "od": 5,
+    "rate": 0.75,
+    "difficulty": 1.4,
+    "windows": [
+      10.5,
+      26.5,
+      43.5,
+      60.5,
+      72.5,
+      92.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": true,
+    "od": 5,
+    "rate": 1,
+    "difficulty": 1,
+    "windows": [
+      19.5,
+      49.5,
+      82.5,
+      112.5,
+      136.5,
+      173.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": true,
+    "od": 5,
+    "rate": 1,
+    "difficulty": 1.4,
+    "windows": [
+      13.5,
+      35.5,
+      58.5,
+      80.5,
+      97.5,
+      123.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": true,
+    "od": 5,
+    "rate": 1.5,
+    "difficulty": 1,
+    "windows": [
+      29.5,
+      73.5,
+      123.5,
+      168.5,
+      204.5,
+      259.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": true,
+    "od": 5,
+    "rate": 1.5,
+    "difficulty": 1.4,
+    "windows": [
+      20.5,
+      52.5,
+      87.5,
+      120.5,
+      145.5,
+      185.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": true,
+    "od": 8,
+    "rate": 0.75,
+    "difficulty": 1,
+    "windows": [
+      12.5,
+      30.5,
+      54.5,
+      77.5,
+      95.5,
+      123.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": true,
+    "od": 8,
+    "rate": 0.75,
+    "difficulty": 1.4,
+    "windows": [
+      8.5,
+      21.5,
+      39.5,
+      55.5,
+      68.5,
+      87.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": true,
+    "od": 8,
+    "rate": 1,
+    "difficulty": 1,
+    "windows": [
+      16.5,
+      40.5,
+      73.5,
+      103.5,
+      127.5,
+      164.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": true,
+    "od": 8,
+    "rate": 1,
+    "difficulty": 1.4,
+    "windows": [
+      11.5,
+      28.5,
+      52.5,
+      73.5,
+      90.5,
+      117.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": true,
+    "od": 8,
+    "rate": 1.5,
+    "difficulty": 1,
+    "windows": [
+      24.5,
+      60.5,
+      109.5,
+      154.5,
+      190.5,
+      246.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": true,
+    "od": 8,
+    "rate": 1.5,
+    "difficulty": 1.4,
+    "windows": [
+      17.5,
+      42.5,
+      78.5,
+      110.5,
+      136.5,
+      175.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": true,
+    "od": 10,
+    "rate": 0.75,
+    "difficulty": 1,
+    "windows": [
+      10.5,
+      25.5,
+      50.5,
+      72.5,
+      90.5,
+      118.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": true,
+    "od": 10,
+    "rate": 0.75,
+    "difficulty": 1.4,
+    "windows": [
+      7.5,
+      18.5,
+      35.5,
+      51.5,
+      64.5,
+      84.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": true,
+    "od": 10,
+    "rate": 1,
+    "difficulty": 1,
+    "windows": [
+      13.5,
+      34.5,
+      67.5,
+      97.5,
+      121.5,
+      158.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": true,
+    "od": 10,
+    "rate": 1,
+    "difficulty": 1.4,
+    "windows": [
+      9.5,
+      24.5,
+      47.5,
+      69.5,
+      86.5,
+      112.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": true,
+    "od": 10,
+    "rate": 1.5,
+    "difficulty": 1,
+    "windows": [
+      20.5,
+      51.5,
+      100.5,
+      145.5,
+      181.5,
+      237.5
+    ]
+  },
+  {
+    "classic": false,
+    "convert": true,
+    "od": 10,
+    "rate": 1.5,
+    "difficulty": 1.4,
+    "windows": [
+      14.5,
+      36.5,
+      71.5,
+      103.5,
+      129.5,
+      169.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": false,
+    "od": 0,
+    "rate": 0.75,
+    "difficulty": 1,
+    "windows": [
+      12.5,
+      48.5,
+      72.5,
+      95.5,
+      113.5,
+      141.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": false,
+    "od": 0,
+    "rate": 0.75,
+    "difficulty": 1.4,
+    "windows": [
+      8.5,
+      34.5,
+      51.5,
+      68.5,
+      80.5,
+      100.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": false,
+    "od": 0,
+    "rate": 1,
+    "difficulty": 1,
+    "windows": [
+      16.5,
+      64.5,
+      97.5,
+      127.5,
+      151.5,
+      188.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": false,
+    "od": 0,
+    "rate": 1,
+    "difficulty": 1.4,
+    "windows": [
+      11.5,
+      45.5,
+      69.5,
+      90.5,
+      107.5,
+      134.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": false,
+    "od": 0,
+    "rate": 1.5,
+    "difficulty": 1,
+    "windows": [
+      24.5,
+      96.5,
+      145.5,
+      190.5,
+      226.5,
+      282.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": false,
+    "od": 0,
+    "rate": 1.5,
+    "difficulty": 1.4,
+    "windows": [
+      17.5,
+      68.5,
+      103.5,
+      136.5,
+      161.5,
+      201.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": false,
+    "od": 4,
+    "rate": 0.75,
+    "difficulty": 1,
+    "windows": [
+      12.5,
+      39.5,
+      63.5,
+      86.5,
+      104.5,
+      132.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": false,
+    "od": 4,
+    "rate": 0.75,
+    "difficulty": 1.4,
+    "windows": [
+      8.5,
+      27.5,
+      45.5,
+      61.5,
+      74.5,
+      94.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": false,
+    "od": 4,
+    "rate": 1,
+    "difficulty": 1,
+    "windows": [
+      16.5,
+      52.5,
+      85.5,
+      115.5,
+      139.5,
+      176.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": false,
+    "od": 4,
+    "rate": 1,
+    "difficulty": 1.4,
+    "windows": [
+      11.5,
+      37.5,
+      60.5,
+      82.5,
+      99.5,
+      125.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": false,
+    "od": 4,
+    "rate": 1.5,
+    "difficulty": 1,
+    "windows": [
+      24.5,
+      78.5,
+      127.5,
+      172.5,
+      208.5,
+      264.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": false,
+    "od": 4,
+    "rate": 1.5,
+    "difficulty": 1.4,
+    "windows": [
+      17.5,
+      55.5,
+      91.5,
+      123.5,
+      148.5,
+      188.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": false,
+    "od": 4.5,
+    "rate": 0.75,
+    "difficulty": 1,
+    "windows": [
+      12.5,
+      37.5,
+      62.5,
+      85.5,
+      103.5,
+      130.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": false,
+    "od": 4.5,
+    "rate": 0.75,
+    "difficulty": 1.4,
+    "windows": [
+      8.5,
+      27.5,
+      44.5,
+      60.5,
+      73.5,
+      93.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": false,
+    "od": 4.5,
+    "rate": 1,
+    "difficulty": 1,
+    "windows": [
+      16.5,
+      50.5,
+      83.5,
+      113.5,
+      137.5,
+      174.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": false,
+    "od": 4.5,
+    "rate": 1,
+    "difficulty": 1.4,
+    "windows": [
+      11.5,
+      36.5,
+      59.5,
+      81.5,
+      98.5,
+      124.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": false,
+    "od": 4.5,
+    "rate": 1.5,
+    "difficulty": 1,
+    "windows": [
+      24.5,
+      75.5,
+      125.5,
+      170.5,
+      206.5,
+      261.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": false,
+    "od": 4.5,
+    "rate": 1.5,
+    "difficulty": 1.4,
+    "windows": [
+      17.5,
+      54.5,
+      89.5,
+      121.5,
+      147.5,
+      186.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": false,
+    "od": 5,
+    "rate": 0.75,
+    "difficulty": 1,
+    "windows": [
+      12.5,
+      36.5,
+      61.5,
+      84.5,
+      102.5,
+      129.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": false,
+    "od": 5,
+    "rate": 0.75,
+    "difficulty": 1.4,
+    "windows": [
+      8.5,
+      26.5,
+      43.5,
+      60.5,
+      72.5,
+      92.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": false,
+    "od": 5,
+    "rate": 1,
+    "difficulty": 1,
+    "windows": [
+      16.5,
+      49.5,
+      82.5,
+      112.5,
+      136.5,
+      173.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": false,
+    "od": 5,
+    "rate": 1,
+    "difficulty": 1.4,
+    "windows": [
+      11.5,
+      35.5,
+      58.5,
+      80.5,
+      97.5,
+      123.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": false,
+    "od": 5,
+    "rate": 1.5,
+    "difficulty": 1,
+    "windows": [
+      24.5,
+      73.5,
+      123.5,
+      168.5,
+      204.5,
+      259.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": false,
+    "od": 5,
+    "rate": 1.5,
+    "difficulty": 1.4,
+    "windows": [
+      17.5,
+      52.5,
+      87.5,
+      120.5,
+      145.5,
+      185.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": false,
+    "od": 8,
+    "rate": 0.75,
+    "difficulty": 1,
+    "windows": [
+      12.5,
+      30.5,
+      54.5,
+      77.5,
+      95.5,
+      123.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": false,
+    "od": 8,
+    "rate": 0.75,
+    "difficulty": 1.4,
+    "windows": [
+      8.5,
+      21.5,
+      39.5,
+      55.5,
+      68.5,
+      87.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": false,
+    "od": 8,
+    "rate": 1,
+    "difficulty": 1,
+    "windows": [
+      16.5,
+      40.5,
+      73.5,
+      103.5,
+      127.5,
+      164.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": false,
+    "od": 8,
+    "rate": 1,
+    "difficulty": 1.4,
+    "windows": [
+      11.5,
+      28.5,
+      52.5,
+      73.5,
+      90.5,
+      117.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": false,
+    "od": 8,
+    "rate": 1.5,
+    "difficulty": 1,
+    "windows": [
+      24.5,
+      60.5,
+      109.5,
+      154.5,
+      190.5,
+      246.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": false,
+    "od": 8,
+    "rate": 1.5,
+    "difficulty": 1.4,
+    "windows": [
+      17.5,
+      42.5,
+      78.5,
+      110.5,
+      136.5,
+      175.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": false,
+    "od": 10,
+    "rate": 0.75,
+    "difficulty": 1,
+    "windows": [
+      12.5,
+      25.5,
+      50.5,
+      72.5,
+      90.5,
+      118.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": false,
+    "od": 10,
+    "rate": 0.75,
+    "difficulty": 1.4,
+    "windows": [
+      8.5,
+      18.5,
+      35.5,
+      51.5,
+      64.5,
+      84.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": false,
+    "od": 10,
+    "rate": 1,
+    "difficulty": 1,
+    "windows": [
+      16.5,
+      34.5,
+      67.5,
+      97.5,
+      121.5,
+      158.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": false,
+    "od": 10,
+    "rate": 1,
+    "difficulty": 1.4,
+    "windows": [
+      11.5,
+      24.5,
+      47.5,
+      69.5,
+      86.5,
+      112.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": false,
+    "od": 10,
+    "rate": 1.5,
+    "difficulty": 1,
+    "windows": [
+      24.5,
+      51.5,
+      100.5,
+      145.5,
+      181.5,
+      237.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": false,
+    "od": 10,
+    "rate": 1.5,
+    "difficulty": 1.4,
+    "windows": [
+      17.5,
+      36.5,
+      71.5,
+      103.5,
+      129.5,
+      169.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": true,
+    "od": 0,
+    "rate": 0.75,
+    "difficulty": 1,
+    "windows": [
+      12.5,
+      35.5,
+      57.5,
+      72.5,
+      90.5,
+      118.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": true,
+    "od": 0,
+    "rate": 0.75,
+    "difficulty": 1.4,
+    "windows": [
+      8.5,
+      25.5,
+      41.5,
+      51.5,
+      64.5,
+      84.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": true,
+    "od": 0,
+    "rate": 1,
+    "difficulty": 1,
+    "windows": [
+      16.5,
+      47.5,
+      77.5,
+      97.5,
+      121.5,
+      158.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": true,
+    "od": 0,
+    "rate": 1,
+    "difficulty": 1.4,
+    "windows": [
+      11.5,
+      33.5,
+      55.5,
+      69.5,
+      86.5,
+      112.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": true,
+    "od": 0,
+    "rate": 1.5,
+    "difficulty": 1,
+    "windows": [
+      24.5,
+      70.5,
+      115.5,
+      145.5,
+      181.5,
+      237.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": true,
+    "od": 0,
+    "rate": 1.5,
+    "difficulty": 1.4,
+    "windows": [
+      17.5,
+      50.5,
+      82.5,
+      103.5,
+      129.5,
+      169.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": true,
+    "od": 4,
+    "rate": 0.75,
+    "difficulty": 1,
+    "windows": [
+      12.5,
+      35.5,
+      57.5,
+      72.5,
+      90.5,
+      118.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": true,
+    "od": 4,
+    "rate": 0.75,
+    "difficulty": 1.4,
+    "windows": [
+      8.5,
+      25.5,
+      41.5,
+      51.5,
+      64.5,
+      84.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": true,
+    "od": 4,
+    "rate": 1,
+    "difficulty": 1,
+    "windows": [
+      16.5,
+      47.5,
+      77.5,
+      97.5,
+      121.5,
+      158.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": true,
+    "od": 4,
+    "rate": 1,
+    "difficulty": 1.4,
+    "windows": [
+      11.5,
+      33.5,
+      55.5,
+      69.5,
+      86.5,
+      112.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": true,
+    "od": 4,
+    "rate": 1.5,
+    "difficulty": 1,
+    "windows": [
+      24.5,
+      70.5,
+      115.5,
+      145.5,
+      181.5,
+      237.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": true,
+    "od": 4,
+    "rate": 1.5,
+    "difficulty": 1.4,
+    "windows": [
+      17.5,
+      50.5,
+      82.5,
+      103.5,
+      129.5,
+      169.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": true,
+    "od": 4.5,
+    "rate": 0.75,
+    "difficulty": 1,
+    "windows": [
+      12.5,
+      35.5,
+      57.5,
+      72.5,
+      90.5,
+      118.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": true,
+    "od": 4.5,
+    "rate": 0.75,
+    "difficulty": 1.4,
+    "windows": [
+      8.5,
+      25.5,
+      41.5,
+      51.5,
+      64.5,
+      84.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": true,
+    "od": 4.5,
+    "rate": 1,
+    "difficulty": 1,
+    "windows": [
+      16.5,
+      47.5,
+      77.5,
+      97.5,
+      121.5,
+      158.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": true,
+    "od": 4.5,
+    "rate": 1,
+    "difficulty": 1.4,
+    "windows": [
+      11.5,
+      33.5,
+      55.5,
+      69.5,
+      86.5,
+      112.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": true,
+    "od": 4.5,
+    "rate": 1.5,
+    "difficulty": 1,
+    "windows": [
+      24.5,
+      70.5,
+      115.5,
+      145.5,
+      181.5,
+      237.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": true,
+    "od": 4.5,
+    "rate": 1.5,
+    "difficulty": 1.4,
+    "windows": [
+      17.5,
+      50.5,
+      82.5,
+      103.5,
+      129.5,
+      169.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": true,
+    "od": 5,
+    "rate": 0.75,
+    "difficulty": 1,
+    "windows": [
+      12.5,
+      25.5,
+      50.5,
+      72.5,
+      90.5,
+      118.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": true,
+    "od": 5,
+    "rate": 0.75,
+    "difficulty": 1.4,
+    "windows": [
+      8.5,
+      18.5,
+      35.5,
+      51.5,
+      64.5,
+      84.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": true,
+    "od": 5,
+    "rate": 1,
+    "difficulty": 1,
+    "windows": [
+      16.5,
+      34.5,
+      67.5,
+      97.5,
+      121.5,
+      158.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": true,
+    "od": 5,
+    "rate": 1,
+    "difficulty": 1.4,
+    "windows": [
+      11.5,
+      24.5,
+      47.5,
+      69.5,
+      86.5,
+      112.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": true,
+    "od": 5,
+    "rate": 1.5,
+    "difficulty": 1,
+    "windows": [
+      24.5,
+      51.5,
+      100.5,
+      145.5,
+      181.5,
+      237.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": true,
+    "od": 5,
+    "rate": 1.5,
+    "difficulty": 1.4,
+    "windows": [
+      17.5,
+      36.5,
+      71.5,
+      103.5,
+      129.5,
+      169.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": true,
+    "od": 8,
+    "rate": 0.75,
+    "difficulty": 1,
+    "windows": [
+      12.5,
+      25.5,
+      50.5,
+      72.5,
+      90.5,
+      118.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": true,
+    "od": 8,
+    "rate": 0.75,
+    "difficulty": 1.4,
+    "windows": [
+      8.5,
+      18.5,
+      35.5,
+      51.5,
+      64.5,
+      84.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": true,
+    "od": 8,
+    "rate": 1,
+    "difficulty": 1,
+    "windows": [
+      16.5,
+      34.5,
+      67.5,
+      97.5,
+      121.5,
+      158.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": true,
+    "od": 8,
+    "rate": 1,
+    "difficulty": 1.4,
+    "windows": [
+      11.5,
+      24.5,
+      47.5,
+      69.5,
+      86.5,
+      112.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": true,
+    "od": 8,
+    "rate": 1.5,
+    "difficulty": 1,
+    "windows": [
+      24.5,
+      51.5,
+      100.5,
+      145.5,
+      181.5,
+      237.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": true,
+    "od": 8,
+    "rate": 1.5,
+    "difficulty": 1.4,
+    "windows": [
+      17.5,
+      36.5,
+      71.5,
+      103.5,
+      129.5,
+      169.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": true,
+    "od": 10,
+    "rate": 0.75,
+    "difficulty": 1,
+    "windows": [
+      12.5,
+      25.5,
+      50.5,
+      72.5,
+      90.5,
+      118.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": true,
+    "od": 10,
+    "rate": 0.75,
+    "difficulty": 1.4,
+    "windows": [
+      8.5,
+      18.5,
+      35.5,
+      51.5,
+      64.5,
+      84.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": true,
+    "od": 10,
+    "rate": 1,
+    "difficulty": 1,
+    "windows": [
+      16.5,
+      34.5,
+      67.5,
+      97.5,
+      121.5,
+      158.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": true,
+    "od": 10,
+    "rate": 1,
+    "difficulty": 1.4,
+    "windows": [
+      11.5,
+      24.5,
+      47.5,
+      69.5,
+      86.5,
+      112.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": true,
+    "od": 10,
+    "rate": 1.5,
+    "difficulty": 1,
+    "windows": [
+      24.5,
+      51.5,
+      100.5,
+      145.5,
+      181.5,
+      237.5
+    ]
+  },
+  {
+    "classic": true,
+    "convert": true,
+    "od": 10,
+    "rate": 1.5,
+    "difficulty": 1.4,
+    "windows": [
+      17.5,
+      36.5,
+      71.5,
+      103.5,
+      129.5,
+      169.5
+    ]
+  }
+]

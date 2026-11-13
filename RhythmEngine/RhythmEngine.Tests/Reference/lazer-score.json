@@ -1,0 +1,50 @@
+[
+  {
+    "result": "perfect",
+    "score": 115453,
+    "accuracy": 1,
+    "combo": 1
+  },
+  {
+    "result": "great",
+    "score": 224052,
+    "accuracy": 0.9918032786885246,
+    "combo": 2
+  },
+  {
+    "result": "good",
+    "score": 225065,
+    "accuracy": 0.8797814207650273,
+    "combo": 3
+  },
+  {
+    "result": "ok",
+    "score": 184415,
+    "accuracy": 0.7418032786885246,
+    "combo": 4
+  },
+  {
+    "result": "meh",
+    "score": 153753,
+    "accuracy": 0.6262295081967213,
+    "combo": 5
+  },
+  {
+    "result": "miss",
+    "score": 125889,
+    "accuracy": 0.5218579234972678,
+    "combo": 0
+  },
+  {
+    "result": "perfect",
+    "score": 186039,
+    "accuracy": 0.5901639344262295,
+    "combo": 1
+  },
+  {
+    "result": "perfect",
+    "score": 254043,
+    "accuracy": 0.6413934426229508,
+    "combo": 2
+  }
+]

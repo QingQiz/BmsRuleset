@@ -1,0 +1,8655 @@
+{
+  "version": "LR2 beta3 100201",
+  "sha256": "a46ef15343e41d3411771c83ac7b0c42d95e5f473db69c6b45a9584c07e94480",
+  "authority": "original x86 instructions under Unicorn 2.1.4",
+  "functions": {
+    "bootstrap_range": [
+      "0x4b57c1",
+      "0x4b5b32"
+    ],
+    "input": "0x419320",
+    "tap": "0x418850",
+    "hold": "0x418e40",
+    "result": "0x418820",
+    "scoreAndHealth": "0x405fb0"
+  },
+  "excluded": "Completed parse values seed the original rank/gauge bootstrap basic blocks. Audio, skin timers, replay output and ghost processing are stubbed; client startup/parser/frame scheduler are outside this fixture.",
+  "tables": [
+    {
+      "rank": 0,
+      "bounds": [
+        8,
+        24,
+        40,
+        200,
+        1000
+      ]
+    },
+    {
+      "rank": 1,
+      "bounds": [
+        15,
+        30,
+        60,
+        200,
+        1000
+      ]
+    },
+    {
+      "rank": 2,
+      "bounds": [
+        18,
+        40,
+        100,
+        200,
+        1000
+      ]
+    },
+    {
+      "rank": 3,
+      "bounds": [
+        21,
+        60,
+        120,
+        200,
+        1000
+      ]
+    }
+  ],
+  "heads": [
+    {
+      "rank": 0,
+      "offset": -1001,
+      "time": 999,
+      "keyState": 1,
+      "events": [],
+      "headState": 0,
+      "index": 0
+    },
+    {
+      "rank": 0,
+      "offset": -1000,
+      "time": 1000,
+      "keyState": 1,
+      "events": [],
+      "headState": 0,
+      "index": 0
+    },
+    {
+      "rank": 0,
+      "offset": -999,
+      "time": 1001,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1001,
+          "grade": 0
+        }
+      ],
+      "headState": 0,
+      "index": 0
+    },
+    {
+      "rank": 0,
+      "offset": -201,
+      "time": 1799,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1799,
+          "grade": 0
+        }
+      ],
+      "headState": 0,
+      "index": 0
+    },
+    {
+      "rank": 0,
+      "offset": -200,
+      "time": 1800,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1800,
+          "grade": 2
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 0,
+      "offset": -199,
+      "time": 1801,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1801,
+          "grade": 2
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 0,
+      "offset": -41,
+      "time": 1959,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1959,
+          "grade": 2
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 0,
+      "offset": -40,
+      "time": 1960,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1960,
+          "grade": 3
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 0,
+      "offset": -39,
+      "time": 1961,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1961,
+          "grade": 3
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 0,
+      "offset": -25,
+      "time": 1975,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1975,
+          "grade": 3
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 0,
+      "offset": -24,
+      "time": 1976,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1976,
+          "grade": 4
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 0,
+      "offset": -23,
+      "time": 1977,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1977,
+          "grade": 4
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 0,
+      "offset": -9,
+      "time": 1991,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1991,
+          "grade": 4
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 0,
+      "offset": -8,
+      "time": 1992,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1992,
+          "grade": 5
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 0,
+      "offset": -7,
+      "time": 1993,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1993,
+          "grade": 5
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 0,
+      "offset": 0,
+      "time": 2000,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2000,
+          "grade": 5
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 0,
+      "offset": 7,
+      "time": 2007,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2007,
+          "grade": 5
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 0,
+      "offset": 8,
+      "time": 2008,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2008,
+          "grade": 5
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 0,
+      "offset": 9,
+      "time": 2009,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2009,
+          "grade": 4
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 0,
+      "offset": 23,
+      "time": 2023,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2023,
+          "grade": 4
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 0,
+      "offset": 24,
+      "time": 2024,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2024,
+          "grade": 4
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 0,
+      "offset": 25,
+      "time": 2025,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2025,
+          "grade": 3
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 0,
+      "offset": 39,
+      "time": 2039,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2039,
+          "grade": 3
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 0,
+      "offset": 40,
+      "time": 2040,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2040,
+          "grade": 3
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 0,
+      "offset": 41,
+      "time": 2041,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2041,
+          "grade": 2
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 0,
+      "offset": 199,
+      "time": 2199,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2199,
+          "grade": 2
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 0,
+      "offset": 200,
+      "time": 2200,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2200,
+          "grade": 2
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 0,
+      "offset": 201,
+      "time": 2201,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2201,
+          "grade": 1
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 0,
+      "offset": 999,
+      "time": 2999,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2999,
+          "grade": 1
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 0,
+      "offset": 1000,
+      "time": 3000,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 3000,
+          "grade": 1
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 0,
+      "offset": 1001,
+      "time": 3001,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 3001,
+          "grade": 1
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 1,
+      "offset": -1001,
+      "time": 999,
+      "keyState": 1,
+      "events": [],
+      "headState": 0,
+      "index": 0
+    },
+    {
+      "rank": 1,
+      "offset": -1000,
+      "time": 1000,
+      "keyState": 1,
+      "events": [],
+      "headState": 0,
+      "index": 0
+    },
+    {
+      "rank": 1,
+      "offset": -999,
+      "time": 1001,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1001,
+          "grade": 0
+        }
+      ],
+      "headState": 0,
+      "index": 0
+    },
+    {
+      "rank": 1,
+      "offset": -201,
+      "time": 1799,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1799,
+          "grade": 0
+        }
+      ],
+      "headState": 0,
+      "index": 0
+    },
+    {
+      "rank": 1,
+      "offset": -200,
+      "time": 1800,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1800,
+          "grade": 2
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 1,
+      "offset": -199,
+      "time": 1801,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1801,
+          "grade": 2
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 1,
+      "offset": -61,
+      "time": 1939,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1939,
+          "grade": 2
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 1,
+      "offset": -60,
+      "time": 1940,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1940,
+          "grade": 3
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 1,
+      "offset": -59,
+      "time": 1941,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1941,
+          "grade": 3
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 1,
+      "offset": -31,
+      "time": 1969,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1969,
+          "grade": 3
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 1,
+      "offset": -30,
+      "time": 1970,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1970,
+          "grade": 4
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 1,
+      "offset": -29,
+      "time": 1971,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1971,
+          "grade": 4
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 1,
+      "offset": -16,
+      "time": 1984,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1984,
+          "grade": 4
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 1,
+      "offset": -15,
+      "time": 1985,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1985,
+          "grade": 5
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 1,
+      "offset": -14,
+      "time": 1986,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1986,
+          "grade": 5
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 1,
+      "offset": 0,
+      "time": 2000,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2000,
+          "grade": 5
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 1,
+      "offset": 14,
+      "time": 2014,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2014,
+          "grade": 5
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 1,
+      "offset": 15,
+      "time": 2015,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2015,
+          "grade": 5
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 1,
+      "offset": 16,
+      "time": 2016,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2016,
+          "grade": 4
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 1,
+      "offset": 29,
+      "time": 2029,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2029,
+          "grade": 4
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 1,
+      "offset": 30,
+      "time": 2030,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2030,
+          "grade": 4
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 1,
+      "offset": 31,
+      "time": 2031,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2031,
+          "grade": 3
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 1,
+      "offset": 59,
+      "time": 2059,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2059,
+          "grade": 3
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 1,
+      "offset": 60,
+      "time": 2060,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2060,
+          "grade": 3
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 1,
+      "offset": 61,
+      "time": 2061,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2061,
+          "grade": 2
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 1,
+      "offset": 199,
+      "time": 2199,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2199,
+          "grade": 2
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 1,
+      "offset": 200,
+      "time": 2200,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2200,
+          "grade": 2
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 1,
+      "offset": 201,
+      "time": 2201,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2201,
+          "grade": 1
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 1,
+      "offset": 999,
+      "time": 2999,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2999,
+          "grade": 1
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 1,
+      "offset": 1000,
+      "time": 3000,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 3000,
+          "grade": 1
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 1,
+      "offset": 1001,
+      "time": 3001,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 3001,
+          "grade": 1
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 2,
+      "offset": -1001,
+      "time": 999,
+      "keyState": 1,
+      "events": [],
+      "headState": 0,
+      "index": 0
+    },
+    {
+      "rank": 2,
+      "offset": -1000,
+      "time": 1000,
+      "keyState": 1,
+      "events": [],
+      "headState": 0,
+      "index": 0
+    },
+    {
+      "rank": 2,
+      "offset": -999,
+      "time": 1001,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1001,
+          "grade": 0
+        }
+      ],
+      "headState": 0,
+      "index": 0
+    },
+    {
+      "rank": 2,
+      "offset": -201,
+      "time": 1799,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1799,
+          "grade": 0
+        }
+      ],
+      "headState": 0,
+      "index": 0
+    },
+    {
+      "rank": 2,
+      "offset": -200,
+      "time": 1800,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1800,
+          "grade": 2
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 2,
+      "offset": -199,
+      "time": 1801,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1801,
+          "grade": 2
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 2,
+      "offset": -101,
+      "time": 1899,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1899,
+          "grade": 2
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 2,
+      "offset": -100,
+      "time": 1900,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1900,
+          "grade": 3
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 2,
+      "offset": -99,
+      "time": 1901,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1901,
+          "grade": 3
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 2,
+      "offset": -41,
+      "time": 1959,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1959,
+          "grade": 3
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 2,
+      "offset": -40,
+      "time": 1960,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1960,
+          "grade": 4
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 2,
+      "offset": -39,
+      "time": 1961,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1961,
+          "grade": 4
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 2,
+      "offset": -19,
+      "time": 1981,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1981,
+          "grade": 4
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 2,
+      "offset": -18,
+      "time": 1982,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1982,
+          "grade": 5
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 2,
+      "offset": -17,
+      "time": 1983,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1983,
+          "grade": 5
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 2,
+      "offset": 0,
+      "time": 2000,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2000,
+          "grade": 5
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 2,
+      "offset": 17,
+      "time": 2017,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2017,
+          "grade": 5
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 2,
+      "offset": 18,
+      "time": 2018,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2018,
+          "grade": 5
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 2,
+      "offset": 19,
+      "time": 2019,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2019,
+          "grade": 4
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 2,
+      "offset": 39,
+      "time": 2039,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2039,
+          "grade": 4
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 2,
+      "offset": 40,
+      "time": 2040,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2040,
+          "grade": 4
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 2,
+      "offset": 41,
+      "time": 2041,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2041,
+          "grade": 3
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 2,
+      "offset": 99,
+      "time": 2099,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2099,
+          "grade": 3
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 2,
+      "offset": 100,
+      "time": 2100,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2100,
+          "grade": 3
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 2,
+      "offset": 101,
+      "time": 2101,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2101,
+          "grade": 2
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 2,
+      "offset": 199,
+      "time": 2199,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2199,
+          "grade": 2
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 2,
+      "offset": 200,
+      "time": 2200,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2200,
+          "grade": 2
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 2,
+      "offset": 201,
+      "time": 2201,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2201,
+          "grade": 1
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 2,
+      "offset": 999,
+      "time": 2999,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2999,
+          "grade": 1
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 2,
+      "offset": 1000,
+      "time": 3000,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 3000,
+          "grade": 1
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 2,
+      "offset": 1001,
+      "time": 3001,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 3001,
+          "grade": 1
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 3,
+      "offset": -1001,
+      "time": 999,
+      "keyState": 1,
+      "events": [],
+      "headState": 0,
+      "index": 0
+    },
+    {
+      "rank": 3,
+      "offset": -1000,
+      "time": 1000,
+      "keyState": 1,
+      "events": [],
+      "headState": 0,
+      "index": 0
+    },
+    {
+      "rank": 3,
+      "offset": -999,
+      "time": 1001,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1001,
+          "grade": 0
+        }
+      ],
+      "headState": 0,
+      "index": 0
+    },
+    {
+      "rank": 3,
+      "offset": -201,
+      "time": 1799,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1799,
+          "grade": 0
+        }
+      ],
+      "headState": 0,
+      "index": 0
+    },
+    {
+      "rank": 3,
+      "offset": -200,
+      "time": 1800,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1800,
+          "grade": 2
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 3,
+      "offset": -199,
+      "time": 1801,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1801,
+          "grade": 2
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 3,
+      "offset": -121,
+      "time": 1879,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1879,
+          "grade": 2
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 3,
+      "offset": -120,
+      "time": 1880,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1880,
+          "grade": 3
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 3,
+      "offset": -119,
+      "time": 1881,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1881,
+          "grade": 3
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 3,
+      "offset": -61,
+      "time": 1939,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1939,
+          "grade": 3
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 3,
+      "offset": -60,
+      "time": 1940,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1940,
+          "grade": 4
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 3,
+      "offset": -59,
+      "time": 1941,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1941,
+          "grade": 4
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 3,
+      "offset": -22,
+      "time": 1978,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1978,
+          "grade": 4
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 3,
+      "offset": -21,
+      "time": 1979,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1979,
+          "grade": 5
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 3,
+      "offset": -20,
+      "time": 1980,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 1980,
+          "grade": 5
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 3,
+      "offset": 0,
+      "time": 2000,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2000,
+          "grade": 5
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 3,
+      "offset": 20,
+      "time": 2020,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2020,
+          "grade": 5
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 3,
+      "offset": 21,
+      "time": 2021,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2021,
+          "grade": 5
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 3,
+      "offset": 22,
+      "time": 2022,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2022,
+          "grade": 4
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 3,
+      "offset": 59,
+      "time": 2059,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2059,
+          "grade": 4
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 3,
+      "offset": 60,
+      "time": 2060,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2060,
+          "grade": 4
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 3,
+      "offset": 61,
+      "time": 2061,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2061,
+          "grade": 3
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 3,
+      "offset": 119,
+      "time": 2119,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2119,
+          "grade": 3
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 3,
+      "offset": 120,
+      "time": 2120,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2120,
+          "grade": 3
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 3,
+      "offset": 121,
+      "time": 2121,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2121,
+          "grade": 2
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 3,
+      "offset": 199,
+      "time": 2199,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2199,
+          "grade": 2
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 3,
+      "offset": 200,
+      "time": 2200,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2200,
+          "grade": 2
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 3,
+      "offset": 201,
+      "time": 2201,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2201,
+          "grade": 1
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 3,
+      "offset": 999,
+      "time": 2999,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2999,
+          "grade": 1
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 3,
+      "offset": 1000,
+      "time": 3000,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 3000,
+          "grade": 1
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "rank": 3,
+      "offset": 1001,
+      "time": 3001,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 3001,
+          "grade": 1
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    }
+  ],
+  "holds": [
+    {
+      "rank": 0,
+      "offset": 0,
+      "release": 2500,
+      "head": {
+        "time": 2000,
+        "keyState": 1,
+        "events": [],
+        "headState": 5,
+        "index": 0
+      },
+      "tail": {
+        "time": 2500,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2500,
+            "grade": 2
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 0,
+      "offset": 0,
+      "release": 2959,
+      "head": {
+        "time": 2000,
+        "keyState": 1,
+        "events": [],
+        "headState": 5,
+        "index": 0
+      },
+      "tail": {
+        "time": 2959,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2959,
+            "grade": 2
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 0,
+      "offset": 0,
+      "release": 2960,
+      "head": {
+        "time": 2000,
+        "keyState": 1,
+        "events": [],
+        "headState": 5,
+        "index": 0
+      },
+      "tail": {
+        "time": 2960,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2960,
+            "grade": 5
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 0,
+      "offset": 0,
+      "release": 3000,
+      "head": {
+        "time": 2000,
+        "keyState": 1,
+        "events": [],
+        "headState": 5,
+        "index": 0
+      },
+      "tail": {
+        "time": 3000,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 3000,
+            "grade": 5
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 0,
+      "offset": 0,
+      "release": 3001,
+      "head": {
+        "time": 2000,
+        "keyState": 1,
+        "events": [],
+        "headState": 5,
+        "index": 0
+      },
+      "tail": {
+        "time": 3001,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 3001,
+            "grade": 5
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 0,
+      "offset": 0,
+      "release": null,
+      "head": {
+        "time": 2000,
+        "keyState": 1,
+        "events": [],
+        "headState": 5,
+        "index": 0
+      },
+      "tail": {
+        "time": 3001,
+        "keyState": 2,
+        "events": [
+          {
+            "time": 3001,
+            "grade": 5
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 0,
+      "offset": 9,
+      "release": 2500,
+      "head": {
+        "time": 2009,
+        "keyState": 1,
+        "events": [],
+        "headState": 4,
+        "index": 0
+      },
+      "tail": {
+        "time": 2500,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2500,
+            "grade": 2
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 0,
+      "offset": 9,
+      "release": 2959,
+      "head": {
+        "time": 2009,
+        "keyState": 1,
+        "events": [],
+        "headState": 4,
+        "index": 0
+      },
+      "tail": {
+        "time": 2959,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2959,
+            "grade": 2
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 0,
+      "offset": 9,
+      "release": 2960,
+      "head": {
+        "time": 2009,
+        "keyState": 1,
+        "events": [],
+        "headState": 4,
+        "index": 0
+      },
+      "tail": {
+        "time": 2960,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2960,
+            "grade": 4
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 0,
+      "offset": 9,
+      "release": 3000,
+      "head": {
+        "time": 2009,
+        "keyState": 1,
+        "events": [],
+        "headState": 4,
+        "index": 0
+      },
+      "tail": {
+        "time": 3000,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 3000,
+            "grade": 4
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 0,
+      "offset": 9,
+      "release": 3001,
+      "head": {
+        "time": 2009,
+        "keyState": 1,
+        "events": [],
+        "headState": 4,
+        "index": 0
+      },
+      "tail": {
+        "time": 3001,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 3001,
+            "grade": 4
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 0,
+      "offset": 9,
+      "release": null,
+      "head": {
+        "time": 2009,
+        "keyState": 1,
+        "events": [],
+        "headState": 4,
+        "index": 0
+      },
+      "tail": {
+        "time": 3001,
+        "keyState": 2,
+        "events": [
+          {
+            "time": 3001,
+            "grade": 4
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 0,
+      "offset": 25,
+      "release": 2500,
+      "head": {
+        "time": 2025,
+        "keyState": 1,
+        "events": [],
+        "headState": 3,
+        "index": 0
+      },
+      "tail": {
+        "time": 2500,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2500,
+            "grade": 2
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 0,
+      "offset": 25,
+      "release": 2959,
+      "head": {
+        "time": 2025,
+        "keyState": 1,
+        "events": [],
+        "headState": 3,
+        "index": 0
+      },
+      "tail": {
+        "time": 2959,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2959,
+            "grade": 2
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 0,
+      "offset": 25,
+      "release": 2960,
+      "head": {
+        "time": 2025,
+        "keyState": 1,
+        "events": [],
+        "headState": 3,
+        "index": 0
+      },
+      "tail": {
+        "time": 2960,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2960,
+            "grade": 3
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 0,
+      "offset": 25,
+      "release": 3000,
+      "head": {
+        "time": 2025,
+        "keyState": 1,
+        "events": [],
+        "headState": 3,
+        "index": 0
+      },
+      "tail": {
+        "time": 3000,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 3000,
+            "grade": 3
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 0,
+      "offset": 25,
+      "release": 3001,
+      "head": {
+        "time": 2025,
+        "keyState": 1,
+        "events": [],
+        "headState": 3,
+        "index": 0
+      },
+      "tail": {
+        "time": 3001,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 3001,
+            "grade": 3
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 0,
+      "offset": 25,
+      "release": null,
+      "head": {
+        "time": 2025,
+        "keyState": 1,
+        "events": [],
+        "headState": 3,
+        "index": 0
+      },
+      "tail": {
+        "time": 3001,
+        "keyState": 2,
+        "events": [
+          {
+            "time": 3001,
+            "grade": 3
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 0,
+      "offset": -41,
+      "release": 2500,
+      "head": {
+        "time": 1959,
+        "keyState": 1,
+        "events": [],
+        "headState": 2,
+        "index": 0
+      },
+      "tail": {
+        "time": 2500,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2500,
+            "grade": 2
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 0,
+      "offset": -41,
+      "release": 2959,
+      "head": {
+        "time": 1959,
+        "keyState": 1,
+        "events": [],
+        "headState": 2,
+        "index": 0
+      },
+      "tail": {
+        "time": 2959,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2959,
+            "grade": 2
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 0,
+      "offset": -41,
+      "release": 2960,
+      "head": {
+        "time": 1959,
+        "keyState": 1,
+        "events": [],
+        "headState": 2,
+        "index": 0
+      },
+      "tail": {
+        "time": 2960,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2960,
+            "grade": 2
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 0,
+      "offset": -41,
+      "release": 3000,
+      "head": {
+        "time": 1959,
+        "keyState": 1,
+        "events": [],
+        "headState": 2,
+        "index": 0
+      },
+      "tail": {
+        "time": 3000,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 3000,
+            "grade": 2
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 0,
+      "offset": -41,
+      "release": 3001,
+      "head": {
+        "time": 1959,
+        "keyState": 1,
+        "events": [],
+        "headState": 2,
+        "index": 0
+      },
+      "tail": {
+        "time": 3001,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 3001,
+            "grade": 2
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 0,
+      "offset": -41,
+      "release": null,
+      "head": {
+        "time": 1959,
+        "keyState": 1,
+        "events": [],
+        "headState": 2,
+        "index": 0
+      },
+      "tail": {
+        "time": 3001,
+        "keyState": 2,
+        "events": [
+          {
+            "time": 3001,
+            "grade": 2
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 0,
+      "offset": 41,
+      "release": 2500,
+      "head": {
+        "time": 2041,
+        "keyState": 1,
+        "events": [
+          {
+            "time": 2041,
+            "grade": 1
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      },
+      "tail": {
+        "time": 2500,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2041,
+            "grade": 1
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 0,
+      "offset": 41,
+      "release": 2959,
+      "head": {
+        "time": 2041,
+        "keyState": 1,
+        "events": [
+          {
+            "time": 2041,
+            "grade": 1
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      },
+      "tail": {
+        "time": 2959,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2041,
+            "grade": 1
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 0,
+      "offset": 41,
+      "release": 2960,
+      "head": {
+        "time": 2041,
+        "keyState": 1,
+        "events": [
+          {
+            "time": 2041,
+            "grade": 1
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      },
+      "tail": {
+        "time": 2960,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2041,
+            "grade": 1
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 0,
+      "offset": 41,
+      "release": 3000,
+      "head": {
+        "time": 2041,
+        "keyState": 1,
+        "events": [
+          {
+            "time": 2041,
+            "grade": 1
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      },
+      "tail": {
+        "time": 3000,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2041,
+            "grade": 1
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 0,
+      "offset": 41,
+      "release": 3001,
+      "head": {
+        "time": 2041,
+        "keyState": 1,
+        "events": [
+          {
+            "time": 2041,
+            "grade": 1
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      },
+      "tail": {
+        "time": 3001,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2041,
+            "grade": 1
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 0,
+      "offset": 41,
+      "release": null,
+      "head": {
+        "time": 2041,
+        "keyState": 1,
+        "events": [
+          {
+            "time": 2041,
+            "grade": 1
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      },
+      "tail": {
+        "time": 3001,
+        "keyState": 2,
+        "events": [
+          {
+            "time": 2041,
+            "grade": 1
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 1,
+      "offset": 0,
+      "release": 2500,
+      "head": {
+        "time": 2000,
+        "keyState": 1,
+        "events": [],
+        "headState": 5,
+        "index": 0
+      },
+      "tail": {
+        "time": 2500,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2500,
+            "grade": 2
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 1,
+      "offset": 0,
+      "release": 2939,
+      "head": {
+        "time": 2000,
+        "keyState": 1,
+        "events": [],
+        "headState": 5,
+        "index": 0
+      },
+      "tail": {
+        "time": 2939,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2939,
+            "grade": 2
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 1,
+      "offset": 0,
+      "release": 2940,
+      "head": {
+        "time": 2000,
+        "keyState": 1,
+        "events": [],
+        "headState": 5,
+        "index": 0
+      },
+      "tail": {
+        "time": 2940,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2940,
+            "grade": 5
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 1,
+      "offset": 0,
+      "release": 3000,
+      "head": {
+        "time": 2000,
+        "keyState": 1,
+        "events": [],
+        "headState": 5,
+        "index": 0
+      },
+      "tail": {
+        "time": 3000,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 3000,
+            "grade": 5
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 1,
+      "offset": 0,
+      "release": 3001,
+      "head": {
+        "time": 2000,
+        "keyState": 1,
+        "events": [],
+        "headState": 5,
+        "index": 0
+      },
+      "tail": {
+        "time": 3001,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 3001,
+            "grade": 5
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 1,
+      "offset": 0,
+      "release": null,
+      "head": {
+        "time": 2000,
+        "keyState": 1,
+        "events": [],
+        "headState": 5,
+        "index": 0
+      },
+      "tail": {
+        "time": 3001,
+        "keyState": 2,
+        "events": [
+          {
+            "time": 3001,
+            "grade": 5
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 1,
+      "offset": 16,
+      "release": 2500,
+      "head": {
+        "time": 2016,
+        "keyState": 1,
+        "events": [],
+        "headState": 4,
+        "index": 0
+      },
+      "tail": {
+        "time": 2500,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2500,
+            "grade": 2
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 1,
+      "offset": 16,
+      "release": 2939,
+      "head": {
+        "time": 2016,
+        "keyState": 1,
+        "events": [],
+        "headState": 4,
+        "index": 0
+      },
+      "tail": {
+        "time": 2939,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2939,
+            "grade": 2
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 1,
+      "offset": 16,
+      "release": 2940,
+      "head": {
+        "time": 2016,
+        "keyState": 1,
+        "events": [],
+        "headState": 4,
+        "index": 0
+      },
+      "tail": {
+        "time": 2940,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2940,
+            "grade": 4
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 1,
+      "offset": 16,
+      "release": 3000,
+      "head": {
+        "time": 2016,
+        "keyState": 1,
+        "events": [],
+        "headState": 4,
+        "index": 0
+      },
+      "tail": {
+        "time": 3000,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 3000,
+            "grade": 4
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 1,
+      "offset": 16,
+      "release": 3001,
+      "head": {
+        "time": 2016,
+        "keyState": 1,
+        "events": [],
+        "headState": 4,
+        "index": 0
+      },
+      "tail": {
+        "time": 3001,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 3001,
+            "grade": 4
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 1,
+      "offset": 16,
+      "release": null,
+      "head": {
+        "time": 2016,
+        "keyState": 1,
+        "events": [],
+        "headState": 4,
+        "index": 0
+      },
+      "tail": {
+        "time": 3001,
+        "keyState": 2,
+        "events": [
+          {
+            "time": 3001,
+            "grade": 4
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 1,
+      "offset": 31,
+      "release": 2500,
+      "head": {
+        "time": 2031,
+        "keyState": 1,
+        "events": [],
+        "headState": 3,
+        "index": 0
+      },
+      "tail": {
+        "time": 2500,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2500,
+            "grade": 2
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 1,
+      "offset": 31,
+      "release": 2939,
+      "head": {
+        "time": 2031,
+        "keyState": 1,
+        "events": [],
+        "headState": 3,
+        "index": 0
+      },
+      "tail": {
+        "time": 2939,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2939,
+            "grade": 2
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 1,
+      "offset": 31,
+      "release": 2940,
+      "head": {
+        "time": 2031,
+        "keyState": 1,
+        "events": [],
+        "headState": 3,
+        "index": 0
+      },
+      "tail": {
+        "time": 2940,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2940,
+            "grade": 3
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 1,
+      "offset": 31,
+      "release": 3000,
+      "head": {
+        "time": 2031,
+        "keyState": 1,
+        "events": [],
+        "headState": 3,
+        "index": 0
+      },
+      "tail": {
+        "time": 3000,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 3000,
+            "grade": 3
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 1,
+      "offset": 31,
+      "release": 3001,
+      "head": {
+        "time": 2031,
+        "keyState": 1,
+        "events": [],
+        "headState": 3,
+        "index": 0
+      },
+      "tail": {
+        "time": 3001,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 3001,
+            "grade": 3
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 1,
+      "offset": 31,
+      "release": null,
+      "head": {
+        "time": 2031,
+        "keyState": 1,
+        "events": [],
+        "headState": 3,
+        "index": 0
+      },
+      "tail": {
+        "time": 3001,
+        "keyState": 2,
+        "events": [
+          {
+            "time": 3001,
+            "grade": 3
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 1,
+      "offset": -61,
+      "release": 2500,
+      "head": {
+        "time": 1939,
+        "keyState": 1,
+        "events": [],
+        "headState": 2,
+        "index": 0
+      },
+      "tail": {
+        "time": 2500,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2500,
+            "grade": 2
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 1,
+      "offset": -61,
+      "release": 2939,
+      "head": {
+        "time": 1939,
+        "keyState": 1,
+        "events": [],
+        "headState": 2,
+        "index": 0
+      },
+      "tail": {
+        "time": 2939,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2939,
+            "grade": 2
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 1,
+      "offset": -61,
+      "release": 2940,
+      "head": {
+        "time": 1939,
+        "keyState": 1,
+        "events": [],
+        "headState": 2,
+        "index": 0
+      },
+      "tail": {
+        "time": 2940,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2940,
+            "grade": 2
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 1,
+      "offset": -61,
+      "release": 3000,
+      "head": {
+        "time": 1939,
+        "keyState": 1,
+        "events": [],
+        "headState": 2,
+        "index": 0
+      },
+      "tail": {
+        "time": 3000,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 3000,
+            "grade": 2
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 1,
+      "offset": -61,
+      "release": 3001,
+      "head": {
+        "time": 1939,
+        "keyState": 1,
+        "events": [],
+        "headState": 2,
+        "index": 0
+      },
+      "tail": {
+        "time": 3001,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 3001,
+            "grade": 2
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 1,
+      "offset": -61,
+      "release": null,
+      "head": {
+        "time": 1939,
+        "keyState": 1,
+        "events": [],
+        "headState": 2,
+        "index": 0
+      },
+      "tail": {
+        "time": 3001,
+        "keyState": 2,
+        "events": [
+          {
+            "time": 3001,
+            "grade": 2
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 1,
+      "offset": 61,
+      "release": 2500,
+      "head": {
+        "time": 2061,
+        "keyState": 1,
+        "events": [
+          {
+            "time": 2061,
+            "grade": 1
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      },
+      "tail": {
+        "time": 2500,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2061,
+            "grade": 1
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 1,
+      "offset": 61,
+      "release": 2939,
+      "head": {
+        "time": 2061,
+        "keyState": 1,
+        "events": [
+          {
+            "time": 2061,
+            "grade": 1
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      },
+      "tail": {
+        "time": 2939,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2061,
+            "grade": 1
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 1,
+      "offset": 61,
+      "release": 2940,
+      "head": {
+        "time": 2061,
+        "keyState": 1,
+        "events": [
+          {
+            "time": 2061,
+            "grade": 1
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      },
+      "tail": {
+        "time": 2940,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2061,
+            "grade": 1
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 1,
+      "offset": 61,
+      "release": 3000,
+      "head": {
+        "time": 2061,
+        "keyState": 1,
+        "events": [
+          {
+            "time": 2061,
+            "grade": 1
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      },
+      "tail": {
+        "time": 3000,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2061,
+            "grade": 1
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 1,
+      "offset": 61,
+      "release": 3001,
+      "head": {
+        "time": 2061,
+        "keyState": 1,
+        "events": [
+          {
+            "time": 2061,
+            "grade": 1
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      },
+      "tail": {
+        "time": 3001,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2061,
+            "grade": 1
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 1,
+      "offset": 61,
+      "release": null,
+      "head": {
+        "time": 2061,
+        "keyState": 1,
+        "events": [
+          {
+            "time": 2061,
+            "grade": 1
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      },
+      "tail": {
+        "time": 3001,
+        "keyState": 2,
+        "events": [
+          {
+            "time": 2061,
+            "grade": 1
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 2,
+      "offset": 0,
+      "release": 2500,
+      "head": {
+        "time": 2000,
+        "keyState": 1,
+        "events": [],
+        "headState": 5,
+        "index": 0
+      },
+      "tail": {
+        "time": 2500,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2500,
+            "grade": 2
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 2,
+      "offset": 0,
+      "release": 2899,
+      "head": {
+        "time": 2000,
+        "keyState": 1,
+        "events": [],
+        "headState": 5,
+        "index": 0
+      },
+      "tail": {
+        "time": 2899,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2899,
+            "grade": 2
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 2,
+      "offset": 0,
+      "release": 2900,
+      "head": {
+        "time": 2000,
+        "keyState": 1,
+        "events": [],
+        "headState": 5,
+        "index": 0
+      },
+      "tail": {
+        "time": 2900,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2900,
+            "grade": 5
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 2,
+      "offset": 0,
+      "release": 3000,
+      "head": {
+        "time": 2000,
+        "keyState": 1,
+        "events": [],
+        "headState": 5,
+        "index": 0
+      },
+      "tail": {
+        "time": 3000,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 3000,
+            "grade": 5
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 2,
+      "offset": 0,
+      "release": 3001,
+      "head": {
+        "time": 2000,
+        "keyState": 1,
+        "events": [],
+        "headState": 5,
+        "index": 0
+      },
+      "tail": {
+        "time": 3001,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 3001,
+            "grade": 5
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 2,
+      "offset": 0,
+      "release": null,
+      "head": {
+        "time": 2000,
+        "keyState": 1,
+        "events": [],
+        "headState": 5,
+        "index": 0
+      },
+      "tail": {
+        "time": 3001,
+        "keyState": 2,
+        "events": [
+          {
+            "time": 3001,
+            "grade": 5
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 2,
+      "offset": 19,
+      "release": 2500,
+      "head": {
+        "time": 2019,
+        "keyState": 1,
+        "events": [],
+        "headState": 4,
+        "index": 0
+      },
+      "tail": {
+        "time": 2500,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2500,
+            "grade": 2
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 2,
+      "offset": 19,
+      "release": 2899,
+      "head": {
+        "time": 2019,
+        "keyState": 1,
+        "events": [],
+        "headState": 4,
+        "index": 0
+      },
+      "tail": {
+        "time": 2899,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2899,
+            "grade": 2
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 2,
+      "offset": 19,
+      "release": 2900,
+      "head": {
+        "time": 2019,
+        "keyState": 1,
+        "events": [],
+        "headState": 4,
+        "index": 0
+      },
+      "tail": {
+        "time": 2900,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2900,
+            "grade": 4
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 2,
+      "offset": 19,
+      "release": 3000,
+      "head": {
+        "time": 2019,
+        "keyState": 1,
+        "events": [],
+        "headState": 4,
+        "index": 0
+      },
+      "tail": {
+        "time": 3000,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 3000,
+            "grade": 4
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 2,
+      "offset": 19,
+      "release": 3001,
+      "head": {
+        "time": 2019,
+        "keyState": 1,
+        "events": [],
+        "headState": 4,
+        "index": 0
+      },
+      "tail": {
+        "time": 3001,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 3001,
+            "grade": 4
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 2,
+      "offset": 19,
+      "release": null,
+      "head": {
+        "time": 2019,
+        "keyState": 1,
+        "events": [],
+        "headState": 4,
+        "index": 0
+      },
+      "tail": {
+        "time": 3001,
+        "keyState": 2,
+        "events": [
+          {
+            "time": 3001,
+            "grade": 4
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 2,
+      "offset": 41,
+      "release": 2500,
+      "head": {
+        "time": 2041,
+        "keyState": 1,
+        "events": [],
+        "headState": 3,
+        "index": 0
+      },
+      "tail": {
+        "time": 2500,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2500,
+            "grade": 2
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 2,
+      "offset": 41,
+      "release": 2899,
+      "head": {
+        "time": 2041,
+        "keyState": 1,
+        "events": [],
+        "headState": 3,
+        "index": 0
+      },
+      "tail": {
+        "time": 2899,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2899,
+            "grade": 2
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 2,
+      "offset": 41,
+      "release": 2900,
+      "head": {
+        "time": 2041,
+        "keyState": 1,
+        "events": [],
+        "headState": 3,
+        "index": 0
+      },
+      "tail": {
+        "time": 2900,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2900,
+            "grade": 3
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 2,
+      "offset": 41,
+      "release": 3000,
+      "head": {
+        "time": 2041,
+        "keyState": 1,
+        "events": [],
+        "headState": 3,
+        "index": 0
+      },
+      "tail": {
+        "time": 3000,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 3000,
+            "grade": 3
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 2,
+      "offset": 41,
+      "release": 3001,
+      "head": {
+        "time": 2041,
+        "keyState": 1,
+        "events": [],
+        "headState": 3,
+        "index": 0
+      },
+      "tail": {
+        "time": 3001,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 3001,
+            "grade": 3
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 2,
+      "offset": 41,
+      "release": null,
+      "head": {
+        "time": 2041,
+        "keyState": 1,
+        "events": [],
+        "headState": 3,
+        "index": 0
+      },
+      "tail": {
+        "time": 3001,
+        "keyState": 2,
+        "events": [
+          {
+            "time": 3001,
+            "grade": 3
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 2,
+      "offset": -101,
+      "release": 2500,
+      "head": {
+        "time": 1899,
+        "keyState": 1,
+        "events": [],
+        "headState": 2,
+        "index": 0
+      },
+      "tail": {
+        "time": 2500,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2500,
+            "grade": 2
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 2,
+      "offset": -101,
+      "release": 2899,
+      "head": {
+        "time": 1899,
+        "keyState": 1,
+        "events": [],
+        "headState": 2,
+        "index": 0
+      },
+      "tail": {
+        "time": 2899,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2899,
+            "grade": 2
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 2,
+      "offset": -101,
+      "release": 2900,
+      "head": {
+        "time": 1899,
+        "keyState": 1,
+        "events": [],
+        "headState": 2,
+        "index": 0
+      },
+      "tail": {
+        "time": 2900,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2900,
+            "grade": 2
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 2,
+      "offset": -101,
+      "release": 3000,
+      "head": {
+        "time": 1899,
+        "keyState": 1,
+        "events": [],
+        "headState": 2,
+        "index": 0
+      },
+      "tail": {
+        "time": 3000,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 3000,
+            "grade": 2
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 2,
+      "offset": -101,
+      "release": 3001,
+      "head": {
+        "time": 1899,
+        "keyState": 1,
+        "events": [],
+        "headState": 2,
+        "index": 0
+      },
+      "tail": {
+        "time": 3001,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 3001,
+            "grade": 2
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 2,
+      "offset": -101,
+      "release": null,
+      "head": {
+        "time": 1899,
+        "keyState": 1,
+        "events": [],
+        "headState": 2,
+        "index": 0
+      },
+      "tail": {
+        "time": 3001,
+        "keyState": 2,
+        "events": [
+          {
+            "time": 3001,
+            "grade": 2
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 2,
+      "offset": 101,
+      "release": 2500,
+      "head": {
+        "time": 2101,
+        "keyState": 1,
+        "events": [
+          {
+            "time": 2101,
+            "grade": 1
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      },
+      "tail": {
+        "time": 2500,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2101,
+            "grade": 1
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 2,
+      "offset": 101,
+      "release": 2899,
+      "head": {
+        "time": 2101,
+        "keyState": 1,
+        "events": [
+          {
+            "time": 2101,
+            "grade": 1
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      },
+      "tail": {
+        "time": 2899,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2101,
+            "grade": 1
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 2,
+      "offset": 101,
+      "release": 2900,
+      "head": {
+        "time": 2101,
+        "keyState": 1,
+        "events": [
+          {
+            "time": 2101,
+            "grade": 1
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      },
+      "tail": {
+        "time": 2900,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2101,
+            "grade": 1
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 2,
+      "offset": 101,
+      "release": 3000,
+      "head": {
+        "time": 2101,
+        "keyState": 1,
+        "events": [
+          {
+            "time": 2101,
+            "grade": 1
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      },
+      "tail": {
+        "time": 3000,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2101,
+            "grade": 1
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 2,
+      "offset": 101,
+      "release": 3001,
+      "head": {
+        "time": 2101,
+        "keyState": 1,
+        "events": [
+          {
+            "time": 2101,
+            "grade": 1
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      },
+      "tail": {
+        "time": 3001,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2101,
+            "grade": 1
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 2,
+      "offset": 101,
+      "release": null,
+      "head": {
+        "time": 2101,
+        "keyState": 1,
+        "events": [
+          {
+            "time": 2101,
+            "grade": 1
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      },
+      "tail": {
+        "time": 3001,
+        "keyState": 2,
+        "events": [
+          {
+            "time": 2101,
+            "grade": 1
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 3,
+      "offset": 0,
+      "release": 2500,
+      "head": {
+        "time": 2000,
+        "keyState": 1,
+        "events": [],
+        "headState": 5,
+        "index": 0
+      },
+      "tail": {
+        "time": 2500,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2500,
+            "grade": 2
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 3,
+      "offset": 0,
+      "release": 2879,
+      "head": {
+        "time": 2000,
+        "keyState": 1,
+        "events": [],
+        "headState": 5,
+        "index": 0
+      },
+      "tail": {
+        "time": 2879,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2879,
+            "grade": 2
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 3,
+      "offset": 0,
+      "release": 2880,
+      "head": {
+        "time": 2000,
+        "keyState": 1,
+        "events": [],
+        "headState": 5,
+        "index": 0
+      },
+      "tail": {
+        "time": 2880,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2880,
+            "grade": 5
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 3,
+      "offset": 0,
+      "release": 3000,
+      "head": {
+        "time": 2000,
+        "keyState": 1,
+        "events": [],
+        "headState": 5,
+        "index": 0
+      },
+      "tail": {
+        "time": 3000,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 3000,
+            "grade": 5
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 3,
+      "offset": 0,
+      "release": 3001,
+      "head": {
+        "time": 2000,
+        "keyState": 1,
+        "events": [],
+        "headState": 5,
+        "index": 0
+      },
+      "tail": {
+        "time": 3001,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 3001,
+            "grade": 5
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 3,
+      "offset": 0,
+      "release": null,
+      "head": {
+        "time": 2000,
+        "keyState": 1,
+        "events": [],
+        "headState": 5,
+        "index": 0
+      },
+      "tail": {
+        "time": 3001,
+        "keyState": 2,
+        "events": [
+          {
+            "time": 3001,
+            "grade": 5
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 3,
+      "offset": 22,
+      "release": 2500,
+      "head": {
+        "time": 2022,
+        "keyState": 1,
+        "events": [],
+        "headState": 4,
+        "index": 0
+      },
+      "tail": {
+        "time": 2500,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2500,
+            "grade": 2
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 3,
+      "offset": 22,
+      "release": 2879,
+      "head": {
+        "time": 2022,
+        "keyState": 1,
+        "events": [],
+        "headState": 4,
+        "index": 0
+      },
+      "tail": {
+        "time": 2879,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2879,
+            "grade": 2
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 3,
+      "offset": 22,
+      "release": 2880,
+      "head": {
+        "time": 2022,
+        "keyState": 1,
+        "events": [],
+        "headState": 4,
+        "index": 0
+      },
+      "tail": {
+        "time": 2880,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2880,
+            "grade": 4
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 3,
+      "offset": 22,
+      "release": 3000,
+      "head": {
+        "time": 2022,
+        "keyState": 1,
+        "events": [],
+        "headState": 4,
+        "index": 0
+      },
+      "tail": {
+        "time": 3000,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 3000,
+            "grade": 4
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 3,
+      "offset": 22,
+      "release": 3001,
+      "head": {
+        "time": 2022,
+        "keyState": 1,
+        "events": [],
+        "headState": 4,
+        "index": 0
+      },
+      "tail": {
+        "time": 3001,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 3001,
+            "grade": 4
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 3,
+      "offset": 22,
+      "release": null,
+      "head": {
+        "time": 2022,
+        "keyState": 1,
+        "events": [],
+        "headState": 4,
+        "index": 0
+      },
+      "tail": {
+        "time": 3001,
+        "keyState": 2,
+        "events": [
+          {
+            "time": 3001,
+            "grade": 4
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 3,
+      "offset": 61,
+      "release": 2500,
+      "head": {
+        "time": 2061,
+        "keyState": 1,
+        "events": [],
+        "headState": 3,
+        "index": 0
+      },
+      "tail": {
+        "time": 2500,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2500,
+            "grade": 2
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 3,
+      "offset": 61,
+      "release": 2879,
+      "head": {
+        "time": 2061,
+        "keyState": 1,
+        "events": [],
+        "headState": 3,
+        "index": 0
+      },
+      "tail": {
+        "time": 2879,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2879,
+            "grade": 2
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 3,
+      "offset": 61,
+      "release": 2880,
+      "head": {
+        "time": 2061,
+        "keyState": 1,
+        "events": [],
+        "headState": 3,
+        "index": 0
+      },
+      "tail": {
+        "time": 2880,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2880,
+            "grade": 3
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 3,
+      "offset": 61,
+      "release": 3000,
+      "head": {
+        "time": 2061,
+        "keyState": 1,
+        "events": [],
+        "headState": 3,
+        "index": 0
+      },
+      "tail": {
+        "time": 3000,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 3000,
+            "grade": 3
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 3,
+      "offset": 61,
+      "release": 3001,
+      "head": {
+        "time": 2061,
+        "keyState": 1,
+        "events": [],
+        "headState": 3,
+        "index": 0
+      },
+      "tail": {
+        "time": 3001,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 3001,
+            "grade": 3
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 3,
+      "offset": 61,
+      "release": null,
+      "head": {
+        "time": 2061,
+        "keyState": 1,
+        "events": [],
+        "headState": 3,
+        "index": 0
+      },
+      "tail": {
+        "time": 3001,
+        "keyState": 2,
+        "events": [
+          {
+            "time": 3001,
+            "grade": 3
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 3,
+      "offset": -121,
+      "release": 2500,
+      "head": {
+        "time": 1879,
+        "keyState": 1,
+        "events": [],
+        "headState": 2,
+        "index": 0
+      },
+      "tail": {
+        "time": 2500,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2500,
+            "grade": 2
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 3,
+      "offset": -121,
+      "release": 2879,
+      "head": {
+        "time": 1879,
+        "keyState": 1,
+        "events": [],
+        "headState": 2,
+        "index": 0
+      },
+      "tail": {
+        "time": 2879,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2879,
+            "grade": 2
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 3,
+      "offset": -121,
+      "release": 2880,
+      "head": {
+        "time": 1879,
+        "keyState": 1,
+        "events": [],
+        "headState": 2,
+        "index": 0
+      },
+      "tail": {
+        "time": 2880,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2880,
+            "grade": 2
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 3,
+      "offset": -121,
+      "release": 3000,
+      "head": {
+        "time": 1879,
+        "keyState": 1,
+        "events": [],
+        "headState": 2,
+        "index": 0
+      },
+      "tail": {
+        "time": 3000,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 3000,
+            "grade": 2
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 3,
+      "offset": -121,
+      "release": 3001,
+      "head": {
+        "time": 1879,
+        "keyState": 1,
+        "events": [],
+        "headState": 2,
+        "index": 0
+      },
+      "tail": {
+        "time": 3001,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 3001,
+            "grade": 2
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 3,
+      "offset": -121,
+      "release": null,
+      "head": {
+        "time": 1879,
+        "keyState": 1,
+        "events": [],
+        "headState": 2,
+        "index": 0
+      },
+      "tail": {
+        "time": 3001,
+        "keyState": 2,
+        "events": [
+          {
+            "time": 3001,
+            "grade": 2
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 3,
+      "offset": 121,
+      "release": 2500,
+      "head": {
+        "time": 2121,
+        "keyState": 1,
+        "events": [
+          {
+            "time": 2121,
+            "grade": 1
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      },
+      "tail": {
+        "time": 2500,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2121,
+            "grade": 1
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 3,
+      "offset": 121,
+      "release": 2879,
+      "head": {
+        "time": 2121,
+        "keyState": 1,
+        "events": [
+          {
+            "time": 2121,
+            "grade": 1
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      },
+      "tail": {
+        "time": 2879,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2121,
+            "grade": 1
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 3,
+      "offset": 121,
+      "release": 2880,
+      "head": {
+        "time": 2121,
+        "keyState": 1,
+        "events": [
+          {
+            "time": 2121,
+            "grade": 1
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      },
+      "tail": {
+        "time": 2880,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2121,
+            "grade": 1
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 3,
+      "offset": 121,
+      "release": 3000,
+      "head": {
+        "time": 2121,
+        "keyState": 1,
+        "events": [
+          {
+            "time": 2121,
+            "grade": 1
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      },
+      "tail": {
+        "time": 3000,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2121,
+            "grade": 1
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 3,
+      "offset": 121,
+      "release": 3001,
+      "head": {
+        "time": 2121,
+        "keyState": 1,
+        "events": [
+          {
+            "time": 2121,
+            "grade": 1
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      },
+      "tail": {
+        "time": 3001,
+        "keyState": 3,
+        "events": [
+          {
+            "time": 2121,
+            "grade": 1
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    },
+    {
+      "rank": 3,
+      "offset": 121,
+      "release": null,
+      "head": {
+        "time": 2121,
+        "keyState": 1,
+        "events": [
+          {
+            "time": 2121,
+            "grade": 1
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      },
+      "tail": {
+        "time": 3001,
+        "keyState": 2,
+        "events": [
+          {
+            "time": 2121,
+            "grade": 1
+          }
+        ],
+        "headState": -1,
+        "index": 1
+      }
+    }
+  ],
+  "arbitration": [
+    {
+      "secondDelta": 50,
+      "time": 2180,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2180,
+          "grade": 2
+        },
+        {
+          "time": 2180,
+          "grade": 2
+        }
+      ],
+      "headState": -1,
+      "index": 2
+    },
+    {
+      "secondDelta": 100,
+      "time": 2200,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2200,
+          "grade": 2
+        },
+        {
+          "time": 2200,
+          "grade": 3
+        }
+      ],
+      "headState": -1,
+      "index": 2
+    },
+    {
+      "secondDelta": 400,
+      "time": 2180,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2180,
+          "grade": 2
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    },
+    {
+      "secondDelta": 500,
+      "time": 2200,
+      "keyState": 1,
+      "events": [
+        {
+          "time": 2200,
+          "grade": 2
+        }
+      ],
+      "headState": -1,
+      "index": 1
+    }
+  ],
+  "gauges": [
+    {
+      "gauge": 0,
+      "total": 130,
+      "noteCount": 2,
+      "coefficients": [
+        -2.0,
+        -6.0,
+        -4.0,
+        32.5,
+        65.0,
+        65.0
+      ],
+      "states": [
+        {
+          "grade": 5,
+          "hp": 85.0,
+          "exScore": 2,
+          "combo": 1,
+          "maxCombo": 1
+        },
+        {
+          "grade": 4,
+          "hp": 100.0,
+          "exScore": 3,
+          "combo": 2,
+          "maxCombo": 2
+        }
+      ]
+    },
+    {
+      "gauge": 0,
+      "total": 130,
+      "noteCount": 100,
+      "coefficients": [
+        -2.0,
+        -6.0,
+        -4.0,
+        0.65,
+        1.3,
+        1.3
+      ],
+      "states": [
+        {
+          "grade": 5,
+          "hp": 21.3,
+          "exScore": 2,
+          "combo": 1,
+          "maxCombo": 1
+        },
+        {
+          "grade": 4,
+          "hp": 22.6,
+          "exScore": 3,
+          "combo": 2,
+          "maxCombo": 2
+        },
+        {
+          "grade": 3,
+          "hp": 23.25,
+          "exScore": 3,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 19.25,
+          "exScore": 3,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 13.25,
+          "exScore": 3,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 11.25,
+          "exScore": 3,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 12.55,
+          "exScore": 5,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 13.850000000000001,
+          "exScore": 6,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 14.500000000000002,
+          "exScore": 6,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 10.500000000000002,
+          "exScore": 6,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 4.500000000000002,
+          "exScore": 6,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 2.5000000000000018,
+          "exScore": 6,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 3.8000000000000016,
+          "exScore": 8,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 5.100000000000001,
+          "exScore": 9,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 5.750000000000002,
+          "exScore": 9,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 2.0,
+          "exScore": 9,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 2.0,
+          "exScore": 9,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 2.0,
+          "exScore": 9,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 3.3,
+          "exScore": 11,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 4.6,
+          "exScore": 12,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 5.25,
+          "exScore": 12,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 2.0,
+          "exScore": 12,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 2.0,
+          "exScore": 12,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 2.0,
+          "exScore": 12,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 3.3,
+          "exScore": 14,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 4.6,
+          "exScore": 15,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 5.25,
+          "exScore": 15,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 2.0,
+          "exScore": 15,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 2.0,
+          "exScore": 15,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 2.0,
+          "exScore": 15,
+          "combo": 0,
+          "maxCombo": 3
+        }
+      ]
+    },
+    {
+      "gauge": 0,
+      "total": 130,
+      "noteCount": 1000,
+      "coefficients": [
+        -2.0,
+        -6.0,
+        -4.0,
+        0.065,
+        0.13,
+        0.13
+      ],
+      "states": [
+        {
+          "grade": 5,
+          "hp": 20.13,
+          "exScore": 2,
+          "combo": 1,
+          "maxCombo": 1
+        },
+        {
+          "grade": 4,
+          "hp": 20.259999999999998,
+          "exScore": 3,
+          "combo": 2,
+          "maxCombo": 2
+        },
+        {
+          "grade": 3,
+          "hp": 20.325,
+          "exScore": 3,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 16.325,
+          "exScore": 3,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 10.325,
+          "exScore": 3,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 8.325,
+          "exScore": 3,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 8.455,
+          "exScore": 5,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 8.585,
+          "exScore": 6,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 8.65,
+          "exScore": 6,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 4.65,
+          "exScore": 6,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 2.0,
+          "exScore": 6,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 2.0,
+          "exScore": 6,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 2.13,
+          "exScore": 8,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 2.26,
+          "exScore": 9,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 2.3249999999999997,
+          "exScore": 9,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 2.0,
+          "exScore": 9,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 2.0,
+          "exScore": 9,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 2.0,
+          "exScore": 9,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 2.13,
+          "exScore": 11,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 2.26,
+          "exScore": 12,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 2.3249999999999997,
+          "exScore": 12,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 2.0,
+          "exScore": 12,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 2.0,
+          "exScore": 12,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 2.0,
+          "exScore": 12,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 2.13,
+          "exScore": 14,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 2.26,
+          "exScore": 15,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 2.3249999999999997,
+          "exScore": 15,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 2.0,
+          "exScore": 15,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 2.0,
+          "exScore": 15,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 2.0,
+          "exScore": 15,
+          "combo": 0,
+          "maxCombo": 3
+        }
+      ]
+    },
+    {
+      "gauge": 0,
+      "total": 260,
+      "noteCount": 2,
+      "coefficients": [
+        -2.0,
+        -6.0,
+        -4.0,
+        65.0,
+        130.0,
+        130.0
+      ],
+      "states": [
+        {
+          "grade": 5,
+          "hp": 100.0,
+          "exScore": 2,
+          "combo": 1,
+          "maxCombo": 1
+        },
+        {
+          "grade": 4,
+          "hp": 100.0,
+          "exScore": 3,
+          "combo": 2,
+          "maxCombo": 2
+        }
+      ]
+    },
+    {
+      "gauge": 0,
+      "total": 260,
+      "noteCount": 100,
+      "coefficients": [
+        -2.0,
+        -6.0,
+        -4.0,
+        1.3,
+        2.6,
+        2.6
+      ],
+      "states": [
+        {
+          "grade": 5,
+          "hp": 22.6,
+          "exScore": 2,
+          "combo": 1,
+          "maxCombo": 1
+        },
+        {
+          "grade": 4,
+          "hp": 25.200000000000003,
+          "exScore": 3,
+          "combo": 2,
+          "maxCombo": 2
+        },
+        {
+          "grade": 3,
+          "hp": 26.500000000000004,
+          "exScore": 3,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 22.500000000000004,
+          "exScore": 3,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 16.500000000000004,
+          "exScore": 3,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 14.500000000000004,
+          "exScore": 3,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 17.100000000000005,
+          "exScore": 5,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 19.700000000000006,
+          "exScore": 6,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 21.000000000000007,
+          "exScore": 6,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 17.000000000000007,
+          "exScore": 6,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 11.000000000000007,
+          "exScore": 6,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 9.000000000000007,
+          "exScore": 6,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 11.600000000000007,
+          "exScore": 8,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 14.200000000000006,
+          "exScore": 9,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 15.500000000000007,
+          "exScore": 9,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 11.500000000000007,
+          "exScore": 9,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 5.500000000000007,
+          "exScore": 9,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 3.500000000000007,
+          "exScore": 9,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 6.100000000000007,
+          "exScore": 11,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 8.700000000000006,
+          "exScore": 12,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 10.000000000000007,
+          "exScore": 12,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 6.000000000000007,
+          "exScore": 12,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 2.0,
+          "exScore": 12,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 2.0,
+          "exScore": 12,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 4.6,
+          "exScore": 14,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 7.199999999999999,
+          "exScore": 15,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 8.5,
+          "exScore": 15,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 4.5,
+          "exScore": 15,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 2.0,
+          "exScore": 15,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 2.0,
+          "exScore": 15,
+          "combo": 0,
+          "maxCombo": 3
+        }
+      ]
+    },
+    {
+      "gauge": 0,
+      "total": 260,
+      "noteCount": 1000,
+      "coefficients": [
+        -2.0,
+        -6.0,
+        -4.0,
+        0.13,
+        0.26,
+        0.26
+      ],
+      "states": [
+        {
+          "grade": 5,
+          "hp": 20.26,
+          "exScore": 2,
+          "combo": 1,
+          "maxCombo": 1
+        },
+        {
+          "grade": 4,
+          "hp": 20.520000000000003,
+          "exScore": 3,
+          "combo": 2,
+          "maxCombo": 2
+        },
+        {
+          "grade": 3,
+          "hp": 20.650000000000002,
+          "exScore": 3,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 16.650000000000002,
+          "exScore": 3,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 10.650000000000002,
+          "exScore": 3,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 8.650000000000002,
+          "exScore": 3,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 8.910000000000002,
+          "exScore": 5,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 9.170000000000002,
+          "exScore": 6,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 9.300000000000002,
+          "exScore": 6,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 5.3000000000000025,
+          "exScore": 6,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 2.0,
+          "exScore": 6,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 2.0,
+          "exScore": 6,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 2.26,
+          "exScore": 8,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 2.5199999999999996,
+          "exScore": 9,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 2.6499999999999995,
+          "exScore": 9,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 2.0,
+          "exScore": 9,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 2.0,
+          "exScore": 9,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 2.0,
+          "exScore": 9,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 2.26,
+          "exScore": 11,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 2.5199999999999996,
+          "exScore": 12,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 2.6499999999999995,
+          "exScore": 12,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 2.0,
+          "exScore": 12,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 2.0,
+          "exScore": 12,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 2.0,
+          "exScore": 12,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 2.26,
+          "exScore": 14,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 2.5199999999999996,
+          "exScore": 15,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 2.6499999999999995,
+          "exScore": 15,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 2.0,
+          "exScore": 15,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 2.0,
+          "exScore": 15,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 2.0,
+          "exScore": 15,
+          "combo": 0,
+          "maxCombo": 3
+        }
+      ]
+    },
+    {
+      "gauge": 1,
+      "total": 130,
+      "noteCount": 2,
+      "coefficients": [
+        -20.0,
+        -100.0,
+        -60.0,
+        0.05,
+        0.1,
+        0.1
+      ],
+      "states": [
+        {
+          "grade": 5,
+          "hp": 100.0,
+          "exScore": 2,
+          "combo": 1,
+          "maxCombo": 1
+        },
+        {
+          "grade": 4,
+          "hp": 100.0,
+          "exScore": 3,
+          "combo": 2,
+          "maxCombo": 2
+        }
+      ]
+    },
+    {
+      "gauge": 1,
+      "total": 130,
+      "noteCount": 100,
+      "coefficients": [
+        -8.76923076923077,
+        -43.846153846153854,
+        -26.30769230769231,
+        0.05,
+        0.1,
+        0.1
+      ],
+      "states": [
+        {
+          "grade": 5,
+          "hp": 100.0,
+          "exScore": 2,
+          "combo": 1,
+          "maxCombo": 1
+        },
+        {
+          "grade": 4,
+          "hp": 100.0,
+          "exScore": 3,
+          "combo": 2,
+          "maxCombo": 2
+        },
+        {
+          "grade": 3,
+          "hp": 100.0,
+          "exScore": 3,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 73.6923076923077,
+          "exScore": 3,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 29.84615384615384,
+          "exScore": 3,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 24.58461538461538,
+          "exScore": 3,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 24.68461538461538,
+          "exScore": 5,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 24.784615384615382,
+          "exScore": 6,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 24.834615384615383,
+          "exScore": 6,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 9.049999999999997,
+          "exScore": 6,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 0.0,
+          "exScore": 6,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 0.0,
+          "exScore": 6,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 0.0,
+          "exScore": 8,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 0.0,
+          "exScore": 9,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 0.0,
+          "exScore": 9,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 0.0,
+          "exScore": 9,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 0.0,
+          "exScore": 9,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 0.0,
+          "exScore": 9,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 0.0,
+          "exScore": 11,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 0.0,
+          "exScore": 12,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 0.0,
+          "exScore": 12,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 0.0,
+          "exScore": 12,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 0.0,
+          "exScore": 12,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 0.0,
+          "exScore": 12,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 0.0,
+          "exScore": 14,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 0.0,
+          "exScore": 15,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 0.0,
+          "exScore": 15,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 0.0,
+          "exScore": 15,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 0.0,
+          "exScore": 15,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 0.0,
+          "exScore": 15,
+          "combo": 0,
+          "maxCombo": 3
+        }
+      ]
+    },
+    {
+      "gauge": 1,
+      "total": 130,
+      "noteCount": 1000,
+      "coefficients": [
+        -6.666666666666667,
+        -33.333333333333336,
+        -20.0,
+        0.05,
+        0.1,
+        0.1
+      ],
+      "states": [
+        {
+          "grade": 5,
+          "hp": 100.0,
+          "exScore": 2,
+          "combo": 1,
+          "maxCombo": 1
+        },
+        {
+          "grade": 4,
+          "hp": 100.0,
+          "exScore": 3,
+          "combo": 2,
+          "maxCombo": 2
+        },
+        {
+          "grade": 3,
+          "hp": 100.0,
+          "exScore": 3,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 80.0,
+          "exScore": 3,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 46.666666666666664,
+          "exScore": 3,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 40.0,
+          "exScore": 3,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 40.1,
+          "exScore": 5,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 40.2,
+          "exScore": 6,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 40.25,
+          "exScore": 6,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 20.25,
+          "exScore": 6,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 0.25,
+          "exScore": 6,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 0.0,
+          "exScore": 6,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 0.0,
+          "exScore": 8,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 0.0,
+          "exScore": 9,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 0.0,
+          "exScore": 9,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 0.0,
+          "exScore": 9,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 0.0,
+          "exScore": 9,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 0.0,
+          "exScore": 9,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 0.0,
+          "exScore": 11,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 0.0,
+          "exScore": 12,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 0.0,
+          "exScore": 12,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 0.0,
+          "exScore": 12,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 0.0,
+          "exScore": 12,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 0.0,
+          "exScore": 12,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 0.0,
+          "exScore": 14,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 0.0,
+          "exScore": 15,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 0.0,
+          "exScore": 15,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 0.0,
+          "exScore": 15,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 0.0,
+          "exScore": 15,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 0.0,
+          "exScore": 15,
+          "combo": 0,
+          "maxCombo": 3
+        }
+      ]
+    },
+    {
+      "gauge": 1,
+      "total": 260,
+      "noteCount": 2,
+      "coefficients": [
+        -20.0,
+        -100.0,
+        -60.0,
+        0.05,
+        0.1,
+        0.1
+      ],
+      "states": [
+        {
+          "grade": 5,
+          "hp": 100.0,
+          "exScore": 2,
+          "combo": 1,
+          "maxCombo": 1
+        },
+        {
+          "grade": 4,
+          "hp": 100.0,
+          "exScore": 3,
+          "combo": 2,
+          "maxCombo": 2
+        }
+      ]
+    },
+    {
+      "gauge": 1,
+      "total": 260,
+      "noteCount": 100,
+      "coefficients": [
+        -8.76923076923077,
+        -43.846153846153854,
+        -26.30769230769231,
+        0.05,
+        0.1,
+        0.1
+      ],
+      "states": [
+        {
+          "grade": 5,
+          "hp": 100.0,
+          "exScore": 2,
+          "combo": 1,
+          "maxCombo": 1
+        },
+        {
+          "grade": 4,
+          "hp": 100.0,
+          "exScore": 3,
+          "combo": 2,
+          "maxCombo": 2
+        },
+        {
+          "grade": 3,
+          "hp": 100.0,
+          "exScore": 3,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 73.6923076923077,
+          "exScore": 3,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 29.84615384615384,
+          "exScore": 3,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 24.58461538461538,
+          "exScore": 3,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 24.68461538461538,
+          "exScore": 5,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 24.784615384615382,
+          "exScore": 6,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 24.834615384615383,
+          "exScore": 6,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 9.049999999999997,
+          "exScore": 6,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 0.0,
+          "exScore": 6,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 0.0,
+          "exScore": 6,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 0.0,
+          "exScore": 8,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 0.0,
+          "exScore": 9,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 0.0,
+          "exScore": 9,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 0.0,
+          "exScore": 9,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 0.0,
+          "exScore": 9,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 0.0,
+          "exScore": 9,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 0.0,
+          "exScore": 11,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 0.0,
+          "exScore": 12,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 0.0,
+          "exScore": 12,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 0.0,
+          "exScore": 12,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 0.0,
+          "exScore": 12,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 0.0,
+          "exScore": 12,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 0.0,
+          "exScore": 14,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 0.0,
+          "exScore": 15,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 0.0,
+          "exScore": 15,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 0.0,
+          "exScore": 15,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 0.0,
+          "exScore": 15,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 0.0,
+          "exScore": 15,
+          "combo": 0,
+          "maxCombo": 3
+        }
+      ]
+    },
+    {
+      "gauge": 1,
+      "total": 260,
+      "noteCount": 1000,
+      "coefficients": [
+        -2.0,
+        -10.0,
+        -6.0,
+        0.05,
+        0.1,
+        0.1
+      ],
+      "states": [
+        {
+          "grade": 5,
+          "hp": 100.0,
+          "exScore": 2,
+          "combo": 1,
+          "maxCombo": 1
+        },
+        {
+          "grade": 4,
+          "hp": 100.0,
+          "exScore": 3,
+          "combo": 2,
+          "maxCombo": 2
+        },
+        {
+          "grade": 3,
+          "hp": 100.0,
+          "exScore": 3,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 94.0,
+          "exScore": 3,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 84.0,
+          "exScore": 3,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 82.0,
+          "exScore": 3,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 82.1,
+          "exScore": 5,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 82.19999999999999,
+          "exScore": 6,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 82.24999999999999,
+          "exScore": 6,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 76.24999999999999,
+          "exScore": 6,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 66.24999999999999,
+          "exScore": 6,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 64.24999999999999,
+          "exScore": 6,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 64.34999999999998,
+          "exScore": 8,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 64.44999999999997,
+          "exScore": 9,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 64.49999999999997,
+          "exScore": 9,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 58.49999999999997,
+          "exScore": 9,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 48.49999999999997,
+          "exScore": 9,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 46.49999999999997,
+          "exScore": 9,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 46.59999999999997,
+          "exScore": 11,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 46.699999999999974,
+          "exScore": 12,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 46.74999999999997,
+          "exScore": 12,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 40.74999999999997,
+          "exScore": 12,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 30.74999999999997,
+          "exScore": 12,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 29.549999999999972,
+          "exScore": 12,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 29.649999999999974,
+          "exScore": 14,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 29.749999999999975,
+          "exScore": 15,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 29.799999999999976,
+          "exScore": 15,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 26.199999999999974,
+          "exScore": 15,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 20.199999999999974,
+          "exScore": 15,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 18.999999999999975,
+          "exScore": 15,
+          "combo": 0,
+          "maxCombo": 3
+        }
+      ]
+    },
+    {
+      "gauge": 2,
+      "total": 130,
+      "noteCount": 2,
+      "coefficients": [
+        0.0,
+        -100.0,
+        -100.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "states": [
+        {
+          "grade": 5,
+          "hp": 100.0,
+          "exScore": 2,
+          "combo": 1,
+          "maxCombo": 1
+        },
+        {
+          "grade": 4,
+          "hp": 100.0,
+          "exScore": 3,
+          "combo": 2,
+          "maxCombo": 2
+        }
+      ]
+    },
+    {
+      "gauge": 2,
+      "total": 130,
+      "noteCount": 100,
+      "coefficients": [
+        0.0,
+        -100.0,
+        -100.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "states": [
+        {
+          "grade": 5,
+          "hp": 100.0,
+          "exScore": 2,
+          "combo": 1,
+          "maxCombo": 1
+        },
+        {
+          "grade": 4,
+          "hp": 100.0,
+          "exScore": 3,
+          "combo": 2,
+          "maxCombo": 2
+        },
+        {
+          "grade": 3,
+          "hp": 100.0,
+          "exScore": 3,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 0.0,
+          "exScore": 3,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 0.0,
+          "exScore": 3,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 0.0,
+          "exScore": 3,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 0.0,
+          "exScore": 5,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 0.0,
+          "exScore": 6,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 0.0,
+          "exScore": 6,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 0.0,
+          "exScore": 6,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 0.0,
+          "exScore": 6,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 0.0,
+          "exScore": 6,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 0.0,
+          "exScore": 8,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 0.0,
+          "exScore": 9,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 0.0,
+          "exScore": 9,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 0.0,
+          "exScore": 9,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 0.0,
+          "exScore": 9,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 0.0,
+          "exScore": 9,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 0.0,
+          "exScore": 11,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 0.0,
+          "exScore": 12,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 0.0,
+          "exScore": 12,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 0.0,
+          "exScore": 12,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 0.0,
+          "exScore": 12,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 0.0,
+          "exScore": 12,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 0.0,
+          "exScore": 14,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 0.0,
+          "exScore": 15,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 0.0,
+          "exScore": 15,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 0.0,
+          "exScore": 15,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 0.0,
+          "exScore": 15,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 0.0,
+          "exScore": 15,
+          "combo": 0,
+          "maxCombo": 3
+        }
+      ]
+    },
+    {
+      "gauge": 2,
+      "total": 130,
+      "noteCount": 1000,
+      "coefficients": [
+        0.0,
+        -100.0,
+        -100.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "states": [
+        {
+          "grade": 5,
+          "hp": 100.0,
+          "exScore": 2,
+          "combo": 1,
+          "maxCombo": 1
+        },
+        {
+          "grade": 4,
+          "hp": 100.0,
+          "exScore": 3,
+          "combo": 2,
+          "maxCombo": 2
+        },
+        {
+          "grade": 3,
+          "hp": 100.0,
+          "exScore": 3,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 0.0,
+          "exScore": 3,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 0.0,
+          "exScore": 3,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 0.0,
+          "exScore": 3,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 0.0,
+          "exScore": 5,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 0.0,
+          "exScore": 6,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 0.0,
+          "exScore": 6,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 0.0,
+          "exScore": 6,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 0.0,
+          "exScore": 6,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 0.0,
+          "exScore": 6,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 0.0,
+          "exScore": 8,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 0.0,
+          "exScore": 9,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 0.0,
+          "exScore": 9,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 0.0,
+          "exScore": 9,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 0.0,
+          "exScore": 9,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 0.0,
+          "exScore": 9,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 0.0,
+          "exScore": 11,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 0.0,
+          "exScore": 12,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 0.0,
+          "exScore": 12,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 0.0,
+          "exScore": 12,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 0.0,
+          "exScore": 12,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 0.0,
+          "exScore": 12,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 0.0,
+          "exScore": 14,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 0.0,
+          "exScore": 15,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 0.0,
+          "exScore": 15,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 0.0,
+          "exScore": 15,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 0.0,
+          "exScore": 15,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 0.0,
+          "exScore": 15,
+          "combo": 0,
+          "maxCombo": 3
+        }
+      ]
+    },
+    {
+      "gauge": 2,
+      "total": 260,
+      "noteCount": 2,
+      "coefficients": [
+        0.0,
+        -100.0,
+        -100.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "states": [
+        {
+          "grade": 5,
+          "hp": 100.0,
+          "exScore": 2,
+          "combo": 1,
+          "maxCombo": 1
+        },
+        {
+          "grade": 4,
+          "hp": 100.0,
+          "exScore": 3,
+          "combo": 2,
+          "maxCombo": 2
+        }
+      ]
+    },
+    {
+      "gauge": 2,
+      "total": 260,
+      "noteCount": 100,
+      "coefficients": [
+        0.0,
+        -100.0,
+        -100.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "states": [
+        {
+          "grade": 5,
+          "hp": 100.0,
+          "exScore": 2,
+          "combo": 1,
+          "maxCombo": 1
+        },
+        {
+          "grade": 4,
+          "hp": 100.0,
+          "exScore": 3,
+          "combo": 2,
+          "maxCombo": 2
+        },
+        {
+          "grade": 3,
+          "hp": 100.0,
+          "exScore": 3,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 0.0,
+          "exScore": 3,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 0.0,
+          "exScore": 3,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 0.0,
+          "exScore": 3,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 0.0,
+          "exScore": 5,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 0.0,
+          "exScore": 6,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 0.0,
+          "exScore": 6,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 0.0,
+          "exScore": 6,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 0.0,
+          "exScore": 6,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 0.0,
+          "exScore": 6,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 0.0,
+          "exScore": 8,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 0.0,
+          "exScore": 9,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 0.0,
+          "exScore": 9,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 0.0,
+          "exScore": 9,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 0.0,
+          "exScore": 9,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 0.0,
+          "exScore": 9,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 0.0,
+          "exScore": 11,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 0.0,
+          "exScore": 12,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 0.0,
+          "exScore": 12,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 0.0,
+          "exScore": 12,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 0.0,
+          "exScore": 12,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 0.0,
+          "exScore": 12,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 0.0,
+          "exScore": 14,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 0.0,
+          "exScore": 15,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 0.0,
+          "exScore": 15,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 0.0,
+          "exScore": 15,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 0.0,
+          "exScore": 15,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 0.0,
+          "exScore": 15,
+          "combo": 0,
+          "maxCombo": 3
+        }
+      ]
+    },
+    {
+      "gauge": 2,
+      "total": 260,
+      "noteCount": 1000,
+      "coefficients": [
+        0.0,
+        -100.0,
+        -100.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "states": [
+        {
+          "grade": 5,
+          "hp": 100.0,
+          "exScore": 2,
+          "combo": 1,
+          "maxCombo": 1
+        },
+        {
+          "grade": 4,
+          "hp": 100.0,
+          "exScore": 3,
+          "combo": 2,
+          "maxCombo": 2
+        },
+        {
+          "grade": 3,
+          "hp": 100.0,
+          "exScore": 3,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 0.0,
+          "exScore": 3,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 0.0,
+          "exScore": 3,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 0.0,
+          "exScore": 3,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 0.0,
+          "exScore": 5,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 0.0,
+          "exScore": 6,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 0.0,
+          "exScore": 6,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 0.0,
+          "exScore": 6,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 0.0,
+          "exScore": 6,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 0.0,
+          "exScore": 6,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 0.0,
+          "exScore": 8,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 0.0,
+          "exScore": 9,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 0.0,
+          "exScore": 9,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 0.0,
+          "exScore": 9,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 0.0,
+          "exScore": 9,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 0.0,
+          "exScore": 9,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 0.0,
+          "exScore": 11,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 0.0,
+          "exScore": 12,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 0.0,
+          "exScore": 12,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 0.0,
+          "exScore": 12,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 0.0,
+          "exScore": 12,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 0.0,
+          "exScore": 12,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 0.0,
+          "exScore": 14,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 0.0,
+          "exScore": 15,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 0.0,
+          "exScore": 15,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 0.0,
+          "exScore": 15,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 0.0,
+          "exScore": 15,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 0.0,
+          "exScore": 15,
+          "combo": 0,
+          "maxCombo": 3
+        }
+      ]
+    },
+    {
+      "gauge": 3,
+      "total": 130,
+      "noteCount": 2,
+      "coefficients": [
+        -1.6,
+        -4.800000000000001,
+        -3.2,
+        39.0,
+        78.0,
+        78.0
+      ],
+      "states": [
+        {
+          "grade": 5,
+          "hp": 98.0,
+          "exScore": 2,
+          "combo": 1,
+          "maxCombo": 1
+        },
+        {
+          "grade": 4,
+          "hp": 100.0,
+          "exScore": 3,
+          "combo": 2,
+          "maxCombo": 2
+        }
+      ]
+    },
+    {
+      "gauge": 3,
+      "total": 130,
+      "noteCount": 100,
+      "coefficients": [
+        -1.6,
+        -4.800000000000001,
+        -3.2,
+        0.78,
+        1.56,
+        1.56
+      ],
+      "states": [
+        {
+          "grade": 5,
+          "hp": 21.56,
+          "exScore": 2,
+          "combo": 1,
+          "maxCombo": 1
+        },
+        {
+          "grade": 4,
+          "hp": 23.119999999999997,
+          "exScore": 3,
+          "combo": 2,
+          "maxCombo": 2
+        },
+        {
+          "grade": 3,
+          "hp": 23.9,
+          "exScore": 3,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 20.7,
+          "exScore": 3,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 15.899999999999999,
+          "exScore": 3,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 14.299999999999999,
+          "exScore": 3,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 15.86,
+          "exScore": 5,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 17.419999999999998,
+          "exScore": 6,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 18.2,
+          "exScore": 6,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 15.0,
+          "exScore": 6,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 10.2,
+          "exScore": 6,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 8.6,
+          "exScore": 6,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 10.16,
+          "exScore": 8,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 11.72,
+          "exScore": 9,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 12.5,
+          "exScore": 9,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 9.3,
+          "exScore": 9,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 4.5,
+          "exScore": 9,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 2.9,
+          "exScore": 9,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 4.46,
+          "exScore": 11,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 6.02,
+          "exScore": 12,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 6.8,
+          "exScore": 12,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 3.5999999999999996,
+          "exScore": 12,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 2.0,
+          "exScore": 12,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 2.0,
+          "exScore": 12,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 3.56,
+          "exScore": 14,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 5.12,
+          "exScore": 15,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 5.9,
+          "exScore": 15,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 2.7,
+          "exScore": 15,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 2.0,
+          "exScore": 15,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 2.0,
+          "exScore": 15,
+          "combo": 0,
+          "maxCombo": 3
+        }
+      ]
+    },
+    {
+      "gauge": 3,
+      "total": 130,
+      "noteCount": 1000,
+      "coefficients": [
+        -1.6,
+        -4.800000000000001,
+        -3.2,
+        0.078,
+        0.156,
+        0.156
+      ],
+      "states": [
+        {
+          "grade": 5,
+          "hp": 20.156,
+          "exScore": 2,
+          "combo": 1,
+          "maxCombo": 1
+        },
+        {
+          "grade": 4,
+          "hp": 20.311999999999998,
+          "exScore": 3,
+          "combo": 2,
+          "maxCombo": 2
+        },
+        {
+          "grade": 3,
+          "hp": 20.389999999999997,
+          "exScore": 3,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 17.189999999999998,
+          "exScore": 3,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 12.389999999999997,
+          "exScore": 3,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 10.789999999999997,
+          "exScore": 3,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 10.945999999999998,
+          "exScore": 5,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 11.101999999999999,
+          "exScore": 6,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 11.179999999999998,
+          "exScore": 6,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 7.979999999999998,
+          "exScore": 6,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 3.179999999999997,
+          "exScore": 6,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 2.0,
+          "exScore": 6,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 2.156,
+          "exScore": 8,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 2.3120000000000003,
+          "exScore": 9,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 2.39,
+          "exScore": 9,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 2.0,
+          "exScore": 9,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 2.0,
+          "exScore": 9,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 2.0,
+          "exScore": 9,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 2.156,
+          "exScore": 11,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 2.3120000000000003,
+          "exScore": 12,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 2.39,
+          "exScore": 12,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 2.0,
+          "exScore": 12,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 2.0,
+          "exScore": 12,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 2.0,
+          "exScore": 12,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 2.156,
+          "exScore": 14,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 2.3120000000000003,
+          "exScore": 15,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 2.39,
+          "exScore": 15,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 2.0,
+          "exScore": 15,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 2.0,
+          "exScore": 15,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 2.0,
+          "exScore": 15,
+          "combo": 0,
+          "maxCombo": 3
+        }
+      ]
+    },
+    {
+      "gauge": 3,
+      "total": 260,
+      "noteCount": 2,
+      "coefficients": [
+        -1.6,
+        -4.800000000000001,
+        -3.2,
+        78.0,
+        156.0,
+        156.0
+      ],
+      "states": [
+        {
+          "grade": 5,
+          "hp": 100.0,
+          "exScore": 2,
+          "combo": 1,
+          "maxCombo": 1
+        },
+        {
+          "grade": 4,
+          "hp": 100.0,
+          "exScore": 3,
+          "combo": 2,
+          "maxCombo": 2
+        }
+      ]
+    },
+    {
+      "gauge": 3,
+      "total": 260,
+      "noteCount": 100,
+      "coefficients": [
+        -1.6,
+        -4.800000000000001,
+        -3.2,
+        1.56,
+        3.12,
+        3.12
+      ],
+      "states": [
+        {
+          "grade": 5,
+          "hp": 23.12,
+          "exScore": 2,
+          "combo": 1,
+          "maxCombo": 1
+        },
+        {
+          "grade": 4,
+          "hp": 26.240000000000002,
+          "exScore": 3,
+          "combo": 2,
+          "maxCombo": 2
+        },
+        {
+          "grade": 3,
+          "hp": 27.8,
+          "exScore": 3,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 24.6,
+          "exScore": 3,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 19.8,
+          "exScore": 3,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 18.2,
+          "exScore": 3,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 21.32,
+          "exScore": 5,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 24.44,
+          "exScore": 6,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 26.0,
+          "exScore": 6,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 22.8,
+          "exScore": 6,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 18.0,
+          "exScore": 6,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 16.4,
+          "exScore": 6,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 19.52,
+          "exScore": 8,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 22.64,
+          "exScore": 9,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 24.2,
+          "exScore": 9,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 21.0,
+          "exScore": 9,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 16.2,
+          "exScore": 9,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 14.6,
+          "exScore": 9,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 17.72,
+          "exScore": 11,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 20.84,
+          "exScore": 12,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 22.4,
+          "exScore": 12,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 19.2,
+          "exScore": 12,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 14.399999999999999,
+          "exScore": 12,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 12.799999999999999,
+          "exScore": 12,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 15.919999999999998,
+          "exScore": 14,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 19.04,
+          "exScore": 15,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 20.599999999999998,
+          "exScore": 15,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 17.4,
+          "exScore": 15,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 12.599999999999998,
+          "exScore": 15,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 10.999999999999998,
+          "exScore": 15,
+          "combo": 0,
+          "maxCombo": 3
+        }
+      ]
+    },
+    {
+      "gauge": 3,
+      "total": 260,
+      "noteCount": 1000,
+      "coefficients": [
+        -1.6,
+        -4.800000000000001,
+        -3.2,
+        0.156,
+        0.312,
+        0.312
+      ],
+      "states": [
+        {
+          "grade": 5,
+          "hp": 20.312,
+          "exScore": 2,
+          "combo": 1,
+          "maxCombo": 1
+        },
+        {
+          "grade": 4,
+          "hp": 20.624000000000002,
+          "exScore": 3,
+          "combo": 2,
+          "maxCombo": 2
+        },
+        {
+          "grade": 3,
+          "hp": 20.78,
+          "exScore": 3,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 17.580000000000002,
+          "exScore": 3,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 12.780000000000001,
+          "exScore": 3,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 11.180000000000001,
+          "exScore": 3,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 11.492,
+          "exScore": 5,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 11.804,
+          "exScore": 6,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 11.96,
+          "exScore": 6,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 8.760000000000002,
+          "exScore": 6,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 3.960000000000001,
+          "exScore": 6,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 2.3600000000000008,
+          "exScore": 6,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 2.6720000000000006,
+          "exScore": 8,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 2.9840000000000004,
+          "exScore": 9,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 3.1400000000000006,
+          "exScore": 9,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 2.0,
+          "exScore": 9,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 2.0,
+          "exScore": 9,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 2.0,
+          "exScore": 9,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 2.312,
+          "exScore": 11,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 2.6239999999999997,
+          "exScore": 12,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 2.78,
+          "exScore": 12,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 2.0,
+          "exScore": 12,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 2.0,
+          "exScore": 12,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 2.0,
+          "exScore": 12,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 5,
+          "hp": 2.312,
+          "exScore": 14,
+          "combo": 1,
+          "maxCombo": 3
+        },
+        {
+          "grade": 4,
+          "hp": 2.6239999999999997,
+          "exScore": 15,
+          "combo": 2,
+          "maxCombo": 3
+        },
+        {
+          "grade": 3,
+          "hp": 2.78,
+          "exScore": 15,
+          "combo": 3,
+          "maxCombo": 3
+        },
+        {
+          "grade": 2,
+          "hp": 2.0,
+          "exScore": 15,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 1,
+          "hp": 2.0,
+          "exScore": 15,
+          "combo": 0,
+          "maxCombo": 3
+        },
+        {
+          "grade": 0,
+          "hp": 2.0,
+          "exScore": 15,
+          "combo": 0,
+          "maxCombo": 3
+        }
+      ]
+    }
+  ]
+}

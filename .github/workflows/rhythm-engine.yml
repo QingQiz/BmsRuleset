@@ -1,0 +1,21 @@
+name: Standalone rhythm engine
+
+on:
+  push:
+    paths:
+      - 'RhythmEngine/**'
+      - '.github/workflows/rhythm-engine.yml'
+  pull_request:
+    paths:
+      - 'RhythmEngine/**'
+      - '.github/workflows/rhythm-engine.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet test RhythmEngine/RhythmEngine.Tests/RhythmEngine.Tests.csproj --configuration Release --filter FullyQualifiedName~RhythmEngine.Tests

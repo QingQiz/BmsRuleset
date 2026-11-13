@@ -1,0 +1,105 @@
+[
+  {
+    "repository": "..\\beatoraja",
+    "path": "src\\bms\\player\\beatoraja\\play\\JudgeProperty.java",
+    "revision": "9cddf911113e74da87458344bb85a4ea45431d0b",
+    "sha256": "8b825f9948b06058e76bd29022839464cdbe5c98444cd68efc6a2fece9ae8a3e"
+  },
+  {
+    "repository": "..\\beatoraja",
+    "path": "src\\bms\\player\\beatoraja\\play\\GaugeProperty.java",
+    "revision": "9cddf911113e74da87458344bb85a4ea45431d0b",
+    "sha256": "2c69b3e7876842b77999183d2391362be1423beef5b537a17bb0ddc83d472ef4"
+  },
+  {
+    "repository": "..\\beatoraja",
+    "path": "src\\bms\\player\\beatoraja\\play\\GrooveGauge.java",
+    "revision": "9cddf911113e74da87458344bb85a4ea45431d0b",
+    "sha256": "67d6a88d5c1522266ffaf347beb783fa837dd7991d31a074f344753e9e592e75"
+  },
+  {
+    "repository": "..\\osu",
+    "path": "osu.Game.Rulesets.Mania\\Scoring\\ManiaHitWindows.cs",
+    "revision": "9a10d935b05a3b896f4bd811d620f2023331db93",
+    "sha256": "3913b38335bdd0a3663391e0ce6d4d13a3a84cb28caa9bf808c3118603ca467a"
+  },
+  {
+    "repository": "..\\osu",
+    "path": "osu.Game.Rulesets.Mania\\Scoring\\ManiaScoreProcessor.cs",
+    "revision": "9a10d935b05a3b896f4bd811d620f2023331db93",
+    "sha256": "9f60db67026bd8297800a9af4fbb8316831f4719ad400b09ff54d02bd33c7495"
+  },
+  {
+    "repository": "artifacts\\rhythm-research\\open2jam",
+    "path": "src\\org\\open2jam\\render\\Render.java",
+    "revision": "11384b3ca957828ae66a72c9e28edd42c97952d5",
+    "sha256": "665c7d64d498a707d7e979014a0a5e8385b9fe273d6ac2dc14664faadf7ff8f7"
+  },
+  {
+    "repository": "https://github.com/etternagame/etterna",
+    "path": "src/RageUtil/Utils/RageUtil.h",
+    "revision": "2d706147cc4bcf95a8ceb24dc4f4129be207f803",
+    "sha256": "c54dfb8a4ff8c1caa767ec47c055caa2996605f05024a1ea27d225c70c7ea60a"
+  },
+  {
+    "repository": "https://malody.en.uptodown.com/android/download",
+    "path": "lib/arm64-v8a/libmalodycpp.so",
+    "revision": "Android 4.3.7",
+    "sha256": "1140dc9374886d3326dc067bf4576159bc3c18d1dc3f34c2aaf5a41d55bc3bb0",
+    "container_sha256": "7b6f5650481f6b1e04ebe8eec93f18c2205521522f94da3f129cfb0c37044138",
+    "fixture": "malody-android-437.json",
+    "execution": "Unicorn 2.1.4; original judgement/hold/Score/accuracy/HP/Bonus/combo and manual Key routing/expiry/tick basic blocks; presentation/statistics callbacks and cipher singleton controlled by harness"
+  },
+  {
+    "repository": "https://raw.githubusercontent.com/brokenpoems/Malody-Mirror/main/Malody/Windows/Malody-4.3.7.zip",
+    "path": "Malody-4.3.7/malody.exe",
+    "revision": "PC 4.3.7",
+    "sha256": "d0cf9ecb493f3fdbd1e3ce48cbfad06ef816d19931ab0c51d9e9655f5eb63ce3",
+    "fixture": "malody-pc-437.json",
+    "execution": "Unicorn 2.1.4, x87 0x027f; original judgement/hold/Score arithmetic and manual Key routing/expiry/tick basic blocks; presentation/statistics callbacks are sinks"
+  },
+  {
+    "repository": "https://apkpure.com/malodyv/me.mugzone.emiria/download",
+    "path": "config.arm64_v8a.apk/lib/arm64-v8a/libil2cpp.so",
+    "revision": "V Android 6.7.22 (381)",
+    "sha256": "2f1a4f10a95ce62ba4fc37f4f848c95826c89214d239f98077b237cdd34ce16c",
+    "container_sha256": "d35d97914e997272556e8609c08edfb514feddfa622ded86b99cd84575fe3ee9",
+    "metadata_sha256": "abe99b3b5571db549ac8b5414d804375c04ff9c299465207c36345b9beeb8e0a",
+    "fixture": "malody-v-6722.json",
+    "execution": "Unicorn 2.1.4; original timing/hold/score arithmetic and Key routing/expiry/repeat dispatch; managed runtime allocation, collection storage, encrypted storage accessors and event notification sink supplied by harness"
+  },
+  {
+    "repository": "https://www.mediafire.com/file/lgd4gp8azgmryie/O2Jam-3.38.zip/file",
+    "path": "App Executables/OTwo.exe",
+    "revision": "e-Games 3.38 (2005-08-08)",
+    "sha256": "3f40d7f4e828da8e97bab391597d73b16d9580d46ff51d24ee185e1b1405a38b",
+    "container_sha256": "ecba596d3c53158bdcff9fb9725555732e6ef45fb52f4f0d55195c9525366102",
+    "fixture": "o2jam-338.json",
+    "execution": "Unicorn 2.1.4, x87 0x027f; original input/clock/expiry/handler/scoring/HP, with audio and presentation notifications stubbed"
+  },
+  {
+    "repository": "https://www.mediafire.com/file/96m0wbp0aw343pu/LR2_100201.zip/file",
+    "path": "LR2beta3/LR2body.exe",
+    "revision": "LR2 beta3 100201",
+    "sha256": "a46ef15343e41d3411771c83ac7b0c42d95e5f473db69c6b45a9584c07e94480",
+    "container_sha256": "34294ea6661b232071688a93de31631e4e8114a82314d3386541e6875a74ff41",
+    "fixture": "lr2-100201.json",
+    "execution": "Unicorn 2.1.4, x87 0x027f; original parser rank/gauge basic blocks, input/tap/LN and score/HP; ghost/replay/audio/skin side effects stubbed"
+  },
+  {
+    "repository": "https://m1.ppy.sh/r/osu!install.exe",
+    "path": "osu!.exe",
+    "revision": "sha256 3adc2d001aac; MVID aa9db4d0-6aa6-4bb7-2f5e-8c1ae12ad43a",
+    "sha256": "3adc2d001aacced5f92ba8ae24121980d5e23f5653f37d14cf4765bca1abd9f9",
+    "fixture": "stable-holds.json",
+    "execution": "REA-decoded original CIL: hold result 0x06003a0d and score/Bonus/Combo/HP 0x0600119e; manager 0x060049db statically inspected; visual/audio callbacks excluded; target assembly is not loaded or launched"
+  },
+  {
+    "repository": "https://github.com/etternagame/etterna",
+    "path": "src/Etterna/Actor/Gameplay/LifeMeterBar.cpp",
+    "revision": "2d706147cc4bcf95a8ceb24dc4f4129be207f803",
+    "sha256": "1a3be12bcbdb0629519eaca7ade83137e6eadeeead8c710e70c9894b0df89088",
+    "fixture": "etterna-life.json",
+    "execution": "compiled original LifeMeterBar::ChangeLife(float), fallback metric coefficients; frame/notification callbacks excluded"
+  }
+]

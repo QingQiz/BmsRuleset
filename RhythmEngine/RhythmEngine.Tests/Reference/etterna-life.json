@@ -1,0 +1,2737 @@
+{
+  "revision": "2d706147cc4bcf95a8ceb24dc4f4129be207f803",
+  "source_sha256": "1a3be12bcbdb0629519eaca7ade83137e6eadeeead8c710e70c9894b0df89088",
+  "authority": "compiled original LifeMeterBar::ChangeLife(float), fallback metric coefficients; frame/notification callbacks excluded",
+  "states": [
+    {
+      "difficulty": 0.5,
+      "index": 0,
+      "result": 0,
+      "hp": 0.5040000081062317,
+      "failed": false
+    },
+    {
+      "difficulty": 0.5,
+      "index": 1,
+      "result": 1,
+      "hp": 0.5080000162124634,
+      "failed": false
+    },
+    {
+      "difficulty": 0.5,
+      "index": 2,
+      "result": 2,
+      "hp": 0.5099999904632568,
+      "failed": false
+    },
+    {
+      "difficulty": 0.5,
+      "index": 3,
+      "result": 0,
+      "hp": 0.5139999985694885,
+      "failed": false
+    },
+    {
+      "difficulty": 0.5,
+      "index": 4,
+      "result": 1,
+      "hp": 0.5180000066757202,
+      "failed": false
+    },
+    {
+      "difficulty": 0.5,
+      "index": 5,
+      "result": 2,
+      "hp": 0.5199999809265137,
+      "failed": false
+    },
+    {
+      "difficulty": 0.5,
+      "index": 6,
+      "result": 0,
+      "hp": 0.5239999890327454,
+      "failed": false
+    },
+    {
+      "difficulty": 0.5,
+      "index": 7,
+      "result": 1,
+      "hp": 0.527999997138977,
+      "failed": false
+    },
+    {
+      "difficulty": 0.5,
+      "index": 8,
+      "result": 2,
+      "hp": 0.5299999713897705,
+      "failed": false
+    },
+    {
+      "difficulty": 0.5,
+      "index": 9,
+      "result": 0,
+      "hp": 0.5339999794960022,
+      "failed": false
+    },
+    {
+      "difficulty": 0.5,
+      "index": 10,
+      "result": 1,
+      "hp": 0.5379999876022339,
+      "failed": false
+    },
+    {
+      "difficulty": 0.5,
+      "index": 11,
+      "result": 2,
+      "hp": 0.5399999618530273,
+      "failed": false
+    },
+    {
+      "difficulty": 0.5,
+      "index": 12,
+      "result": 0,
+      "hp": 0.543999969959259,
+      "failed": false
+    },
+    {
+      "difficulty": 0.5,
+      "index": 13,
+      "result": 1,
+      "hp": 0.5479999780654907,
+      "failed": false
+    },
+    {
+      "difficulty": 0.5,
+      "index": 14,
+      "result": 2,
+      "hp": 0.5499999523162842,
+      "failed": false
+    },
+    {
+      "difficulty": 0.5,
+      "index": 15,
+      "result": 0,
+      "hp": 0.5539999604225159,
+      "failed": false
+    },
+    {
+      "difficulty": 0.5,
+      "index": 16,
+      "result": 1,
+      "hp": 0.5579999685287476,
+      "failed": false
+    },
+    {
+      "difficulty": 0.5,
+      "index": 17,
+      "result": 2,
+      "hp": 0.559999942779541,
+      "failed": false
+    },
+    {
+      "difficulty": 0.5,
+      "index": 18,
+      "result": 0,
+      "hp": 0.5639999508857727,
+      "failed": false
+    },
+    {
+      "difficulty": 0.5,
+      "index": 19,
+      "result": 1,
+      "hp": 0.5679999589920044,
+      "failed": false
+    },
+    {
+      "difficulty": 0.5,
+      "index": 20,
+      "result": 2,
+      "hp": 0.5699999332427979,
+      "failed": false
+    },
+    {
+      "difficulty": 0.5,
+      "index": 21,
+      "result": 0,
+      "hp": 0.5739999413490295,
+      "failed": false
+    },
+    {
+      "difficulty": 0.5,
+      "index": 22,
+      "result": 1,
+      "hp": 0.5779999494552612,
+      "failed": false
+    },
+    {
+      "difficulty": 0.5,
+      "index": 23,
+      "result": 2,
+      "hp": 0.5799999237060547,
+      "failed": false
+    },
+    {
+      "difficulty": 0.5,
+      "index": 24,
+      "result": 0,
+      "hp": 0.5839999318122864,
+      "failed": false
+    },
+    {
+      "difficulty": 0.5,
+      "index": 25,
+      "result": 1,
+      "hp": 0.5879999399185181,
+      "failed": false
+    },
+    {
+      "difficulty": 0.5,
+      "index": 26,
+      "result": 2,
+      "hp": 0.5899999141693115,
+      "failed": false
+    },
+    {
+      "difficulty": 0.5,
+      "index": 27,
+      "result": 0,
+      "hp": 0.5939999222755432,
+      "failed": false
+    },
+    {
+      "difficulty": 0.5,
+      "index": 28,
+      "result": 1,
+      "hp": 0.5979999303817749,
+      "failed": false
+    },
+    {
+      "difficulty": 0.5,
+      "index": 29,
+      "result": 2,
+      "hp": 0.5999999046325684,
+      "failed": false
+    },
+    {
+      "difficulty": 0.5,
+      "index": 30,
+      "result": 5,
+      "hp": 0.43999990820884705,
+      "failed": false
+    },
+    {
+      "difficulty": 0.5,
+      "index": 31,
+      "result": 6,
+      "hp": 0.11999991536140442,
+      "failed": false
+    },
+    {
+      "difficulty": 0.5,
+      "index": 32,
+      "result": 3,
+      "hp": 0.11999991536140442,
+      "failed": false
+    },
+    {
+      "difficulty": 0.5,
+      "index": 33,
+      "result": 4,
+      "hp": 0.03999991714954376,
+      "failed": false
+    },
+    {
+      "difficulty": 0.5,
+      "index": 34,
+      "result": 5,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 35,
+      "result": 6,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 36,
+      "result": 3,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 37,
+      "result": 4,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 38,
+      "result": 5,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 39,
+      "result": 6,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 40,
+      "result": 3,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 41,
+      "result": 4,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 42,
+      "result": 5,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 43,
+      "result": 6,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 44,
+      "result": 3,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 45,
+      "result": 4,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 46,
+      "result": 5,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 47,
+      "result": 6,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 48,
+      "result": 3,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 49,
+      "result": 4,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 50,
+      "result": 0,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 51,
+      "result": 1,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 52,
+      "result": 2,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 53,
+      "result": 3,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 54,
+      "result": 4,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 55,
+      "result": 5,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 56,
+      "result": 6,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 57,
+      "result": 7,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 58,
+      "result": 8,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 59,
+      "result": 9,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 60,
+      "result": 0,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 61,
+      "result": 1,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 62,
+      "result": 2,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 63,
+      "result": 3,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 64,
+      "result": 4,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 65,
+      "result": 5,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 66,
+      "result": 6,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 67,
+      "result": 7,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 68,
+      "result": 8,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 69,
+      "result": 9,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 70,
+      "result": 0,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 71,
+      "result": 1,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 72,
+      "result": 2,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 73,
+      "result": 3,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 74,
+      "result": 4,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 75,
+      "result": 5,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 76,
+      "result": 6,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 77,
+      "result": 7,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 78,
+      "result": 8,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 79,
+      "result": 9,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 80,
+      "result": 0,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 81,
+      "result": 1,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 82,
+      "result": 2,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 83,
+      "result": 3,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 84,
+      "result": 4,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 85,
+      "result": 5,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 86,
+      "result": 6,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 87,
+      "result": 7,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 88,
+      "result": 8,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 89,
+      "result": 9,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 90,
+      "result": 0,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 91,
+      "result": 1,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 92,
+      "result": 2,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 93,
+      "result": 3,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 94,
+      "result": 4,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 95,
+      "result": 5,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 96,
+      "result": 6,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 97,
+      "result": 7,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 98,
+      "result": 8,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 99,
+      "result": 9,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 100,
+      "result": 0,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 101,
+      "result": 1,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 102,
+      "result": 2,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 103,
+      "result": 3,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 104,
+      "result": 4,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 105,
+      "result": 5,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 106,
+      "result": 6,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 107,
+      "result": 7,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 108,
+      "result": 8,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 109,
+      "result": 9,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 110,
+      "result": 0,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 111,
+      "result": 1,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 112,
+      "result": 2,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 113,
+      "result": 3,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 114,
+      "result": 4,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 115,
+      "result": 5,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 116,
+      "result": 6,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 117,
+      "result": 7,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 118,
+      "result": 8,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 119,
+      "result": 9,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 120,
+      "result": 0,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 121,
+      "result": 1,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 122,
+      "result": 2,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 123,
+      "result": 3,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 124,
+      "result": 4,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 125,
+      "result": 5,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 126,
+      "result": 6,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 127,
+      "result": 7,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 128,
+      "result": 8,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 0.5,
+      "index": 129,
+      "result": 9,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 0,
+      "result": 0,
+      "hp": 0.5080000162124634,
+      "failed": false
+    },
+    {
+      "difficulty": 1,
+      "index": 1,
+      "result": 1,
+      "hp": 0.5160000324249268,
+      "failed": false
+    },
+    {
+      "difficulty": 1,
+      "index": 2,
+      "result": 2,
+      "hp": 0.5200000405311584,
+      "failed": false
+    },
+    {
+      "difficulty": 1,
+      "index": 3,
+      "result": 0,
+      "hp": 0.5280000567436218,
+      "failed": false
+    },
+    {
+      "difficulty": 1,
+      "index": 4,
+      "result": 1,
+      "hp": 0.5360000729560852,
+      "failed": false
+    },
+    {
+      "difficulty": 1,
+      "index": 5,
+      "result": 2,
+      "hp": 0.5400000810623169,
+      "failed": false
+    },
+    {
+      "difficulty": 1,
+      "index": 6,
+      "result": 0,
+      "hp": 0.5480000972747803,
+      "failed": false
+    },
+    {
+      "difficulty": 1,
+      "index": 7,
+      "result": 1,
+      "hp": 0.5560001134872437,
+      "failed": false
+    },
+    {
+      "difficulty": 1,
+      "index": 8,
+      "result": 2,
+      "hp": 0.5600001215934753,
+      "failed": false
+    },
+    {
+      "difficulty": 1,
+      "index": 9,
+      "result": 0,
+      "hp": 0.5680001378059387,
+      "failed": false
+    },
+    {
+      "difficulty": 1,
+      "index": 10,
+      "result": 1,
+      "hp": 0.5760001540184021,
+      "failed": false
+    },
+    {
+      "difficulty": 1,
+      "index": 11,
+      "result": 2,
+      "hp": 0.5800001621246338,
+      "failed": false
+    },
+    {
+      "difficulty": 1,
+      "index": 12,
+      "result": 0,
+      "hp": 0.5880001783370972,
+      "failed": false
+    },
+    {
+      "difficulty": 1,
+      "index": 13,
+      "result": 1,
+      "hp": 0.5960001945495605,
+      "failed": false
+    },
+    {
+      "difficulty": 1,
+      "index": 14,
+      "result": 2,
+      "hp": 0.6000002026557922,
+      "failed": false
+    },
+    {
+      "difficulty": 1,
+      "index": 15,
+      "result": 0,
+      "hp": 0.6080002188682556,
+      "failed": false
+    },
+    {
+      "difficulty": 1,
+      "index": 16,
+      "result": 1,
+      "hp": 0.616000235080719,
+      "failed": false
+    },
+    {
+      "difficulty": 1,
+      "index": 17,
+      "result": 2,
+      "hp": 0.6200002431869507,
+      "failed": false
+    },
+    {
+      "difficulty": 1,
+      "index": 18,
+      "result": 0,
+      "hp": 0.6280002593994141,
+      "failed": false
+    },
+    {
+      "difficulty": 1,
+      "index": 19,
+      "result": 1,
+      "hp": 0.6360002756118774,
+      "failed": false
+    },
+    {
+      "difficulty": 1,
+      "index": 20,
+      "result": 2,
+      "hp": 0.6400002837181091,
+      "failed": false
+    },
+    {
+      "difficulty": 1,
+      "index": 21,
+      "result": 0,
+      "hp": 0.6480002999305725,
+      "failed": false
+    },
+    {
+      "difficulty": 1,
+      "index": 22,
+      "result": 1,
+      "hp": 0.6560003161430359,
+      "failed": false
+    },
+    {
+      "difficulty": 1,
+      "index": 23,
+      "result": 2,
+      "hp": 0.6600003242492676,
+      "failed": false
+    },
+    {
+      "difficulty": 1,
+      "index": 24,
+      "result": 0,
+      "hp": 0.668000340461731,
+      "failed": false
+    },
+    {
+      "difficulty": 1,
+      "index": 25,
+      "result": 1,
+      "hp": 0.6760003566741943,
+      "failed": false
+    },
+    {
+      "difficulty": 1,
+      "index": 26,
+      "result": 2,
+      "hp": 0.680000364780426,
+      "failed": false
+    },
+    {
+      "difficulty": 1,
+      "index": 27,
+      "result": 0,
+      "hp": 0.6880003809928894,
+      "failed": false
+    },
+    {
+      "difficulty": 1,
+      "index": 28,
+      "result": 1,
+      "hp": 0.6960003972053528,
+      "failed": false
+    },
+    {
+      "difficulty": 1,
+      "index": 29,
+      "result": 2,
+      "hp": 0.7000004053115845,
+      "failed": false
+    },
+    {
+      "difficulty": 1,
+      "index": 30,
+      "result": 5,
+      "hp": 0.620000422000885,
+      "failed": false
+    },
+    {
+      "difficulty": 1,
+      "index": 31,
+      "result": 6,
+      "hp": 0.4600004255771637,
+      "failed": false
+    },
+    {
+      "difficulty": 1,
+      "index": 32,
+      "result": 3,
+      "hp": 0.4600004255771637,
+      "failed": false
+    },
+    {
+      "difficulty": 1,
+      "index": 33,
+      "result": 4,
+      "hp": 0.42000043392181396,
+      "failed": false
+    },
+    {
+      "difficulty": 1,
+      "index": 34,
+      "result": 5,
+      "hp": 0.3400004506111145,
+      "failed": false
+    },
+    {
+      "difficulty": 1,
+      "index": 35,
+      "result": 6,
+      "hp": 0.1800004541873932,
+      "failed": false
+    },
+    {
+      "difficulty": 1,
+      "index": 36,
+      "result": 3,
+      "hp": 0.1800004541873932,
+      "failed": false
+    },
+    {
+      "difficulty": 1,
+      "index": 37,
+      "result": 4,
+      "hp": 0.14000046253204346,
+      "failed": false
+    },
+    {
+      "difficulty": 1,
+      "index": 38,
+      "result": 5,
+      "hp": 0.0600004643201828,
+      "failed": false
+    },
+    {
+      "difficulty": 1,
+      "index": 39,
+      "result": 6,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 40,
+      "result": 3,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 41,
+      "result": 4,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 42,
+      "result": 5,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 43,
+      "result": 6,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 44,
+      "result": 3,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 45,
+      "result": 4,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 46,
+      "result": 5,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 47,
+      "result": 6,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 48,
+      "result": 3,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 49,
+      "result": 4,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 50,
+      "result": 0,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 51,
+      "result": 1,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 52,
+      "result": 2,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 53,
+      "result": 3,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 54,
+      "result": 4,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 55,
+      "result": 5,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 56,
+      "result": 6,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 57,
+      "result": 7,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 58,
+      "result": 8,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 59,
+      "result": 9,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 60,
+      "result": 0,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 61,
+      "result": 1,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 62,
+      "result": 2,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 63,
+      "result": 3,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 64,
+      "result": 4,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 65,
+      "result": 5,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 66,
+      "result": 6,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 67,
+      "result": 7,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 68,
+      "result": 8,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 69,
+      "result": 9,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 70,
+      "result": 0,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 71,
+      "result": 1,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 72,
+      "result": 2,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 73,
+      "result": 3,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 74,
+      "result": 4,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 75,
+      "result": 5,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 76,
+      "result": 6,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 77,
+      "result": 7,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 78,
+      "result": 8,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 79,
+      "result": 9,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 80,
+      "result": 0,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 81,
+      "result": 1,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 82,
+      "result": 2,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 83,
+      "result": 3,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 84,
+      "result": 4,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 85,
+      "result": 5,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 86,
+      "result": 6,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 87,
+      "result": 7,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 88,
+      "result": 8,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 89,
+      "result": 9,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 90,
+      "result": 0,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 91,
+      "result": 1,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 92,
+      "result": 2,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 93,
+      "result": 3,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 94,
+      "result": 4,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 95,
+      "result": 5,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 96,
+      "result": 6,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 97,
+      "result": 7,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 98,
+      "result": 8,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 99,
+      "result": 9,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 100,
+      "result": 0,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 101,
+      "result": 1,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 102,
+      "result": 2,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 103,
+      "result": 3,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 104,
+      "result": 4,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 105,
+      "result": 5,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 106,
+      "result": 6,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 107,
+      "result": 7,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 108,
+      "result": 8,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 109,
+      "result": 9,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 110,
+      "result": 0,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 111,
+      "result": 1,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 112,
+      "result": 2,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 113,
+      "result": 3,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 114,
+      "result": 4,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 115,
+      "result": 5,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 116,
+      "result": 6,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 117,
+      "result": 7,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 118,
+      "result": 8,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 119,
+      "result": 9,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 120,
+      "result": 0,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 121,
+      "result": 1,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 122,
+      "result": 2,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 123,
+      "result": 3,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 124,
+      "result": 4,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 125,
+      "result": 5,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 126,
+      "result": 6,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 127,
+      "result": 7,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 128,
+      "result": 8,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 1,
+      "index": 129,
+      "result": 9,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 0,
+      "result": 0,
+      "hp": 0.515999972820282,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 1,
+      "result": 1,
+      "hp": 0.531999945640564,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 2,
+      "result": 2,
+      "hp": 0.5399999618530273,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 3,
+      "result": 0,
+      "hp": 0.5559999346733093,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 4,
+      "result": 1,
+      "hp": 0.5719999074935913,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 5,
+      "result": 2,
+      "hp": 0.5799999237060547,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 6,
+      "result": 0,
+      "hp": 0.5959998965263367,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 7,
+      "result": 1,
+      "hp": 0.6119998693466187,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 8,
+      "result": 2,
+      "hp": 0.619999885559082,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 9,
+      "result": 0,
+      "hp": 0.635999858379364,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 10,
+      "result": 1,
+      "hp": 0.651999831199646,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 11,
+      "result": 2,
+      "hp": 0.6599998474121094,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 12,
+      "result": 0,
+      "hp": 0.6759998202323914,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 13,
+      "result": 1,
+      "hp": 0.6919997930526733,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 14,
+      "result": 2,
+      "hp": 0.6999998092651367,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 15,
+      "result": 0,
+      "hp": 0.7159997820854187,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 16,
+      "result": 1,
+      "hp": 0.7319997549057007,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 17,
+      "result": 2,
+      "hp": 0.7399997711181641,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 18,
+      "result": 0,
+      "hp": 0.755999743938446,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 19,
+      "result": 1,
+      "hp": 0.771999716758728,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 20,
+      "result": 2,
+      "hp": 0.7799997329711914,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 21,
+      "result": 0,
+      "hp": 0.7959997057914734,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 22,
+      "result": 1,
+      "hp": 0.8119996786117554,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 23,
+      "result": 2,
+      "hp": 0.8199996948242188,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 24,
+      "result": 0,
+      "hp": 0.8359996676445007,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 25,
+      "result": 1,
+      "hp": 0.8519996404647827,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 26,
+      "result": 2,
+      "hp": 0.8599996566772461,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 27,
+      "result": 0,
+      "hp": 0.8759996294975281,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 28,
+      "result": 1,
+      "hp": 0.8919996023178101,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 29,
+      "result": 2,
+      "hp": 0.8999996185302734,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 30,
+      "result": 5,
+      "hp": 0.8599995970726013,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 31,
+      "result": 6,
+      "hp": 0.7799996137619019,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 32,
+      "result": 3,
+      "hp": 0.7799996137619019,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 33,
+      "result": 4,
+      "hp": 0.7599996328353882,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 34,
+      "result": 5,
+      "hp": 0.7199996113777161,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 35,
+      "result": 6,
+      "hp": 0.6399996280670166,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 36,
+      "result": 3,
+      "hp": 0.6399996280670166,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 37,
+      "result": 4,
+      "hp": 0.6199996471405029,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 38,
+      "result": 5,
+      "hp": 0.5799996256828308,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 39,
+      "result": 6,
+      "hp": 0.49999964237213135,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 40,
+      "result": 3,
+      "hp": 0.49999964237213135,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 41,
+      "result": 4,
+      "hp": 0.4799996316432953,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 42,
+      "result": 5,
+      "hp": 0.43999963998794556,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 43,
+      "result": 6,
+      "hp": 0.3599996566772461,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 44,
+      "result": 3,
+      "hp": 0.3599996566772461,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 45,
+      "result": 4,
+      "hp": 0.33999964594841003,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 46,
+      "result": 5,
+      "hp": 0.2999996542930603,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 47,
+      "result": 6,
+      "hp": 0.21999965608119965,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 48,
+      "result": 3,
+      "hp": 0.21999965608119965,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 49,
+      "result": 4,
+      "hp": 0.19999966025352478,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 50,
+      "result": 0,
+      "hp": 0.21599966287612915,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 51,
+      "result": 1,
+      "hp": 0.23199966549873352,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 52,
+      "result": 2,
+      "hp": 0.2399996668100357,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 53,
+      "result": 3,
+      "hp": 0.2399996668100357,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 54,
+      "result": 4,
+      "hp": 0.21999967098236084,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 55,
+      "result": 5,
+      "hp": 0.1799996793270111,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 56,
+      "result": 6,
+      "hp": 0.09999968111515045,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 57,
+      "result": 7,
+      "hp": 0.11599968373775482,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 58,
+      "result": 8,
+      "hp": 0.0759996846318245,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 59,
+      "result": 9,
+      "hp": 0.0759996846318245,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 60,
+      "result": 0,
+      "hp": 0.09199968725442886,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 61,
+      "result": 1,
+      "hp": 0.10799968987703323,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 62,
+      "result": 2,
+      "hp": 0.11599969118833542,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 63,
+      "result": 3,
+      "hp": 0.11599969118833542,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 64,
+      "result": 4,
+      "hp": 0.09599968791007996,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 65,
+      "result": 5,
+      "hp": 0.05599968880414963,
+      "failed": false
+    },
+    {
+      "difficulty": 2,
+      "index": 66,
+      "result": 6,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 67,
+      "result": 7,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 68,
+      "result": 8,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 69,
+      "result": 9,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 70,
+      "result": 0,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 71,
+      "result": 1,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 72,
+      "result": 2,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 73,
+      "result": 3,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 74,
+      "result": 4,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 75,
+      "result": 5,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 76,
+      "result": 6,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 77,
+      "result": 7,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 78,
+      "result": 8,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 79,
+      "result": 9,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 80,
+      "result": 0,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 81,
+      "result": 1,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 82,
+      "result": 2,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 83,
+      "result": 3,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 84,
+      "result": 4,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 85,
+      "result": 5,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 86,
+      "result": 6,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 87,
+      "result": 7,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 88,
+      "result": 8,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 89,
+      "result": 9,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 90,
+      "result": 0,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 91,
+      "result": 1,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 92,
+      "result": 2,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 93,
+      "result": 3,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 94,
+      "result": 4,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 95,
+      "result": 5,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 96,
+      "result": 6,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 97,
+      "result": 7,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 98,
+      "result": 8,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 99,
+      "result": 9,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 100,
+      "result": 0,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 101,
+      "result": 1,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 102,
+      "result": 2,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 103,
+      "result": 3,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 104,
+      "result": 4,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 105,
+      "result": 5,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 106,
+      "result": 6,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 107,
+      "result": 7,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 108,
+      "result": 8,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 109,
+      "result": 9,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 110,
+      "result": 0,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 111,
+      "result": 1,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 112,
+      "result": 2,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 113,
+      "result": 3,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 114,
+      "result": 4,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 115,
+      "result": 5,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 116,
+      "result": 6,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 117,
+      "result": 7,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 118,
+      "result": 8,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 119,
+      "result": 9,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 120,
+      "result": 0,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 121,
+      "result": 1,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 122,
+      "result": 2,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 123,
+      "result": 3,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 124,
+      "result": 4,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 125,
+      "result": 5,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 126,
+      "result": 6,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 127,
+      "result": 7,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 128,
+      "result": 8,
+      "hp": 0,
+      "failed": true
+    },
+    {
+      "difficulty": 2,
+      "index": 129,
+      "result": 9,
+      "hp": 0,
+      "failed": true
+    }
+  ]
+}
