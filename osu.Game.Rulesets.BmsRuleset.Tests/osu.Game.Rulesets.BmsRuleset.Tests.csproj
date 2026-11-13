@@ -16,12 +16,12 @@
     <ItemGroup>
         <ProjectReference Include="..\osu.Game.Rulesets.BmsRuleset\osu.Game.Rulesets.BmsRuleset.csproj"/>
     </ItemGroup>
-    <!-- Tests exercise the engine embedded in the shipped DLL; importing its source assemblies
+    <!-- Tests exercise the engine embedded in the shipped DLL; importing its source assembly
          again would give the same contracts two different assembly identities. -->
     <Target Name="UseEmbeddedRhythmEngine" BeforeTargets="CoreCompile">
         <ItemGroup>
-            <ReferencePath Remove="@(ReferencePath)" Condition="'%(ReferencePath.Filename)' == 'RhythmEngine' Or '%(ReferencePath.Filename)' == 'RhythmEngine.Profiles'" />
-            <ReferencePathWithRefAssemblies Remove="@(ReferencePathWithRefAssemblies)" Condition="'%(ReferencePathWithRefAssemblies.Filename)' == 'RhythmEngine' Or '%(ReferencePathWithRefAssemblies.Filename)' == 'RhythmEngine.Profiles'" />
+            <ReferencePath Remove="@(ReferencePath)" Condition="'%(ReferencePath.Filename)' == 'RhythmEngine'" />
+            <ReferencePathWithRefAssemblies Remove="@(ReferencePathWithRefAssemblies)" Condition="'%(ReferencePathWithRefAssemblies.Filename)' == 'RhythmEngine'" />
         </ItemGroup>
     </Target>
     <ItemGroup Label="Embedded BMS Test Songs">

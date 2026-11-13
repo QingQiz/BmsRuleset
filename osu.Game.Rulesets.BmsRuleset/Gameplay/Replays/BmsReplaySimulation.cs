@@ -9,7 +9,6 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
-using RhythmEngine;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
@@ -20,6 +19,8 @@ using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
+using RhythmEngine.Core;
+using RhythmEngine.Profiles.Bms;
 
 namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 
@@ -70,8 +71,8 @@ internal static class BmsReplaySimulation
         {
             var notes = objects.Where(note => note.Column == index).ToArray();
             return new BmsJudgementColumnDefinition(notes, beatmap.LayoutVariant, index, new SimulationOutput(score, health, recordGauge));
-        }).ToArray(), notes => (RhythmEngine.Profiles.BmsProfiles.CreateScore(score.EmptyPoorBreaksCombo
-            ?? BmsJudgementProfileProvider.EmptyPoorBreaksCombo(beatmap.LayoutVariant)), health.CreateEngineHealth(notes)));
+        }).ToArray(), notes => (BmsProfiles.CreateScore(score.EmptyPoorBreaksCombo
+                                                        ?? BmsJudgementProfileProvider.EmptyPoorBreaksCombo(beatmap.LayoutVariant)), health.CreateEngineHealth(notes)));
 
         AdvanceTo(beatmap, replay, mods, engine, columnCount, frames[^1].Time, time =>
         {

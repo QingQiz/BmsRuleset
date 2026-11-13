@@ -1,7 +1,7 @@
-using RhythmEngine;
 using System.Collections.Generic;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.Scoring;
+using RhythmEngine.Core;
 
 namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 
@@ -40,5 +40,5 @@ internal interface IBmsJudgementOutput
 
 internal readonly record struct BmsFrameContext(double SimulationTime, double GameplayRate, bool IsRewinding = false)
 {
-    internal RhythmEngine.JudgementResult? EngineResult { get; init; }
+    internal JudgementResult? EngineResult { get; init; }
 }

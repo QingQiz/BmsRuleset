@@ -28,6 +28,7 @@ using osu.Game.Rulesets.Objects.Types;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 using osu.Game.Tests.Beatmaps;
+using RhythmEngine.Profiles.Bms;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Mods;
 
@@ -620,7 +621,7 @@ public class BmsModLr2Test
         var output = new BmsReplaySimulation.SimulationOutput(score, health, _ => gauges.Add(health.CurrentGaugeStates.ToArray()));
         var engine = new BmsJudgementEngine(Enumerable.Range(1, 3).Select(column => new BmsJudgementColumnDefinition(
             beatmap.HitObjects.Where(note => note.Column == column).ToArray(), beatmap.LayoutVariant, column, output)).ToArray(),
-            notes => (RhythmEngine.Profiles.BmsProfiles.CreateScore(score.EmptyPoorBreaksCombo ?? BmsJudgementProfileProvider.EmptyPoorBreaksCombo(layout)), health.CreateEngineHealth(notes)));
+            notes => (BmsProfiles.CreateScore(score.EmptyPoorBreaksCombo ?? BmsJudgementProfileProvider.EmptyPoorBreaksCombo(layout)), health.CreateEngineHealth(notes)));
         (double Time, int Column, bool Pressed)[] inputs = [(100, 1, true), (110, 1, false), (1017, 1, true), (1025, 1, false), (1500, 2, true), (1900, 2, false)];
         var replay = new osu.Game.Replays.Replay { HasReceivedAllFrames = true };
         foreach (var input in inputs)

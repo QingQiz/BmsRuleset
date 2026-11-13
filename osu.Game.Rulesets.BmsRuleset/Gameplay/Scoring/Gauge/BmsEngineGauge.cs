@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Immutable;
 using System.Linq;
-using RhythmEngine;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.Scoring;
+using RhythmEngine.Core;
 
 namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 

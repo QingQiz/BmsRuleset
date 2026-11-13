@@ -1,10 +1,11 @@
 using System;
 using System.Linq;
-using RhythmEngine;
-using RhythmEngine.Profiles;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.Scoring;
+using RhythmEngine.Core;
+using RhythmEngine.Profiles.Bms;
+using RhythmEngine.Profiles.Common;
 
 namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 

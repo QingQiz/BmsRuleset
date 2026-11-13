@@ -11,7 +11,7 @@ public class BmsJudgementResult(HitObject hitObject, Rulesets.Judgements.Judgeme
     // penalise it twice. Keep the framework result for completion and accuracy accounting.
     public bool SuppressPenalty { get; set; }
 
-    internal RhythmEngine.JudgementResult? EngineResult { get; set; }
+    internal RhythmEngine.Core.JudgementResult? EngineResult { get; set; }
 
     internal double EventTime => getRawTime(this) ?? HitObject.GetEndTime();
 

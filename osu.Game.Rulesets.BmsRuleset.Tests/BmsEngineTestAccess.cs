@@ -3,12 +3,12 @@ using System.Collections.Generic;
 using System;
 using System.Linq;
 using System.Reflection;
-using RhythmEngine;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.Presentation;
+using RhythmEngine.Core;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests;
 

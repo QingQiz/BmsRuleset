@@ -1,5 +1,9 @@
 using NUnit.Framework;
-using RhythmEngine.Profiles;
+using RhythmEngine.Core;
+using RhythmEngine.Profiles.Bms;
+using RhythmEngine.Profiles.Common;
+using RhythmEngine.Profiles.Etterna;
+using RhythmEngine.Profiles.Mania;
 
 namespace RhythmEngine.Tests;
 
@@ -16,7 +20,7 @@ public class AuditRegressionTest
         session.AdvanceTo(ms(2020), [input(2020, true)]);
         Assert.That(session.EventCount, Is.Zero);
         session.AdvanceTo(ms(2021));
-        Assert.That(session.GetEventsSince(0).Select(e => (e.Result, e.Time)), Is.EqualTo(new[] { (grade, ms(2021)) }));
+        Assert.That(session.GetEventsSince(0).Select(e => (e.Result, e.Time)), Is.EqualTo([(grade, ms(2021))]));
         Assert.That(session.Completed, Is.True);
     }
 
@@ -47,7 +51,7 @@ public class AuditRegressionTest
     {
         var session = ManiaProfiles.CreateLazer(chart(tap(0, 1000), tap(1, 1100), tap(2, 1300))).CreateSession();
         session.AdvanceTo(ms(1100), [input(1000, true, 1), input(1100, true, 2)]);
-        Assert.That(session.GetEventsSince(0).Select(e => e.NoteId), Is.EqualTo(new[] { 0 }));
+        Assert.That(session.GetEventsSince(0).Select(e => e.NoteId), Is.EqualTo([0]));
         session.AdvanceTo(ms(1350), [input(1150, false, 1), input(1200, false, 2), input(1300, true, 1)]);
         Assert.That(session.GetEventsSince(0).Single(e => e.NoteId == 2).Result, Is.EqualTo("perfect"));
     }
@@ -71,7 +75,7 @@ public class AuditRegressionTest
     {
         var session = ManiaProfiles.CreateStable(chart(tap(0, 1000), tap(1, 1050))).CreateSession();
         session.AdvanceTo(ms(950), [input(900, true), input(901, false), input(950, true)]);
-        Assert.That(session.GetEventsSince(0).Select(e => (e.NoteId, e.Result)), Is.EqualTo(new[] { (0, "ok") }));
+        Assert.That(session.GetEventsSince(0).Select(e => (e.NoteId, e.Result)), Is.EqualTo([(0, "ok")]));
         session.AdvanceTo(ms(1050), [input(951, false), input(1050, true)]);
         Assert.That(session.GetEventsSince(0).Last().NoteId, Is.EqualTo(1));
         Assert.That(session.GetEventsSince(0).Last().Result, Is.EqualTo("perfect"));

@@ -52,14 +52,14 @@
         <ProjectReference Include="$(OsuSourcePath)\osu.Game\osu.Game.csproj"/>
     </ItemGroup>
     <ItemGroup>
-        <ProjectReference Include="..\RhythmEngine\RhythmEngine.Profiles\RhythmEngine.Profiles.csproj" />
+        <ProjectReference Include="..\RhythmEngine\RhythmEngine\RhythmEngine.csproj" />
         <InternalsVisibleTo Include="osu.Game.Rulesets.BmsRuleset.Tests"/>
         <InternalsVisibleTo Include="MonoMod.Utils.Cil.ILGeneratorProxy"/>
     </ItemGroup>
     <Target Name="RepackBmsRuleset" AfterTargets="Build">
         <ItemGroup>
             <BmsHarmonyAssembly Include="@(ReferencePath)" Condition="'%(ReferencePath.Filename)' == '0Harmony'" />
-            <BmsEngineAssemblies Include="@(ReferencePath)" Condition="'%(ReferencePath.Filename)' == 'RhythmEngine' Or '%(ReferencePath.Filename)' == 'RhythmEngine.Profiles'" />
+            <BmsEngineAssembly Include="@(ReferencePath)" Condition="'%(ReferencePath.Filename)' == 'RhythmEngine'" />
             <BmsRepackLibraryPath Include="@(ReferencePath->'%(RootDir)%(Directory)')" />
             <BmsRepackLibraryPath Include="$(TargetDir)" />
             <!-- MSBuild normalises backslashes in item paths on Unix, including regex escapes. -->
@@ -68,10 +68,10 @@
             <BmsRepackInternalizeExclude Include="^RhythmEngine[.]" />
             <BmsRepackInputAssemblies Include="$(TargetPath)" />
             <BmsRepackInputAssemblies Include="@(BmsHarmonyAssembly)" />
-            <BmsRepackInputAssemblies Include="@(BmsEngineAssemblies)" />
+            <BmsRepackInputAssemblies Include="@(BmsEngineAssembly)" />
         </ItemGroup>
         <Error Condition="'@(BmsHarmonyAssembly)' == ''" Text="Unable to locate 0Harmony.dll for BMS ruleset repack. Restore Lib.Harmony before building with BmsRepackRuleset=true." />
-        <Error Condition="'@(BmsEngineAssemblies->Count())' != '2'" Text="Both RhythmEngine assemblies are required for the portable ruleset DLL." />
+        <Error Condition="'@(BmsEngineAssembly)' == ''" Text="RhythmEngine.dll is required for the portable ruleset DLL." />
         <ILRepack
             Parallel="true"
             Internalize="true"

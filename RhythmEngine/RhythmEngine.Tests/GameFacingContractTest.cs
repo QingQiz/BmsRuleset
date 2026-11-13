@@ -1,6 +1,10 @@
 using NUnit.Framework;
+using RhythmEngine.Core;
 using RhythmEngine.Hosting;
-using RhythmEngine.Profiles;
+using RhythmEngine.Profiles.Common;
+using RhythmEngine.Profiles.Malody;
+using RhythmEngine.Profiles.Mania;
+using RhythmEngine.Profiles.O2Jam;
 
 namespace RhythmEngine.Tests;
 

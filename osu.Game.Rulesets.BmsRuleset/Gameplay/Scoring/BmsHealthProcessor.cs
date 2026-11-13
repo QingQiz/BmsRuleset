@@ -9,15 +9,16 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
-using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
+using RhythmEngine.Core;
+using JudgementResult = osu.Game.Rulesets.Judgements.JudgementResult;
 
 namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 
 public partial class BmsHealthProcessor : HealthProcessor
 {
-    internal RhythmEngine.HealthConfiguration CreateEngineHealth(BmsHitObject[] objects)
+    internal HealthConfiguration CreateEngineHealth(BmsHitObject[] objects)
     {
         ensureInitialized();
         syncActiveStateFromHealth();
@@ -26,10 +27,10 @@ public partial class BmsHealthProcessor : HealthProcessor
             state.Profile with { GutsRules = state.Profile.GutsRules.ToImmutableArray() }, state.Calculator!.Total,
             state.Calculator.NoteCount, effectiveProfileFamily)).ToImmutableArray();
         return BmsEngineGauge.Create(objects, calculators,
-            gaugeStates.Select(state => new RhythmEngine.HealthState(state.CurrentHp, state.IsHpFailed)).ToImmutableArray());
+            gaugeStates.Select(state => new HealthState(state.CurrentHp, state.IsHpFailed)).ToImmutableArray());
     }
 
-    internal void ApplyEngineHealth(RhythmEngine.HealthState health)
+    internal void ApplyEngineHealth(HealthState health)
     {
         for (var i = 0; i < gaugeStates.Count; i++)
         {
@@ -40,7 +41,7 @@ public partial class BmsHealthProcessor : HealthProcessor
         HasEverFailed |= health.HasFailed;
     }
 
-    internal void ApplyEngineTick(RhythmEngine.HealthState health)
+    internal void ApplyEngineTick(HealthState health)
     {
         ApplyEngineHealth(health);
         markEverFailedIfEmpty();

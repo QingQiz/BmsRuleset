@@ -1,6 +1,8 @@
 using System.Text.Json;
 using NUnit.Framework;
-using RhythmEngine.Profiles;
+using RhythmEngine.Core;
+using RhythmEngine.Profiles.Common;
+using RhythmEngine.Profiles.Mania;
 
 namespace RhythmEngine.Tests;
 

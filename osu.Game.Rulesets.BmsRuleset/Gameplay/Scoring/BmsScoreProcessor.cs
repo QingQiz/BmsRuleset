@@ -12,10 +12,11 @@ using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
-using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
+using RhythmEngine.Core;
+using JudgementResult = osu.Game.Rulesets.Judgements.JudgementResult;
 
 namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 
@@ -132,7 +133,7 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
     public void RegisterEmptyPoor(double eventTime, double expectedTime, int column)
         => RegisterNonConsumingJudgement(HitResult.Miss, eventTime, expectedTime, column);
 
-    public void RegisterNonConsumingJudgement(HitResult result, double eventTime, double expectedTime, int column, RhythmEngine.ScoreState? engineScore = null)
+    public void RegisterNonConsumingJudgement(HitResult result, double eventTime, double expectedTime, int column, ScoreState? engineScore = null)
     {
         if (engineScore != null)
             applyEngineScore(engineScore);
@@ -160,7 +161,7 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
     ///     Applies a separate CN/HCN endpoint without requiring the source drawable to complete.
     /// </summary>
     public BmsLongNoteJudgementResult ApplySyntheticLongNoteEndpoint(BmsLongNoteEndpointResult endpointResult, bool suppressPenalty = false,
-        RhythmEngine.JudgementResult? engineResult = null)
+        RhythmEngine.Core.JudgementResult? engineResult = null)
     {
         var endpoint = endpointResult.Source.CreateSyntheticEndpoint(endpointResult.ExpectedTime);
         var result = new BmsLongNoteJudgementResult(endpoint, endpoint.CreateJudgement(), [endpointResult])
@@ -265,7 +266,7 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
         }
     }
 
-    private void applyEngineScore(RhythmEngine.ScoreState state)
+    private void applyEngineScore(ScoreState state)
     {
         Combo.Value = state.Combo;
         HighestCombo.Value = state.MaximumCombo;

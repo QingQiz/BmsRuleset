@@ -1,5 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <ItemGroup>
-    <ProjectReference Include="../RhythmEngine/RhythmEngine.csproj" />
-  </ItemGroup>
-</Project>

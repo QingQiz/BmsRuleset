@@ -1,8 +1,8 @@
 using osu.Game.Rulesets.Scoring;
 using System.Linq;
-using RhythmEngine;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+using RhythmEngine.Core;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.Presentation;
 

@@ -1,6 +1,8 @@
 using System.Collections.Immutable;
 using NUnit.Framework;
-using RhythmEngine.Profiles;
+using RhythmEngine.Core;
+using RhythmEngine.Profiles.Common;
+using RhythmEngine.Profiles.Malody;
 using RhythmEngine.Profiles.Patterns;
 
 namespace RhythmEngine.Tests;
@@ -205,7 +207,7 @@ public class MalodyConfigurationTest
         Assert.That(session.Score.Combo, Is.Zero);
         Assert.That(session.Completed, Is.False);
         var clone = session.Clone();
-        InputEvent[] regrab = [new InputEvent(ms(1400), 0, true)];
+        InputEvent[] regrab = [new(ms(1400), 0, true)];
         session.AdvanceTo(ms(2200), regrab);
         clone.AdvanceTo(ms(1550), regrab);
         clone.AdvanceTo(ms(2200));

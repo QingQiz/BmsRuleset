@@ -1,3 +1,4 @@
+using RhythmEngine.Core;
 using RhythmEngine.Hosting;
 
 namespace RhythmEngine.Tests.Hosting;

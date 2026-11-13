@@ -1,6 +1,6 @@
 using System.Linq;
-using RhythmEngine;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
+using RhythmEngine.Core;
 
 namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 

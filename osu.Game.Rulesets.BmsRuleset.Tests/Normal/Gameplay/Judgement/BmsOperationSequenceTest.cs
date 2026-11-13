@@ -9,6 +9,8 @@ using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.Scoring;
+using RhythmEngine.Core;
+using RhythmEngine.Profiles.Bms;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
 
@@ -51,7 +53,7 @@ public class BmsOperationSequenceTest
         {
             engine.ProcessFrame(new BmsFrameContext(time, 1), 0);
             var judged = note is BmsLongNote hold ? engine.GetColumn(1).GetLongNoteState(hold).HeadJudged : output.GetMainResult(note).HasResult;
-            Assert.That(judged, Is.EqualTo(RhythmEngine.Time.FromMilliseconds(time) > RhythmEngine.Time.FromMilliseconds(start) + RhythmEngine.Time.FromMilliseconds(offset)), $"at {time:R}");
+            Assert.That(judged, Is.EqualTo(Time.FromMilliseconds(time) > Time.FromMilliseconds(start) + Time.FromMilliseconds(offset)), $"at {time:R}");
         }
     }
 
@@ -150,7 +152,7 @@ public class BmsOperationSequenceTest
         Assert.That(output.GetMainResult(note).Type, Is.EqualTo(HitResult.Meh));
     }
 
-    private static (List<Event> Events, RhythmEngine.HealthState[] Gauges, bool Failed, (double Score, int Combo, int MaximumCombo) Score)
+    private static (List<Event> Events, HealthState[] Gauges, bool Failed, (double Score, int Combo, int MaximumCombo) Score)
         run(BmsLongNoteMode mode, BmsLayoutVariant layout, double interval)
     {
         var beatmap = new BmsBeatmap { LayoutVariant = layout, Rank = 2, LockedLongNoteMode = mode };
@@ -192,7 +194,7 @@ public class BmsOperationSequenceTest
             return new BmsJudgementColumnDefinition(objects, layout, column, output);
         }).ToArray();
         var engine = new BmsJudgementEngine(definitions, notes =>
-            (RhythmEngine.Profiles.BmsProfiles.CreateScore(BmsJudgementProfileProvider.EmptyPoorBreaksCombo(layout)), health.CreateEngineHealth(notes)));
+            (BmsProfiles.CreateScore(BmsJudgementProfileProvider.EmptyPoorBreaksCombo(layout)), health.CreateEngineHealth(notes)));
         (double Time, int Column, bool Pressed)[] inputs =
         [
             (1000, 1, true), (1025, 2, true), (1026, 2, false), (1100, 3, true),

@@ -23,7 +23,6 @@ using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Embedded;
 using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Runtime;
-using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
@@ -31,6 +30,9 @@ using osu.Game.Rulesets.UI;
 using osu.Game.Screens.Play;
 using osu.Game.Skinning;
 using osuTK;
+using RhythmEngine.Core;
+using RhythmEngine.Profiles.Bms;
+using JudgementResult = osu.Game.Rulesets.Judgements.JudgementResult;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 
@@ -91,7 +93,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         var judgementObjects = Beatmap.HitObjects.ToArray();
         judgementEngine = new BmsJudgementEngine(judgementColumns.Select(column => new BmsJudgementColumnDefinition(
             judgementObjects, LayoutVariant, column.Index, column.JudgementBridge)).ToArray(), objects =>
-            (RhythmEngine.Profiles.BmsProfiles.CreateScore(scoreProcessor?.EmptyPoorBreaksCombo ?? BmsJudgementProfileProvider.EmptyPoorBreaksCombo(LayoutVariant)),
+            (BmsProfiles.CreateScore(scoreProcessor?.EmptyPoorBreaksCombo ?? BmsJudgementProfileProvider.EmptyPoorBreaksCombo(LayoutVariant)),
              healthProcessor?.CreateEngineHealth(objects) ?? BmsEngineGauge.CreateDefault(objects)));
         foreach (var column in judgementColumns)
         {
@@ -508,7 +510,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         requestJudgementDisplay(type);
     }
 
-    internal void ApplyEngineHealth(RhythmEngine.HealthState state) => healthProcessor?.ApplyEngineTick(state);
+    internal void ApplyEngineHealth(HealthState state) => healthProcessor?.ApplyEngineTick(state);
 
     private void requestJudgementDisplay(HitResult result)
     {
@@ -526,7 +528,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     ///     Registers a separate CN/HCN endpoint through the score and health processors.
     /// </summary>
     internal void ApplySyntheticLongNoteEndpoint(BmsLongNoteEndpointResult endpoint, bool suppressPenalty,
-        RhythmEngine.JudgementResult? engineResult = null)
+        RhythmEngine.Core.JudgementResult? engineResult = null)
     {
         var note = endpoint.Source;
         var scoreResult = scoreProcessor?.ApplySyntheticLongNoteEndpoint(endpoint, suppressPenalty, engineResult);

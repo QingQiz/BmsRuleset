@@ -1,6 +1,12 @@
 using NUnit.Framework;
+using RhythmEngine.Core;
 using RhythmEngine.Hosting;
-using RhythmEngine.Profiles;
+using RhythmEngine.Profiles.Bms;
+using RhythmEngine.Profiles.Common;
+using RhythmEngine.Profiles.Etterna;
+using RhythmEngine.Profiles.Malody;
+using RhythmEngine.Profiles.Mania;
+using RhythmEngine.Profiles.O2Jam;
 using RhythmEngine.Profiles.Patterns;
 using RhythmEngine.Tests.Hosting;
 
@@ -114,7 +120,7 @@ public class HostLifecycleTest
         var host = new RecordingHost();
         host.Present(session.Current);
         host.Present(session.AdvanceTo(1_000_000, [new(1_000_000, 0, true)]));
-        Assert.That(host.Audio, Is.EqualTo(new[] { (1_000_000L, 10, "body", true) }));
+        Assert.That(host.Audio, Is.EqualTo([(1_000_000L, 10, "body", true)]));
         host.Present(session.AdvanceTo(2_500_000, [new(2_000_000, 0, false)]));
         Assert.That(host.Audio, Has.Count.EqualTo(2));
         Assert.That(host.Audio[^1].Active, Is.False);
@@ -164,8 +170,8 @@ public class HostLifecycleTest
         host.Present(session.Current);
         var frame = session.AdvanceTo(2_500_000, [new(2_000_000, 0, true)]);
         host.Present(frame);
-        Assert.That(host.Outcomes, Is.EqualTo(new[] { SessionOutcome.Failed, SessionOutcome.Cleared }));
-        Assert.That(host.Judgements.Select(j => j.Health), Is.EqualTo(new[] { new HealthState(-1, true), new HealthState(4, false) }));
+        Assert.That(host.Outcomes, Is.EqualTo([SessionOutcome.Failed, SessionOutcome.Cleared]));
+        Assert.That(host.Judgements.Select(j => j.Health), Is.EqualTo([new HealthState(-1, true), new HealthState(4, false)]));
         Assert.That(host.Score.Score, Is.EqualTo(7));
         Assert.That(frame.Cleared, Is.True);
         var replayed = session.Reconstruct(2_500_000, [new(2_000_000, 0, true)]);
@@ -181,12 +187,12 @@ public class HostLifecycleTest
         var rule = new TapRule(new TapConfiguration(windows, 100, "absent", 3));
         var chart = new Chart(1, [new ChartNote(4, 0, 1_000, 1_000, rule)]);
         var configuration = new SessionConfiguration("independent-asymmetric", new ScoreConfiguration(new ScoreState(), (state, context) =>
-        {
-            var value = context.Event.Result switch { "precise" => 3, "late" => 1, _ => 0 };
-            return state with { Score = state.Score + value };
-        }, plan => plan.MaximumAccuracy), new HealthConfiguration(new HealthState(10, false),
-            context => new HealthState(context.Score.Score + 10, false),
-            context => context.Completed ? SessionOutcome.Cleared : SessionOutcome.InProgress),
+            {
+                var value = context.Event.Result switch { "precise" => 3, "late" => 1, _ => 0 };
+                return state with { Score = state.Score + value };
+            }, plan => plan.MaximumAccuracy), new HealthConfiguration(new HealthState(10, false),
+                context => new HealthState(context.Score.Score + 10, false),
+                context => context.Completed ? SessionOutcome.Cleared : SessionOutcome.InProgress),
             context => [.. context.Candidates.OrderBy(c => c.StartTime).ThenBy(c => c.NoteIndex).Take(1)]);
         IGameplaySession session = new GameplaySession(chart, configuration);
         var host = new RecordingHost();
@@ -236,7 +242,7 @@ public class HostLifecycleTest
         Assert.That(transition.Input, Is.EqualTo(new InputEvent(1_550_000, 0, true)));
         Assert.That(transition.Before.Completed, Is.False);
         Assert.That(transition.After.Completed, Is.True);
-        Assert.That(host.Notes[10].Parts.Select(p => p.Part), Is.EqualTo(new[] { "head", "body", "tail" }));
+        Assert.That(host.Notes[10].Parts.Select(p => p.Part), Is.EqualTo(["head", "body", "tail"]));
         Assert.That(host.Notes[10].Parts.All(p => p.Resolved && !p.Active), Is.True);
     }
 
@@ -244,15 +250,17 @@ public class HostLifecycleTest
     public void SameTimeExpiryAndInputKeepOrderAndLaneIdentity()
     {
         var rule = new TapRule(new TapConfiguration(new TimingWindows([new("perfect", -1, 1)]), 1, "miss", 305));
-        var chart = new Chart(2, [new ChartNote(7, 0, 1_000, 1_000, rule), new ChartNote(3, 0, 1_000, 1_000, rule),
-            new ChartNote(9, 1, 1_002, 1_002, rule)]);
+        var chart = new Chart(2, [
+            new ChartNote(7, 0, 1_000, 1_000, rule), new ChartNote(3, 0, 1_000, 1_000, rule),
+            new ChartNote(9, 1, 1_002, 1_002, rule)
+        ]);
         IGameplaySession session = new GameplaySession(chart, unscoredConfiguration());
         var host = new RecordingHost();
         host.Present(session.Current);
         var frame = session.AdvanceTo(1_002, [new(1_002, 1, true)]);
         host.Present(frame);
-        Assert.That(frame.Transitions.Select(t => t.After.Id), Is.EqualTo(new[] { 7, 3, 9 }));
-        Assert.That(frame.Transitions.Select(t => t.Input.HasValue), Is.EqualTo(new[] { false, false, true }));
+        Assert.That(frame.Transitions.Select(t => t.After.Id), Is.EqualTo([7, 3, 9]));
+        Assert.That(frame.Transitions.Select(t => t.Input.HasValue), Is.EqualTo([false, false, true]));
         Assert.That(host.Notes[7].Lane, Is.Zero);
         Assert.That(host.Notes[3].Lane, Is.Zero);
         Assert.That(host.Notes[9].Lane, Is.EqualTo(1));
