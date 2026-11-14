@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -32,6 +33,7 @@ public partial class TestSceneBmsCourseSelect
         practiceHudLoadGate?.Set();
         if (previousPracticeUiScale is not { } scale)
             return;
+
         Schedule(() => config.SetValue(OsuSetting.UIScale, scale));
         previousPracticeUiScale = null;
     }
@@ -49,7 +51,6 @@ public partial class TestSceneBmsCourseSelect
         PracticeIsolationPlayer first = null!;
         RealPracticeRoot root = null!;
         PracticeTransitionMonitor monitor = null!;
-        Dictionary<string, Quad> expected = null!;
         var skinsCreated = 0;
         var hudLoadEntered = new ManualResetEventSlim();
         string? layoutFailure = null;
@@ -75,8 +76,11 @@ public partial class TestSceneBmsCourseSelect
         AddStep("open practice", () => Stack.Push(practice = new LayoutPracticeScreen(session, () =>
         {
             if (delayHud)
+            {
                 return new SkinProvidingContainer(new GatedPracticeSkin(new BmsBuiltInSkinTransformer(new ArgonSkin(Dependencies.Get<SkinManager>())),
                     skinsCreated++ > 0 ? practiceHudLoadGate : null, hudLoadEntered));
+            }
+
             return skin is { } kind ? BmsTestSkins.CreateSkinSource(kind, Dependencies.Get<SkinManager>()) : Dependencies.Get<SkinManager>();
         })));
         AddUntilStep("first count-in ready", () => practice.Countdown.IsReady);
@@ -89,19 +93,22 @@ public partial class TestSceneBmsCourseSelect
         AddWaitStep("settle first layout", 5);
         AddStep("monitor actual HUD bounds and repeat", () =>
         {
-            expected = practiceHudLayout(first);
+            var expected = practiceHudLayout(first);
             Assert.That(expected.Count, Is.GreaterThan(3));
             monitor = monitorPracticeTransitions();
             monitor.ObserveFrame = () =>
             {
                 if (Stack.CurrentScreen is not BmsPracticePlayer { IsLoaded: true, Alpha: 1 } player)
                     return;
+
                 var actual = practiceHudLayout(player);
+
                 if (!actual.Keys.Order().SequenceEqual(expected.Keys.Order()))
                 {
                     layoutFailure ??= "A visible repeat was missing HUD components.";
                     return;
                 }
+
                 foreach (var (name, quad) in expected)
                 {
                     if ((actual[name].TopLeft - quad.TopLeft).Length >= 0.1f || (actual[name].BottomRight - quad.BottomRight).Length >= 0.1f)
@@ -110,6 +117,7 @@ public partial class TestSceneBmsCourseSelect
             };
             first.ChildrenOfType<GameplayClockContainer>().Single().Seek(2500);
         });
+
         if (delayHud)
         {
             AddUntilStep("replacement HUD loading is delayed", () => hudLoadEntered.IsSet && practice.Players.Count == 2 && practice.Players[1].IsLoaded);
@@ -117,6 +125,7 @@ public partial class TestSceneBmsCourseSelect
             AddAssert("replacement waits for complete HUD", () => practice.Players[1].Alpha == 0 && first.IsAlive && !first.IsPracticeDisposed);
             AddStep("finish skin loading", () => practiceHudLoadGate!.Set());
         }
+
         AddUntilStep("second count-in ready", () => practice.Players.Count == 2 && practice.Countdown.IsReady);
         AddWaitStep("observe revealed HUD", 8);
         AddStep("start second attempt", () => practice.SkipCountdown());
@@ -175,7 +184,7 @@ public partial class TestSceneBmsCourseSelect
         {
             var component = base.GetDrawableComponent(lookup);
             return gate != null && lookup is GlobalSkinnableContainerLookup { Lookup: GlobalSkinnableContainers.MainHUDComponents, Ruleset: null }
-                                   && component is Container container
+                                && component is Container container
                 ? new GatedPracticeHud(container, gate, entered)
                 : component;
         }
@@ -186,6 +195,7 @@ public partial class TestSceneBmsCourseSelect
         private readonly Container content;
         private readonly ManualResetEventSlim gate;
         private readonly ManualResetEventSlim entered;
+
         protected override Container<Drawable> Content => content;
 
         internal GatedPracticeHud(Container content, ManualResetEventSlim gate, ManualResetEventSlim entered)

@@ -30,6 +30,7 @@ using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 using osu.Game.Screens.Play;
+using osu.Game.Screens.Select;
 using osu.Game.Tests.Beatmaps;
 using osuTK.Graphics;
 
@@ -38,7 +39,6 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal;
 [TestFixture]
 public class BmsRulesetTest
 {
-
     [SetUp]
     public void SetUp()
     {
@@ -159,7 +159,7 @@ public class BmsRulesetTest
         Assert.That(processor, Is.TypeOf<BmsHealthProcessor>());
         var health = (BmsHealthProcessor)processor;
         var initialHealth = health.Health.Value;
-        health.ApplyHellChargeTick(false);
+        health.ApplyTestBodyTick(false);
         Assert.That(health.Health.Value, Is.LessThan(initialHealth));
     }
 
@@ -379,15 +379,15 @@ public class BmsRulesetTest
     [Test]
     public void TestBmsSongSelectIsAcceptedAsPresentScoreParent()
     {
-        var validScreens = BmsReplayPatcher.AddBmsSongSelect([typeof(osu.Game.Screens.Select.SongSelect)]).ToArray();
+        var validScreens = BmsReplayPatcher.AddBmsSongSelect([typeof(Screens.Select.SongSelect)]).ToArray();
 
-        Assert.That(validScreens, Is.EqualTo(new[] { typeof(osu.Game.Screens.Select.SongSelect), typeof(BmsSongSelect) }));
+        Assert.That(validScreens, Is.EqualTo(new[] { typeof(Screens.Select.SongSelect), typeof(BmsSongSelect) }));
     }
 
     [Test]
     public void TestBmsSoloSongSelectIsAcceptedAsSkinEditorGameplayParent()
     {
-        var validScreens = BmsReplayPatcher.AddBmsSongSelect([typeof(osu.Game.Screens.Play.Player), typeof(osu.Game.Screens.Select.SoloSongSelect)]).ToArray();
+        var validScreens = BmsReplayPatcher.AddBmsSongSelect([typeof(Player), typeof(SoloSongSelect)]).ToArray();
 
         Assert.That(validScreens.Any(type => type.IsAssignableFrom(typeof(BmsSoloSongSelect))), Is.True);
         Assert.That(validScreens, Does.Not.Contain(typeof(BmsSongSelect)));
@@ -489,7 +489,7 @@ public class BmsRulesetTest
         new BmsDifficultyInfo { Rank = 3, LayoutVariant = BmsLayoutVariant.Bme7K }.WriteToOsuDifficulty(beatmapInfo);
 
         var rank = ruleset.GetBeatmapAttributesForDisplay(beatmapInfo, Array.Empty<Mod>())
-            .Single(attribute => attribute.Acronym == "RK");
+                          .Single(attribute => attribute.Acronym == "RK");
 
         var metrics = rank.AdditionalMetrics.ToDictionary(metric => metric.Name.ToString(), metric => metric.Value.ToString());
 

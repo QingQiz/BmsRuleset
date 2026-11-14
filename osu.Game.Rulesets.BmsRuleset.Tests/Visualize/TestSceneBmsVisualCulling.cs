@@ -4,19 +4,17 @@ using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
 using osu.Framework.Graphics;
-using osu.Framework.Testing;
 using osu.Framework.Graphics.Pooling;
-using osu.Framework.Timing;
+using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
-using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Tests.Visual;
 
@@ -43,8 +41,9 @@ public partial class TestSceneBmsVisualCulling : BmsPlayerTestScene
             LockedLongNoteMode = mode,
             HitObjects =
             [
-                longNote ? new BmsLongNote { StartTime = 5000, Duration = 2000, Column = 1 }
-                         : new BmsNote { StartTime = 5000, Column = 1 },
+                longNote
+                    ? new BmsLongNote { StartTime = 5000, Duration = 2000, Column = 1 }
+                    : new BmsNote { StartTime = 5000, Column = 1 },
                 new BmsNote { StartTime = 30000, Column = 2 },
             ],
         };
@@ -64,10 +63,13 @@ public partial class TestSceneBmsVisualCulling : BmsPlayerTestScene
         seek(4800);
         AddUntilStep("object alive", () =>
         {
-            drawable = Playfield.AllColumnAliveObjects().OfType<DrawableBmsHitObject>().SingleOrDefault(d => d.HitObject.StartTime == 5000)!;
-            if (drawable != null)
-                hitObject = drawable.HitObject;
-            return drawable != null;
+            var candidate = Playfield.AllColumnAliveObjects().OfType<DrawableBmsHitObject>().SingleOrDefault(d => d.HitObject.StartTime == 5000);
+            if (candidate == null)
+                return false;
+
+            drawable = candidate;
+            hitObject = drawable.HitObject;
+            return true;
         });
     }
 
@@ -82,6 +84,7 @@ public partial class TestSceneBmsVisualCulling : BmsPlayerTestScene
         AddStep("move full object outside viewport", () =>
         {
             drawable.HitObject.ScrollPositionAtStartTime = -1_000_000;
+
             if (drawable.HitObject is BmsLongNote ln)
             {
                 ln.ScrollPositionAtEndTime = -1_000_000;
@@ -120,6 +123,7 @@ public partial class TestSceneBmsVisualCulling : BmsPlayerTestScene
     public void TestHitFeedbackPreservesOverlappingPulseBrightness(bool isLongNote)
     {
         load();
+
         for (var pulse = 0; pulse < 4; pulse++)
         {
             seek(4800 + pulse * 50);
@@ -161,7 +165,7 @@ public partial class TestSceneBmsVisualCulling : BmsPlayerTestScene
         AddStep("hold head and vary only the visual projection", () =>
         {
             var column = (BmsColumn)Playfield.Stage.Columns[1];
-            PressColumn(column, 5000);
+            PressColumn(column, 5010);
             var note = (BmsLongNote)hitObject;
             var state = column.Judgements.GetLongNoteState(note);
             var result = drawable.Result.Type;
@@ -181,11 +185,13 @@ public partial class TestSceneBmsVisualCulling : BmsPlayerTestScene
             Assert.That(prepared.OriginY, Is.EqualTo(-1_000_000));
             Assert.That(graphics.Select(d => (d.Position, d.Size, d.Scale, d.Alpha)), Is.EqualTo(beforePreparation),
                 "Preparing a culling boundary must not apply graphics or advance their animation.");
+
             for (var i = 0; i < 20; i++)
             {
                 drawable.UpdateVisualLayout(-100, frame);
                 drawable.UpdateVisualLayout(-1_000_000, frame with { ScrollPosition = -1_000_000 });
             }
+
             Assert.That(column.Judgements.GetLongNoteState(note), Is.EqualTo(state));
             Assert.That(drawable.Result.Type, Is.EqualTo(result));
             Assert.That(Player.Results, Has.Count.EqualTo(resultCount));
@@ -246,5 +252,4 @@ public partial class TestSceneBmsVisualCulling : BmsPlayerTestScene
         AddAssert("culled body recovers health", () => Player.HealthProcessor.Health.Value > releasedHealth);
         AddAssert("body remains culled", () => !drawable.IsPresent);
     }
-
 }

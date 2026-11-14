@@ -1,14 +1,14 @@
-﻿using NUnit.Framework;
+using NUnit.Framework;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Testing;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
-using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Tests.Visual;
 using osuTK.Graphics;
@@ -108,7 +108,7 @@ public partial class TestSceneBmsHealthBar : OsuTestScene
     public void TestEmptyPoorDrain()
     {
         AddStep("set health to 80%", () => healthProcessor.Health.Value = 0.80);
-        AddStep("register empty poor", () => healthProcessor.RegisterEmptyPoor());
+        AddStep("register empty poor", () => healthProcessor.ApplyTestEmptyPoor());
         AddUntilStep("health display drained", () => healthProcessor.Health.Value, () => Is.EqualTo(0.78).Within(0.001));
     }
 
@@ -182,7 +182,7 @@ public partial class TestSceneBmsHealthBar : OsuTestScene
     public void TestLandmineDrain()
     {
         AddStep("set health to 80%", () => healthProcessor.Health.Value = 0.80);
-        AddStep("detonate landmine", () => healthProcessor.ApplyResult(new JudgementResult(beatmap.HitObjects[1], beatmap.HitObjects[1].CreateJudgement())
+        AddStep("detonate landmine", () => healthProcessor.ApplyTestResult(new BmsJudgementResult(beatmap.HitObjects[1], beatmap.HitObjects[1].CreateJudgement())
         {
             Type = HitResult.Meh,
         }));

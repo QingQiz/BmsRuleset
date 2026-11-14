@@ -48,20 +48,23 @@ public partial class TestSceneBmsCourseSelect
         {
             directory = Path.Combine(LocalStorage.GetFullPath(string.Empty), $"dan-health-{Guid.NewGuid():N}");
             Directory.CreateDirectory(directory);
+
             for (var stage = 0; stage < 3; stage++)
             {
                 var notes = autoGauge ? stage < 2 ? 6 : 2 : 1;
-                File.WriteAllText(Path.Combine(directory, $"stage-{stage}.bms"), $"""
-                    #PLAYER 1
-                    #TITLE Dan Health {courseId}
-                    #SUBTITLE Stage {stage}
-                    #ARTIST Test
-                    #BPM 120
-                    #PLAYLEVEL 1
-                    #DIFFICULTY 1
-                    #01011:{string.Concat(Enumerable.Repeat("01", notes))}
-                    """);
+                File.WriteAllText(Path.Combine(directory, $"stage-{stage}.bms"),
+                    $"""
+                     #PLAYER 1
+                     #TITLE Dan Health {courseId}
+                     #SUBTITLE Stage {stage}
+                     #ARTIST Test
+                     #BPM 120
+                     #PLAYLEVEL 1
+                     #DIFFICULTY 1
+                     #01011:{string.Concat(Enumerable.Repeat("01", notes))}
+                     """);
             }
+
             import = new BmsFileImporter(Realm, LocalStorage).Import(directory);
         });
         AddUntilStep("charts imported", () => import.IsCompleted);
@@ -93,7 +96,7 @@ public partial class TestSceneBmsCourseSelect
         {
             var stageIndex = stage;
             AddUntilStep($"stage {stageIndex + 1} player entered", () => Stack.CurrentScreen is BmsCoursePlayer current
-                && !ReferenceEquals(current, player) && current.IsLoaded && current.LoadedBeatmapSuccessfully && current.Alpha == 1);
+                                                                         && !ReferenceEquals(current, player) && current.IsLoaded && current.LoadedBeatmapSuccessfully && current.Alpha == 1);
             AddStep("check opening after framework load", () =>
             {
                 player = (BmsCoursePlayer)Stack.CurrentScreen;
@@ -123,15 +126,15 @@ public partial class TestSceneBmsCourseSelect
             if (stageIndex < 2)
             {
                 AddUntilStep("framework displays imported stage result", () => Stack.CurrentScreen is BmsCourseStageResultsScreen result
-                    && result.IsLoaded && result.Alpha == 1);
+                                                                               && result.IsLoaded && result.Alpha == 1);
                 AddStep("start next stage from actual result button", () =>
                     ((BmsCourseStageResultsScreen)Stack.CurrentScreen).ChildrenOfType<BmsCourseResultButton>()
-                        .Single(button => button.Name == "Start next course stage button").TriggerClick());
+                    .Single(button => button.Name == "Start next course stage button").TriggerClick());
             }
         }
 
         AddUntilStep("framework displays final dan result", () => Stack.CurrentScreen is BmsCourseResultsScreen result
-            && result.IsLoaded && result.Alpha == 1);
+                                                                  && result.IsLoaded && result.Alpha == 1);
         AddStep("verify imported scores retain each stage opening", () =>
         {
             for (var stage = 0; stage < charts.Length; stage++)
@@ -188,6 +191,7 @@ public partial class TestSceneBmsCourseSelect
                     session.RequestAdvance();
                     session.Advance();
                 }
+
                 var beatmap = new BmsBeatmap
                 {
                     BeatmapInfo = stageBeatmap,
@@ -221,14 +225,15 @@ public partial class TestSceneBmsCourseSelect
             {
                 Assert.That(player.Health.CurrentGaugeStates, Is.EqualTo(expected));
                 var tierAtStart = player.Health.GaugeType;
+
                 if (autoGauge && stageIndex < 2)
                 {
                     for (var bad = 0; player.Health.GaugeType == tierAtStart && bad < 200; bad++)
-                        player.Health.RegisterNonConsumingJudgement(HitResult.Ok);
+                        player.Health.ApplyTestNonConsumingJudgement(HitResult.Ok);
                     Assert.That(player.Health.GaugeType, Is.Not.EqualTo(tierAtStart));
                 }
                 else
-                    player.Health.RegisterNonConsumingJudgement(HitResult.Ok);
+                    player.Health.ApplyTestNonConsumingJudgement(HitResult.Ok);
 
                 expected = player.Health.CurrentGaugeStates.Where(state => !state.Failed).ToArray();
                 saved[stageIndex] = player.CompleteStage();
@@ -241,6 +246,7 @@ public partial class TestSceneBmsCourseSelect
         AddStep("verify independent saved stage openings", () =>
         {
             Assert.That(session.Status, Is.EqualTo(BmsCourseStatus.Passed));
+
             for (var stage = 0; stage < saved.Length; stage++)
             {
                 var archived = BmsTestReplayArchive.RoundTrip(saved[stage].DeepClone());

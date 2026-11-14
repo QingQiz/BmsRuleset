@@ -16,7 +16,7 @@ public class AuditRegressionTest
     [TestCase(BmsRank.Easy, "pgreat")]
     public void Lr2LateShortHoldRetainsHeadUntilTheNextClockTick(BmsRank rank, string grade)
     {
-        var session = Lr2Beta3Profile.Create(chart(hold(0, 2000, 2010)), new Lr2Beta3Options(Rank: rank)).CreateSession();
+        var session = Lr2Beta3Profile.Create(chart(hold(0, 2000, 2010)), new Lr2Beta3Options(Rank: rank)).CreateRecordingSession();
         session.AdvanceTo(ms(2020), [input(2020, true)]);
         Assert.That(session.EventCount, Is.Zero);
         session.AdvanceTo(ms(2021));
@@ -30,7 +30,7 @@ public class AuditRegressionTest
     [TestCase(1050, 1300, "let-go")]
     public void EtternaHoldGraceStartsAfterItsHeadTime(int release, int regrab, string tail)
     {
-        var session = EtternaProfile.Create(chart(hold(0, 1000, 2000))).CreateSession();
+        var session = EtternaProfile.Create(chart(hold(0, 1000, 2000))).CreateRecordingSession();
         session.AdvanceTo(ms(2200), [input(850, true), input(release, false), input(regrab, true)]);
         Assert.That(session.GetEventsSince(0).Last().Result.Value, Is.EqualTo(tail));
     }
@@ -39,7 +39,7 @@ public class AuditRegressionTest
     [TestCase(KeyNoteKind.Roll)]
     public void EtternaMissedHoldStillConstrainsInternalTap(KeyNoteKind kind)
     {
-        var session = EtternaProfile.Create(chart(hold(0, 1000, 2000) with { Kind = kind }, tap(1, 1500))).CreateSession();
+        var session = EtternaProfile.Create(chart(hold(0, 1000, 2000) with { Kind = kind }, tap(1, 1500))).CreateRecordingSession();
         session.AdvanceTo(ms(1350), [input(1350, true)]);
         Assert.That(session.GetEventsSince(0).Any(e => e.NoteId == 1), Is.False);
         session.AdvanceTo(ms(1500), [input(1400, false), input(1500, true)]);
@@ -49,7 +49,7 @@ public class AuditRegressionTest
     [Test]
     public void LazerUsesLogicalLaneEdgesWhileRetainingPhysicalControls()
     {
-        var session = ManiaProfiles.CreateLazer(chart(tap(0, 1000), tap(1, 1100), tap(2, 1300))).CreateSession();
+        var session = ManiaProfiles.CreateLazer(chart(tap(0, 1000), tap(1, 1100), tap(2, 1300))).CreateRecordingSession();
         session.AdvanceTo(ms(1100), [input(1000, true, 1), input(1100, true, 2)]);
         Assert.That(session.GetEventsSince(0).Select(e => e.NoteId), Is.EqualTo([0]));
         session.AdvanceTo(ms(1350), [input(1150, false, 1), input(1200, false, 2), input(1300, true, 1)]);
@@ -61,7 +61,7 @@ public class AuditRegressionTest
     [TestCase(KeyNoteKind.SustainHold)]
     public void BeatorajaRetainsResolvedHoldHeadForEmptyPoor(KeyNoteKind kind)
     {
-        var session = BmsProfiles.CreateBeatoraja(chart(hold(0, 1000, 1010) with { Kind = kind })).CreateSession();
+        var session = BmsProfiles.CreateBeatoraja(chart(hold(0, 1000, 1010) with { Kind = kind })).CreateRecordingSession();
         session.AdvanceTo(ms(1050), [input(1000, true), input(1010, false), input(1050, true)]);
         Assert.That(session.GetEventsSince(0).Last().Result.Value, Is.EqualTo("empty-poor"));
         Assert.That(session.Health.Value, Is.EqualTo(98));
@@ -73,7 +73,7 @@ public class AuditRegressionTest
     [Test]
     public void StableEarlyJudgedTapBlocksItsLaneUntilStart()
     {
-        var session = ManiaProfiles.CreateStable(chart(tap(0, 1000), tap(1, 1050))).CreateSession();
+        var session = ManiaProfiles.CreateStable(chart(tap(0, 1000), tap(1, 1050))).CreateRecordingSession();
         session.AdvanceTo(ms(950), [input(900, true), input(901, false), input(950, true)]);
         Assert.That(session.GetEventsSince(0).Select(e => (e.NoteId, e.Result.Value)), Is.EqualTo([(0, "ok")]));
         session.AdvanceTo(ms(1050), [input(951, false), input(1050, true)]);

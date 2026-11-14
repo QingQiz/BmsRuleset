@@ -8,6 +8,7 @@ using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.Presentation;
 using osu.Game.Rulesets.Scoring;
+using RhythmEngine.Core;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
 
@@ -17,16 +18,19 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
 internal sealed class BmsLongNoteTestContext
 {
     internal BmsLongNote Note { get; }
-    internal BmsJudgementView Column { get; private set; }
+    internal BmsJudgementView Column { get; }
     internal BmsRecordingJudgementOutput Output { get; } = new();
     internal BmsLongNoteState State => Column.GetLongNoteState(Note);
     internal List<(HitResult Result, IReadOnlyList<BmsLongNoteEndpointResult> Endpoints)> MainResults { get; } = [];
     internal List<(BmsLongNoteState State, BmsFrameContext Frame)> Publications { get; } = [];
     internal IEnumerable<HitResult> Results => MainResults.Select(r => r.Result);
+
     internal IEnumerable<(double endpointTime, double eventTime, HitResult result)> MainEndpoints
         => MainResults.SelectMany(r => r.Endpoints.Select(e => (e.ExpectedTime, e.EventTime, e.Result)));
+
     internal IEnumerable<(double endpointTime, double eventTime, HitResult result)> SyntheticEndpoints
         => Output.SyntheticEndpoints.Select(e => (e.ExpectedTime, e.EventTime, e.Result));
+
     internal int HeadPublications { get; private set; }
     internal int FinishedPublications => Publications.Count(p => !p.Frame.IsRewinding && p.State.TailJudged && !p.State.LongNoteStarted);
     private BmsLongNoteState lastState;
@@ -38,7 +42,7 @@ internal sealed class BmsLongNoteTestContext
     internal Action<double>? BeforeOperation;
 
     internal BmsLongNoteTestContext(BmsLongNoteMode mode, double start = 1000, double duration = 500,
-                                   int column = 1, int rank = 2, BmsLayoutVariant layout = BmsLayoutVariant.Bme7K)
+                                    int column = 1, int rank = 2, BmsLayoutVariant layout = BmsLayoutVariant.Bme7K)
         : this(new BmsLongNote
         {
             StartTime = start, Duration = duration, Column = column,
@@ -47,10 +51,12 @@ internal sealed class BmsLongNoteTestContext
     {
     }
 
-    internal BmsLongNoteTestContext(BmsLongNote note)
+    internal BmsLongNoteTestContext(BmsLongNote note,
+                                    Func<BmsHitObject[], (ScoreConfiguration Score, HealthConfiguration Health)>? configurationFactory = null)
     {
         Note = note;
-        Column = new BmsJudgementEngine([note], note.Beatmap.LayoutVariant, note.Column, Output).GetColumn(note.Column);
+        Column = new BmsJudgementEngine([note], note.Beatmap.LayoutVariant, [new BmsJudgementColumnDefinition(note.Column, Output)],
+            configurationFactory).GetColumn(note.Column);
 
         Output.ResultApplied = (_, _) => MainResults.Add((Output.GetMainResult(Note).Type, Output.GetEndpoints(Note).ToArray()));
         Output.StatePublished = (_, state, frame) =>
@@ -62,7 +68,7 @@ internal sealed class BmsLongNoteTestContext
         };
         Output.Feedback = feedback =>
         {
-            if (feedback.StartsWith("sample:")) sampleCount++;
+            if (feedback.StartsWith("sample:", StringComparison.Ordinal)) sampleCount++;
         };
     }
 
@@ -95,6 +101,7 @@ internal sealed class BmsLongNoteTestContext
             Rewind(time);
             return;
         }
+
         record(time, () => Frame(time, elapsed, holding), holding, time - elapsed);
         if ((Column.PressedDirections != 0) != holding)
             Column.Engine().QueueInput(time - elapsed, Note.Column, holding, false);
@@ -124,8 +131,9 @@ internal sealed class BmsLongNoteTestContext
         HeadPublications = sampleCount = 0;
         lastState = default;
         currentTime = double.NegativeInfinity;
-        Column = new BmsJudgementEngine([Note], Note.Beatmap.LayoutVariant, Note.Column, Output).GetColumn(Note.Column);
+        Column.Engine().Reset();
         replaying = true;
+
         try
         {
             foreach (var operation in previous)
@@ -138,8 +146,10 @@ internal sealed class BmsLongNoteTestContext
                         operations.Add(new Operation(time, () => Frame(time, elapsed, holding), holding, operation.StartTime));
                         Frame(time, elapsed, holding);
                     }
+
                     break;
                 }
+
                 operation.Apply();
                 operations.Add(operation);
             }

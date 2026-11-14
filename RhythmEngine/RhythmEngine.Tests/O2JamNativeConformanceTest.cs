@@ -17,7 +17,10 @@ public class O2JamNativeConformanceTest
     public static IEnumerable<TestCaseData> Holds()
     {
         foreach (var row in read("holds"))
-            yield return new TestCaseData(row).SetName($"O2Jam338_Hold_{row.GetProperty("bpm")}_{row.GetProperty("headTime")}_{(row.TryGetProperty("release", out var release) ? release : row.GetProperty("advance"))}");
+        {
+            yield return new TestCaseData(row).SetName(
+                $"O2Jam338_Hold_{row.GetProperty("bpm")}_{row.GetProperty("headTime")}_{(row.TryGetProperty("release", out var release) ? release : row.GetProperty("advance"))}");
+        }
     }
 
     [TestCaseSource(nameof(Heads))]
@@ -26,7 +29,7 @@ public class O2JamNativeConformanceTest
         var clock = clockFor(row);
         var time = ms(row.GetProperty("time").GetInt32());
         Assert.That(clock.TickAt(time), Is.EqualTo(row.GetProperty("tick").GetInt32()));
-        var session = O2Jam338Profile.Create(1, [new O2JamTickNote(0, 0, 192)], clock).CreateSession();
+        var session = O2Jam338Profile.Create(1, [new O2JamTickNote(0, 0, 192)], clock).CreateRecordingSession();
         session.AdvanceTo(time, [new InputEvent(time, 0, true)]);
         // The native fixture calls the input loop before the separate expiry pass.
         var expected = row.GetProperty("events").EnumerateArray().Select(result).ToArray();
@@ -37,7 +40,7 @@ public class O2JamNativeConformanceTest
     public void HoldReleaseAndTimeoutMatchOriginalInstructions(JsonElement row)
     {
         var clock = clockFor(row);
-        var session = O2Jam338Profile.Create(1, [new O2JamTickNote(0, 0, 192, 288)], clock).CreateSession();
+        var session = O2Jam338Profile.Create(1, [new O2JamTickNote(0, 0, 192, 288)], clock).CreateRecordingSession();
         var inputs = new List<InputEvent>();
         if (row.GetProperty("headTime").ValueKind != JsonValueKind.Null)
             inputs.Add(new InputEvent(ms(row.GetProperty("headTime").GetInt32()), 0, true));
@@ -55,7 +58,7 @@ public class O2JamNativeConformanceTest
         foreach (var row in read("timeouts"))
         {
             var clock = clockFor(row.GetProperty("bpm").GetInt32());
-            var session = O2Jam338Profile.Create(1, [new O2JamTickNote(0, 0, 192, 288)], clock).CreateSession();
+            var session = O2Jam338Profile.Create(1, [new O2JamTickNote(0, 0, 192, 288)], clock).CreateRecordingSession();
             var time = ms(row.GetProperty("time").GetInt32());
             Assert.That(clock.TickAt(time), Is.EqualTo(row.GetProperty("tick").GetInt32()));
             session.AdvanceTo(time, row.GetProperty("heldTail").GetBoolean() ? [new InputEvent(clock.TimeAt(192), 0, true)] : []);
@@ -72,7 +75,8 @@ public class O2JamNativeConformanceTest
             var clock = new O2JamClock([new O2JamClockPoint(0, 0), new O2JamClockPoint((rows.Length + 2) * 2000, (rows.Length + 2) * 192)]);
             var profile = O2Jam338Profile.Create(1, Enumerable.Range(0, rows.Length).Select(i => new O2JamTickNote(i, 0, (i + 1) * 192)),
                 clock, (O2JamDifficulty)row.GetProperty("difficulty").GetInt32());
-            var session = profile.CreateSession();
+            var session = profile.CreateRecordingSession();
+
             for (var i = 0; i < rows.Length; i++)
             {
                 var expected = rows[i];

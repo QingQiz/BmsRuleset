@@ -1,3 +1,4 @@
+#nullable enable
 using System.Linq;
 using NUnit.Framework;
 using osu.Game.Beatmaps;
@@ -6,6 +7,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Filter;
@@ -35,6 +37,7 @@ public class BmsonLayoutTest
         Assert.That(BmsDifficultyInfo.GetLayout(info.Difficulty), Is.EqualTo(beatmap.LayoutVariant));
         Assert.That(new BmsRuleset().GetVariantForBeatmap(info), Is.EqualTo((int)beatmap.LayoutVariant));
         Assert.That(new BmsFilterCriteria(null).Matches(info, new FilterCriteria()), Is.True);
+
         for (var column = 0; column < columns; column++)
         {
             var action = BmsKeyBindingConfiguration.ActionForColumn(beatmap.LayoutVariant, column);
@@ -57,7 +60,7 @@ public class BmsonLayoutTest
             info: $$""", "mode_hint":"{{mode}}" """));
         beatmap.LockedLongNoteMode = BmsLongNoteMode.ChargeNote;
         var note = beatmap.HitObjects.OfType<BmsLongNote>().Single();
-        var windows = osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.BmsJudgementProfileProvider.GetTable(note, false);
+        var windows = BmsJudgementProfileProvider.GetTable(note, false);
         Assert.That(windows.ResultForOffset(30), Is.EqualTo(HitResult.Perfect));
         Assert.That(windows.ResultForOffset(31), Is.EqualTo(HitResult.Great));
         var replay = new BmsAutoGenerator(beatmap).Generate();

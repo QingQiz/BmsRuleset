@@ -7,14 +7,14 @@ using System.Threading;
 using NUnit.Framework;
 using osu.Framework.Audio.Track;
 using osu.Framework.Graphics.Textures;
-using osu.Game.Beatmaps;
 using osu.Game.Audio;
+using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Randomisation;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Gauge;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Randomisation;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Practice;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
@@ -154,7 +154,7 @@ public class BmsPracticeBeatmapTest
     [Test]
     public void MixedGaugeChainKeepsFullChartPerJudgementChanges([Values(0d, 230d, 400d)] double total, [Values] BmsGaugeProfileFamily family)
     {
-        var full = createBeatmap(Enumerable.Range(0, 100).Select(index => new BmsNote { StartTime = index * 100, Column = 1 }).ToArray());
+        var full = createBeatmap([.. Enumerable.Range(0, 100).Select(index => new BmsNote { StartTime = index * 100, Column = 1 })]);
         full.Total = total;
         var practice = BmsPracticeBeatmap.Create(full, new BmsPracticeSettings { StartTime = 1000, EndTime = 2000 });
         using var normalHealth = new BmsHealthProcessor();
@@ -166,10 +166,11 @@ public class BmsPracticeBeatmapTest
 
         foreach (var result in new[] { HitResult.Ok, HitResult.Great, HitResult.Perfect, HitResult.Good, HitResult.Meh })
         {
-            normalHealth.RegisterNonConsumingJudgement(result);
-            practiceHealth.RegisterNonConsumingJudgement(result);
+            normalHealth.ApplyTestNonConsumingJudgement(result);
+            practiceHealth.ApplyTestNonConsumingJudgement(result);
             var expected = normalHealth.CurrentGaugeStates;
             var actual = practiceHealth.CurrentGaugeStates;
+
             for (var i = 0; i < expected.Count; i++)
             {
                 Assert.That(actual[i].GaugeType, Is.EqualTo(expected[i].GaugeType));
@@ -186,11 +187,12 @@ public class BmsPracticeBeatmapTest
     public void PreparedModsFixSeedsWithoutChangingSongSelectOrKeepingCourseState()
     {
         var random = new BmsModLaneRandom();
-        var gauge = new BmsModHardGauge();
-        gauge.InitialHealth.Value = 0.25;
-        gauge.GaugeProfileFamily.Value = BmsGaugeProfileFamily.Lr2;
-        var autoGauge = new BmsModAutoGauge();
-        autoGauge.ClassHealth.Value = 0.3;
+        var gauge = new BmsModHardGauge
+        {
+            InitialHealth = { Value = 0.25 },
+            GaugeProfileFamily = { Value = BmsGaugeProfileFamily.Lr2 },
+        };
+        var autoGauge = new BmsModAutoGauge { ClassHealth = { Value = 0.3 } };
 
         var mods = BmsPracticeSession.PrepareMods([random, gauge, autoGauge]);
         var again = BmsPracticeSession.PrepareMods(mods);
@@ -217,6 +219,7 @@ public class BmsPracticeBeatmapTest
         mods = [.. mods, BmsPracticeSession.CreateBranchReplay(first)!];
         Assert.That(mods.OfType<BmsModBranchReplay>().Single().Decisions.Value, Is.Not.Empty);
         var expected = first.HitObjects.Select(note => (note.StartTime, note.Column, note.SampleKey)).ToArray();
+
         for (var i = 0; i < 4; i++)
         {
             var again = BmsPracticeSession.GetFullBeatmap(source, BmsPracticeSession.PrepareMods(mods));
@@ -312,7 +315,7 @@ public class BmsPracticeBeatmapTest
     [Test]
     public void RepeatedNativePreviewsKeepIdenticalLayoutAndSourceOwnership()
     {
-        var full = createBeatmap(Enumerable.Range(0, 7).Select(column => new BmsNote { StartTime = column * 1000, Column = column, SampleKey = (ushort)(column + 1) }).ToArray());
+        var full = createBeatmap([.. Enumerable.Range(0, 7).Select(column => new BmsNote { StartTime = column * 1000, Column = column, SampleKey = (ushort)(column + 1) })]);
         var source = new TestWorkingBeatmap(full);
         var originalColumns = full.HitObjects.Select(note => note.Column).ToArray();
         var mods = BmsPracticeSession.PrepareMods([new BmsModLaneRandom()]);

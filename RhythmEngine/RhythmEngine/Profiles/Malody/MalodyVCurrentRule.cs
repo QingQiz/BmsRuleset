@@ -16,6 +16,7 @@ internal sealed record MalodyVTiming(TimingWindows Windows, long GoodWindow, lon
         var cool = (pro ? 76 : 85) + offset;
         var good = (pro ? 110 : 130) + offset;
         var miss = (pro ? 160 : 170) + offset;
+
         if (conversionPercent > 0)
         {
             best += (good - best) * conversionPercent / 100;
@@ -26,6 +27,7 @@ internal sealed record MalodyVTiming(TimingWindows Windows, long GoodWindow, lon
 
         var inverseScale = 1 / scale;
         var entries = ImmutableArray.CreateBuilder<TimingWindow>();
+
         foreach (var (result, bound) in new[] { (MalodyResults.BEST, best), (MalodyResults.COOL, cool), (MalodyResults.GOOD, good) })
         {
             var edge = firstOutside(bound, false);
@@ -45,6 +47,7 @@ internal sealed record MalodyVTiming(TimingWindows Windows, long GoodWindow, lon
                 throw new ArgumentOutOfRangeException(nameof(scale));
 
             var high = Math.Max(1, (long)Math.Ceiling(upperMilliseconds * 1000));
+
             while (low < high)
             {
                 var middle = low + (high - low) / 2;
@@ -71,19 +74,22 @@ internal sealed class MalodyVCurrentRule(MalodyVTiming timing, bool hold, bool j
 
     public IEnumerable<ScoringOpportunity> GetScoringOpportunities(ChartNote note)
     {
-        yield return new ScoringOpportunity(note.Id, NoteParts.HEAD, note.StartTime, 1000);
+        yield return new ScoringOpportunity(note.Id, NoteParts.HEAD, 1000);
 
         if (hold && judgeAtEnd)
-            yield return new ScoringOpportunity(note.Id, NoteParts.TAIL, note.EndTime, 1000);
+            yield return new ScoringOpportunity(note.Id, NoteParts.TAIL, 1000);
     }
 
     public InputCandidate? GetCandidate(NoteContext context, InputEvent input, int noteIndex)
     {
         var state = (MalodyHoldState)context.State;
+
         if (state.HeadResolved)
+        {
             return input.Pressed && context.Time >= context.Note.EndTime
                 ? null
                 : new InputCandidate(noteIndex, context.Note.StartTime, context.Time - context.Note.EndTime, 0);
+        }
 
         var offset = context.Time - context.Note.StartTime;
         return input.Pressed && timing.Windows.ResultFor(offset) != null
@@ -95,12 +101,14 @@ internal sealed class MalodyVCurrentRule(MalodyVTiming timing, bool hold, bool j
     {
         var state = (MalodyHoldState)context.State;
         var emissions = ImmutableArray.CreateBuilder<NoteEmission>();
+
         if (!state.HeadResolved)
         {
             var offset = context.Time - context.Note.StartTime;
             var result = timing.Windows.ResultFor(offset)!;
             emitGrade(emissions, NoteParts.HEAD, result, context.Note.StartTime, offset);
             state = state with { HeadResolved = true, TickTime = result == MalodyResults.MISS || !hold ? null : context.Note.StartTime + tick_interval };
+
             if (result == MalodyResults.MISS && hold && judgeAtEnd)
             {
                 emissions.Add(new NoteEmission(NoteParts.TAIL, MalodyResults.MISS, context.Note.EndTime));
@@ -115,6 +123,7 @@ internal sealed class MalodyVCurrentRule(MalodyVTiming timing, bool hold, bool j
         else if (!context.Input.Held && state.TickTime != null)
         {
             state = emitTicks(context.Note, state, Math.Min(context.Time, context.Note.EndTime), emissions);
+
             if (judgeAtEnd)
             {
                 var offset = context.Time - context.Note.EndTime;
@@ -144,6 +153,7 @@ internal sealed class MalodyVCurrentRule(MalodyVTiming timing, bool hold, bool j
     {
         var state = (MalodyHoldState)context.State;
         var emissions = ImmutableArray.CreateBuilder<NoteEmission>();
+
         if (!state.HeadResolved)
         {
             state = state with { HeadResolved = true };
@@ -156,6 +166,7 @@ internal sealed class MalodyVCurrentRule(MalodyVTiming timing, bool hold, bool j
         else
         {
             state = emitTicks(context.Note, state, context.Time, emissions);
+
             if (judgeAtEnd && context.Time > context.Note.EndTime + timing.MissWindow)
             {
                 if (state.TickTime != null && context.Input.Held)

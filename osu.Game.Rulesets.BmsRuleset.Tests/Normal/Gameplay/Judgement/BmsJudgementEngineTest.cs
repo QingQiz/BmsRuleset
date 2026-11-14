@@ -1,7 +1,9 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using NUnit.Framework;
 using osu.Framework.Graphics;
 using osu.Framework.Timing;
@@ -9,15 +11,36 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 using osu.Game.Rulesets.Scoring;
 using RhythmEngine.Core;
 using RhythmEngine.Profiles.Bms;
+using RhythmEngine.Profiles.Common;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
 
 [TestFixture]
 public class BmsJudgementEngineTest
 {
+    [Test]
+    public void DisabledBadWindowPreservesPassivePoorDeadline()
+    {
+        using var windows = BmsJudgementProfileProvider.UseWindowMods([new BmsModNoBad()]);
+        var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, Rank = 2 };
+        var note = new BmsNote { Beatmap = beatmap, Column = 1, StartTime = 1000 };
+        var output = new BmsRecordingJudgementOutput();
+        var engine = new BmsJudgementEngine([note], beatmap.LayoutVariant, 1, output);
+
+        engine.QueueInput(1150, 1, true, false);
+        engine.ProcessFrame(new BmsFrameContext(1150, 1), 150);
+        Assert.That(output.MainResults, Is.Zero);
+        engine.ProcessFrame(new BmsFrameContext(1210, 1), 60);
+        Assert.That(output.MainResults, Is.Zero);
+        engine.ProcessFrame(new BmsFrameContext(1210.001, 1), 0.001);
+        Assert.That(output.GetMainResult(note).Type, Is.EqualTo(HitResult.Meh));
+        Assert.That(output.MainResults, Is.EqualTo(1));
+    }
+
     [Test]
     public void ResultMappingDistinguishesUnresolvedAndSilentResultsFromUnknownIds()
     {
@@ -31,27 +54,31 @@ public class BmsJudgementEngineTest
     }
 
     private static IEnumerable<Type> coreTypes => typeof(BmsJudgementEngine).Assembly.GetTypes()
-        .Where(t => (t.Namespace == typeof(BmsJudgementEngine).Namespace
-                     || t.Namespace?.StartsWith(typeof(BmsJudgementEngine).Namespace + ".", StringComparison.Ordinal) == true)
-                    && !t.IsDefined(typeof(System.Runtime.CompilerServices.CompilerGeneratedAttribute)));
+                                                                            .Where(t => (t.Namespace == typeof(BmsJudgementEngine).Namespace
+                                                                                         || t.Namespace?.StartsWith(typeof(BmsJudgementEngine).Namespace + ".", StringComparison.Ordinal) == true)
+                                                                                        && !t.IsDefined(typeof(CompilerGeneratedAttribute)));
 
     [TestCaseSource(nameof(coreTypes))]
     public void CoreMembersDoNotDependOnDrawablesOrClocks(Type coreType)
     {
         const BindingFlags members = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
         var types = coreType.GetFields(members).Select(f => f.FieldType)
-            .Concat(coreType.GetMethods(members).SelectMany(m => m.GetParameters().Select(p => p.ParameterType).Append(m.ReturnType)))
-            .Concat(coreType.GetConstructors(members).SelectMany(c => c.GetParameters().Select(p => p.ParameterType)));
+                            .Concat(coreType.GetMethods(members).SelectMany(m => m.GetParameters().Select(p => p.ParameterType).Append(m.ReturnType)))
+                            .Concat(coreType.GetConstructors(members).SelectMany(c => c.GetParameters().Select(p => p.ParameterType)));
         Assert.That(types.SelectMany(expand).Where(t => typeof(Drawable).IsAssignableFrom(t) || typeof(IClock).IsAssignableFrom(t)
-            || t.Namespace?.StartsWith("osu.Game.Rulesets.BmsRuleset.UI", StringComparison.Ordinal) == true), Is.Empty);
+                                                                                             || t.Namespace?.StartsWith("osu.Game.Rulesets.BmsRuleset.UI", StringComparison.Ordinal) == true),
+            Is.Empty);
 
         static IEnumerable<Type> expand(Type type)
         {
             yield return type;
-            if (type.HasElementType)
+
+            if (type.GetElementType() is { } elementType)
             {
-                foreach (var item in expand(type.GetElementType()!)) yield return item;
+                foreach (var item in expand(elementType))
+                    yield return item;
             }
+
             foreach (var argument in type.GetGenericArguments())
             {
                 foreach (var item in expand(argument)) yield return item;
@@ -69,15 +96,15 @@ public class BmsJudgementEngineTest
         BmsHitObject[] objects = [hold, mine, note];
         var events = new List<string>();
         var outputs = Enumerable.Range(1, 3).Select(_ => new BmsRecordingJudgementOutput()).ToArray();
+
         foreach (var output in outputs)
         {
             output.ResultApplied = (source, _) => events.Add($"result:{source.Column}");
-            output.BodyTick = (source, _, _, _) => events.Add($"body:{source.Column}");
+            output.BodyTick = frame => events.Add($"body:{frame.EngineResult!.Event.Lane}");
         }
-        var engine = new BmsJudgementEngine(Enumerable.Range(1, 3).Select(i =>
-            new BmsJudgementColumnDefinition(objects, beatmap.LayoutVariant, i, outputs[i - 1])).ToArray());
 
-
+        var engine = new BmsJudgementEngine(objects, beatmap.LayoutVariant, Enumerable.Range(1, 3).Select(i =>
+            new BmsJudgementColumnDefinition(i, outputs[i - 1])).ToArray());
 
         engine.QueueInput(1000, 1, true, false);
         engine.ProcessFrame(new BmsFrameContext(1000, 1), 1);
@@ -116,7 +143,7 @@ public class BmsJudgementEngineTest
 
     [TestCase(false)]
     [TestCase(true)]
-    public void LandmineStateIsRecreatedWithTheEngine(bool held)
+    public void ResetRestoresLandmineAndInputState(bool held)
     {
         var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K };
         var mine = new BmsLandmine { Beatmap = beatmap, Column = 1, StartTime = 1000 };
@@ -128,10 +155,11 @@ public class BmsJudgementEngineTest
         engine.ProcessFrame(new BmsFrameContext(1007, 1), 7);
 
         Assert.That(column.GetLandmineState(mine).HandledTime, Is.EqualTo(1000));
-        output = new BmsRecordingJudgementOutput();
-        engine = new BmsJudgementEngine([mine], beatmap.LayoutVariant, 1, output);
-        column = engine.GetColumn(1);
+        output.Reset();
+        engine.Reset();
         Assert.That(column.GetLandmineState(mine).HandledTime, Is.Null);
+        Assert.That(column.PressedDirections, Is.Zero);
+        Assert.That(column.GetNote(mine).Completed, Is.False);
 
         engine.QueueInput(1000, 1, true, false);
         engine.ProcessFrame(new BmsFrameContext(1007, 1), 7);
@@ -198,7 +226,6 @@ public class BmsJudgementEngineTest
         var engine = new BmsJudgementEngine([note, mine], beatmap.LayoutVariant, 1, output);
         var column = engine.GetColumn(1);
 
-
         engine.QueueInput(1000, 1, true, false);
         engine.QueueInput(1000, 1, false, false);
         engine.ProcessFrame(new BmsFrameContext(1000, 1), 500);
@@ -241,12 +268,14 @@ public class BmsJudgementEngineTest
         {
             var snapshot = view.GetNote(note);
             observed.Add((snapshot.Parts[0].Resolved, snapshot.Parts[2].Resolved, snapshot.Held));
+
             for (var i = 0; i < 10; i++)
             {
                 var detached = snapshot with { Completed = true, Parts = [] };
                 Assert.That(detached.Completed, Is.True);
                 Assert.That(view.GetNote(note), Is.SameAs(snapshot));
             }
+
             output.StatePublished = null;
         };
         engine.QueueInput(1000, 1, true, false);
@@ -261,7 +290,8 @@ public class BmsJudgementEngineTest
 
     [Test]
     public void CoincidentHoldEndpointsRetainBothDecisions(
-        [Values(BmsLongNoteMode.LongNote, BmsLongNoteMode.ChargeNote, BmsLongNoteMode.HellChargeNote)] BmsLongNoteMode mode,
+        [Values(BmsLongNoteMode.LongNote, BmsLongNoteMode.ChargeNote, BmsLongNoteMode.HellChargeNote)]
+        BmsLongNoteMode mode,
         [Values(0, .0001)] double duration)
     {
         var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, Rank = 2, LockedLongNoteMode = mode };
@@ -271,11 +301,15 @@ public class BmsJudgementEngineTest
         engine.QueueInput(1000, 1, true, false);
         engine.QueueInput(1000 + duration, 1, false, false);
         engine.ProcessFrame(new BmsFrameContext(2000, 1), 2000);
-        Assert.That(engine.Session().GetEventsSince(0).Select(e => e.Part.Value), Is.EqualTo(new[] { "head", "tail" }));
+        Assert.That(engine.GetColumn(1).GetNote(note).Parts.Where(p => p.Part == NoteParts.HEAD || p.Part == NoteParts.TAIL)
+                          .All(p => p.Resolved), Is.True);
         Assert.That(engine.Session().Score.Score, Is.EqualTo(mode == BmsLongNoteMode.LongNote ? 2 : 4));
         Assert.That(engine.GetColumn(1).GetNote(note).Completed, Is.True);
+
         if (mode == BmsLongNoteMode.LongNote)
+        {
             Assert.That(output.GetEndpoints(note).Select(endpoint => endpoint.Kind),
                 Is.EqualTo(new[] { BmsLongNoteEndpointKind.Head, BmsLongNoteEndpointKind.Tail }));
+        }
     }
 }

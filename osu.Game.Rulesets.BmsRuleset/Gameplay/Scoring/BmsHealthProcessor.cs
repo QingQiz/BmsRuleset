@@ -20,14 +20,23 @@ public partial class BmsHealthProcessor : HealthProcessor
 {
     internal HealthConfiguration CreateEngineHealth(BmsHitObject[] objects)
     {
-        ensureInitialized();
+        ensureGaugeStates();
         syncActiveStateFromHealth();
         captureInitialGaugeStates();
-        var calculators = gaugeStates.Select(state => new BmsGaugeCalculator(
-            state.Profile with { GutsRules = [..state.Profile.GutsRules] }, state.Calculator!.Total,
-            state.Calculator.NoteCount, effectiveProfileFamily)).ToImmutableArray();
+        var noteCount = Math.Max(1, beatmap?.CountScoringNotes() ?? 0);
+        var total = (beatmap as BmsBeatmap)?.Total;
+        var fullNoteCount = beatmap is BmsBeatmap { PracticeFullNoteCount: { } fullCount } ? Math.Max(1, fullCount) : noteCount;
+        var calculators = gaugeStates.Select(state =>
+        {
+            var profile = state.Profile with { GutsRules = [.. state.Profile.GutsRules] };
+            var effectiveTotal = BmsGaugeCalculator.ResolveTotal(profile, total, fullNoteCount, effectiveProfileFamily);
+            // Mixed Auto Gauge chains need full-chart survival settings and proportional recovery TOTAL.
+            var calculatorTotal = profile.Algorithm == BmsGaugeAlgorithm.Total ? effectiveTotal * noteCount / fullNoteCount : effectiveTotal;
+            var calculatorNoteCount = profile.Algorithm == BmsGaugeAlgorithm.Total ? noteCount : fullNoteCount;
+            return new BmsGaugeCalculator(profile, calculatorTotal, calculatorNoteCount, effectiveProfileFamily);
+        }).ToImmutableArray();
         return BmsEngineGauge.Create(objects, calculators,
-            [..gaugeStates.Select(state => new HealthState(state.CurrentHp, state.IsHpFailed))]);
+            [.. gaugeStates.Select(state => new HealthState(state.CurrentHp, state.IsHpFailed))]);
     }
 
     internal void ApplyEngineHealth(HealthState health)
@@ -79,7 +88,7 @@ public partial class BmsHealthProcessor : HealthProcessor
     internal void ResetReplayState()
     {
         // Course stages and configurable initial health need the original seed, not profile defaults.
-        ensureInitialized();
+        ensureGaugeStates();
         syncActiveStateFromHealth();
         replayInitialStates ??= initialGaugeStates ?? CurrentGaugeStates;
         Reset(false);
@@ -94,7 +103,6 @@ public partial class BmsHealthProcessor : HealthProcessor
     private int endResultIndex;
 
     private IBeatmap? beatmap;
-    private bool initialized;
     private BmsGaugeProfileFamily layoutProfileFamily = BmsGaugeProfileFamily.SevenKeys;
     private IApplicableToGaugeProfile[] profileMods = [];
 
@@ -109,7 +117,7 @@ public partial class BmsHealthProcessor : HealthProcessor
             syncActiveStateFromHealth();
             field = value;
             profileMods = value.OfType<IApplicableToGaugeProfile>().ToArray();
-            initialized = false;
+
             foreach (var state in gaugeStates)
             {
                 var defaultInitialHealth = initialGaugeStates == null && !state.HasExplicitInitialHealth
@@ -117,7 +125,6 @@ public partial class BmsHealthProcessor : HealthProcessor
                 state.Profile = createProfile(state.GaugeType);
                 if (defaultInitialHealth)
                     state.CurrentHp = state.Profile.InitialHealth;
-                state.Calculator = null;
                 state.IsHpFailed |= state.Profile.IsFailed(state.CurrentHp);
             }
 
@@ -150,71 +157,6 @@ public partial class BmsHealthProcessor : HealthProcessor
             layoutProfileFamily = BmsGaugeProfileFamilyProvider.FromLayout(bmsBeatmap.LayoutVariant);
             refreshGaugeProfiles();
         }
-    }
-
-    /// <summary>
-    ///     Applies an Empty POOR gauge penalty directly — no note is consumed.
-    /// </summary>
-    public void RegisterEmptyPoor() => RegisterNonConsumingJudgement(HitResult.Miss);
-
-    public void RegisterNonConsumingJudgement(HitResult result)
-    {
-        ensureInitialized();
-        syncActiveStateFromHealth();
-        captureInitialGaugeStates();
-
-        for (var i = 0; i < gaugeStates.Count; i++)
-        {
-            var state = gaugeStates[i];
-            if (state.IsHpFailed) continue;
-
-            var delta = state.Calculator!.GetDeltaFor(result, state.CurrentHp);
-            state.CurrentHp = state.Calculator.ApplyDelta(state.CurrentHp, delta);
-
-            if (state.Profile.IsFailed(state.CurrentHp))
-                state.IsHpFailed = true;
-        }
-
-        resolveActiveState();
-        markEverFailedIfEmpty();
-    }
-
-    /// <summary>
-    ///     Applies a health change from a synthetic long-note endpoint
-    ///     (CN/HCN tail), using the same judgement/health pipeline as normal results.
-    /// </summary>
-    public void ApplySyntheticLongNoteEndpoint(JudgementResult result)
-    {
-        ApplyResult(result);
-    }
-
-    /// <summary>
-    ///     Applies a HellChargeNote body tick at ~200 ms cadence.
-    ///     The default scale applies half-GREAT gauge recovery or half-BAD gauge damage.
-    ///     Does not add judgement count, combo, or score.
-    /// </summary>
-    public void ApplyHellChargeTick(bool holding, double scale = 0.5)
-    {
-        ensureInitialized();
-        syncActiveStateFromHealth();
-        captureInitialGaugeStates();
-
-        var type = holding ? HitResult.Great : HitResult.Ok;
-
-        for (var i = 0; i < gaugeStates.Count; i++)
-        {
-            var state = gaugeStates[i];
-            if (state.IsHpFailed) continue;
-
-            var delta = state.Calculator!.GetDeltaFor(type, state.CurrentHp) * scale;
-            state.CurrentHp = state.Calculator.ApplyDelta(state.CurrentHp, delta);
-
-            if (state.Profile.IsFailed(state.CurrentHp))
-                state.IsHpFailed = true;
-        }
-
-        resolveActiveState();
-        markEverFailedIfEmpty();
     }
 
     public void SetGaugeType(BmsGaugeType gaugeType, BmsGaugeProfileFamily? profileFamilyOverride = null)
@@ -291,13 +233,11 @@ public partial class BmsHealthProcessor : HealthProcessor
         activeGaugeIndex = 0;
         endResultIndex = 0;
         resolveActiveState();
-
-        initialized = false;
     }
 
     public void RestoreGaugeStates(IReadOnlyList<BmsGaugeStateSnapshot> states)
     {
-        ensureInitialized();
+        ensureGaugeStates();
 
         foreach (var state in gaugeStates)
         {
@@ -340,7 +280,6 @@ public partial class BmsHealthProcessor : HealthProcessor
     protected override void Reset(bool storeResults)
     {
         base.Reset(storeResults);
-        initialized = false;
         Health.MaxValue = GaugeProfile.MaxHealth;
         Health.Value = GaugeProfile.InitialHealth;
         HasEverFailed = false;
@@ -360,7 +299,7 @@ public partial class BmsHealthProcessor : HealthProcessor
 
     protected override void ApplyResultInternal(JudgementResult result)
     {
-        ensureInitialized();
+        ensureGaugeStates();
         syncActiveStateFromHealth();
         captureInitialGaugeStates();
         base.ApplyResultInternal(result);
@@ -374,66 +313,21 @@ public partial class BmsHealthProcessor : HealthProcessor
 
     private void captureInitialGaugeStates() => initialGaugeStates ??= CurrentGaugeStates;
 
-    protected override HitResult GetSimulatedHitResult(Rulesets.Judgements.Judgement judgement) => judgement.MaxResult == HitResult.Meh
+    protected override HitResult GetSimulatedHitResult(Judgements.Judgement judgement) => judgement.MaxResult == HitResult.Meh
         ? HitResult.IgnoreMiss
         : base.GetSimulatedHitResult(judgement);
 
     protected override double GetHealthIncreaseFor(JudgementResult result)
     {
-        if (result is BmsJudgementResult { EngineResult: { } engine })
-        {
-            var previous = Health.Value;
-            ApplyEngineHealth(engine.Health);
-            return Health.Value - previous;
-        }
-
-        if (result is BmsJudgementResult { SuppressPenalty: true })
+        if (IsSimulating)
             return 0;
 
-        ensureInitialized();
-        syncActiveStateFromHealth();
+        if (result is not BmsJudgementResult { EngineResult: { } engine })
+            throw new InvalidOperationException("Gameplay health requires an engine judgement.");
 
-        // The framework captures Health.Value BEFORE calling this method,
-        // then does Health.Value = capturedOldValue + this_return_value.
-        // We must return the net delta so the framework's arithmetic arrives
-        // at the correct value.
-        var oldHealth = Health.Value;
-
-        if (result.HitObject is BmsLandmine mine)
-        {
-            if (result.Type != HitResult.Meh)
-                return 0;
-
-            // Mines use the same gauge bounds, including the recovery gauges' 2% floor.
-            var damageFraction = mine.LandmineDamagePercent / 100.0;
-            foreach (var state in gaugeStates)
-            {
-                if (state.IsHpFailed) continue;
-
-                state.CurrentHp = state.Calculator!.ApplyDelta(state.CurrentHp, -damageFraction);
-                if (state.Profile.IsFailed(state.CurrentHp))
-                    state.IsHpFailed = true;
-            }
-
-            resolveActiveState();
-            return Health.Value - oldHealth;
-        }
-
-        // Normal note: each non-failed state computes its own delta independently.
-        for (var i = 0; i < gaugeStates.Count; i++)
-        {
-            var state = gaugeStates[i];
-            if (state.IsHpFailed) continue;
-
-            var delta = state.Calculator!.GetDeltaFor(result.Type, state.CurrentHp);
-            state.CurrentHp = state.Calculator.ApplyDelta(state.CurrentHp, delta);
-
-            if (state.Profile.IsFailed(state.CurrentHp))
-                state.IsHpFailed = true;
-        }
-
-        resolveActiveState();
-        return Health.Value - oldHealth;
+        var previous = Health.Value;
+        ApplyEngineHealth(engine.Health);
+        return Health.Value - previous;
     }
 
     private void markEverFailedIfEmpty()
@@ -455,12 +349,8 @@ public partial class BmsHealthProcessor : HealthProcessor
         }
     }
 
-    private void ensureInitialized()
+    private void ensureGaugeStates()
     {
-        if (initialized) return;
-
-        initialized = true;
-
         // When no gauge types have been set explicitly, default to the current
         // GaugeType (Normal) so that health calculations always have a state.
         if (gaugeStates.Count == 0)
@@ -471,20 +361,6 @@ public partial class BmsHealthProcessor : HealthProcessor
                 Profile = GaugeProfile,
                 CurrentHp = GaugeProfile.InitialHealth,
             });
-        }
-
-        var noteCount = Math.Max(1, beatmap?.CountScoringNotes() ?? 0);
-
-        var total = (beatmap as BmsBeatmap)?.Total;
-
-        var fullNoteCount = beatmap is BmsBeatmap { PracticeFullNoteCount: { } fullCount } ? Math.Max(1, fullCount) : noteCount;
-        foreach (var state in gaugeStates)
-        {
-            var effectiveTotal = BmsGaugeCalculator.ResolveTotal(state.Profile, total, fullNoteCount, effectiveProfileFamily);
-            // Mixed Auto Gauge chains need the full chart context for survival algorithms and proportional TOTAL for recovery gauges.
-            var calculatorTotal = state.Profile.Algorithm == BmsGaugeAlgorithm.Total ? effectiveTotal * noteCount / fullNoteCount : effectiveTotal;
-            var calculatorNoteCount = state.Profile.Algorithm == BmsGaugeAlgorithm.Total ? noteCount : fullNoteCount;
-            state.Calculator = new BmsGaugeCalculator(state.Profile, calculatorTotal, calculatorNoteCount, effectiveProfileFamily);
         }
     }
 
@@ -498,7 +374,6 @@ public partial class BmsHealthProcessor : HealthProcessor
         foreach (var state in gaugeStates)
         {
             state.Profile = createProfile(state.GaugeType);
-            state.Calculator = null;
             state.CurrentHp = state.Profile.InitialHealth;
             state.HasExplicitInitialHealth = false;
             state.IsHpFailed = false;
@@ -506,7 +381,6 @@ public partial class BmsHealthProcessor : HealthProcessor
 
         activeGaugeIndex = 0;
         endResultIndex = 0;
-        initialized = false;
         resolveActiveState();
     }
 
@@ -532,6 +406,7 @@ public partial class BmsHealthProcessor : HealthProcessor
     private BmsGaugeStateSnapshot[] snapshotGaugeStates()
     {
         var snapshots = new BmsGaugeStateSnapshot[gaugeStates.Count];
+
         for (var i = 0; i < gaugeStates.Count; i++)
         {
             var state = gaugeStates[i];
@@ -545,7 +420,6 @@ public partial class BmsHealthProcessor : HealthProcessor
     {
         public BmsGaugeType GaugeType;
         public BmsGaugeProfile Profile = null!;
-        public BmsGaugeCalculator? Calculator;
         public double CurrentHp;
         public bool HasExplicitInitialHealth;
         public bool IsHpFailed;

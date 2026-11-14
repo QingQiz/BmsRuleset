@@ -8,12 +8,12 @@ using NUnit.Framework;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Mixing.Pcm;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Processing;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 using osu.Game.Rulesets.BmsRuleset.Tests.Audio;
-using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 
@@ -68,7 +68,7 @@ public class BmsHotPathPerformanceTest
         asset.Complete(2048L * 4096);
         var mixer = new BmsPcmVoiceMixer();
         mixer.SubmitPlayBatch(Enumerable.Range(0, 64)
-            .Select(i => new BmsVoicePlay(asset, (ushort)i, 0, SourceOffsetFrame: i * 8192)).ToArray());
+                                        .Select(i => new BmsVoicePlay(asset, (ushort)i, 0, SourceOffsetFrame: i * 8192)).ToArray());
         var output = new float[88200];
         return new Measurement(() => mixer.Render(output), () =>
         {
@@ -86,9 +86,9 @@ public class BmsHotPathPerformanceTest
         for (var i = 0; i < count; i++)
             beatmap.HitObjects.Add(new BmsHitObject { StartTime = i * 10, Column = i % 8 });
         processor.ApplyBeatmap(beatmap);
-        var results = beatmap.HitObjects.Select(note => new JudgementResult(note, note.CreateJudgement()) { Type = HitResult.Perfect }).ToArray();
+        var results = beatmap.HitObjects.Select(note => new BmsJudgementResult(note, note.CreateJudgement()) { Type = HitResult.Perfect }).ToArray();
         foreach (var result in results)
-            processor.ApplyResult(result);
+            processor.ApplyTestResult(result);
         var score = new ScoreInfo();
         processor.PopulateScore(score);
         return new Measurement(() =>
@@ -107,9 +107,11 @@ public class BmsHotPathPerformanceTest
     {
         var elapsed = new double[7];
         var allocations = new long[7];
+
         for (var run = -2; run < elapsed.Length; run++)
         {
             var measurement = setup();
+
             try
             {
                 GC.Collect();
@@ -147,6 +149,7 @@ public class BmsHotPathPerformanceTest
         var json = JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true });
         TestContext.Progress.WriteLine(json);
         var directory = Environment.GetEnvironmentVariable("BMS_PERFORMANCE_RESULTS");
+
         if (!string.IsNullOrEmpty(directory))
         {
             Directory.CreateDirectory(directory);

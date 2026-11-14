@@ -51,6 +51,7 @@ internal static class BmsReplaySimulation
         foreach (var mod in mods.OfType<IApplicableToScoreProcessor>())
             mod.ApplyToScoreProcessor(score);
         health.ApplyBeatmap(beatmap);
+
         if (courseGaugeStates != null)
         {
             health.ConfigureGaugeContext(true, courseGaugeProfileFamily);
@@ -60,8 +61,10 @@ internal static class BmsReplaySimulation
         else if (mods.OfType<BmsModAutoGauge>().FirstOrDefault() is { } autoGauge)
             autoGauge.ApplyToHealthProcessor(health);
         else
+        {
             foreach (var mod in mods.OfType<BmsModGauge>())
                 mod.ApplyToHealthProcessor(health);
+        }
 
         var gauges = new List<BmsGaugeHistoryEvent>();
         if (courseGaugeStates?.Count > 0 || (courseGaugeStates == null &&
@@ -70,20 +73,21 @@ internal static class BmsReplaySimulation
                                                  : mods.OfType<BmsModGauge>().Any(mod => mod.InitialHealth.Value.HasValue))))
             recordGauge(0);
 
-        var objects = beatmap.HitObjects.Where(note => note is BmsNote or BmsLongNote or BmsLandmine).OrderBy(note => note.StartTime).ToArray();
+        var objects = beatmap.HitObjects.Where(note => note is BmsNote or BmsLongNote or BmsLandmine).ToArray();
         var columnCount = Math.Max(beatmap.TotalColumns, objects.Select(note => note.Column + 1).DefaultIfEmpty(1).Max());
-        var engine = new BmsJudgementEngine(Enumerable.Range(0, columnCount).Select(index =>
-        {
-            var notes = objects.Where(note => note.Column == index).ToArray();
-            return new BmsJudgementColumnDefinition(notes, beatmap.LayoutVariant, index, new SimulationOutput(score, health, recordGauge));
-        }).ToArray(), notes => (BmsProfiles.CreateScore(score.EmptyPoorBreaksCombo
-                                                        ?? BmsJudgementProfileProvider.EmptyPoorBreaksCombo(beatmap.LayoutVariant)), health.CreateEngineHealth(notes)));
+        var output = new SimulationOutput(score, health, recordGauge);
+        var engine = new BmsJudgementEngine(
+            objects, beatmap.LayoutVariant,
+            Enumerable.Range(0, columnCount).Select(index => new BmsJudgementColumnDefinition(index, output)).ToArray(),
+            notes => (BmsProfiles.CreateScore(score.EmptyPoorBreaksCombo ?? BmsJudgementProfileProvider.EmptyPoorBreaksCombo(beatmap.LayoutVariant)),
+                health.CreateEngineHealth(notes))
+        );
 
-        AdvanceTo(beatmap, replay, mods, engine, columnCount, frames[^1].Time, time =>
+        advanceTo(beatmap, replay, frames, mods, engine, columnCount, frames[^1].Time, time =>
         {
             manualClock.CurrentTime = time;
             clock.ProcessFrame();
-        }, cancellationToken);
+        }, cancellationToken, null);
 
         return (score.JudgementEvents, gauges);
 
@@ -98,14 +102,20 @@ internal static class BmsReplaySimulation
     internal static void AdvanceTo(BmsBeatmap beatmap, Replay replay, IReadOnlyList<Mod> mods, BmsJudgementEngine engine,
                                    int columnCount, double targetTime, Action<double> updateClock, CancellationToken cancellationToken = default,
                                    double? fromTime = null)
+        => advanceTo(beatmap, replay, replay.Frames.OfType<BmsReplayFrame>().OrderBy(frame => frame.Time).ToArray(),
+            mods, engine, columnCount, targetTime, updateClock, cancellationToken, fromTime);
+
+    private static void advanceTo(BmsBeatmap beatmap, Replay replay, BmsReplayFrame[] frames, IReadOnlyList<Mod> mods, BmsJudgementEngine engine,
+                                  int columnCount, double targetTime, Action<double> updateClock, CancellationToken cancellationToken,
+                                  double? fromTime)
     {
-        var frames = replay.Frames.OfType<BmsReplayFrame>().OrderBy(frame => frame.Time).ToArray();
         var algorithm = BmsReplayFrame.GetAlgorithm(replay);
         var rates = mods.OfType<IApplicableToRate>().ToArray();
         var pressed = new HashSet<BmsAction>();
         var nextInput = 0;
-        var time = fromTime ?? Math.Min(targetTime, Math.Min(0, Math.Min(frames.Select(frame => frame.Time).DefaultIfEmpty(0).Min(),
+        var time = fromTime ?? Math.Min(targetTime, Math.Min(0, Math.Min(frames.Length > 0 ? frames[0].Time : 0,
             beatmap.HitObjects.Select(note => note.StartTime - BmsJudgementProfileProvider.GetBehaviour(beatmap.LayoutVariant).SearchWindow).DefaultIfEmpty(0).Min())));
+
         if (fromTime != null)
         {
             // The existing engine already consumed every input at the starting timestamp.
@@ -123,6 +133,7 @@ internal static class BmsReplaySimulation
             cancellationToken.ThrowIfCancellationRequested();
             updateClock(time);
             var frame = frameAt(time);
+
             while (nextInput < frames.Length && frames[nextInput].Time == time)
             {
                 var input = frames[nextInput++];
@@ -130,14 +141,17 @@ internal static class BmsReplaySimulation
                     continue;
 
                 var actions = input.Actions.ToHashSet();
+
                 foreach (var action in pressed)
                 {
-                    if (!actions.Contains(action)) queue(action, false, input.Time);
+                    if (!actions.Contains(action))
+                        queue(action, false, input.Time);
                 }
 
                 foreach (var action in actions)
                 {
-                    if (!pressed.Contains(action)) queue(action, true, input.Time);
+                    if (!pressed.Contains(action))
+                        queue(action, true, input.Time);
                 }
 
                 pressed = actions;
@@ -147,6 +161,7 @@ internal static class BmsReplaySimulation
             // Aborted attempts also settle held tails at their recorded endpoint.
             if (replay.HasReceivedAllFrames && frames.Length > 0 && nextInput == frames.Length && time == frames[^1].Time)
                 engine.CompleteLongNotesAtEnd(frame, frameAt);
+
             if (time == targetTime)
             {
                 updateClock(targetTime);
@@ -192,12 +207,12 @@ internal static class BmsReplaySimulation
 
         public void ApplySyntheticEndpoint(BmsLongNoteEndpointResult endpoint, in BmsFrameContext frame, bool suppressPenalty)
         {
-            health.ApplySyntheticLongNoteEndpoint(score.ApplySyntheticLongNoteEndpoint(endpoint, suppressPenalty, frame.EngineResult));
+            health.ApplyResult(score.ApplySyntheticLongNoteEndpoint(endpoint, suppressPenalty, frame.EngineResult!));
             // PMS releases apply after their grace period while retaining the key-up judgement time.
             recordGauge(endpoint.ApplicationTime ?? endpoint.EventTime);
         }
 
-        public void ApplyBodyTick(BmsLongNote note, bool holding, double scale, in BmsFrameContext frame)
+        public void ApplyBodyTick(in BmsFrameContext frame)
         {
             health.ApplyEngineTick(frame.EngineResult!.Health);
             recordGauge(frame.SimulationTime);

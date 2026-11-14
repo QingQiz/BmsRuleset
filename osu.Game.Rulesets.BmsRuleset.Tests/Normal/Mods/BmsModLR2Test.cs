@@ -40,7 +40,7 @@ public class BmsModLr2Test
     {
         var mod = new BmsRuleset().CreateModFromAcronym("R2");
         Assert.That(mod, Is.TypeOf<BmsModLr2>());
-        Assert.That(mod.Type, Is.EqualTo(ModType.Fun));
+        Assert.That(mod!.Type, Is.EqualTo(ModType.Fun));
         Assert.That(mod.Icon?.FontName, Is.EqualTo("bmsIcons"));
         Assert.That(mod.IncompatibleMods, Does.Contain(typeof(BmsModChargeNote)).And.Contain(typeof(BmsModHellChargeNote)));
         Assert.That(new BmsModChargeNote().IncompatibleMods, Does.Contain(typeof(BmsModLr2)));
@@ -85,9 +85,10 @@ public class BmsModLr2Test
     [TestCase("rank.bms", 4, 167, 18, 26.302)]
     [TestCase("rank.pms", 0, 48, 8, 11.08)]
     public void NativeConversionRecomputesLr2RatesFromTheChart(string path, int rank, int exRank,
-                                                                  double firstPerfect, double secondPerfect)
+                                                               double firstPerfect, double secondPerfect)
     {
-        string[] lines = [
+        string[] lines =
+        [
             $"#RANK {rank}", "#WAV01 note.wav", $"#EXRANK01 {exRank}", "#00011:01", "#001A0:01", "#00111:01",
         ];
         var source = createDecodedBeatmap(BmsChartParser.Parse(lines, path));
@@ -109,6 +110,7 @@ public class BmsModLr2Test
         Assert.That(first.JudgementRate, Is.EqualTo(rank == 4 ? .75 : .25));
         Assert.That(second.JudgementRate, Is.EqualTo(rank == 4 ? 1.2525 : .36).Within(1e-12));
         Assert.That(source.HitObjects.Cast<BmsHitObject>().Select(note => note.JudgementRate), Is.EqualTo(sourceRates));
+
         for (var i = 0; i < sourceNotes.Length; i++)
         {
             Assert.That(beatmap.HitObjects[i], Is.Not.SameAs(sourceNotes[i]));
@@ -227,6 +229,7 @@ public class BmsModLr2Test
         var note = new BmsNote { Beatmap = beatmap, JudgementRate = .75, Column = 1 };
         var windows = new BmsHitWindows(note);
         Assert.That(windows.WindowFor(HitResult.Perfect), Is.EqualTo(15));
+
         using (BmsJudgementProfileProvider.UseWindowMods([new BmsModLr2()]))
         {
             windows.SetDifficulty(5);
@@ -249,11 +252,13 @@ public class BmsModLr2Test
     {
         var original = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, 1, 2, false);
         BmsJudgementWindowTable first;
+
         using (BmsJudgementProfileProvider.UseWindowMods([new BmsModNoGood(), new BmsModLr2(), new BmsModNoBad()]))
         {
             first = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, 1, 2, false);
             Assert.That(BmsJudgementProfileProvider.ResolveJudgementRate(BmsLayoutVariant.Popn9K, 4, null), Is.EqualTo(.75));
         }
+
         using (BmsJudgementProfileProvider.UseWindowMods([new BmsModNoBad(), new BmsModLr2(), new BmsModNoGood()]))
         {
             var second = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, 1, 2, false);
@@ -355,7 +360,7 @@ public class BmsModLr2Test
         score.ApplyBeatmap(new BmsBeatmap { LayoutVariant = layout });
         new BmsModLr2().ApplyToScoreProcessor(score);
         score.Combo.Value = 5;
-        score.RegisterEmptyPoor();
+        score.ApplyTestEmptyPoor();
         Assert.That(score.Combo.Value, Is.EqualTo(5));
     }
 
@@ -366,12 +371,12 @@ public class BmsModLr2Test
         score.ApplyBeatmap(new BmsBeatmap { LayoutVariant = layout });
         score.Combo.Value = 5;
         using (BmsJudgementProfileProvider.UseWindowMods([new BmsModLr2()]))
-            score.RegisterEmptyPoor();
+            score.ApplyTestEmptyPoor();
         Assert.That(score.Combo.Value, Is.Zero);
         new BmsModLr2().ApplyToScoreProcessor(score);
         score.Combo.Value = 5;
         using (BmsJudgementProfileProvider.UseWindowMods([]))
-            score.RegisterEmptyPoor();
+            score.ApplyTestEmptyPoor();
         Assert.That(score.Combo.Value, Is.EqualTo(5));
     }
 
@@ -429,7 +434,7 @@ public class BmsModLr2Test
         health.ApplyBeatmap(beatmap);
         health.Mods = [new BmsModLr2()];
         health.SetGaugeTypes([BmsGaugeType.Hard], replaceExisting: true, initialStates: [new BmsGaugeStateSnapshot(BmsGaugeType.Hard, 0.03, false)]);
-        health.RegisterEmptyPoor();
+        health.ApplyTestEmptyPoor();
         Assert.That(health.Health.Value, Is.Zero);
         Assert.That(health.HasEverFailed, Is.True);
         Assert.That(health.CurrentGaugeStates.Single().Failed, Is.True);
@@ -448,7 +453,8 @@ public class BmsModLr2Test
         using var health = new BmsHealthProcessor();
         health.ApplyBeatmap(beatmap);
         health.Mods = [new BmsModLr2()];
-        health.ApplyHellChargeTick(true, 1);
+        health.ApplyTestBodyTick(true);
+        health.ApplyTestBodyTick(true);
         Assert.That(health.Health.Value, Is.EqualTo(0.20352).Within(1e-9));
     }
 
@@ -469,7 +475,7 @@ public class BmsModLr2Test
         if (!lr2First) health.Mods = [auto, mod];
         foreach (var state in health.CurrentGaugeStates.Where(state => state.GaugeType is BmsGaugeType.Normal or BmsGaugeType.Easy or BmsGaugeType.AssistEasy))
             Assert.That(state.Health, Is.EqualTo(0.2).Within(1e-9));
-        health.RegisterEmptyPoor();
+        health.ApplyTestEmptyPoor();
         Assert.That(health.CurrentGaugeStates.Single(state => state.GaugeType == BmsGaugeType.Hazard).Health, Is.EqualTo(1));
         Assert.That(health.CurrentGaugeStates.Single(state => state.GaugeType == BmsGaugeType.Normal).Health, Is.EqualTo(0.18).Within(1e-9));
         var expected = health.CurrentGaugeStates.ToArray();
@@ -485,23 +491,24 @@ public class BmsModLr2Test
         beatmap.HitObjects.Add(new BmsNote { Beatmap = beatmap, JudgementRate = .75, Column = 1, StartTime = 1000 });
         using var health = new BmsHealthProcessor();
         health.ApplyBeatmap(beatmap);
+
         if (explicitSeed)
             health.SetGaugeTypes([BmsGaugeType.Normal], replaceExisting: true, initialStates: [new BmsGaugeStateSnapshot(BmsGaugeType.Normal, .3, false)]);
         else
         {
-            health.RegisterEmptyPoor();
+            health.ApplyTestEmptyPoor();
             health.Health.Value = .3;
         }
 
         health.Mods = [new BmsModLr2()];
         Assert.That(health.GaugeProfile.InitialHealth, Is.EqualTo(.2));
         Assert.That(health.Health.Value, Is.EqualTo(.3).Within(1e-9));
-        health.RegisterEmptyPoor();
+        health.ApplyTestEmptyPoor();
         Assert.That(health.Health.Value, Is.EqualTo(.28).Within(1e-9));
         health.Mods = [];
         Assert.That(health.GaugeProfile.InitialHealth, Is.EqualTo(.3));
         Assert.That(health.Health.Value, Is.EqualTo(.28).Within(1e-9));
-        health.RegisterNonConsumingJudgement(HitResult.Ok);
+        health.ApplyTestNonConsumingJudgement(HitResult.Ok);
         Assert.That(health.Health.Value, Is.EqualTo(.26).Within(1e-9));
     }
 
@@ -553,7 +560,7 @@ public class BmsModLr2Test
         var attributes = new BmsRuleset().GetBeatmapAttributesForDisplay(info, [new BmsModLr2()]).ToArray();
         Assert.That(attributes, Is.Not.Empty);
         Assert.That(attributes.Single(attribute => attribute.Acronym == "RK").AdditionalMetrics
-            .Single(metric => metric.Name.ToString() == "Normal note PGREAT").Value.ToString(), Is.EqualTo("-18 to +18 ms"));
+                              .Single(metric => metric.Name.ToString() == "Normal note PGREAT").Value.ToString(), Is.EqualTo("-18 to +18 ms"));
         Assert.That(attributes.Single(attribute => attribute.Acronym == "LM").AdjustedValue, Is.EqualTo((float)BmsLongNoteMode.LongNote));
         Assert.That(BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, 1, 2, false), Is.SameAs(defaultTable));
     }
@@ -577,7 +584,7 @@ public class BmsModLr2Test
     {
         var beatmap = createBeatmap();
         beatmap.HitObjects.Add(new BmsNote { Beatmap = beatmap, JudgementRate = .75, Column = 1, StartTime = 1000 });
-        var replay = new osu.Game.Replays.Replay
+        var replay = new Game.Replays.Replay
         {
             HasReceivedAllFrames = true,
             Frames = [new BmsReplayFrame(100, BmsAction.Key1), new BmsReplayFrame(110), new BmsReplayFrame(2000)],
@@ -611,7 +618,8 @@ public class BmsModLr2Test
         ]);
         foreach (var note in beatmap.HitObjects) note.ApplyDefaults(beatmap.ControlPointInfo, beatmap.Difficulty);
         using var score = new BmsScoreProcessor();
-        using var health = new BmsHealthProcessor { Mods = mods };
+        using var health = new BmsHealthProcessor();
+        health.Mods = mods;
         score.Mods.Value = mods;
         score.ApplyBeatmap(beatmap);
         mod.ApplyToScoreProcessor(score);
@@ -619,11 +627,12 @@ public class BmsModLr2Test
         foreach (var item in mods.OfType<IApplicableToHealthProcessor>()) item.ApplyToHealthProcessor(health);
         var gauges = new List<BmsGaugeStateSnapshot[]>();
         var output = new BmsReplaySimulation.SimulationOutput(score, health, _ => gauges.Add(health.CurrentGaugeStates.ToArray()));
-        var engine = new BmsJudgementEngine(Enumerable.Range(1, 3).Select(column => new BmsJudgementColumnDefinition(
-            beatmap.HitObjects.Where(note => note.Column == column).ToArray(), beatmap.LayoutVariant, column, output)).ToArray(),
+        var engine = new BmsJudgementEngine(beatmap.HitObjects.ToArray(), beatmap.LayoutVariant, Enumerable.Range(1, 3)
+                                                                                                           .Select(column => new BmsJudgementColumnDefinition(column, output)).ToArray(),
             notes => (BmsProfiles.CreateScore(score.EmptyPoorBreaksCombo ?? BmsJudgementProfileProvider.EmptyPoorBreaksCombo(layout)), health.CreateEngineHealth(notes)));
         (double Time, int Column, bool Pressed)[] inputs = [(100, 1, true), (110, 1, false), (1017, 1, true), (1025, 1, false), (1500, 2, true), (1900, 2, false)];
-        var replay = new osu.Game.Replays.Replay { HasReceivedAllFrames = true };
+        var replay = new Game.Replays.Replay { HasReceivedAllFrames = true };
+
         foreach (var input in inputs)
         {
             engine.QueueInput(input.Time, input.Column, input.Pressed, false);

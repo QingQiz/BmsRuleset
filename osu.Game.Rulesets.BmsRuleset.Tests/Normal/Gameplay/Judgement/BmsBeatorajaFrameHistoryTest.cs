@@ -6,7 +6,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
-using osu.Game.Rulesets.Scoring;
+using RhythmEngine.Profiles.Bms;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
 
@@ -43,13 +43,20 @@ public class BmsBeatorajaFrameHistoryTest
     {
         using var run = new Run();
         run.Head();
-        run.Frame(1650, 650, true); run.Expect(0.30);
-        run.Frame(1651, 1, true); run.Expect(0.30);
-        run.Rewind(rewindTime); run.Expect(0.30);
-        run.Frame(1651, 1, true); run.Expect(0.30);
-        run.Frame(1652, 1, true); run.Expect(0.30);
-        run.Frame(1800, 148, true); run.Expect(0.30);
-        run.Frame(1801, 1, true); run.Expect(0.32);
+        run.Frame(1650, 650, true);
+        run.Expect(0.30);
+        run.Frame(1651, 1, true);
+        run.Expect(0.30);
+        run.Rewind(rewindTime);
+        run.Expect(0.30);
+        run.Frame(1651, 1, true);
+        run.Expect(0.30);
+        run.Frame(1652, 1, true);
+        run.Expect(0.30);
+        run.Frame(1800, 148, true);
+        run.Expect(0.30);
+        run.Frame(1801, 1, true);
+        run.Expect(0.32);
     }
 
     [Test]
@@ -57,15 +64,25 @@ public class BmsBeatorajaFrameHistoryTest
     {
         using var run = new Run();
         run.Head();
-        run.Frame(1150, 150, true); run.Expect(0.24);
-        run.Frame(1250, 100, false); run.Expect(0.18);
-        run.Frame(1400, 150, true); run.Expect(0.18);
-        run.Frame(1401, 1, true); run.Expect(0.20);
-        run.Frame(1602, 201, false); run.Expect(0.20);
-        run.Frame(1603, 1, false); run.Expect(0.185);
-        run.Rewind(1250); run.Expect(0.18);
-        run.Frame(1400, 150, true); run.Frame(1401, 1, true);
-        run.Frame(1602, 201, false); run.Frame(1603, 1, false); run.Expect(0.185);
+        run.Frame(1150, 150, true);
+        run.Expect(0.24);
+        run.Frame(1250, 100, false);
+        run.Expect(0.18);
+        run.Frame(1400, 150, true);
+        run.Expect(0.18);
+        run.Frame(1401, 1, true);
+        run.Expect(0.20);
+        run.Frame(1602, 201, false);
+        run.Expect(0.20);
+        run.Frame(1603, 1, false);
+        run.Expect(0.185);
+        run.Rewind(1250);
+        run.Expect(0.18);
+        run.Frame(1400, 150, true);
+        run.Frame(1401, 1, true);
+        run.Frame(1602, 201, false);
+        run.Frame(1603, 1, false);
+        run.Expect(0.185);
     }
 
     [Test]
@@ -73,13 +90,21 @@ public class BmsBeatorajaFrameHistoryTest
     {
         using var run = new Run();
         run.Head();
-        run.Frame(1650, 650, true); run.Expect(0.30);
-        run.Release(1650); run.Expect(0.24);
-        run.Frame(1750, 100, false); run.Expect(0.24);
-        run.Frame(2301, 551, false); run.Expect(0.195);
-        run.Frame(2951, 650, true); run.Expect(0.255);
-        run.Rewind(1750); run.Expect(0.24);
-        run.Frame(2301, 551, false); run.Frame(2951, 650, true); run.Expect(0.255);
+        run.Frame(1650, 650, true);
+        run.Expect(0.30);
+        run.Release(1650);
+        run.Expect(0.24);
+        run.Frame(1750, 100, false);
+        run.Expect(0.24);
+        run.Frame(2301, 551, false);
+        run.Expect(0.195);
+        run.Frame(2951, 650, true);
+        run.Expect(0.255);
+        run.Rewind(1750);
+        run.Expect(0.24);
+        run.Frame(2301, 551, false);
+        run.Frame(2951, 650, true);
+        run.Expect(0.255);
     }
 
     [TestCase(2999)]
@@ -89,21 +114,28 @@ public class BmsBeatorajaFrameHistoryTest
     {
         using var run = new Run();
         run.Head();
-        run.Frame(2999, 1999, true); run.Expect(0.42);
-        run.Frame(3000, 1, true); run.Release(3000); run.Expect(0.46);
-        run.Frame(3001, 1, true); run.Expect(0.46);
+        run.Frame(2999, 1999, true);
+        run.Expect(0.42);
+        run.Frame(3000, 1, true);
+        run.Release(3000);
+        run.Expect(0.46);
+        run.Frame(3001, 1, true);
+        run.Expect(0.46);
         run.Rewind(rewindTime);
+
         if (rewindTime < 3000)
         {
             run.Expect(0.42);
-            run.Frame(3000, 1, true); run.Release(3000);
+            run.Frame(3000, 1, true);
+            run.Release(3000);
         }
-        run.Frame(3002, 2, true); run.Expect(0.46);
+
+        run.Frame(3002, 2, true);
+        run.Expect(0.46);
     }
 
     private sealed class Run : IDisposable
     {
-        private readonly BmsLongNote note;
         private readonly BmsLongNoteTestContext context;
         private readonly BmsHealthProcessor health;
         private readonly ManualClock clock = new();
@@ -112,7 +144,7 @@ public class BmsBeatorajaFrameHistoryTest
         public Run()
         {
             framed = new FramedClock(clock);
-            note = new BmsLongNote { StartTime = 1000, Duration = 2000, Column = 1 };
+            var note = new BmsLongNote { StartTime = 1000, Duration = 2000, Column = 1 };
             var beatmap = new BmsBeatmap
             {
                 LayoutVariant = BmsLayoutVariant.Bme7K, TotalColumns = 8, Rank = 2,
@@ -122,26 +154,51 @@ public class BmsBeatorajaFrameHistoryTest
             note.Beatmap = beatmap;
             health = new BmsHealthProcessor { Clock = framed };
             health.ApplyBeatmap(beatmap);
-            context = new BmsLongNoteTestContext(note);
-            context.BeforeRebuild = health.ResetReplayState;
-            context.BeforeOperation = time;
-            context.Output.ResultApplied += (_, _) => health.ApplyResult(new BmsLongNoteJudgementResult(note, note.CreateJudgement(), context.Output.GetEndpoints(note)) { Type = context.Output.GetMainResult(note).Type });
+            context = new BmsLongNoteTestContext(note, notes => (BmsProfiles.CreateScore(), health.CreateEngineHealth(notes)))
+            {
+                BeforeRebuild = health.ResetReplayState,
+                BeforeOperation = time,
+            };
+            context.Output.ResultApplied += (_, _) => health.ApplyTestResult(new BmsLongNoteJudgementResult(note, note.CreateJudgement(), context.Output.GetEndpoints(note))
+                { Type = context.Output.GetMainResult(note).Type });
             context.Output.SyntheticEndpoint += (endpoint, applied) =>
             {
-                if (applied) health.ApplySyntheticLongNoteEndpoint(new BmsLongNoteJudgementResult(note.CreateSyntheticEndpoint(endpoint.ExpectedTime), note.CreateJudgement(), [endpoint]) { Type = endpoint.Result });
+                if (applied) health.ApplyTestResult(new BmsLongNoteJudgementResult(note.CreateSyntheticEndpoint(endpoint.ExpectedTime), note.CreateJudgement(), [endpoint]) { Type = endpoint.Result });
             };
-            context.Output.BodyTick += (_, holding, scale, frame) => health.ApplyHellChargeTick(holding, scale);
+            context.Output.BodyTick += frame => health.ApplyEngineTick(frame.EngineResult!.Health);
         }
 
-        private void time(double t) { clock.CurrentTime = t; framed.ProcessFrame(); }
-        public void Head() { time(1000); context.Press(1000); Expect(0.24); }
-        public void Frame(double t, double elapsed, bool holding) { time(t); context.Frame(t, elapsed, holding); }
+        private void time(double t)
+        {
+            clock.CurrentTime = t;
+            framed.ProcessFrame();
+        }
+
+        public void Head()
+        {
+            time(1000);
+            context.Press(1000);
+            Expect(0.24);
+        }
+
+        public void Frame(double t, double elapsed, bool holding)
+        {
+            time(t);
+            context.Frame(t, elapsed, holding);
+        }
+
         public void Release(double t)
         {
             time(t);
             context.Release(t);
         }
-        public void Rewind(double t) { context.Rewind(t); time(t); }
+
+        public void Rewind(double t)
+        {
+            context.Rewind(t);
+            time(t);
+        }
+
         public void Expect(double value) => Assert.That(health.Health.Value, Is.EqualTo(value).Within(1e-10), "HCN health at " + clock.CurrentTime);
         public void Dispose() => health.Dispose();
     }

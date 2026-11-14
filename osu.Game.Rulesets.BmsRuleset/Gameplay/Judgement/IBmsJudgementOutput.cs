@@ -16,7 +16,7 @@ internal interface IBmsJudgementOutput
 
     void ApplySyntheticEndpoint(BmsLongNoteEndpointResult endpoint, in BmsFrameContext frame, bool suppressPenalty);
 
-    void ApplyBodyTick(BmsLongNote note, bool holding, double scale, in BmsFrameContext frame);
+    void ApplyBodyTick(in BmsFrameContext frame);
 
     /// <summary>
     /// Receives immutable engine output. Presentation cannot write back into judgement state.

@@ -138,7 +138,7 @@ public static class MalodyProfile
             MalodyJudge.Amateur => 78, MalodyJudge.Beginner => 85, MalodyJudge.Climber => 100,
             MalodyJudge.Dancer => 110, _ => 120,
         };
-        var chart = source.Compile(note => createRule(note, windows, options, timing));
+        var chart = compileChart(source, windows, options, timing);
         var descriptor = new ProfileDescriptor($"malody-key-{options.Client}-{options.Judge}-{(classic ? "4.3.7" : options.VVersion)}",
             classic ? "malody-4.3.7-pc-d0cf9ecb493f-android-7b6f5650481f" : timing != null ? "malody-v-6.7.22-2f1a4f10a95c" : "malody-v-rc2.0-21c73a27b7e1",
             EvidenceLevel.StaticBinary,
@@ -158,17 +158,27 @@ public static class MalodyProfile
         return new CompiledProfile(chart, new SessionConfiguration(descriptor.Id, createScore(multiplier, !classic), health, ProfileSupport.Oldest), descriptor);
     }
 
-    private static INoteRule createRule(KeyNote note, TimingWindows windows, MalodyOptions options, MalodyVTiming? timing)
+    private static Chart compileChart(KeyChart source, TimingWindows windows, MalodyOptions options, MalodyVTiming? timing)
     {
-        if (timing != null)
+        var rules = new Dictionary<KeyNoteKind, INoteRule>();
+        return source.Compile(note =>
         {
-            if (note.Kind is not (KeyNoteKind.Tap or KeyNoteKind.Hold))
-                throw ProfileSupport.Unsupported("Malody Key", note.Kind);
-            if (note.Kind == KeyNoteKind.Hold && note.EndTime == note.StartTime)
-                throw new ArgumentException("Malody holds require a positive duration.", nameof(note));
+            if (note.Kind == KeyNoteKind.Hold && note.EndTime <= note.StartTime)
+                throw new ArgumentException("Malody holds require a positive duration.", nameof(source));
 
-            return new MalodyVCurrentRule(timing, note.Kind == KeyNoteKind.Hold, options.JudgeAtEnd);
-        }
+            if (!rules.TryGetValue(note.Kind, out var rule))
+                rules.Add(note.Kind, rule = createRule(note.Kind, windows, options, timing));
+            return rule;
+        });
+    }
+
+    private static INoteRule createRule(KeyNoteKind kind, TimingWindows windows, MalodyOptions options, MalodyVTiming? timing)
+    {
+        if (kind is not (KeyNoteKind.Tap or KeyNoteKind.Hold))
+            throw ProfileSupport.Unsupported("Malody Key", kind);
+
+        if (timing != null)
+            return new MalodyVCurrentRule(timing, kind == KeyNoteKind.Hold, options.JudgeAtEnd);
 
         var deadline = options.Client switch
         {
@@ -176,13 +186,8 @@ public static class MalodyProfile
             MalodyClient.ClassicMobile => Time.FromMilliseconds(170),
             _ => windows.Entries[^1].Late,
         };
-        if (note.Kind == KeyNoteKind.Tap)
+        if (kind == KeyNoteKind.Tap)
             return new TapRule(new TapConfiguration(windows, deadline, MalodyResults.MISS, 1000));
-
-        if (note.Kind != KeyNoteKind.Hold)
-            throw ProfileSupport.Unsupported("Malody Key", note.Kind);
-        if (note.EndTime == note.StartTime)
-            throw new ArgumentException("Malody holds require a positive duration.", nameof(note));
 
         if (options.Client is MalodyClient.ClassicPc or MalodyClient.ClassicMobile)
             return new MalodyClassicHoldRule(windows, deadline, Time.FromMilliseconds(options.Client == MalodyClient.ClassicMobile ? 130 : 110));
@@ -215,6 +220,7 @@ public static class MalodyProfile
             // The native client's bonus is an integer percentage, independent of its float HP field.
             var bonus = Math.Clamp((int)Math.Round(state.Bonus * 100) + change, 0, 100) / 100.0;
             var next = ProfileSupport.Accumulate(state, context, values);
+
             if (vScore)
             {
                 // V multiplies by a single-precision bonus factor before accumulating a double score.

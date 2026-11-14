@@ -10,7 +10,6 @@ using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
-using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 
@@ -27,12 +26,13 @@ public partial class BmsScoreProcessorTest
             new BmsLongNote { StartTime = 1000 + i * 10, Duration = 500, Column = i % 8, Beatmap = source.Beatmap },
             1100 + i % 4 * 10, i % 3 == 0 ? 1100 + i % 4 * 10 : 1600 + i % 4 * 10)).ToArray();
         foreach (var result in results)
-            processor.ApplyResult(result);
+            processor.ApplyTestResult(result);
         var ledger = processor.JudgementEvents.ToArray();
         var remaining = ledger.ToList();
         var score = new ScoreInfo();
         processor.PopulateScore(score);
         var random = new Random(20260920);
+
         foreach (var index in Enumerable.Range(0, results.Length).OrderBy(_ => random.Next()))
         {
             processor.RevertResult(results[index]);
@@ -44,6 +44,7 @@ public partial class BmsScoreProcessorTest
             for (var i = 0; i < score.HitEvents.Count; i++)
                 Assert.That(score.HitEvents[i].LastHitObject, Is.SameAs(i == 0 ? null : score.HitEvents[i - 1].HitObject));
         }
+
         processor.Dispose();
     }
 
@@ -86,17 +87,23 @@ public partial class BmsScoreProcessorTest
         return (processor, source);
     }
 
-    private static BmsBeatmap createThreeNoteBeatmap() => new()
+    private static BmsBeatmap createThreeNoteBeatmap()
     {
-        LayoutVariant = BmsLayoutVariant.Bme7K,
-        TotalColumns = 8,
-        HitObjects =
+        var beatmap = new BmsBeatmap
         {
-            new BmsHitObject { StartTime = 1000, Column = 1 },
-            new BmsHitObject { StartTime = 2000, Column = 2 },
-            new BmsHitObject { StartTime = 3000, Column = 3 },
-        },
-    };
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            TotalColumns = 8,
+            HitObjects =
+            {
+                new BmsHitObject { StartTime = 1000, Column = 1 },
+                new BmsHitObject { StartTime = 2000, Column = 2 },
+                new BmsHitObject { StartTime = 3000, Column = 3 },
+            },
+        };
+        foreach (var note in beatmap.HitObjects)
+            note.Beatmap = beatmap;
+        return beatmap;
+    }
 
     private sealed partial class TestBmsScoreProcessor : BmsScoreProcessor
     {
@@ -126,8 +133,8 @@ public partial class BmsScoreProcessorTest
     {
         var (processor, source) = createLongNoteProcessor(BmsLongNoteMode.ChargeNote);
 
-        processor.ApplyResult(createEndpointResult(source, BmsLongNoteEndpointKind.Head, 1012));
-        processor.ApplyResult(createEndpointResult(source, BmsLongNoteEndpointKind.Tail, 1490));
+        processor.ApplyTestResult(createEndpointResult(source, BmsLongNoteEndpointKind.Head, 1012));
+        processor.ApplyTestResult(createEndpointResult(source, BmsLongNoteEndpointKind.Tail, 1490));
 
         Assert.Multiple(() =>
         {
@@ -150,7 +157,7 @@ public partial class BmsScoreProcessorTest
         processor.ApplyBeatmap(beatmap);
 
         foreach (var note in beatmap.HitObjects)
-            processor.ApplyResult(new JudgementResult(note, note.CreateJudgement()) { Type = HitResult.Perfect });
+            processor.ApplyTestResult(new BmsJudgementResult(note, note.CreateJudgement()) { Type = HitResult.Perfect });
 
         manualClock.CurrentTime = 10000;
         framedClock.ProcessFrame();
@@ -179,8 +186,8 @@ public partial class BmsScoreProcessorTest
             Column = 2,
             Beatmap = first.Beatmap,
         };
-        processor.ApplyResult(createLongNoteResult(first, 1012, 1490));
-        processor.ApplyResult(createLongNoteResult(second, 2015, 2492));
+        processor.ApplyTestResult(createLongNoteResult(first, 1012, 1490));
+        processor.ApplyTestResult(createLongNoteResult(second, 2015, 2492));
 
         var score = new ScoreInfo();
         processor.PopulateScore(score);
@@ -212,7 +219,7 @@ public partial class BmsScoreProcessorTest
     {
         var (processor, source) = createLongNoteProcessor();
         var result = createLongNoteResult(source, 1012, 1490);
-        processor.ApplyResult(result);
+        processor.ApplyTestResult(result);
 
         processor.RevertResult(result);
 
@@ -223,7 +230,7 @@ public partial class BmsScoreProcessorTest
         processor.PopulateScore(rewoundScore);
         Assert.That(rewoundScore.HitEvents, Is.Empty);
 
-        processor.ApplyResult(createLongNoteResult(source, 1015, 1490));
+        processor.ApplyTestResult(createLongNoteResult(source, 1015, 1490));
 
         var populatedScore = new ScoreInfo();
         processor.PopulateScore(populatedScore);
@@ -246,7 +253,7 @@ public partial class BmsScoreProcessorTest
         };
         var result = new BmsLongNoteJudgementResult(source, source.CreateJudgement(), endpoints) { Type = HitResult.Great };
 
-        processor.ApplyResult(result);
+        processor.ApplyTestResult(result);
 
         var populatedScore = new ScoreInfo();
         processor.PopulateScore(populatedScore);
@@ -265,10 +272,11 @@ public partial class BmsScoreProcessorTest
     public void TestPopulatedScoreTracksIncrementalJudgementEvents()
     {
         var processor = new BmsScoreProcessor();
+        processor.ApplyBeatmap(new BmsBeatmap { TotalColumns = 8 });
         var score = new ScoreInfo();
         processor.PopulateScore(score);
 
-        processor.RegisterEmptyPoor(1234);
+        processor.ApplyTestEmptyPoor(1234);
 
         Assert.Multiple(() =>
         {
@@ -288,13 +296,14 @@ public partial class BmsScoreProcessorTest
             TotalColumns = 8,
             HitObjects = { new BmsHitObject { StartTime = 1000, Column = 1 } },
         };
+        beatmap.HitObjects[0].Beatmap = beatmap;
         processor.ApplyBeatmap(beatmap);
 
-        processor.ApplyResult(new JudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
+        processor.ApplyTestResult(new BmsJudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
             { Type = HitResult.Perfect });
         Assert.That(processor.Combo.Value, Is.EqualTo(1));
 
-        processor.RegisterEmptyPoor();
+        processor.ApplyTestEmptyPoor();
         Assert.That(processor.Combo.Value, Is.EqualTo(1), "E-POOR must not break combo");
     }
 
@@ -302,14 +311,15 @@ public partial class BmsScoreProcessorTest
     public void TestRegisterEmptyPoorIncrementsStatisticsCounter()
     {
         var processor = new BmsScoreProcessor();
+        processor.ApplyBeatmap(new BmsBeatmap { TotalColumns = 8 });
 
         Assert.That(processor.Statistics.GetValueOrDefault(HitResult.Miss), Is.EqualTo(0));
 
-        processor.RegisterEmptyPoor();
+        processor.ApplyTestEmptyPoor();
         Assert.That(processor.Statistics.GetValueOrDefault(HitResult.Miss), Is.EqualTo(1));
 
-        processor.RegisterEmptyPoor();
-        processor.RegisterEmptyPoor();
+        processor.ApplyTestEmptyPoor();
+        processor.ApplyTestEmptyPoor();
         Assert.That(processor.Statistics.GetValueOrDefault(HitResult.Miss), Is.EqualTo(3));
     }
 
@@ -317,8 +327,9 @@ public partial class BmsScoreProcessorTest
     public void TestRegisterEmptyPoorRecordsHitEventAtPressTime()
     {
         var processor = new BmsScoreProcessor();
+        processor.ApplyBeatmap(new BmsBeatmap { TotalColumns = 8 });
 
-        processor.RegisterEmptyPoor(1234);
+        processor.ApplyTestEmptyPoor(1234);
 
         var score = new ScoreInfo();
         processor.PopulateScore(score);
@@ -332,10 +343,11 @@ public partial class BmsScoreProcessorTest
     public void TestRegisterEmptyPoorUsesNextNoteOffset()
     {
         var processor = new BmsScoreProcessor();
+        processor.ApplyBeatmap(new BmsBeatmap { TotalColumns = 8 });
         BmsTimingObservation? registeredObservation = null;
         processor.EmptyPoorRegistered += observation => registeredObservation = observation;
 
-        processor.RegisterEmptyPoor(600, 1000, 2);
+        processor.ApplyTestEmptyPoor(600, 1000, 2);
 
         var score = new ScoreInfo();
         processor.PopulateScore(score);
@@ -356,8 +368,8 @@ public partial class BmsScoreProcessorTest
     public void TestResetClearsJudgementLedger()
     {
         var (processor, source) = createLongNoteProcessor();
-        processor.ApplyResult(createLongNoteResult(source, 1012, 1490));
-        processor.RegisterEmptyPoor(2000);
+        processor.ApplyTestResult(createLongNoteResult(source, 1012, 1490));
+        processor.ApplyTestEmptyPoor(2000);
 
         Assert.That(processor.ScoringJudgementEventCount, Is.EqualTo(1));
 
@@ -387,8 +399,8 @@ public partial class BmsScoreProcessorTest
         var laterResult = createEndpointResult(laterNote, BmsLongNoteEndpointKind.Head, 2010);
         var earlierResult = createEndpointResult(earlierNote, BmsLongNoteEndpointKind.Head, 990);
 
-        processor.ApplyResult(laterResult);
-        processor.ApplyResult(earlierResult);
+        processor.ApplyTestResult(laterResult);
+        processor.ApplyTestResult(earlierResult);
         processor.RevertResult(earlierResult);
 
         var score = new ScoreInfo();
@@ -408,8 +420,8 @@ public partial class BmsScoreProcessorTest
         var head = createEndpointResult(source, BmsLongNoteEndpointKind.Head, 1012);
         var tail = createEndpointResult(source, BmsLongNoteEndpointKind.Tail, 1490);
 
-        processor.ApplyResult(head);
-        processor.ApplyResult(tail);
+        processor.ApplyTestResult(head);
+        processor.ApplyTestResult(tail);
         processor.RevertResult(tail);
 
         var score = new ScoreInfo();
@@ -430,13 +442,13 @@ public partial class BmsScoreProcessorTest
         var beatmap = createThreeNoteBeatmap();
         processor.ApplyBeatmap(beatmap);
 
-        processor.ApplyResult(new JudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
+        processor.ApplyTestResult(new BmsJudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
             { Type = HitResult.Perfect });
-        processor.ApplyResult(new JudgementResult(beatmap.HitObjects[1], beatmap.HitObjects[1].CreateJudgement())
+        processor.ApplyTestResult(new BmsJudgementResult(beatmap.HitObjects[1], beatmap.HitObjects[1].CreateJudgement())
             { Type = HitResult.Perfect });
         Assert.That(processor.Combo.Value, Is.EqualTo(2));
 
-        processor.ApplyResult(new JudgementResult(beatmap.HitObjects[2], beatmap.HitObjects[2].CreateJudgement())
+        processor.ApplyTestResult(new BmsJudgementResult(beatmap.HitObjects[2], beatmap.HitObjects[2].CreateJudgement())
             { Type = HitResult.Ok });
         Assert.That(processor.Combo.Value, Is.EqualTo(0));
     }
@@ -461,13 +473,13 @@ public partial class BmsScoreProcessorTest
         var beatmap = createThreeNoteBeatmap();
         processor.ApplyBeatmap(beatmap);
 
-        processor.ApplyResult(new JudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
+        processor.ApplyTestResult(new BmsJudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
             { Type = HitResult.Perfect });
-        processor.ApplyResult(new JudgementResult(beatmap.HitObjects[1], beatmap.HitObjects[1].CreateJudgement())
+        processor.ApplyTestResult(new BmsJudgementResult(beatmap.HitObjects[1], beatmap.HitObjects[1].CreateJudgement())
             { Type = HitResult.Perfect });
         Assert.That(processor.Combo.Value, Is.EqualTo(2));
 
-        processor.ApplyResult(new JudgementResult(beatmap.HitObjects[2], beatmap.HitObjects[2].CreateJudgement())
+        processor.ApplyTestResult(new BmsJudgementResult(beatmap.HitObjects[2], beatmap.HitObjects[2].CreateJudgement())
             { Type = HitResult.Meh });
         Assert.That(processor.Combo.Value, Is.EqualTo(0));
     }
@@ -520,9 +532,9 @@ public partial class BmsScoreProcessorTest
     {
         var processor = new BmsScoreProcessor();
         var landmine = new BmsLandmine { StartTime = 1000, Column = 1 };
-        var result = new JudgementResult(landmine, landmine.CreateJudgement()) { Type = HitResult.Meh };
+        var result = new BmsJudgementResult(landmine, landmine.CreateJudgement()) { Type = HitResult.Meh };
 
-        processor.ApplyResult(result);
+        processor.ApplyTestResult(result);
 
         Assert.Multiple(() =>
         {
@@ -541,16 +553,16 @@ public partial class BmsScoreProcessorTest
         var head = createEndpointResult(source, BmsLongNoteEndpointKind.Head, 1012);
         var tail = createEndpointResult(source, BmsLongNoteEndpointKind.Tail, 1490);
 
-        processor.ApplyResult(head);
-        processor.ApplyResult(tail);
-        processor.RegisterEmptyPoor(1600);
+        processor.ApplyTestResult(head);
+        processor.ApplyTestResult(tail);
+        processor.ApplyTestEmptyPoor(1600);
 
         Assert.That(processor.ScoringJudgementEventCount, Is.EqualTo(2));
 
         processor.RevertResult(tail);
         Assert.That(processor.ScoringJudgementEventCount, Is.EqualTo(1));
 
-        processor.ApplyResult(createEndpointResult(source, BmsLongNoteEndpointKind.Tail, 1495));
+        processor.ApplyTestResult(createEndpointResult(source, BmsLongNoteEndpointKind.Tail, 1495));
         Assert.That(processor.ScoringJudgementEventCount, Is.EqualTo(2));
     }
 
@@ -560,7 +572,7 @@ public partial class BmsScoreProcessorTest
         var (processor, source) = createLongNoteProcessor(BmsLongNoteMode.ChargeNote);
         var endpoint = new BmsLongNoteEndpointResult(source, BmsLongNoteEndpointKind.Head, 988, 1, HitResult.Great);
 
-        processor.ApplyResult(new BmsLongNoteJudgementResult(source, source.CreateJudgement(), [endpoint]) { Type = HitResult.Great });
+        processor.ApplyTestResult(new BmsLongNoteJudgementResult(source, source.CreateJudgement(), [endpoint]) { Type = HitResult.Great });
 
         var score = new ScoreInfo();
         processor.PopulateScore(score);
@@ -586,8 +598,8 @@ public partial class BmsScoreProcessorTest
             Beatmap = earlierNote.Beatmap,
         };
 
-        processor.ApplyResult(createEndpointResult(laterNote, BmsLongNoteEndpointKind.Head, 2010));
-        processor.ApplyResult(createEndpointResult(earlierNote, BmsLongNoteEndpointKind.Head, 990));
+        processor.ApplyTestResult(createEndpointResult(laterNote, BmsLongNoteEndpointKind.Head, 2010));
+        processor.ApplyTestResult(createEndpointResult(earlierNote, BmsLongNoteEndpointKind.Head, 990));
 
         var score = new ScoreInfo();
         processor.PopulateScore(score);

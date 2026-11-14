@@ -26,7 +26,7 @@ public class Lr2NativeConformanceTest
     {
         var profile = Lr2Beta3Profile.Create(new KeyChart(1, [new KeyNote(0, 0, ms(2000), ms(2000))]),
             new Lr2Beta3Options(Rank: (BmsRank)row.GetProperty("rank").GetInt32()));
-        var session = profile.CreateSession();
+        var session = profile.CreateRecordingSession();
         var time = ms(row.GetProperty("time").GetInt32());
         session.AdvanceTo(time, [new InputEvent(time, 0, true)]);
         Assert.That(session.GetEventsSince(0).Select(e => e.Result.Value), Is.EqualTo(row.GetProperty("events").EnumerateArray().Select(grade)));
@@ -38,7 +38,7 @@ public class Lr2NativeConformanceTest
     {
         var profile = Lr2Beta3Profile.Create(new KeyChart(1, [new KeyNote(0, 0, ms(2000), ms(3000), KeyNoteKind.Hold)]),
             new Lr2Beta3Options(Rank: (BmsRank)row.GetProperty("rank").GetInt32()));
-        var session = profile.CreateSession();
+        var session = profile.CreateRecordingSession();
         var headTime = ms(2000 + row.GetProperty("offset").GetInt32());
         session.AdvanceTo(headTime, [new InputEvent(headTime, 0, true)]);
         Assert.That(session.GetEventsSince(0).Select(e => e.Result.Value), Is.EqualTo(row.GetProperty("head").GetProperty("events").EnumerateArray().Select(grade)));
@@ -56,7 +56,7 @@ public class Lr2NativeConformanceTest
         {
             var second = 2000 + row.GetProperty("secondDelta").GetInt32();
             var source = new KeyChart(1, [new KeyNote(0, 0, ms(2000), ms(2000)), new KeyNote(1, 0, ms(second), ms(second))]);
-            var session = Lr2Beta3Profile.Create(source).CreateSession();
+            var session = Lr2Beta3Profile.Create(source).CreateRecordingSession();
             var time = ms(row.GetProperty("time").GetInt32());
             session.AdvanceTo(time, [new InputEvent(time, 0, true)]);
             Assert.That(session.GetEventsSince(0).Select(e => e.Result.Value), Is.EqualTo(row.GetProperty("events").EnumerateArray().Select(grade)), row.ToString());
@@ -75,6 +75,7 @@ public class Lr2NativeConformanceTest
             var score = configuration.Score.InitialState;
             var health = configuration.Health.InitialState;
             var index = 0;
+
             foreach (var expected in row.GetProperty("states").EnumerateArray())
             {
                 var result = grade(expected);

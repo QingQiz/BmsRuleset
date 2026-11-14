@@ -1,10 +1,11 @@
+using System.Collections.Frozen;
 using System.Collections.Immutable;
 
 namespace RhythmEngine.Core;
 
 public sealed record ChartNote(int Id, int Lane, long StartTime, long EndTime, INoteRule Rule);
 
-public sealed record ScoringOpportunity(int NoteId, PartId Part, long Time, double MaximumAccuracy, double Weight = 1);
+public sealed record ScoringOpportunity(int NoteId, PartId Part, double MaximumAccuracy, double Weight = 1);
 
 public sealed class ScorePlan
 {
@@ -12,10 +13,13 @@ public sealed class ScorePlan
 
     public double MaximumAccuracy { get; }
 
+    internal FrozenDictionary<(int NoteId, PartId Part), ScoringOpportunity> OpportunitiesByPart { get; }
+
     internal ScorePlan(ImmutableArray<ScoringOpportunity> opportunities)
     {
         Opportunities = opportunities;
         MaximumAccuracy = opportunities.Sum(o => o.MaximumAccuracy * o.Weight);
+        OpportunitiesByPart = opportunities.ToFrozenDictionary(o => (o.NoteId, o.Part));
     }
 }
 
@@ -27,6 +31,10 @@ public sealed class Chart
 
     public ScorePlan ScorePlan { get; }
 
+    internal ImmutableArray<ImmutableArray<int>> LaneNotes { get; }
+
+    internal FrozenDictionary<int, int> NoteIndices { get; }
+
     public Chart(int laneCount, IEnumerable<ChartNote> notes)
     {
         if (laneCount <= 0)
@@ -34,17 +42,21 @@ public sealed class Chart
 
         LaneCount = laneCount;
         // Source order is authoritative for simultaneous objects, including during replay reconstruction.
-        Notes = [..notes];
+        Notes = [.. notes];
         if (Notes.Select(n => n.Id).Distinct().Count() != Notes.Length
             || Notes.Any(n => n.Lane < 0 || n.Lane >= laneCount || n.EndTime < n.StartTime))
             throw new ArgumentException("Notes require unique IDs, valid lanes, rules and ordered endpoints.", nameof(notes));
 
         var opportunities = Notes.SelectMany(n => n.Rule.GetScoringOpportunities(n)).ToImmutableArray();
-        if (opportunities.Any(o => o.Part == null || !double.IsFinite(o.MaximumAccuracy)
-                                  || o.MaximumAccuracy < 0 || !double.IsFinite(o.Weight) || o.Weight <= 0)
+        // Rule implementations cross the public chart boundary, so validate their part IDs at runtime.
+        // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
+        if (opportunities.Any(o => o.Part == null || !double.IsFinite(o.MaximumAccuracy) || o.MaximumAccuracy < 0 || !double.IsFinite(o.Weight) || o.Weight <= 0)
             || opportunities.Select(o => (o.NoteId, o.Part)).Distinct().Count() != opportunities.Length)
             throw new ArgumentException("Scoring opportunities require unique part IDs and finite nonnegative potential.", nameof(notes));
 
         ScorePlan = new ScorePlan(opportunities);
+        NoteIndices = Notes.Select((n, i) => (n.Id, Index: i)).ToFrozenDictionary(n => n.Id, n => n.Index);
+        var laneNotes = Notes.Select((n, i) => (n.Lane, Index: i)).ToLookup(n => n.Lane, n => n.Index);
+        LaneNotes = [.. Enumerable.Range(0, laneCount).Select(lane => laneNotes[lane].ToImmutableArray())];
     }
 }

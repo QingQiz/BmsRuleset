@@ -11,7 +11,6 @@ using osu.Game.Rulesets.BmsRuleset.Gameplay.Practice;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
-using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
@@ -32,7 +31,7 @@ public partial class BmsScoreProcessorTest
         processor.ApplyBeatmap(practice);
 
         foreach (var note in practice.HitObjects)
-            processor.ApplyResult(new JudgementResult(note, note.CreateJudgement()) { Type = HitResult.Perfect });
+            processor.ApplyTestResult(new BmsJudgementResult(note, note.CreateJudgement()) { Type = HitResult.Perfect });
 
         manualClock.CurrentTime = 2499;
         framedClock.ProcessFrame();
@@ -47,7 +46,8 @@ public partial class BmsScoreProcessorTest
 
     [Test]
     public void TestPracticeEndPreservesCompleteHoldAndSlowWindow(
-        [Values(BmsLongNoteMode.LongNote, BmsLongNoteMode.ChargeNote, BmsLongNoteMode.HellChargeNote)] BmsLongNoteMode mode)
+        [Values(BmsLongNoteMode.LongNote, BmsLongNoteMode.ChargeNote, BmsLongNoteMode.HellChargeNote)]
+        BmsLongNoteMode mode)
     {
         var source = new BmsLongNote { StartTime = 1000, Duration = 1000, Column = 1 };
         var full = new BmsBeatmap
@@ -65,14 +65,14 @@ public partial class BmsScoreProcessorTest
         var processor = new TestBmsScoreProcessor { Clock = framedClock };
         processor.ApplyBeatmap(practice);
         if (mode != BmsLongNoteMode.LongNote)
-            processor.ApplyResult(createEndpointResult(hold, BmsLongNoteEndpointKind.Head, hold.StartTime));
+            processor.ApplyTestResult(createEndpointResult(hold, BmsLongNoteEndpointKind.Head, hold.StartTime));
 
         processor.UpdateCompletion();
         Assert.That(processor.HasCompleted.Value, Is.False);
 
         manualClock.CurrentTime = hold.EndTime;
         framedClock.ProcessFrame();
-        processor.ApplyResult(mode == BmsLongNoteMode.LongNote
+        processor.ApplyTestResult(mode == BmsLongNoteMode.LongNote
             ? createLongNoteResult(hold, hold.StartTime, hold.EndTime)
             : createEndpointResult(hold, BmsLongNoteEndpointKind.Tail, hold.EndTime));
         processor.UpdateCompletion();
@@ -99,6 +99,7 @@ public partial class BmsScoreProcessorTest
             TotalColumns = 8,
             HitObjects = { new BmsHitObject { StartTime = 1000, Column = 1 } },
         };
+        beatmap.HitObjects[0].Beatmap = beatmap;
         var manualClock = new ManualClock { CurrentTime = completionTime };
         var framedClock = new FramedClock(manualClock);
         var scoreProcessor = new TestBmsScoreProcessor { Clock = framedClock };
@@ -127,9 +128,9 @@ public partial class BmsScoreProcessorTest
         manualClock.CurrentTime = completionTime + 1;
         framedClock.ProcessFrame();
         var note = beatmap.HitObjects.Single();
-        var result = new JudgementResult(note, note.CreateJudgement()) { Type = HitResult.Meh };
-        healthProcessor.ApplyResult(result);
-        scoreProcessor.ApplyResult(result);
+        var result = new BmsJudgementResult(note, note.CreateJudgement()) { Type = HitResult.Meh };
+        healthProcessor.ApplyTestResult(result);
+        scoreProcessor.ApplyTestResult(result);
         scoreProcessor.UpdateCompletion();
 
         Assert.Multiple(() =>
@@ -151,11 +152,11 @@ public partial class BmsScoreProcessorTest
     {
         var (processor, source) = createLongNoteProcessor(mode);
         processor.Clock = new FramedClock(new ManualClock { CurrentTime = 10000 });
-        processor.ApplyResult(createEndpointResult(source, BmsLongNoteEndpointKind.Head, 1000));
+        processor.ApplyTestResult(createEndpointResult(source, BmsLongNoteEndpointKind.Head, 1000));
         processor.UpdateCompletion();
         Assert.That(processor.HasCompleted.Value, Is.False);
 
-        processor.ApplyResult(createEndpointResult(source, BmsLongNoteEndpointKind.Tail, 1600));
+        processor.ApplyTestResult(createEndpointResult(source, BmsLongNoteEndpointKind.Tail, 1600));
         processor.UpdateCompletion();
         Assert.That(processor.HasCompleted.Value, Is.True);
     }
@@ -165,20 +166,23 @@ public partial class BmsScoreProcessorTest
     {
         var note = new BmsHitObject { StartTime = 1000, Column = 1 };
         var mine = new BmsLandmine { StartTime = 500, Column = 2 };
+        var beatmap = new BmsBeatmap { HitObjects = { mine, note } };
+        mine.Beatmap = beatmap;
+        note.Beatmap = beatmap;
         var processor = new TestBmsScoreProcessor { Clock = new FramedClock(new ManualClock { CurrentTime = 10000 }) };
-        processor.ApplyBeatmap(new BmsBeatmap { HitObjects = { mine, note } });
+        processor.ApplyBeatmap(beatmap);
 
-        processor.RegisterEmptyPoor(600);
+        processor.ApplyTestEmptyPoor(600);
         Assert.That(processor.ScoringJudgementEventCount, Is.Zero);
 
         if (detonateMine)
-            processor.ApplyResult(new JudgementResult(mine, mine.CreateJudgement()) { Type = HitResult.Meh });
+            processor.ApplyTestResult(new BmsJudgementResult(mine, mine.CreateJudgement()) { Type = HitResult.Meh });
 
         Assert.That(processor.ScoringJudgementEventCount, Is.Zero);
         processor.UpdateCompletion();
         Assert.That(processor.HasCompleted.Value, Is.False);
 
-        processor.ApplyResult(new JudgementResult(note, note.CreateJudgement()) { Type = HitResult.Perfect });
+        processor.ApplyTestResult(new BmsJudgementResult(note, note.CreateJudgement()) { Type = HitResult.Perfect });
         Assert.That(processor.ScoringJudgementEventCount, Is.EqualTo(1));
         processor.UpdateCompletion();
         Assert.That(processor.HasCompleted.Value, Is.True);
@@ -189,8 +193,9 @@ public partial class BmsScoreProcessorTest
     {
         var mine = new BmsLandmine { StartTime = 3000, Column = 2, LandmineDamagePercent = 10 };
         var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, TotalColumns = 8 };
+        mine.Beatmap = beatmap;
         if (includeNote)
-            beatmap.HitObjects.Add(new BmsHitObject { StartTime = 1000, Column = 1 });
+            beatmap.HitObjects.Add(new BmsHitObject { Beatmap = beatmap, StartTime = 1000, Column = 1 });
         beatmap.HitObjects.Add(mine);
 
         var manualClock = new ManualClock();
@@ -207,9 +212,9 @@ public partial class BmsScoreProcessorTest
         if (includeNote)
         {
             var note = beatmap.HitObjects[0];
-            var result = new JudgementResult(note, note.CreateJudgement()) { Type = HitResult.Perfect };
-            healthProcessor.ApplyResult(result);
-            scoreProcessor.ApplyResult(result);
+            var result = new BmsJudgementResult(note, note.CreateJudgement()) { Type = HitResult.Perfect };
+            healthProcessor.ApplyTestResult(result);
+            scoreProcessor.ApplyTestResult(result);
         }
 
         healthProcessor.RestoreGaugeStates(healthProcessor.CurrentGaugeStates.Select(state =>
@@ -232,12 +237,12 @@ public partial class BmsScoreProcessorTest
 
         if (detonateMine)
         {
-            var result = new JudgementResult(mine, mine.CreateJudgement()) { Type = HitResult.Meh };
-            healthProcessor.ApplyResult(result);
-            scoreProcessor.ApplyResult(result);
+            var result = new BmsJudgementResult(mine, mine.CreateJudgement()) { Type = HitResult.Meh };
+            healthProcessor.ApplyTestResult(result);
+            scoreProcessor.ApplyTestResult(result);
         }
 
-        manualClock.CurrentTime = mine.StartTime + BmsHitWindows.FALLBACK_BAD_WINDOW - 1;
+        manualClock.CurrentTime = mine.StartTime + BmsJudgementProfileProvider.GetTable(mine, false).SlowWindowFor(HitResult.Ok) - 1;
         framedClock.ProcessFrame();
         scoreProcessor.UpdateCompletion();
         Assert.That(scoreProcessor.HasCompleted.Value, Is.False);
@@ -262,7 +267,7 @@ public partial class BmsScoreProcessorTest
     {
         var beatmap = new BmsBeatmap();
         if (includeMine)
-            beatmap.HitObjects.Add(new BmsLandmine { StartTime = 1000, Column = 1 });
+            beatmap.HitObjects.Add(new BmsLandmine { Beatmap = beatmap, StartTime = 1000, Column = 1 });
 
         var processor = new TestBmsScoreProcessor { Clock = new FramedClock(new ManualClock { CurrentTime = 10000 }) };
         processor.ApplyBeatmap(beatmap);
@@ -276,7 +281,7 @@ public partial class BmsScoreProcessorTest
         var (processor, source) = createLongNoteProcessor();
         processor.Clock = new FramedClock(new ManualClock { CurrentTime = 10000 });
         var result = createLongNoteResult(source, 1000, 1500);
-        processor.ApplyResult(result);
+        processor.ApplyTestResult(result);
         processor.UpdateCompletion();
         Assert.That(processor.HasCompleted.Value, Is.True);
 
@@ -284,7 +289,7 @@ public partial class BmsScoreProcessorTest
         processor.UpdateCompletion();
         Assert.That(processor.HasCompleted.Value, Is.False);
 
-        processor.ApplyResult(createLongNoteResult(source, 1000, 1500));
+        processor.ApplyTestResult(createLongNoteResult(source, 1000, 1500));
         processor.UpdateCompletion();
         Assert.That(processor.HasCompleted.Value, Is.True);
     }
@@ -293,6 +298,7 @@ public partial class BmsScoreProcessorTest
     public void TestRewindDoesNotFinaliseScore()
     {
         var beatmap = new BmsBeatmap { HitObjects = { new BmsHitObject { StartTime = 1000, Column = 1 } } };
+        beatmap.HitObjects[0].Beatmap = beatmap;
         var manualClock = new ManualClock { CurrentTime = 10000 };
         var framedClock = new FramedClock(manualClock);
         var scoreProcessor = new TestBmsScoreProcessor { Clock = framedClock };
@@ -304,7 +310,7 @@ public partial class BmsScoreProcessorTest
         using var completion = new BmsGameplayCompletionController(scoreProcessor, healthProcessor, gameplayState, null, null);
 
         var note = beatmap.HitObjects.Single();
-        scoreProcessor.ApplyResult(new JudgementResult(note, note.CreateJudgement()) { Type = HitResult.Perfect });
+        scoreProcessor.ApplyTestResult(new BmsJudgementResult(note, note.CreateJudgement()) { Type = HitResult.Perfect });
         scoreProcessor.UpdateCompletion();
         Assert.That(scoreProcessor.HasCompleted.Value, Is.True);
 

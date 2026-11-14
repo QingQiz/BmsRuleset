@@ -4,6 +4,7 @@ using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Testing;
@@ -11,6 +12,7 @@ using osu.Framework.Timing;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.UI;
@@ -70,14 +72,14 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
         AddStep("hide EPOOR", () => Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter>().Single().ShowEmptyPoor.Value = false);
         AddUntilStep("EPOOR window hidden", () => emptyPoorWindow().Alpha == 0);
         AddStep("register hidden EPOOR", () =>
-            ((BmsScoreProcessor)Player.GameplayState.ScoreProcessor).RegisterEmptyPoor(input_time, BmsTestBeatmaps.FIRST_NOTE_TIME, 0));
+            ((BmsScoreProcessor)Player.GameplayState.ScoreProcessor).ApplyTestEmptyPoor(input_time, BmsTestBeatmaps.FIRST_NOTE_TIME, 0));
         AddWaitStep("wait for scheduled update", 1);
         AddAssert("hidden EPOOR adds no line", () => !Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter>().Single().Judgements.Lines.Any());
         AddStep("show EPOOR", () => Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter>().Single().ShowEmptyPoor.Value = true);
         AddUntilStep("EPOOR window shown", () => emptyPoorWindow().Alpha == 1);
         AddStep("register EPOOR timing", () =>
-            ((BmsScoreProcessor)Player.GameplayState.ScoreProcessor).RegisterEmptyPoor(input_time, BmsTestBeatmaps.FIRST_NOTE_TIME, 0));
-        AddUntilStep("error line appears", () => Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter>().Single().Judgements.Lines.Count() == 1);
+            ((BmsScoreProcessor)Player.GameplayState.ScoreProcessor).ApplyTestEmptyPoor(input_time, BmsTestBeatmaps.FIRST_NOTE_TIME, 0));
+        AddUntilStep("error line appears", () => Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter>().Single().Judgements.Lines.Count == 1);
         AddAssert("EPOOR line is on fast side", () =>
             Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter>().Single().Judgements.Lines.Single().X
             < 0.5f);
@@ -93,7 +95,7 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
         {
             var processor = (BmsScoreProcessor)Player.GameplayState.ScoreProcessor;
             for (var i = 0; i < 100; i++)
-                processor.RegisterEmptyPoor(BmsTestBeatmaps.FIRST_NOTE_TIME - i, BmsTestBeatmaps.FIRST_NOTE_TIME, 0);
+                processor.ApplyTestEmptyPoor(BmsTestBeatmaps.FIRST_NOTE_TIME - i, BmsTestBeatmaps.FIRST_NOTE_TIME, 0);
         }
 
         AddStep("load player", LoadPlayer);
@@ -132,13 +134,15 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
             meter().Clear();
             var processor = (BmsScoreProcessor)Player.GameplayState.ScoreProcessor;
             for (var i = 0; i < 20; i++)
-                processor.RegisterEmptyPoor(500 + i * 50, 1000, 0);
+                processor.ApplyTestEmptyPoor(500 + i * 50, 1000, 0);
         });
         AddUntilStep("twenty lines prepared", () => meter().Judgements.Lines.Count == 20 && meter().Judgements.Lines.All(line => double.IsFinite(line.FadeStart)));
         AddStep("load reference boxes", () =>
         {
             references = new Container { RelativeSizeAxes = Axes.Both };
+
             foreach (var line in meter().Judgements.Lines)
+            {
                 references.Add(new Box
                 {
                     X = line.X,
@@ -152,6 +156,8 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
                     Alpha = 0.4f,
                     Blending = BlendingParameters.Additive,
                 });
+            }
+
             addInternal(meter(), references);
         });
         AddUntilStep("reference boxes loaded", () => references.Children.All(box => box.IsLoaded));
@@ -164,7 +170,7 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
             meter().Position += new Vector2(13, 17);
             meter().Scale *= 1.25f;
             meter().Rotation = 11;
-            meter().Colour = osu.Framework.Graphics.Colour.ColourInfo.GradientHorizontal(Colour4.Cyan, Colour4.White);
+            meter().Colour = ColourInfo.GradientHorizontal(Colour4.Cyan, Colour4.White);
             assertSnapshots();
             clock.CurrentTime = 500;
             meter().UpdateSubTree();
@@ -172,7 +178,7 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
             assertSnapshots();
             meter().Colour = Colour4.White;
             assertSnapshots();
-            meter().Colour = osu.Framework.Graphics.Colour.ColourInfo.GradientVertical(Colour4.Red, Colour4.Blue);
+            meter().Colour = ColourInfo.GradientVertical(Colour4.Red, Colour4.Blue);
             assertSnapshots();
             meter().Clear();
             for (var slot = 0; slot < 3; slot++)
@@ -182,10 +188,12 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
         void assertSnapshots()
         {
             meter().UpdateSubTreeMasking();
+
             for (var slot = 0; slot < 3; slot++)
             {
                 var node = (BmsHitErrorMeter.JudgementsLayer.JudgementsDrawNode)generate(meter().Judgements, ++frame, slot, false)!;
                 Assert.That(node.Lines, Has.Count.EqualTo(references.Children.Count));
+
                 for (var i = 0; i < node.Lines.Count; i++)
                 {
                     var actual = node.Lines[i];
@@ -270,6 +278,7 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
             // A settings change applies to new lines; the ongoing fade retains its duration.
             meter().JudgementFadeDuration.Value = seconds == 20 ? 0.1f : 20;
             double[] offsets = [0, 8, seconds * 250, seconds * 500, seconds * 500, seconds * 1000 - 1, seconds * 500, 0, seconds * 1000];
+
             foreach (var offset in offsets)
             {
                 clock.CurrentTime = 1000 + offset;
@@ -360,8 +369,8 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
         AddStep("hide colour bar", () => meter().ColourBarHeight.Value = 0);
         AddAssert("zero height hides colour bar and preserves timing overlay", () =>
             colourBar().DrawHeight == 0 && !colourBar().IsPresent
-            && meter().ChildrenOfType<Box>().Single(child => child.Name == "centre marker").IsPresent
-            && judgements().IsPresent && meter().ChildrenOfType<Triangle>().Single().IsPresent);
+                                        && meter().ChildrenOfType<Box>().Single(child => child.Name == "centre marker").IsPresent
+                                        && judgements().IsPresent && meter().ChildrenOfType<Triangle>().Single().IsPresent);
         AddStep("restore colour bar height", () => meter().ColourBarHeight.SetDefault());
         AddAssert("colour bar becomes visible at default height", () =>
             colourBar().IsPresent && Math.Abs(colourBar().DrawHeight - 3 * LegacySkin.STABLE_MAGIC_SCALE_FACTOR) < 0.001);
@@ -419,7 +428,7 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
                 2 => [new BmsModNoGreat()],
                 _ => [],
             };
-            LoadPlayer(noBad ? [..mods, new BmsModNoBad()] : mods);
+            LoadPlayer(noBad ? [.. mods, new BmsModNoBad()] : mods);
         });
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
         AddUntilStep("meter loaded", () => meter().IsLoaded);
@@ -462,9 +471,9 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
         AddAssert("default fade lasts ten seconds", () => meter().JudgementFadeDuration.Value == 10);
         AddStep("set short fade", () => meter().JudgementFadeDuration.Value = 0.5f);
         AddStep("register EPOOR timing", () =>
-            ((BmsScoreProcessor)Player.GameplayState.ScoreProcessor).RegisterEmptyPoor(
+            ((BmsScoreProcessor)Player.GameplayState.ScoreProcessor).ApplyTestEmptyPoor(
                 BmsTestBeatmaps.FIRST_NOTE_TIME - 400, BmsTestBeatmaps.FIRST_NOTE_TIME, 0));
-        AddUntilStep("error line appears", () => Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter>().Single().Judgements.Lines.Count() == 1);
+        AddUntilStep("error line appears", () => Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter>().Single().Judgements.Lines.Count == 1);
         AddAssert("legacy line fades without shrinking", () =>
         {
             var line = meter().Judgements.Lines.Single();
@@ -478,6 +487,7 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
     public void TestPoorLinesFollowVisibleWindowEnds([Values(false, true)] bool noBad, [Values(0, 1, 2)] int constraint)
     {
         BmsHitErrorMeter meter() => Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter>().Single();
+
         Box window(HitResult result) => meter().ChildrenOfType<Box>().Single(child =>
             child.Name == (result == HitResult.Miss ? "empty poor window" : $"{result} window"));
 
@@ -489,20 +499,20 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
                 2 => [new BmsModNoGreat()],
                 _ => [],
             };
-            LoadPlayer(noBad ? [..mods, new BmsModNoBad()] : mods);
+            LoadPlayer(noBad ? [.. mods, new BmsModNoBad()] : mods);
         });
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
         AddUntilStep("hit error meter loaded", () => meter().IsLoaded);
         AddStep("stop gameplay clock", () => Player.GameplayClockContainer.Stop());
         AddStep("register Fast and Slow POOR", registerPoors);
-        AddUntilStep("both POOR lines appear", () => meter().Judgements.Lines.Count() == 2);
+        AddUntilStep("both POOR lines appear", () => meter().Judgements.Lines.Count == 2);
         AddStep("POOR lines match visible outer edges", () => assertEnds(showEmptyPoor: true));
         AddStep("hide E-POOR", () => meter().ShowEmptyPoor.Value = false);
         AddStep("existing POOR lines follow remaining hit windows", () => assertEnds(showEmptyPoor: false));
         AddStep("clear lines", () => meter().Clear());
         AddUntilStep("lines cleared", () => !meter().Judgements.Lines.Any());
         AddStep("register POOR with E-POOR hidden", registerPoors);
-        AddUntilStep("both POOR lines appear again", () => meter().Judgements.Lines.Count() == 2);
+        AddUntilStep("both POOR lines appear again", () => meter().Judgements.Lines.Count == 2);
         AddStep("new POOR lines use remaining hit windows", () => assertEnds(showEmptyPoor: false));
         AddStep("show E-POOR", () => meter().ShowEmptyPoor.Value = true);
         AddStep("existing POOR lines return to outer edges", () => assertEnds(showEmptyPoor: true));
@@ -510,22 +520,25 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
         void registerPoors()
         {
             var notes = Player.GameplayState.Beatmap.HitObjects.OfType<BmsNote>().Take(2).ToArray();
+
             for (var i = 0; i < notes.Length; i++)
             {
-                var result = new JudgementResult(notes[i], notes[i].CreateJudgement()) { Type = HitResult.Meh };
+                var result = new BmsJudgementResult(notes[i], notes[i].CreateJudgement()) { Type = HitResult.Meh };
                 typeof(JudgementResult).GetProperty(nameof(JudgementResult.TimeOffset))!.SetValue(result, i == 0 ? -281d : 281d);
-                Player.GameplayState.ScoreProcessor.ApplyResult(result);
+                ((BmsScoreProcessor)Player.GameplayState.ScoreProcessor).ApplyTestResult(result);
             }
         }
 
         void assertEnds(bool showEmptyPoor)
         {
-            var hitResult = !noBad ? HitResult.Ok : constraint switch
-            {
-                1 => HitResult.Great,
-                2 => HitResult.Perfect,
-                _ => HitResult.Good,
-            };
+            var hitResult = !noBad
+                ? HitResult.Ok
+                : constraint switch
+                {
+                    1 => HitResult.Great,
+                    2 => HitResult.Perfect,
+                    _ => HitResult.Good,
+                };
             var left = window(showEmptyPoor ? HitResult.Miss : hitResult).ScreenSpaceDrawQuad.AABBFloat.Left;
             var right = window(showEmptyPoor && noBad ? HitResult.Miss : hitResult).ScreenSpaceDrawQuad.AABBFloat.Right;
             var lines = meter().Judgements.Lines.OrderBy(line => line.X).ToArray();

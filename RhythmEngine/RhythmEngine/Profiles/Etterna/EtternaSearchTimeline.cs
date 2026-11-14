@@ -14,13 +14,23 @@ internal sealed class EtternaSearchTimeline
     {
         // KeyChart's initial tempo also applies before its first explicit point.
         // long.MinValue is the existing initial-tempo sentinel, not a beat anchor.
-        times = [..chart.Tempos.Where(t => t.Time != long.MinValue).Select(t => t.Time).Append(0).Distinct().Order()];
-        tempos = [..times.Select(t => chart.Tempos.LastOrDefault(p => p.Time <= t, chart.Tempos[0]).BeatsPerMinute)];
+        times = [.. chart.Tempos.Where(t => t.Time != long.MinValue).Select(t => t.Time).Append(0).Distinct().Order()];
+        var tempoValues = ImmutableArray.CreateBuilder<double>(times.Length);
+        var tempoIndex = 0;
+
+        foreach (var time in times)
+        {
+            while (tempoIndex + 1 < chart.Tempos.Length && chart.Tempos[tempoIndex + 1].Time <= time)
+                tempoIndex++;
+            tempoValues.Add(chart.Tempos[tempoIndex].BeatsPerMinute);
+        }
+
+        tempos = tempoValues.MoveToImmutable();
         var accumulated = new double[times.Length];
         for (var i = 1; i < times.Length; i++)
             accumulated[i] = accumulated[i - 1] + Time.ToMilliseconds(times[i] - times[i - 1]) * tempos[i - 1] / 60000;
         var zero = accumulated[times.IndexOf(0)];
-        beats = [..accumulated.Select(b => b - zero)];
+        beats = [.. accumulated.Select(b => b - zero)];
     }
 
     internal int RowAt(long time)

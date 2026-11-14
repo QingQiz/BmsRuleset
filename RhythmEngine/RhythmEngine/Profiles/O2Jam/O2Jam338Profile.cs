@@ -16,7 +16,7 @@ public sealed class O2JamClock
 
     public O2JamClock(IEnumerable<O2JamClockPoint> points)
     {
-        Points = [..points];
+        Points = [.. points];
         if (Points.Length < 2 || Points[0].Milliseconds < 0 || Points[0].Tick < 0 || Points[^1].Tick >= 1_000_000_000
             || Points.Zip(Points.Skip(1)).Any(p => p.First.Milliseconds >= p.Second.Milliseconds || p.First.Tick >= p.Second.Tick))
             throw new ArgumentException("O2Jam requires at least two clock anchors in strict time and tick order.", nameof(points));
@@ -50,6 +50,7 @@ public sealed class O2JamClock
         var after = Points[index + 1];
         var low = before.Milliseconds;
         var high = after.Milliseconds;
+
         while (low < high)
         {
             var middle = low + (high - low) / 2;
@@ -66,6 +67,7 @@ public sealed class O2JamClock
     {
         var low = 0;
         var high = Points.Length - 1;
+
         while (high - low > 1)
         {
             var middle = low + (high - low) / 2;
@@ -129,9 +131,11 @@ public static class O2Jam338Profile
                 var raw = context.Event.OriginalResult;
                 var pills = state.Counters.GetValueOrDefault(O2JamCounters.PILLS);
                 var streak = state.Counters.GetValueOrDefault(O2JamCounters.COOL_STREAK);
+
                 if (raw == O2JamResults.COOL && pills < 5)
                 {
                     streak++;
+
                     if (streak > 14)
                     {
                         pills++;
@@ -193,19 +197,22 @@ internal sealed class O2Jam338NoteRule(O2JamClock clock, int headTick, int? tail
 
     public IEnumerable<ScoringOpportunity> GetScoringOpportunities(ChartNote note)
     {
-        yield return new ScoringOpportunity(note.Id, NoteParts.HEAD, note.StartTime, 200);
+        yield return new ScoringOpportunity(note.Id, NoteParts.HEAD, 200);
 
         if (tailTick != null)
-            yield return new ScoringOpportunity(note.Id, NoteParts.TAIL, note.EndTime, 200);
+            yield return new ScoringOpportunity(note.Id, NoteParts.TAIL, 200);
     }
 
     public InputCandidate? GetCandidate(NoteContext context, InputEvent input, int noteIndex)
     {
         var state = (O2Jam338NoteState)context.State;
+
         if (state.HeadResolved)
+        {
             return !input.Pressed && !context.Input.Held
                 ? new InputCandidate(noteIndex, context.Note.StartTime, clock.TickAt(input.Time) - tailTick!.Value, 0)
                 : null;
+        }
 
         var offset = clock.TickAt(input.Time) - headTick;
         return input.Pressed && input.Time >= clock.Points[0].Milliseconds * 1000L && Math.Abs(offset) <= 25

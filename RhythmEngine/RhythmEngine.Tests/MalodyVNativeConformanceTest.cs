@@ -37,6 +37,7 @@ public class MalodyVNativeConformanceTest
         var first = rows[0];
         var windows = MalodyProfile.VWindows((MalodyJudge)first.GetProperty("rank").GetInt32(), first.GetProperty("pro").GetBoolean(),
             !first.GetProperty("suppressEarlyMiss").GetBoolean(), scale: first.GetProperty("scale").GetSingle());
+
         foreach (var row in rows)
         {
             var offset = row.GetProperty("offset").GetInt32();
@@ -66,7 +67,7 @@ public class MalodyVNativeConformanceTest
             var source = new KeyChart(1, [new KeyNote(0, 0, ms(1000), ms(2000), KeyNoteKind.Hold)]);
             var options = new MalodyOptions(Client: row.GetProperty("pro").GetBoolean() ? MalodyClient.VPro : MalodyClient.VStandard,
                 Judge: (MalodyJudge)row.GetProperty("rank").GetInt32(), JudgeAtEnd: row.GetProperty("endJudgement").GetBoolean());
-            var session = MalodyProfile.Create(source, options).CreateSession();
+            var session = MalodyProfile.Create(source, options).CreateRecordingSession();
             var release = row.GetProperty("release").GetInt32();
             session.AdvanceTo(ms(release), [new InputEvent(ms(1000), 0, true), new InputEvent(ms(release), 0, false)]);
             var outputs = row.GetProperty("outputs").EnumerateArray().ToArray();
@@ -92,7 +93,7 @@ public class MalodyVNativeConformanceTest
             }));
             var options = new MalodyOptions(Client: row.GetProperty("pro").GetBoolean() ? MalodyClient.VPro : MalodyClient.VStandard,
                 Judge: (MalodyJudge)row.GetProperty("rank").GetInt32(), JudgeAtEnd: row.GetProperty("endJudgement").GetBoolean());
-            var session = MalodyProfile.Create(source, options).CreateSession();
+            var session = MalodyProfile.Create(source, options).CreateRecordingSession();
             var inputs = row.GetProperty("inputs").EnumerateArray().Select(input =>
                 new InputEvent(ms(input.GetProperty("time").GetInt32()), 0, input.GetProperty("pressed").GetBoolean())).ToArray();
             session.AdvanceTo(ms(row.GetProperty("until").GetInt32()), inputs);
@@ -121,6 +122,7 @@ public class MalodyVNativeConformanceTest
             var health = configuration.Health.InitialState;
             var sequence = 0;
             var criticals = 0;
+
             foreach (var expected in row.GetProperty("states").EnumerateArray())
             {
                 var code = expected.GetProperty("code").GetUInt32();
@@ -131,6 +133,7 @@ public class MalodyVNativeConformanceTest
                 ScoringOpportunity? opportunity = part == "body" ? null : profile.Chart.ScorePlan.Opportunities.Single(o => o.Part.Value == part);
                 state = configuration.Score.Reduce(state, new ScoreContext(emission, opportunity, profile.Chart.ScorePlan));
                 health = configuration.Health.Reduce(new HealthContext(emission, health, state, profile.Chart.ScorePlan));
+
                 if ((code & 0x4000000) != 0)
                 {
                     criticals++;
@@ -138,7 +141,7 @@ public class MalodyVNativeConformanceTest
                     state = configuration.Score.Reduce(state, new ScoreContext(critical, null, profile.Chart.ScorePlan));
                 }
 
-                Assert.Multiple(() =>
+                using (Assert.EnterMultipleScope())
                 {
                     Assert.That(state.Score, Is.EqualTo(expected.GetProperty("score").GetDouble()), $"score {sequence}");
                     Assert.That(state.Counters.GetValueOrDefault("malody-raw-score"), Is.EqualTo(expected.GetProperty("rawScore").GetDouble()).Within(1e-8), $"raw score {sequence}");
@@ -148,7 +151,7 @@ public class MalodyVNativeConformanceTest
                     Assert.That(state.Combo, Is.EqualTo(expected.GetProperty("combo").GetInt32()), $"combo {sequence}");
                     Assert.That(state.MaximumCombo, Is.EqualTo(expected.GetProperty("maxCombo").GetInt32()), $"maximum combo {sequence}");
                     Assert.That(state.Counters.GetValueOrDefault("critical"), Is.EqualTo(criticals), $"criticals {sequence}");
-                });
+                }
             }
         }
     }

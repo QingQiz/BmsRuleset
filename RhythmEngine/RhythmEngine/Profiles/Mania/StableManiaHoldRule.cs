@@ -26,7 +26,7 @@ internal sealed class StableManiaHoldRule(ImmutableArray<long> windows) : INoteR
 
     public IEnumerable<ScoringOpportunity> GetScoringOpportunities(ChartNote note)
     {
-        yield return new ScoringOpportunity(note.Id, NoteParts.TAIL, note.EndTime, 300);
+        yield return new ScoringOpportunity(note.Id, NoteParts.TAIL, 300);
     }
 
     public InputCandidate? GetCandidate(NoteContext context, InputEvent input, int noteIndex)
@@ -46,6 +46,7 @@ internal sealed class StableManiaHoldRule(ImmutableArray<long> windows) : INoteR
     {
         var state = (StableManiaHoldState)context.State;
         var time = clockTime(context.Time);
+
         if (input.Pressed)
         {
             state = state with { Held = true, PressTime = time, TickTime = Math.Max(context.Note.StartTime, time + tick_interval) };
@@ -62,6 +63,7 @@ internal sealed class StableManiaHoldRule(ImmutableArray<long> windows) : INoteR
     public NoteUpdate ApplyTimer(NoteContext context)
     {
         var state = (StableManiaHoldState)context.State;
+
         if (state.TickTime == context.Time && context.Time <= context.Note.EndTime)
         {
             var next = schedule(context, state with { TickTime = context.Time + tick_interval });
@@ -85,14 +87,17 @@ internal sealed class StableManiaHoldRule(ImmutableArray<long> windows) : INoteR
         var headError = Math.Abs(press - note.StartTime);
         var combined = headError + Math.Abs(release - note.EndTime);
         var result = ManiaResults.MEH;
+
         if (release < note.EndTime - windows[4])
             result = ManiaResults.MISS;
         else
         {
             ResultId[] grades = [ManiaResults.PERFECT, ManiaResults.GREAT, ManiaResults.GOOD, ManiaResults.OK];
+
             for (var i = 0; i < grades.Length; i++)
             {
                 var factor = i == 0 ? 1.2 : i == 1 ? 1.1 : 1;
+
                 if (headError <= windows[i] * factor && combined <= windows[i] * factor * 2)
                 {
                     result = state.Broken && i < 2 ? ManiaResults.GOOD : grades[i];

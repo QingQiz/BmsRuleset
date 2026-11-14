@@ -10,6 +10,17 @@ namespace RhythmEngine.Tests;
 [TestFixture]
 public class MalodyConfigurationTest
 {
+    [Test]
+    public void EveryHoldRequiresPositiveDuration([Values] MalodyClient client, [Values(0, -1)] int duration)
+    {
+        var source = new KeyChart(1,
+        [
+            new KeyNote(0, 0, ms(1000), ms(2000), KeyNoteKind.Hold),
+            new KeyNote(1, 0, ms(3000), ms(3000 + duration), KeyNoteKind.Hold),
+        ]);
+        Assert.Throws<ArgumentException>(() => MalodyProfile.Create(source, new MalodyOptions(Client: client)));
+    }
+
     [TestCase(MalodyJudge.Amateur, 56, 96, 130, 1560)]
     [TestCase(MalodyJudge.Beginner, 46, 86, 120, 1700)]
     [TestCase(MalodyJudge.Climber, 36, 76, 110, 2000)]
@@ -20,7 +31,7 @@ public class MalodyConfigurationTest
         var windows = MalodyProfile.PcWindows(judge);
         Assert.That(windows.Entries.Take(3).Select(w => Time.ToMilliseconds(w.Late)), Is.EqualTo([best, cool, good]));
         var profile = MalodyProfile.Create(tapChart(), new MalodyCalibration(testHealth()), new MalodyOptions(Judge: judge));
-        var session = profile.CreateSession();
+        var session = profile.CreateRecordingSession();
         session.AdvanceTo(ms(2000), [new InputEvent(ms(1000), 0, true)]);
         Assert.That(session.Score.Score, Is.EqualTo(perfectScore).Within(1e-7));
         Assert.That(session.MaximumScore, Is.EqualTo(perfectScore).Within(1e-7));
@@ -51,7 +62,7 @@ public class MalodyConfigurationTest
     [TestCase(MalodyClient.VPro)]
     public void ProAndLegacyPcUseThePublishedPcTable(MalodyClient client)
     {
-        var session = MalodyProfile.Create(tapChart(), new MalodyCalibration(testHealth()), new MalodyOptions(Client: client)).CreateSession();
+        var session = MalodyProfile.Create(tapChart(), new MalodyCalibration(testHealth()), new MalodyOptions(Client: client)).CreateRecordingSession();
         session.AdvanceTo(ms(2000), [new InputEvent(ms(1040), 0, true)]);
         Assert.That(session.GetEventsSince(0).Single().Result.Value, Is.EqualTo("cool"));
         Assert.That(session.Score.Score, Is.EqualTo(1485));
@@ -68,7 +79,7 @@ public class MalodyConfigurationTest
         ]);
         var calibration = new MalodyCalibration(testHealth(), ImmutableDictionary<MalodyJudge, TimingWindows>.Empty.Add(MalodyJudge.Climber, measuredWindows));
         var profile = MalodyProfile.Create(tapChart(), calibration, new MalodyOptions(Client: client));
-        var calibrated = profile.CreateSession();
+        var calibrated = profile.CreateRecordingSession();
         calibrated.AdvanceTo(ms(1049), [new InputEvent(ms(1049), 0, true)]);
         Assert.That(calibrated.GetEventsSince(0).First().Result.Value, Is.EqualTo("best"));
     }
@@ -77,7 +88,7 @@ public class MalodyConfigurationTest
     public void ScoreUsesUpdatedBoundedBonusAndHoldDropKeepsAccuracyDenominator()
     {
         var notes = new KeyChart(1, [new KeyNote(0, 0, ms(1000), ms(1000)), new KeyNote(1, 0, ms(2000), ms(3000), KeyNoteKind.Hold)]);
-        var session = MalodyProfile.Create(notes, new MalodyCalibration(testHealth())).CreateSession();
+        var session = MalodyProfile.Create(notes, new MalodyCalibration(testHealth())).CreateRecordingSession();
         session.AdvanceTo(ms(4000), [new InputEvent(ms(2000), 0, true), new InputEvent(ms(2500), 0, false)]);
         Assert.That(session.GetEventsSince(0).Where(e => e.Result.Value != "hold-tick").Select(e => e.Result.Value), Is.EqualTo(["miss", "best", "hold-drop"]));
         Assert.That(session.Score.Score, Is.EqualTo(1690).Within(1e-7));
@@ -96,12 +107,12 @@ public class MalodyConfigurationTest
         var singleTap = tapChart();
         var windows = MalodyProfile.PcWindows(judge);
         var goodOffset = (Time.ToMilliseconds(windows.Entries[1].Late) + Time.ToMilliseconds(windows.Entries[2].Late)) / 2;
-        var goodSession = MalodyProfile.Create(singleTap, new MalodyCalibration(testHealth()), new MalodyOptions(Judge: judge)).CreateSession();
+        var goodSession = MalodyProfile.Create(singleTap, new MalodyCalibration(testHealth()), new MalodyOptions(Judge: judge)).CreateRecordingSession();
         goodSession.AdvanceTo(ms(1500), [new InputEvent(ms(1000 + goodOffset), 0, true)]);
         Assert.That(goodSession.GetEventsSince(0).Single().Result.Value, Is.EqualTo("good"));
         Assert.That(goodSession.Score.Bonus, Is.EqualTo(0.92).Within(1e-12));
 
-        var missSession = MalodyProfile.Create(singleTap, new MalodyCalibration(testHealth()), new MalodyOptions(Judge: judge)).CreateSession();
+        var missSession = MalodyProfile.Create(singleTap, new MalodyCalibration(testHealth()), new MalodyOptions(Judge: judge)).CreateRecordingSession();
         missSession.AdvanceTo(ms(1500));
         Assert.That(missSession.GetEventsSince(0).Single().Result.Value, Is.EqualTo("miss"));
         Assert.That(missSession.Score.Bonus, Is.EqualTo(0.68).Within(1e-12));
@@ -111,7 +122,7 @@ public class MalodyConfigurationTest
     public void BonusChangesBeforeMixedJudgementScoring()
     {
         var chart = new KeyChart(1, Enumerable.Range(0, 4).Select(i => new KeyNote(i, 0, ms((i + 1) * 1000), ms((i + 1) * 1000))));
-        var session = MalodyProfile.Create(chart, new MalodyCalibration(testHealth()), new MalodyOptions(Judge: MalodyJudge.Climber)).CreateSession();
+        var session = MalodyProfile.Create(chart, new MalodyCalibration(testHealth()), new MalodyOptions(Judge: MalodyJudge.Climber)).CreateRecordingSession();
         session.AdvanceTo(ms(1500), [new InputEvent(ms(1100), 0, true), new InputEvent(ms(1101), 0, false)]);
         Assert.That(session.GetEventsSince(0).Last().Result.Value, Is.EqualTo("good"));
         Assert.That(session.Score.Bonus, Is.EqualTo(0.92).Within(1e-12));
@@ -143,6 +154,7 @@ public class MalodyConfigurationTest
         var profile = MalodyProfile.Create(tapChart(), new MalodyOptions(Client: MalodyClient.ClassicMobile, Judge: judge));
         var windows = ((TapRule)profile.Chart.Notes[0].Rule).Configuration.Windows;
         Assert.That(windows.Entries.Take(3).Select(w => Time.ToMilliseconds(w.Late)), Is.EqualTo([best, cool, good]));
+
         foreach (var sign in new[] { -1, 1 })
         {
             Assert.That(windows.ResultFor(ms(sign * best))?.Value, Is.EqualTo("best"));
@@ -162,7 +174,7 @@ public class MalodyConfigurationTest
     public void HealthAndBonusHaveSeparateRankScaling(MalodyJudge judge)
     {
         var source = new KeyChart(1, Enumerable.Range(0, 4).Select(i => new KeyNote(i, 0, ms((i + 1) * 1000), ms((i + 1) * 1000))));
-        var session = MalodyProfile.Create(source, new MalodyOptions(Judge: judge)).CreateSession();
+        var session = MalodyProfile.Create(source, new MalodyOptions(Judge: judge)).CreateRecordingSession();
         var scale = (int)judge + 1;
         var windows = MalodyProfile.PcWindows(judge);
         session.AdvanceTo(ms(1500));
@@ -185,12 +197,12 @@ public class MalodyConfigurationTest
     {
         var source = new KeyChart(1, [new KeyNote(0, 0, ms(1000), ms(2000), KeyNoteKind.Hold)]);
         var profile = MalodyProfile.Create(source, new MalodyOptions(Client: client));
-        var early = profile.CreateSession();
+        var early = profile.CreateRecordingSession();
         early.AdvanceTo(ms(2200), [new InputEvent(ms(1000), 0, true), new InputEvent(ms(2000 - lenience) - 1, 0, false)]);
         Assert.That(early.GetEventsSince(0).Last().Result.Value, Is.EqualTo("hold-drop"));
         Assert.That(early.Score.Bonus, Is.EqualTo(0.68));
 
-        var atBoundary = profile.CreateSession();
+        var atBoundary = profile.CreateRecordingSession();
         atBoundary.AdvanceTo(ms(2200), [new InputEvent(ms(1000), 0, true), new InputEvent(ms(2000 - lenience), 0, false)]);
         Assert.That(atBoundary.GetEventsSince(0).Any(e => e.Result.Value == "hold-drop"), Is.False);
         Assert.That(atBoundary.Score.Score, Is.EqualTo(2000));
@@ -202,7 +214,7 @@ public class MalodyConfigurationTest
     public void ClassicHoldCanRegrabAfterEachDropWithoutScoringItsHeadAgain()
     {
         var source = new KeyChart(1, [new KeyNote(0, 0, ms(1000), ms(2000), KeyNoteKind.Hold)]);
-        var session = MalodyProfile.Create(source).CreateSession();
+        var session = MalodyProfile.Create(source).CreateRecordingSession();
         session.AdvanceTo(ms(1300), [new InputEvent(ms(1000), 0, true), new InputEvent(ms(1250), 0, false)]);
         Assert.That(session.Score.Combo, Is.Zero);
         Assert.That(session.Completed, Is.False);
@@ -228,6 +240,7 @@ public class MalodyConfigurationTest
     public void VUsesStrictGradeComparisons(MalodyClient client, int best, int cool, int good)
     {
         var windows = MalodyProfile.VWindows(MalodyJudge.Climber, client == MalodyClient.VPro);
+
         foreach (var sign in new[] { -1, 1 })
         {
             Assert.That(windows.ResultFor(ms(sign * (best - 1)))?.Value, Is.EqualTo("best"));
@@ -241,7 +254,7 @@ public class MalodyConfigurationTest
     [TestCase(MalodyClient.VPro)]
     public void VEarlyMissCanBeDisabledWithoutLosingLaterPerfectInput(MalodyClient client)
     {
-        var session = MalodyProfile.Create(tapChart(), new MalodyOptions(Client: client, AllowEarlyMiss: false, VVersion: MalodyVVersion.Rc20)).CreateSession();
+        var session = MalodyProfile.Create(tapChart(), new MalodyOptions(Client: client, AllowEarlyMiss: false, VVersion: MalodyVVersion.Rc20)).CreateRecordingSession();
         session.AdvanceTo(ms(850), [new InputEvent(ms(850), 0, true)]);
         Assert.That(session.EventCount, Is.Zero);
         session.AdvanceTo(ms(1000), [new InputEvent(ms(900), 0, false), new InputEvent(ms(1000), 0, true)]);
@@ -253,7 +266,7 @@ public class MalodyConfigurationTest
     public void Rc20FlushesAllBodyTicksBeforeAReleaseJudgement(MalodyClient client, int lenience)
     {
         var source = new KeyChart(1, [new KeyNote(0, 0, ms(1000), ms(2000), KeyNoteKind.Hold)]);
-        var session = MalodyProfile.Create(source, new MalodyOptions(Client: client, VVersion: MalodyVVersion.Rc20)).CreateSession();
+        var session = MalodyProfile.Create(source, new MalodyOptions(Client: client, VVersion: MalodyVVersion.Rc20)).CreateRecordingSession();
         session.AdvanceTo(ms(2000 - lenience), [new InputEvent(ms(1000), 0, true), new InputEvent(ms(2000 - lenience), 0, false)]);
         Assert.That(session.Completed, Is.True);
         Assert.That(session.Score.Combo, Is.EqualTo(11));
@@ -266,7 +279,7 @@ public class MalodyConfigurationTest
     public void ClassicHeadMissCanRegrabForBodyComboWithoutChangingAccuracy()
     {
         var source = new KeyChart(1, [new KeyNote(0, 0, ms(1000), ms(2000), KeyNoteKind.Hold)]);
-        var session = MalodyProfile.Create(source).CreateSession();
+        var session = MalodyProfile.Create(source).CreateRecordingSession();
         session.AdvanceTo(ms(2100), [new InputEvent(ms(1400), 0, true)]);
         Assert.That(session.GetEventsSince(0).First().Result.Value, Is.EqualTo("miss"));
         Assert.That(session.Score.Combo, Is.EqualTo(6));
@@ -278,7 +291,7 @@ public class MalodyConfigurationTest
     public void VDisplaysTheFloorOfAccumulatedFractionalScore()
     {
         var source = new KeyChart(1, Enumerable.Range(0, 4).Select(i => new KeyNote(i, 0, ms((i + 1) * 1000), ms((i + 1) * 1000))));
-        var session = MalodyProfile.Create(source, new MalodyOptions(Client: MalodyClient.VPro)).CreateSession();
+        var session = MalodyProfile.Create(source, new MalodyOptions(Client: MalodyClient.VPro)).CreateRecordingSession();
         session.AdvanceTo(ms(3500),
         [
             new InputEvent(ms(1050), 0, true), new InputEvent(ms(1100), 0, false),
@@ -295,7 +308,7 @@ public class MalodyConfigurationTest
     public void EmptyHealthUsesTheConfiguredFailurePolicy(bool failOnEmpty)
     {
         var source = new KeyChart(1, Enumerable.Range(0, 30).Select(i => new KeyNote(i, 0, ms((i + 1) * 1000), ms((i + 1) * 1000))));
-        var session = MalodyProfile.Create(source, new MalodyOptions(FailOnEmpty: failOnEmpty)).CreateSession();
+        var session = MalodyProfile.Create(source, new MalodyOptions(FailOnEmpty: failOnEmpty)).CreateRecordingSession();
         session.AdvanceTo(ms(31000));
         Assert.That(session.Health.Value, Is.Zero);
         Assert.That(session.Health.HasFailed, Is.EqualTo(failOnEmpty));
@@ -306,7 +319,7 @@ public class MalodyConfigurationTest
     public void CurrentVEndJudgementScoresBothHeadAndPromotedTail()
     {
         var source = new KeyChart(1, [new KeyNote(0, 0, ms(1000), ms(2000), KeyNoteKind.Hold)]);
-        var session = MalodyProfile.Create(source, new MalodyOptions(Client: MalodyClient.VPro, JudgeAtEnd: true)).CreateSession();
+        var session = MalodyProfile.Create(source, new MalodyOptions(Client: MalodyClient.VPro, JudgeAtEnd: true)).CreateRecordingSession();
         session.AdvanceTo(ms(1500), [new InputEvent(ms(1050), 0, true)]);
         Assert.That(session.Score.Score, Is.EqualTo(1485));
         Assert.That(session.Score.AccuracyMaximum, Is.EqualTo(1000));
@@ -320,7 +333,7 @@ public class MalodyConfigurationTest
     public void CurrentVMissingHeadAlsoMissesTheGradedTailAtTheGoodHorizon()
     {
         var source = new KeyChart(1, [new KeyNote(0, 0, ms(1000), ms(2000), KeyNoteKind.Hold)]);
-        var session = MalodyProfile.Create(source, new MalodyOptions(Client: MalodyClient.VPro, JudgeAtEnd: true)).CreateSession();
+        var session = MalodyProfile.Create(source, new MalodyOptions(Client: MalodyClient.VPro, JudgeAtEnd: true)).CreateRecordingSession();
         session.AdvanceTo(ms(1110));
         Assert.That(session.EventCount, Is.Zero);
         session.AdvanceTo(ms(1110) + 1);
@@ -334,7 +347,7 @@ public class MalodyConfigurationTest
     public void CurrentVRequiresReleaseForGradedTailAndUsesUnscaledTimeout()
     {
         var source = new KeyChart(1, [new KeyNote(0, 0, ms(1000), ms(2000), KeyNoteKind.Hold)]);
-        var session = MalodyProfile.Create(source, new MalodyOptions(Client: MalodyClient.VPro, JudgeAtEnd: true, WindowScale: 2)).CreateSession();
+        var session = MalodyProfile.Create(source, new MalodyOptions(Client: MalodyClient.VPro, JudgeAtEnd: true, WindowScale: 2)).CreateRecordingSession();
         session.AdvanceTo(ms(2160), [new InputEvent(ms(1000), 0, true)]);
         Assert.That(session.Completed, Is.False);
         Assert.That(session.GetEventsSince(0).Count(e => e.Part.Value == "tail"), Is.Zero);
@@ -347,7 +360,7 @@ public class MalodyConfigurationTest
 
     private static string judgeResult(MalodyJudge judge, double offset)
     {
-        var session = MalodyProfile.Create(tapChart(), new MalodyCalibration(testHealth()), new MalodyOptions(Judge: judge)).CreateSession();
+        var session = MalodyProfile.Create(tapChart(), new MalodyCalibration(testHealth()), new MalodyOptions(Judge: judge)).CreateRecordingSession();
         session.AdvanceTo(ms(2000), [new InputEvent(ms(1000 + offset), 0, true)]);
         return session.GetEventsSince(0).Single().Result.Value;
     }

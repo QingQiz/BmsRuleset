@@ -11,6 +11,7 @@ using osu.Framework.Input.StateChanges;
 using osu.Framework.Testing;
 using osu.Framework.Timing;
 using osu.Game.Beatmaps;
+using osu.Game.Replays;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
@@ -27,7 +28,7 @@ using osuTK.Input;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 
-// Keep this scene and its observer portable to the pre-refactor checkout: only host inputs and outputs are shared.
+// Observe the live host boundary so input, audio and reconstruction use their production paths.
 [HeadlessTest, NonParallelizable]
 [Category("JudgementInstrumentation")]
 public partial class TestSceneBmsGitComparison : BmsPlayerTestScene
@@ -89,6 +90,7 @@ public partial class TestSceneBmsGitComparison : BmsPlayerTestScene
             new BmsReplayFrame(3401, first), new BmsReplayFrame(3990, first, reverse), new BmsReplayFrame(3991, reverse),
             new BmsReplayFrame(4002), new BmsReplayFrame(4200, third), new BmsReplayFrame(4201), new BmsReplayFrame(13000),
         ];
+
         if (layout == BmsLayoutVariant.Bme7KDouble)
         {
             foreach (var frame in result.Cast<BmsReplayFrame>().Where(f => f.Time >= 3000 && f.Time < 4002))
@@ -113,6 +115,7 @@ public partial class TestSceneBmsGitComparison : BmsPlayerTestScene
             var bindings = BmsKeyBindingConfiguration.GetDefaultKeyBindings((int)layout);
             var previousKeys = new HashSet<Key>();
             if (deferred) Playfield.BeginGameplayFrame();
+
             foreach (var frame in frames().Cast<BmsReplayFrame>().Where(f => f.Time >= 3000 && f.Time <= 4201))
             {
                 advance(frame.Time);
@@ -122,6 +125,7 @@ public partial class TestSceneBmsGitComparison : BmsPlayerTestScene
                 previousKeys = keys;
                 inputManager.UpdateSubTree();
                 observer.Mark("input");
+
                 if (frame.Time == 3202)
                 {
                     Playfield.Beatmap.HitObjects.OfType<BmsLongNote>().First().ApplyDefaults(Playfield.Beatmap.ControlPointInfo, Playfield.Beatmap.Difficulty);
@@ -130,6 +134,7 @@ public partial class TestSceneBmsGitComparison : BmsPlayerTestScene
             }
 
             if (deferred) Playfield.EndGameplayFrame();
+
             foreach (var time in new[] { 4500d, 6000, 2998, 3000, 3202 })
             {
                 advance(time);
@@ -168,22 +173,27 @@ public partial class TestSceneBmsGitComparison : BmsPlayerTestScene
         using var budget = new ScopedMethodProbe(typeof(FrameStabilityContainer).GetMethod("updateClock", instance)!,
             typeof(TestSceneBmsGitComparison).GetMethod(nameof(fixWallClockBudget), BindingFlags.Static | BindingFlags.NonPublic)!);
         using var observer = new BmsGitComparisonRecorder(Playfield, Player.ScoreProcessor, Player.HealthProcessor);
+
         foreach (var time in new[] { 3000d, 3002, 3202, 3401, 3991, 4202, 6000, 2998, 3202, 4202 })
         {
             SeekReplayInFrames(time);
             Assert.That(Player.DrawableRuleset.FrameStableClock.CurrentTime, Is.EqualTo(time).Within(.001));
+
             if (time == 2998)
             {
                 Assert.That(Player.ScoreProcessor.Statistics.Values, Is.All.Zero);
                 Assert.That(CurrentResults, Is.Empty);
             }
+
             observer.Mark("seek");
         }
 
-        observer.Save(scenario, rebuiltReplay: true);
+        observer.Save(scenario);
         budgetHost = null;
     }
 
+    // Harmony binds the patched instance by this reserved parameter name.
+    // ReSharper disable once InconsistentNaming
     private static void fixWallClockBudget(FrameStabilityContainer __instance)
     {
         // Machine load may split catchup across outer frames; the real stability clock still chooses all simulation steps.
@@ -230,8 +240,10 @@ public partial class TestSceneBmsGitComparison : BmsPlayerTestScene
         Player.ScoreProcessor.Clock = framed;
         Player.HealthProcessor.Clock = framed;
         var keyboard = new KeyboardDevice();
+        var recordedInputs = new Replay { Frames = frames().ToList() };
         inputManager.UseParentInput = false;
         typeof(CustomInputManager).GetMethod("AddHandler", instance)!.Invoke(inputManager, [keyboard]);
+
         try
         {
             Playfield.EndGameplayFrame();
@@ -240,11 +252,13 @@ public partial class TestSceneBmsGitComparison : BmsPlayerTestScene
             {
                 manual.CurrentTime = time;
                 framed.ProcessFrame();
+                Playfield.RewindLiveInputs(recordedInputs, Player.DrawableRuleset.Mods, time);
             }, keyboard);
         }
         finally
         {
             Playfield.EndGameplayFrame();
+            Playfield.RewindLiveInputs(recordedInputs, Player.DrawableRuleset.Mods, previous.CurrentTime);
             Playfield.Clock = previous;
             Playfield.ProcessCustomClock = process;
             inputManager.Clock = inputClock;

@@ -77,7 +77,7 @@ public class GameFacingContractTest
                 new O2JamClock([new O2JamClockPoint(0, 0), new O2JamClockPoint(4000, 384)]))
             : MalodyProfile.Create(new KeyChart(1, [new KeyNote(0, 0, 2000000, 3000000, KeyNoteKind.Hold)]),
                 new MalodyOptions(Client: MalodyClient.VPro, JudgeAtEnd: true));
-        var session = profile.CreateSession();
+        var session = profile.CreateRecordingSession();
         session.AdvanceTo(2500000, [new InputEvent(2000000, 0, true)]);
         var clone = session.Clone();
         var prefix = session.GetEventsSince(0);

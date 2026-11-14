@@ -45,7 +45,7 @@ public static class Lr2Beta3Profile
             if (note.Kind == KeyNoteKind.Hold && note.EndTime <= note.StartTime)
                 throw new ArgumentException("LR2 LN endpoints must have positive duration.", nameof(source));
 
-            return new Lr2Beta3NoteRule([..bounds], note.Kind == KeyNoteKind.Hold);
+            return new Lr2Beta3NoteRule([.. bounds], note.Kind == KeyNoteKind.Hold);
         });
         var values = ProfileSupport.Values((BmsResults.PGREAT, 2, 2, ComboChange.Increment), (BmsResults.GREAT, 1, 1, ComboChange.Increment),
             (BmsResults.GOOD, 0, 0, ComboChange.Increment), (BmsResults.BAD, 0, 0, ComboChange.Reset), (BmsResults.POOR, 0, 0, ComboChange.Reset));
@@ -140,7 +140,7 @@ internal sealed class Lr2Beta3NoteRule(ImmutableArray<int> bounds, bool hold) : 
 
     public IEnumerable<ScoringOpportunity> GetScoringOpportunities(ChartNote note)
     {
-        yield return new ScoringOpportunity(note.Id, NoteParts.NOTE, note.StartTime, 2);
+        yield return new ScoringOpportunity(note.Id, NoteParts.NOTE, 2);
     }
 
     public InputCandidate? GetCandidate(NoteContext context, InputEvent input, int noteIndex)
@@ -163,6 +163,7 @@ internal sealed class Lr2Beta3NoteRule(ImmutableArray<int> bounds, bool hold) : 
     public NoteUpdate ApplyInput(NoteContext context, InputEvent input)
     {
         var state = (Lr2Beta3NoteState)context.State;
+
         if (state.Head is { } head && !input.Pressed)
         {
             var result = clockTime(context.Time) < context.Note.EndTime - bounds[2] * 1000L ? BmsResults.BAD : head;

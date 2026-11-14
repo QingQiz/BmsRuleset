@@ -5,9 +5,9 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
-using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.Presentation;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
+using RhythmEngine.Profiles.Bms;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
 
@@ -66,17 +66,21 @@ public class BmsHellChargeTimeTest
             var inputs = new[] { (1500d, false), (2000d, true), (2600d, false), (2950d, true) };
             var next = 0;
             var previous = 1000d;
+
             for (var time = 1000 + interval; previous < 3500; time += interval)
             {
                 var end = Math.Min(3500, time);
+
                 while (next < inputs.Length && inputs[next].Item1 <= end)
                 {
                     engine.QueueInput(inputs[next].Item1, 1, inputs[next].Item2, false);
                     next++;
                 }
+
                 engine.ProcessFrame(new BmsFrameContext(end, 1), end - previous);
                 previous = end;
             }
+
             return output.BodyTicks.Select(tick => (tick.Holding, tick.Time)).ToArray();
         }
     }
@@ -89,11 +93,12 @@ public class BmsHellChargeTimeTest
         var held = new BmsLongNote { Beatmap = beatmap, Column = 2, StartTime = 1000, Duration = 3000 };
         var output = new BmsRecordingJudgementOutput();
         var health = createHealth();
-        output.BodyTick = (_, holding, scale, frame) => health.ApplyHellChargeTick(holding, scale);
-        var engine = new BmsJudgementEngine(
-            new BmsJudgementColumnDefinition([released], beatmap.LayoutVariant, 1, output),
-            new BmsJudgementColumnDefinition([held], beatmap.LayoutVariant, 2, output));
-
+        output.BodyTick = frame => health.ApplyEngineTick(frame.EngineResult!.Health);
+        var engine = new BmsJudgementEngine([released, held], beatmap.LayoutVariant, [
+                new BmsJudgementColumnDefinition(1, output),
+                new BmsJudgementColumnDefinition(2, output)
+            ],
+            notes => (BmsProfiles.CreateScore(), health.CreateEngineHealth(notes)));
 
         engine.QueueInput(1000, 1, true, false);
         engine.QueueInput(1000, 2, true, false);
@@ -108,9 +113,9 @@ public class BmsHellChargeTimeTest
             (1, false, 1600.001), (2, true, 1600.001),
             (1, false, 1800.001), (2, true, 1800.001),
         ];
-        Assert.That(output.BodyTicks.Select(tick => (tick.Note.Column, tick.Holding, tick.Time)), Is.EqualTo(expected));
+        Assert.That(output.BodyTicks.Select(tick => (tick.Column, tick.Holding, tick.Time)), Is.EqualTo(expected));
         var expectedHealth = createHealth();
-        foreach (var tick in expected) expectedHealth.ApplyHellChargeTick(tick.Holding);
+        foreach (var tick in expected) expectedHealth.ApplyTestBodyTick(tick.Holding);
         Assert.That(health.CurrentGaugeStates, Is.EqualTo(expectedHealth.CurrentGaugeStates));
 
         static BmsHealthProcessor createHealth()

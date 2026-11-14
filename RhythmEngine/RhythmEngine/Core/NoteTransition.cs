@@ -29,6 +29,12 @@ public sealed record JudgementResult(JudgementEvent Event, ScoreState Score, Hea
 public readonly record struct InputDispatch(InputEvent Input, int FirstTransitionIndex, int TransitionCount);
 
 /// <summary>
+/// Ordered output owned by the caller. Input dispatch ranges index this batch's transitions;
+/// transition and judgement sequence numbers remain absolute within the attempt.
+/// </summary>
+public sealed record JudgementBatch(ImmutableArray<NoteTransition> Transitions, ImmutableArray<InputDispatch> Inputs);
+
+/// <summary>
 /// One rule invocation, including silent input and timer transitions. Input is null for a timer.
 /// Ordered transitions preserve release/regrab edges within a single host frame.
 /// </summary>

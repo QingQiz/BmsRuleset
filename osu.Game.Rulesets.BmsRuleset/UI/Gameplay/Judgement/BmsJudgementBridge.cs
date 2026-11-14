@@ -2,19 +2,19 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
-using NoteSnapshot = RhythmEngine.Core.NoteSnapshot;
-using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.Presentation;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.Presentation;
 using osu.Game.Rulesets.Judgements;
+using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
+using NoteSnapshot = RhythmEngine.Core.NoteSnapshot;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Judgement;
 
@@ -41,10 +41,8 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
         // apply stale deltas to the freshly reset processors.
         judgedEntries(column).Clear();
         PrepareReplayResults();
-        foreach (var entry in replayEntries!.Values)
-        {
-            entry.ResetReplayResult();
-        }
+
+        foreach (var entry in replayEntries!.Values) entry.ResetReplayResult();
     }
 
     [UnsafeAccessor(UnsafeAccessorKind.Field, Name = "judgedEntries")]
@@ -95,31 +93,18 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
         if (binding == null || binding.Generation != generation)
             return;
 
-        binding.Bound = false;
         boundObjects.Remove(drawable);
         representations.Remove(binding.Note);
     }
 
-    internal DrawableBmsHitObject GetRepresentation(BmsHitObject note)
-        => representations.TryGetValue(note, out var binding) && isCurrent(binding)
-            ? binding.Drawable
-            : note is BmsLandmine mine && landmineRepresentations.TryGetValue(mine, out var drawable)
-                                       && ReferenceEquals(drawable.HitObject, mine)
-                ? drawable
-                : throw new InvalidOperationException("A main result requires the current representation.");
-
     private bool isCurrent(Binding binding)
-        => binding.Bound && binding.Drawable.BindingGeneration == binding.Generation && ReferenceEquals(binding.Drawable.HitObject, binding.Note);
+        => binding.Drawable.BindingGeneration == binding.Generation && ReferenceEquals(binding.Drawable.HitObject, binding.Note);
 
     private sealed class Binding
     {
         internal readonly BmsHitObject Note;
         internal readonly DrawableBmsHitObject Drawable;
         internal readonly long Generation;
-
-        // Captured callbacks retain their own binding identity even if the same drawable
-        // is rebound without advancing its local generation.
-        internal bool Bound = true;
 
         internal Binding(BmsHitObject note, DrawableBmsHitObject drawable, long generation)
         {
@@ -172,6 +157,7 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
         drawable ??= (DrawableBmsHitObject)getPooledRepresentation(column, note, null);
         var generation = drawable.BindingGeneration;
         Action<DrawableHitObject, JudgementResult>? temporaryNotification = null;
+
         if (temporary)
         {
             Bind(drawable);
@@ -220,7 +206,7 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
 
     public void ApplySyntheticEndpoint(BmsLongNoteEndpointResult endpoint, in BmsFrameContext frame, bool suppressPenalty)
     {
-        playfield.ApplySyntheticLongNoteEndpoint(endpoint, suppressPenalty, frame.EngineResult);
+        playfield.ApplySyntheticLongNoteEndpoint(endpoint, suppressPenalty, frame.EngineResult!);
     }
 
     public void PublishState(BmsLandmine note, in BmsLandmineState state, in BmsFrameContext frame)
@@ -234,7 +220,7 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
             observer.Observer(state, frame);
     }
 
-    public void ApplyBodyTick(BmsLongNote note, bool holding, double scale, in BmsFrameContext frame)
+    public void ApplyBodyTick(in BmsFrameContext frame)
         => playfield.ApplyEngineHealth(frame.EngineResult!.Health);
 
     public void ApplyNonConsumingBad(BmsHitObject note, in BmsFrameContext frame)

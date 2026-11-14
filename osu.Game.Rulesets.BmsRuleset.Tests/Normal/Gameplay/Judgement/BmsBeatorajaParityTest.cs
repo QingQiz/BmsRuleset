@@ -4,12 +4,9 @@ using NUnit.Framework;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
-using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.Presentation;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
-using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 
@@ -28,10 +25,10 @@ public class BmsBeatorajaParityTest
         processor.SetGaugeType(gauge);
         processor.ApplyBeatmap(new BmsBeatmap { Total = 10, HitObjects = { note } });
         for (var i = 0; i < 100; i++)
-            processor.RegisterEmptyPoor();
+            processor.ApplyTestEmptyPoor();
         Assert.That(processor.Health.Value, Is.EqualTo(0.02));
         Assert.That(processor.HasEverFailed, Is.False);
-        processor.ApplyResult(new JudgementResult(note, note.CreateJudgement()) { Type = HitResult.Perfect });
+        processor.ApplyTestResult(new BmsJudgementResult(note, note.CreateJudgement()) { Type = HitResult.Perfect });
         Assert.That(processor.Health.Value, Is.EqualTo(0.12).Within(1e-9));
     }
 
@@ -45,7 +42,7 @@ public class BmsBeatorajaParityTest
         note.Beatmap = beatmap;
         var processor = new BmsHealthProcessor();
         processor.ApplyBeatmap(beatmap);
-        processor.ApplyResult(new JudgementResult(note, note.CreateJudgement()) { Type = HitResult.Perfect });
+        processor.ApplyTestResult(new BmsJudgementResult(note, note.CreateJudgement()) { Type = HitResult.Perfect });
         Assert.That(processor.Health.Value, Is.EqualTo(expected).Within(1e-9));
     }
 
@@ -74,7 +71,7 @@ public class BmsBeatorajaParityTest
         var processor = new BmsScoreProcessor();
         processor.ApplyBeatmap(new BmsBeatmap { LayoutVariant = layout });
         processor.Combo.Value = 3;
-        processor.RegisterEmptyPoor(1000, 1100, 1);
+        processor.ApplyTestEmptyPoor(1000, 1100, 1);
         Assert.That(processor.Combo.Value, Is.EqualTo(expectedCombo));
         processor.ResetReplayState();
         Assert.That(processor.Combo.Value, Is.Zero);
@@ -86,7 +83,7 @@ public class BmsBeatorajaParityTest
         var processor = new BmsScoreProcessor();
         processor.ApplyBeatmap(new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Popn9K });
         processor.Combo.Value = 3;
-        processor.RegisterNonConsumingJudgement(HitResult.Ok, 850, 1000, 1);
+        processor.ApplyTestNonConsumingJudgement(HitResult.Ok, 850, 1000, 1);
         Assert.That(processor.Combo.Value, Is.Zero);
         Assert.That(processor.ScoringJudgementEventCount, Is.Zero);
         Assert.That(processor.JudgementEvents[0].Source.IsScoring, Is.False);
@@ -101,15 +98,17 @@ public class BmsBeatorajaParityTest
         var first = new BmsNote();
         var missed = new BmsNote { StartTime = 1000 };
         var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Popn9K, HitObjects = { first, missed } };
+        first.Beatmap = beatmap;
+        missed.Beatmap = beatmap;
         var score = new BmsScoreProcessor();
         var health = new BmsHealthProcessor();
         score.ApplyBeatmap(beatmap);
         health.ApplyBeatmap(beatmap);
-        score.ApplyResult(new JudgementResult(first, first.CreateJudgement()) { Type = HitResult.Perfect });
+        score.ApplyTestResult(new BmsJudgementResult(first, first.CreateJudgement()) { Type = HitResult.Perfect });
         var result = new BmsJudgementResult(missed, missed.CreateJudgement()) { Type = HitResult.Meh, SuppressPenalty = true };
         var oldHealth = health.Health.Value;
-        score.ApplyResult(result);
-        health.ApplyResult(result);
+        score.ApplyTestResult(result);
+        health.ApplyTestResult(result);
         Assert.That(score.Accuracy.Value, Is.EqualTo(0.5));
         Assert.That(score.Combo.Value, Is.EqualTo(1));
         Assert.That(score.HighestCombo.Value, Is.EqualTo(1));
@@ -129,7 +128,7 @@ public class BmsBeatorajaParityTest
         Assert.That(score.HighestCombo.Value, Is.EqualTo(1));
         Assert.That(score.ScoringJudgementEventCount, Is.EqualTo(1));
         Assert.That(BmsExScore.CreateProgression(score.JudgementEvents), Is.EqualTo(new[] { 0, 2 }));
-        score.ApplyResult(result);
+        score.ApplyTestResult(result);
         Assert.That(score.Accuracy.Value, Is.EqualTo(0.5));
         Assert.That(score.Combo.Value, Is.EqualTo(1));
         Assert.That(score.JudgementEvents.Count(e => e.SuppressPenalty), Is.EqualTo(1));

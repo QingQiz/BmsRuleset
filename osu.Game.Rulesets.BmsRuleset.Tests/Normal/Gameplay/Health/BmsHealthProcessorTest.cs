@@ -11,9 +11,10 @@ using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
-using osu.Game.Rulesets.Judgements;
+using osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
 using osu.Game.Rulesets.Scoring;
 using osuTK.Graphics;
+using RhythmEngine.Profiles.Bms;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Health;
 
@@ -26,6 +27,7 @@ public class BmsHealthProcessorTest
         using var processor = new BmsHealthProcessor();
         processor.SetGaugeTypes(Enum.GetValues<BmsGaugeType>(), profileFamilyOverride: family);
         var expected = new List<BmsGaugeStateSnapshot[]>();
+
         for (var i = 0; i < 40; i++)
         {
             apply(i);
@@ -33,24 +35,27 @@ public class BmsHealthProcessorTest
         }
 
         var discarded = processor.CurrentGaugeStates;
+
         for (var attempt = 0; attempt < 2; attempt++)
         {
             processor.ResetReplayState();
+
             for (var i = 0; i < 16; i++)
             {
                 apply(i);
                 Assert.That(processor.CurrentGaugeStates, Is.EqualTo(expected[i]), "event " + i);
             }
-            processor.ApplyHellChargeTick(true);
+
+            processor.ApplyTestBodyTick(true);
             Assert.That(discarded, Is.EqualTo(expected[^1]), "Snapshots must survive later gauge changes.");
         }
 
         void apply(int index)
         {
             if (index % 3 == 0)
-                processor.RegisterNonConsumingJudgement(HitResult.Ok);
+                processor.ApplyTestNonConsumingJudgement(HitResult.Ok);
             else
-                processor.ApplyHellChargeTick(index % 3 == 1);
+                processor.ApplyTestBodyTick(index % 3 == 1);
         }
     }
 
@@ -59,18 +64,18 @@ public class BmsHealthProcessorTest
     {
         var processor = createProcessorWithClock(1200);
         processor.SetGaugeType(BmsGaugeType.Hazard);
-        processor.ApplyHellChargeTick(true);
+        processor.ApplyTestBodyTick(true);
         var note = new BmsNote { StartTime = 1000, Column = 1 };
-        processor.ApplyResult(new JudgementResult(note, note.CreateJudgement()) { Type = HitResult.Ok });
+        processor.ApplyTestResult(new BmsJudgementResult(note, note.CreateJudgement()) { Type = HitResult.Ok });
         Assert.That(processor.HasFailed, Is.True);
         Assert.That(processor.HasEverFailed, Is.True);
 
         processor.ResetReplayState();
-        processor.ApplyHellChargeTick(true);
+        processor.ApplyTestBodyTick(true);
         Assert.That(processor.HasFailed, Is.False);
         Assert.That(processor.HasEverFailed, Is.False);
         Assert.That(processor.Health.Value, Is.EqualTo(1));
-        processor.ApplyHellChargeTick(true);
+        processor.ApplyTestBodyTick(true);
         Assert.That(processor.HasFailed, Is.False);
     }
 
@@ -80,8 +85,9 @@ public class BmsHealthProcessorTest
     {
         var processor = createProcessorWithClock(1200);
         processor.SetGaugeType(BmsGaugeType.Hazard);
-        processor.ApplyHellChargeTick(true);
+        processor.ApplyTestBodyTick(true);
         BmsJudgementResult result;
+
         if (syntheticTail)
         {
             var note = new BmsLongNote { StartTime = 1000, Duration = 500, Column = 1 };
@@ -93,14 +99,15 @@ public class BmsHealthProcessorTest
             var note = new BmsNote { StartTime = 1000, Column = 1 };
             result = new BmsJudgementResult(note, note.CreateJudgement());
         }
+
         result.Type = HitResult.Ok;
         result.SetTiming(1000, 1);
-        processor.ApplyResult(result);
+        processor.ApplyTestResult(result);
 
         Assert.That(processor.HasFailed, Is.True);
         Assert.That(processor.Health.Value, Is.Zero);
         processor.ResetReplayState();
-        processor.ApplyHellChargeTick(true);
+        processor.ApplyTestBodyTick(true);
         Assert.That(processor.HasFailed, Is.False);
         Assert.That(processor.HasEverFailed, Is.False);
         Assert.That(processor.Health.Value, Is.EqualTo(1));
@@ -116,15 +123,15 @@ public class BmsHealthProcessorTest
             new(BmsGaugeType.Normal, 0.2, false),
         ]);
         var initial = processor.CurrentGaugeStates.ToArray();
-        processor.RegisterEmptyPoor();
+        processor.ApplyTestEmptyPoor();
         var afterMiss = processor.CurrentGaugeStates.ToArray();
         Assert.That(afterMiss[0].Failed, Is.True);
 
-        processor.ApplyHellChargeTick(false, 100);
+        for (var i = 0; i < 200; i++) processor.ApplyTestBodyTick(false);
         Assert.That(processor.HasFailed, Is.False);
         Assert.That(processor.HasEverFailed, Is.False);
         processor.ResetReplayState();
-        processor.RegisterEmptyPoor();
+        processor.ApplyTestEmptyPoor();
         Assert.That(processor.CurrentGaugeStates, Is.EqualTo(afterMiss));
         Assert.That(processor.HasFailed, Is.False);
         Assert.That(processor.HasEverFailed, Is.False);
@@ -135,7 +142,8 @@ public class BmsHealthProcessorTest
 
     [Test]
     public void TestEndClearThresholdBoundary(
-        [Values(BmsGaugeType.Normal, BmsGaugeType.Easy, BmsGaugeType.AssistEasy)] BmsGaugeType gaugeType,
+        [Values(BmsGaugeType.Normal, BmsGaugeType.Easy, BmsGaugeType.AssistEasy)]
+        BmsGaugeType gaugeType,
         [Values] BmsGaugeProfileFamily family,
         [Values(-1, 0, 1)] int boundary)
     {
@@ -262,7 +270,7 @@ public class BmsHealthProcessorTest
         processor.ApplyBeatmap(beatmap);
 
         // Hazard BAD (Ok) = -1 (instant kill on Fixed algorithm).
-        processor.ApplyResult(new JudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
+        processor.ApplyTestResult(new BmsJudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
             { Type = HitResult.Ok });
 
         Assert.That(processor.HasFailed, Is.True);
@@ -293,7 +301,7 @@ public class BmsHealthProcessorTest
         processor.ApplyBeatmap(beatmap);
 
         // Hazard starts at 1.0 (survival gauge). Apply a BAD (Ok) which is -1 for Hazard.
-        processor.ApplyResult(new JudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
+        processor.ApplyTestResult(new BmsJudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
             { Type = HitResult.Ok });
 
         // Hazard should be failed, now active should be ExHard. Framework failure NOT triggered.
@@ -318,7 +326,7 @@ public class BmsHealthProcessorTest
         processor.ApplyBeatmap(beatmap);
 
         processor.Health.Value = 0.01;
-        processor.ApplyHellChargeTick(false);
+        processor.ApplyTestBodyTick(false);
 
         var states = processor.CurrentGaugeStates;
         Assert.That(processor.GaugeType, Is.EqualTo(BmsGaugeType.Normal));
@@ -390,7 +398,7 @@ public class BmsHealthProcessorTest
 
         // PGREAT gain = Total/100/NoteCount * 1 = 200/100/1 = 2.0
         // Normal HP = 0.2 + 2.0 = 2.2 → clamped to 1.0 (≥0.8 pass)
-        processor.ApplyResult(new JudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
+        processor.ApplyTestResult(new BmsJudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
             { Type = HitResult.Perfect });
 
         Assert.That(processor.HasPassedAtEnd(), Is.True);
@@ -410,7 +418,7 @@ public class BmsHealthProcessorTest
         });
 
         processor.Health.Value = 0.01;
-        processor.RegisterEmptyPoor();
+        processor.ApplyTestEmptyPoor();
 
         Assert.That(processor.Health.Value, Is.Zero);
         Assert.That(processor.HasEverFailed, Is.True);
@@ -429,7 +437,7 @@ public class BmsHealthProcessorTest
         processor.ApplyBeatmap(beatmap);
 
         processor.Health.Value = 0.01;
-        processor.RegisterEmptyPoor();
+        processor.ApplyTestEmptyPoor();
 
         Assert.That(processor.Health.Value, Is.EqualTo(0.02));
     }
@@ -447,7 +455,7 @@ public class BmsHealthProcessorTest
         processor.ApplyBeatmap(beatmap);
 
         processor.Health.Value = 0.8;
-        processor.RegisterEmptyPoor();
+        processor.ApplyTestEmptyPoor();
 
         Assert.That(processor.Health.Value, Is.EqualTo(0.78).Within(0.001));
         Assert.That(processor.HasFailed, Is.False);
@@ -471,7 +479,7 @@ public class BmsHealthProcessorTest
         processor.ApplyBeatmap(beatmap);
 
         var initialHealth = processor.Health.Value;
-        processor.ApplyResult(new JudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
+        processor.ApplyTestResult(new BmsJudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
         {
             Type = HitResult.Ok,
         });
@@ -510,7 +518,7 @@ public class BmsHealthProcessorTest
         };
         processor.ApplyBeatmap(beatmap);
 
-        processor.ApplyResult(new JudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
+        processor.ApplyTestResult(new BmsJudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
             { Type = HitResult.Perfect });
 
         Assert.That(processor.HasFailed, Is.False);
@@ -551,7 +559,7 @@ public class BmsHealthProcessorTest
 
         foreach (var hitObject in beatmap.HitObjects)
         {
-            processor.ApplyResult(new JudgementResult(hitObject, hitObject.CreateJudgement())
+            processor.ApplyTestResult(new BmsJudgementResult(hitObject, hitObject.CreateJudgement())
             {
                 Type = HitResult.Perfect,
             });
@@ -573,7 +581,7 @@ public class BmsHealthProcessorTest
         };
         processor.ApplyBeatmap(beatmap);
 
-        processor.ApplyResult(new JudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
+        processor.ApplyTestResult(new BmsJudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
         {
             Type = HitResult.Perfect,
         });
@@ -599,7 +607,7 @@ public class BmsHealthProcessorTest
         processor.ApplyBeatmap(beatmap);
 
         var initialHealth = processor.Health.Value;
-        processor.ApplyResult(new JudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
+        processor.ApplyTestResult(new BmsJudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
         {
             Type = HitResult.Meh,
         });
@@ -639,7 +647,7 @@ public class BmsHealthProcessorTest
         };
         processor.ApplyBeatmap(beatmap);
 
-        processor.ApplyResult(new JudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
+        processor.ApplyTestResult(new BmsJudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
         {
             Type = HitResult.Ok,
         });
@@ -666,12 +674,16 @@ public class BmsHealthProcessorTest
         processor.ApplyBeatmap(beatmap);
 
         processor.Health.Value = 0.8;
-        processor.ApplyResult(new JudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
-        {
-            Type = HitResult.IgnoreMiss,
-        });
+        var mine = (BmsLandmine)beatmap.HitObjects[0];
+        mine.Beatmap = beatmap;
+        var output = new BmsRecordingJudgementOutput();
+        var engine = new BmsJudgementEngine([mine], beatmap.LayoutVariant, [new BmsJudgementColumnDefinition(mine.Column, output)],
+            notes => (BmsProfiles.CreateScore(), processor.CreateEngineHealth(notes)));
+        engine.ProcessFrame(new BmsFrameContext(1000, 1), 1000);
 
         Assert.That(processor.Health.Value, Is.EqualTo(0.8).Within(0.001));
+        Assert.That(engine.Session().Health.Value, Is.EqualTo(0.8));
+        Assert.That(output.MainResults, Is.Zero);
         Assert.That(processor.HasFailed, Is.False);
     }
 
@@ -692,7 +704,7 @@ public class BmsHealthProcessorTest
         processor.ApplyBeatmap(beatmap);
 
         processor.Health.Value = 0.8;
-        processor.ApplyResult(new JudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
+        processor.ApplyTestResult(new BmsJudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
         {
             Type = HitResult.Meh,
         });
@@ -718,7 +730,7 @@ public class BmsHealthProcessorTest
         };
         processor.ApplyBeatmap(beatmap);
 
-        processor.ApplyResult(new JudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
+        processor.ApplyTestResult(new BmsJudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
         {
             Type = HitResult.Perfect,
         });
@@ -745,7 +757,7 @@ public class BmsHealthProcessorTest
         processor.ApplyBeatmap(beatmap);
 
         processor.Health.Value = 1;
-        processor.ApplyResult(new JudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
+        processor.ApplyTestResult(new BmsJudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
         {
             Type = HitResult.Meh,
         });
@@ -813,45 +825,48 @@ public class BmsHealthProcessorTest
         processor.SetGaugeTypes(BmsModAutoGauge.COURSE_AUTO_GAUGE_CHAIN, profileFamilyOverride: BmsGaugeProfileFamily.Lr2);
         var note = new BmsNote { StartTime = 1000, Column = 1 };
         for (var miss = 0; miss < 5; miss++)
-            processor.ApplyResult(new JudgementResult(note, note.CreateJudgement()) { Type = HitResult.Meh });
+            processor.ApplyTestResult(new BmsJudgementResult(note, note.CreateJudgement()) { Type = HitResult.Meh });
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(processor.Health.Value, Is.GreaterThan(0).And.LessThan(1e-15));
             Assert.That(processor.HasFailed, Is.False);
             Assert.That(processor.HasEverFailed, Is.False);
-        });
+        }
 
-        processor.ApplyResult(new JudgementResult(note, note.CreateJudgement()) { Type = HitResult.Meh });
-        Assert.Multiple(() =>
+        processor.ApplyTestResult(new BmsJudgementResult(note, note.CreateJudgement()) { Type = HitResult.Meh });
+
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(processor.GaugeType, Is.EqualTo(BmsGaugeType.ExClass));
             Assert.That(processor.Health.Value, Is.EqualTo(0.4).Within(1e-15));
             Assert.That(processor.CurrentGaugeStates.First().Failed, Is.True);
             Assert.That(processor.HasFailed, Is.False);
             Assert.That(processor.HasEverFailed, Is.False);
-        });
+        }
     }
 
     [Test]
     public void TestTinyCarriedHealthSurvivesJudgementWithoutGaugeChange(
-        [Values(BmsGaugeType.Class, BmsGaugeType.ExClass, BmsGaugeType.ExHardClass)] BmsGaugeType type,
+        [Values(BmsGaugeType.Class, BmsGaugeType.ExClass, BmsGaugeType.ExHardClass)]
+        BmsGaugeType type,
         [Values(1e-9, double.Epsilon)] double remaining)
     {
         using var processor = new BmsHealthProcessor();
         processor.SetGaugeTypes([type], profileFamilyOverride: BmsGaugeProfileFamily.FiveKeys,
             initialStates: [new(type, remaining, false)]);
         var note = new BmsNote { StartTime = 1000, Column = 1 };
-        processor.ApplyResult(new JudgementResult(note, note.CreateJudgement()) { Type = HitResult.Good });
-        Assert.Multiple(() =>
+        processor.ApplyTestResult(new BmsJudgementResult(note, note.CreateJudgement()) { Type = HitResult.Good });
+
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(processor.Health.Value, Is.EqualTo(remaining));
             Assert.That(processor.HasFailed, Is.False);
             Assert.That(processor.HasEverFailed, Is.False);
             Assert.That(processor.HasPassedAtEnd(), Is.True);
-        });
+        }
 
-        processor.ApplyResult(new JudgementResult(note, note.CreateJudgement()) { Type = HitResult.Ok });
+        processor.ApplyTestResult(new BmsJudgementResult(note, note.CreateJudgement()) { Type = HitResult.Ok });
         Assert.That(processor.Health.Value, Is.Zero);
         Assert.That(processor.HasFailed, Is.True);
         Assert.That(processor.HasPassedAtEnd(), Is.False);

@@ -90,10 +90,11 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     {
         var judgementColumns = Stage.Columns.Cast<BmsColumn>().ToArray();
         var judgementObjects = Beatmap.HitObjects.ToArray();
-        judgementEngine = new BmsJudgementEngine(judgementColumns.Select(column => new BmsJudgementColumnDefinition(
-            judgementObjects, LayoutVariant, column.Index, column.JudgementBridge)).ToArray(), objects =>
+        judgementEngine = new BmsJudgementEngine(judgementObjects, LayoutVariant, judgementColumns.Select(column =>
+            new BmsJudgementColumnDefinition(column.Index, column.JudgementBridge)).ToArray(), objects =>
             (BmsProfiles.CreateScore(scoreProcessor?.EmptyPoorBreaksCombo ?? BmsJudgementProfileProvider.EmptyPoorBreaksCombo(LayoutVariant)),
-             healthProcessor?.CreateEngineHealth(objects) ?? BmsEngineGauge.CreateDefault(objects)));
+                healthProcessor?.CreateEngineHealth(objects) ?? BmsEngineGauge.CreateDefault(objects)));
+
         foreach (var column in judgementColumns)
         {
             column.Judgements = judgementEngine.GetColumn(column.Index);
@@ -127,6 +128,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         if (hitObject is BmsHitObject bmsHo)
         {
             var col = bmsHo.Column;
+
             if (col >= 0 && col < Stage.Columns.Length)
             {
                 ((Playfield)Stage.Columns[col]).Add(hitObject);
@@ -231,6 +233,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     public bool OnPressed(KeyBindingPressEvent<BmsAction> e)
     {
         if (restoringReplayInput) return true;
+
         switch (e.Action)
         {
             case BmsAction.IncreaseScrollSpeed:
@@ -254,6 +257,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     public void OnReleased(KeyBindingReleaseEvent<BmsAction> e)
     {
         if (restoringReplayInput) return;
+
         switch (e.Action)
         {
             case BmsAction.IncreaseScrollSpeed:
@@ -271,7 +275,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     private void processJudgementFrame()
     {
-        if (replayVisualsPending && IsReplaySeekFrame)
+        if (replayVisualsPending && isReplaySeekFrame)
         {
             replayVisualsPending = false;
             foreach (var column in Stage.Columns.Cast<BmsColumn>())
@@ -379,6 +383,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         var canDefer = IsLoaded;
         foreach (var column in Stage.Columns)
             canDefer &= ((BmsColumnHitObjectContainer)column.HitObjectContainer).CanDeferUpdate;
+
         if (canDefer)
         {
             updateScrollPosition();
@@ -526,16 +531,14 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     /// <summary>
     ///     Registers a separate CN/HCN endpoint through the score and health processors.
     /// </summary>
-    internal void ApplySyntheticLongNoteEndpoint(BmsLongNoteEndpointResult endpoint, bool suppressPenalty,
-        RhythmEngine.Core.JudgementResult? engineResult = null)
+    internal void ApplySyntheticLongNoteEndpoint(
+        BmsLongNoteEndpointResult endpoint, bool suppressPenalty,
+        RhythmEngine.Core.JudgementResult engineResult)
     {
         var note = endpoint.Source;
         var scoreResult = scoreProcessor?.ApplySyntheticLongNoteEndpoint(endpoint, suppressPenalty, engineResult);
 
-        if (scoreResult != null)
-        {
-            healthProcessor?.ApplySyntheticLongNoteEndpoint(scoreResult);
-        }
+        if (scoreResult != null) healthProcessor?.ApplyResult(scoreResult);
 
         if (!IsRebuildingReplay && endpoint.Kind == BmsLongNoteEndpointKind.Tail && endpoint.Result.IsHit())
         {

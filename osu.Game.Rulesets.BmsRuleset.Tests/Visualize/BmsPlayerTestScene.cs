@@ -1,5 +1,4 @@
 #nullable enable
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,18 +9,19 @@ using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.IO.Stores;
 using osu.Framework.Platform;
-using osu.Game.Database;
 using osu.Game.Beatmaps;
+using osu.Game.Database;
 using osu.Game.IO;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
-using osu.Game.Rulesets.Replays;
-using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Judgements;
+using osu.Game.Rulesets.Mods;
+using osu.Game.Rulesets.Replays;
 using osu.Game.Screens.Play;
 using osu.Game.Tests.Visual;
 
@@ -34,7 +34,6 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 /// </summary>
 public abstract partial class BmsPlayerTestScene : PlayerTestScene, IStorageResourceProvider
 {
-
     protected override bool HasCustomSteps => true;
 
     protected override double TimePerAction => 0;
@@ -59,6 +58,7 @@ public abstract partial class BmsPlayerTestScene : PlayerTestScene, IStorageReso
         Player.GameplayClockContainer.Stop();
         Player.DrawableRuleset.UpdateSubTree();
         var updates = 0;
+
         do
         {
             var target = Math.Min(time, Player.DrawableRuleset.FrameStableClock.CurrentTime + 16);
@@ -79,14 +79,16 @@ public abstract partial class BmsPlayerTestScene : PlayerTestScene, IStorageReso
     private static extern ref FramedBeatmapClock gameplayClock(GameplayClockContainer container);
 
     // Fixed-plan execution scenes supply numerical contexts; input-generation scenes use actual input events.
-    private protected PressOutcome PressColumn(IBmsColumn column, double inputTime, bool reverseScratch = false)
+    protected private void PressColumn(IBmsColumn column, double inputTime, bool reverseScratch = false)
     {
         var source = (BmsColumn)column;
-        return source.Judgements.HandleNotePress(new BmsPressContext(inputTime, frameFor(source), reverseScratch),
-            Playfield.JudgementAlgorithm);
+        var engine = source.Judgements.Engine();
+        var frame = frameFor(source);
+        engine.QueueInput(inputTime, source.Index, true, reverseScratch);
+        engine.ProcessFrame(frame with { SimulationTime = Math.Max(inputTime, frame.SimulationTime) }, 0, Playfield.JudgementAlgorithm);
     }
 
-    private protected void ReleaseColumn(IBmsColumn column, double inputTime, bool reverseScratch = false)
+    protected private void ReleaseColumn(IBmsColumn column, double inputTime, bool reverseScratch = false)
     {
         var source = (BmsColumn)column;
         source.Judgements.HandleExecutionRelease(inputTime, frameFor(source), reverseScratch);

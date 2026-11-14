@@ -43,14 +43,15 @@ public sealed class HoldRule : INoteRule
     public IEnumerable<ScoringOpportunity> GetScoringOpportunities(ChartNote note)
     {
         if (Configuration.HeadAccuracy > 0)
-            yield return new ScoringOpportunity(note.Id, NoteParts.HEAD, note.StartTime, Configuration.HeadAccuracy);
+            yield return new ScoringOpportunity(note.Id, NoteParts.HEAD, Configuration.HeadAccuracy);
         if (Configuration.TailAccuracy > 0)
-            yield return new ScoringOpportunity(note.Id, NoteParts.TAIL, note.EndTime, Configuration.TailAccuracy);
+            yield return new ScoringOpportunity(note.Id, NoteParts.TAIL, Configuration.TailAccuracy);
     }
 
     public InputCandidate? GetCandidate(NoteContext context, InputEvent input, int noteIndex)
     {
         var state = (HoldState)context.State;
+
         if (state.TailResolved)
         {
             var resolvedOffset = context.Time - context.Note.StartTime;
@@ -103,8 +104,12 @@ public sealed class HoldRule : INoteRule
         {
             var offset = context.Time - context.Note.StartTime;
             var result = Configuration.HeadWindows.ResultFor(offset)!;
+
             if (Configuration.NonResolvingHeadResults.Contains(result))
-                return new NoteUpdate(schedule(context.Note, state with { Mistake = true }, context.Time, context.Input.Held), [new NoteEmission(NoteParts.EMPTY, result, context.Note.StartTime, offset)]);
+            {
+                return new NoteUpdate(schedule(context.Note, state with { Mistake = true }, context.Time, context.Input.Held),
+                    [new NoteEmission(NoteParts.EMPTY, result, context.Note.StartTime, offset)]);
+            }
 
             state = state with
             {
@@ -210,6 +215,7 @@ public sealed class HoldRule : INoteRule
         state = emitBalance(context, state, emissions);
 
         var endTime = context.Note.EndTime + Configuration.AutomaticEndOffset;
+
         if (!state.TailResolved && Configuration.EndMode != HoldEndMode.Release && context.Time >= endTime)
         {
             var held = state.Holding || state.DropDeadline > context.Time;
@@ -253,12 +259,15 @@ public sealed class HoldRule : INoteRule
         var evaluation = new HoldEvaluation(context.Note, state.HeadResult ?? Configuration.MissResult, state.HeadOffset,
             tailResult, offset, state.Broken, reason);
         var result = Configuration.ResolveResult(evaluation);
+
         if (result is { } emission)
+        {
             emissions.Add(emission with
             {
                 SuppressPenalty = reason == HoldResolution.MissedHead && Configuration.HeadAccuracy == 0
                                                                       && state.Mistake && Configuration.SuppressRepeatedMistakes
             });
+        }
 
         state = state with { TailTime = context.Time, TailOffset = offset, TailResult = tailResult, Resolution = reason, PendingRelease = null };
 

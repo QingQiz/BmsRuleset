@@ -14,7 +14,7 @@ public sealed partial class BmsPlayfield
 {
     internal bool IsRebuildingReplay { get; private set; }
 
-    private bool IsReplaySeekFrame => replaySeekTime == Time.Current;
+    private bool isReplaySeekFrame => replaySeekTime == Time.Current;
 
     private double? replaySeekTime;
     private bool replayVisualsPending;
@@ -23,6 +23,7 @@ public sealed partial class BmsPlayfield
     internal void RewindLiveInputs(Replay replay, IReadOnlyList<Mod> mods, double time)
     {
         if (time >= judgementEngine.CurrentTime || !double.IsFinite(judgementEngine.CurrentTime)) return;
+
         SeekReplay(replay, mods, time);
         // Live controls resume immediately; only a replay handler has a seek-completion callback.
         FinishReplaySeekInput();
@@ -38,26 +39,31 @@ public sealed partial class BmsPlayfield
         var manualClock = new ManualClock();
         var clock = new FramedClock(manualClock);
         var fromTime = double.IsFinite(judgementEngine.CurrentTime) && time > judgementEngine.CurrentTime
-            ? judgementEngine.CurrentTime : (double?)null;
+            ? judgementEngine.CurrentTime
+            : (double?)null;
+
         using (new BmsReplayRebuildScope(score, health, allowFailure))
         {
             IsRebuildingReplay = true;
+
             try
             {
                 score.Clock = health.Clock = clock;
+
                 if (fromTime == null)
                 {
                     score.ResetReplayState();
                     health.ResetReplayState();
                     foreach (var column in Stage.Columns.Cast<BmsColumn>())
                         column.JudgementBridge.ResetReplayResults();
-                    initialiseJudgementEngine();
+                    judgementEngine.Reset();
                 }
                 else
                 {
                     foreach (var column in Stage.Columns.Cast<BmsColumn>())
                         column.JudgementBridge.PrepareReplayResults();
                 }
+
                 BmsReplaySimulation.AdvanceTo(Beatmap, replay, mods, judgementEngine, TotalColumns, time, currentTime =>
                 {
                     manualClock.CurrentTime = currentTime;

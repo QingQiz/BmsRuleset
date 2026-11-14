@@ -35,20 +35,16 @@ public sealed class GameplaySession : IGameplaySession
     }
 
     public SessionFrame AdvanceTo(long time, ReadOnlySpan<InputEvent> inputs = default)
-    {
-        var firstTransition = session.TransitionCount;
-        session.AdvanceTo(time, inputs);
-        return frame(session.GetTransitionsSince(firstTransition), false);
-    }
+        => frame(session.AdvanceTo(time, inputs).Transitions, false);
 
     public SessionFrame Reconstruct(long time, ReadOnlySpan<InputEvent> replayInputs)
     {
         // Build independently so invalid replay input leaves the live session usable.
         var rebuilt = new JudgementSession(chart, configuration);
-        rebuilt.AdvanceTo(time, replayInputs);
+        var batch = rebuilt.AdvanceTo(time, replayInputs);
         session = rebuilt;
         generation++;
-        return frame(session.GetTransitionsSince(0), true);
+        return frame(batch.Transitions, true);
     }
 
     public SessionFrame Restart()

@@ -1,11 +1,11 @@
 #nullable enable
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using System;
-using System.Linq;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Colour;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
@@ -13,6 +13,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Tests.Visual;
 using osuTK.Graphics;
@@ -54,21 +55,25 @@ public partial class TestSceneBmsInvisibleNote : BmsPlayerTestScene
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.LoadedBeatmapSuccessfully && Playfield.Stage.IsLoaded);
         seek(4800);
         AddAssert("invisible notes retained", () => Playfield.Beatmap.InvisibleNotes.Count == 1);
+
         if (!initiallyVisible)
         {
             AddAssert("hidden markers have no entries", () => !Playfield.Stage.Columns[1].HitObjectContainer.Entries
                 .Any(e => e.HitObject is BmsInvisibleNote));
             AddAssert("hidden markers have no layer", () => layer == null);
-            AddAssert("hidden input gives no judgement", () => PressColumn(Playfield.Stage.Columns[1], 4800).Equals(PressOutcome.Empty));
+            AddStep("press hidden column", () => PressColumn(Playfield.Stage.Columns[1], 4800));
+            AddAssert("hidden input gives no judgement", () => ((BmsScoreProcessor)Player.ScoreProcessor).JudgementEvents.Count == 0);
             AddStep("release hidden column", () => ReleaseColumn(Playfield.Stage.Columns[1], 4800));
         }
+
         AddStep("enable display", () => config.SetValue(BmsRulesetSetting.ShowInvisibleNotes, true));
         AddUntilStep("outline visible", () => layer is { IsPresent: true } && layer.Markers.Count == 1);
         AddAssert("markers never register hit objects", () => !Playfield.Stage.Columns[1].HitObjectContainer.Entries
             .Any(e => e.HitObject is BmsInvisibleNote));
-        AddAssert("yellow hollow rectangle", () => layer!.Colour.Equals((osu.Framework.Graphics.Colour.ColourInfo)Color4.Yellow)
-            && layer.DrawWidth > 0 && layer.MarkerHeight == 8);
-        AddAssert("press gives no judgement", () => PressColumn(Playfield.Stage.Columns[1], 4800).Equals(PressOutcome.Empty));
+        AddAssert("yellow hollow rectangle", () => layer!.Colour.Equals((ColourInfo)Color4.Yellow)
+                                                   && layer.DrawWidth > 0 && layer.MarkerHeight == 8);
+        AddStep("press marker column", () => PressColumn(Playfield.Stage.Columns[1], 4800));
+        AddAssert("press gives no judgement", () => ((BmsScoreProcessor)Player.ScoreProcessor).JudgementEvents.Count == 0);
         AddStep("release column", () => ReleaseColumn(Playfield.Stage.Columns[1], 4800));
         AddAssert("no score events", () => Player.Results.Count == 0);
         AddStep("disable display live", () => config.SetValue(BmsRulesetSetting.ShowInvisibleNotes, false));
@@ -85,7 +90,11 @@ public partial class TestSceneBmsInvisibleNote : BmsPlayerTestScene
     [Test]
     public void BatchSnapshotsAreIsolatedAndStableUpdatesDoNotAllocate()
     {
-        AddStep("enable markers", () => { config.SetValue(BmsRulesetSetting.ShowInvisibleNotes, true); LoadPlayer(); });
+        AddStep("enable markers", () =>
+        {
+            config.SetValue(BmsRulesetSetting.ShowInvisibleNotes, true);
+            LoadPlayer();
+        });
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.LoadedBeatmapSuccessfully);
         seek(4800);
         AddUntilStep("marker loaded", () => layer is { IsLoaded: true } && layer.Markers.Count == 1);
@@ -96,6 +105,7 @@ public partial class TestSceneBmsInvisibleNote : BmsPlayerTestScene
                 .CreateDelegate<Func<Drawable, ulong, int, bool, DrawNode?>>();
             var drawable = layer!;
             ulong frame = 0;
+
             for (var slot = 0; slot < 3; slot++)
             {
                 Playfield.Stage.SetNoteHeightScale(1);
@@ -107,8 +117,7 @@ public partial class TestSceneBmsInvisibleNote : BmsPlayerTestScene
                 var scroll = Playfield.ScrollController;
                 var column = (BmsColumn)Playfield.Stage.Columns[1];
                 var position = scroll.GetVisualScrollPosition(5000, Playfield.Beatmap.InvisibleNotes[0].ScrollPositionAtStartTime);
-                var expectedY = drawable.DrawHeight - column.HitTargetPosition
-                    - (float)((position - scroll.CurrentScrollPosition) * scroll.ScrollCoordinateScale(drawable.DrawHeight, column.HitTargetPosition));
+                var expectedY = drawable.DrawHeight - column.HitTargetPosition - (float)((position - scroll.CurrentScrollPosition) * scroll.ScrollCoordinateScale(drawable.DrawHeight, column.HitTargetPosition));
                 Assert.That(before[0].Y, Is.EqualTo(expectedY).Within(.001));
                 Assert.That(before[0].Alpha, Is.EqualTo(1));
                 Playfield.Stage.SetNoteHeightScale(1.37f);
@@ -117,6 +126,7 @@ public partial class TestSceneBmsInvisibleNote : BmsPlayerTestScene
                 Assert.That((IEnumerable<BmsInvisibleNoteLayer.Marker>)field.GetValue(node)!, Is.EqualTo(before));
                 Assert.That(drawable.MarkerHeight, Is.EqualTo(10.96f).Within(.001));
             }
+
             for (var i = 0; i < 100; i++) drawable.UpdateSubTree();
             var allocated = GC.GetAllocatedBytesForCurrentThread();
             for (var i = 0; i < 100; i++) drawable.UpdateSubTree();

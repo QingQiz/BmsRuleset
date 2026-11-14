@@ -6,10 +6,10 @@ using osu.Game.Online.API;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
-using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
@@ -19,7 +19,6 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Mods;
 [TestFixture]
 public class BmsModAutoGaugeTest
 {
-
     /// <summary>
     ///     Builds an Auto Gauge whose resolved worst gauge is ExHard: the six-tier chain is
     ///     installed via <see cref="BmsModAutoGauge.ApplyToHealthProcessor" />, then a single
@@ -40,7 +39,7 @@ public class BmsModAutoGaugeTest
         };
         hp.ApplyBeatmap(beatmap);
 
-        hp.ApplyResult(new JudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
+        hp.ApplyTestResult(new BmsJudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
             { Type = HitResult.Ok });
         hp.HasPassedAtEnd();
 
@@ -117,7 +116,7 @@ public class BmsModAutoGaugeTest
         autoGauge.ApplyToScore(score);
         Assert.That(score.Mods, Has.One.TypeOf<BmsModHazardGauge>());
 
-        hp.ApplyResult(new JudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
+        hp.ApplyTestResult(new BmsJudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
             { Type = HitResult.Ok });
         hp.HasPassedAtEnd();
 
@@ -185,7 +184,8 @@ public class BmsModAutoGaugeTest
         health.ApplyBeatmap(new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K });
         restored.ApplyToHealthProcessor(health);
         restored.ApplyToScore(new ScoreInfo { Mods = [restored] });
-        Assert.Multiple(() =>
+
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(health.IsCourseGaugeMode, Is.True);
             Assert.That(health.ConfiguredProfileFamily, Is.EqualTo(BmsGaugeProfileFamily.Lr2));
@@ -195,7 +195,7 @@ public class BmsModAutoGaugeTest
                 new BmsGaugeStateSnapshot(BmsGaugeType.Class, 0.81, false),
             }));
             Assert.That(restored.ExHardClassHealth.Value, Is.Null);
-        });
+        }
 
         foreach (var control in restored.CreateSettingsControls())
         {
@@ -217,12 +217,14 @@ public class BmsModAutoGaugeTest
         using var health = new BmsHealthProcessor();
         health.ApplyBeatmap(new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K });
         restored.ApplyToHealthProcessor(health);
-        Assert.Multiple(() =>
+
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(health.IsCourseGaugeMode, Is.True);
             Assert.That(health.ConfiguredProfileFamily, Is.EqualTo(BmsGaugeProfileFamily.FiveKeys));
             Assert.That(health.CurrentGaugeStates.Single(), Is.EqualTo(new BmsGaugeStateSnapshot(type, 0.42, false)));
-        });
+        }
+
         foreach (var control in restored.CreateSettingsControls())
         {
             Assert.That(control.IsPresent, Is.False);

@@ -45,7 +45,7 @@ public sealed class TapRule : INoteRule
 
     public IEnumerable<ScoringOpportunity> GetScoringOpportunities(ChartNote note)
     {
-        yield return new ScoringOpportunity(note.Id, NoteParts.TAP, note.StartTime, Configuration.MaximumAccuracy);
+        yield return new ScoringOpportunity(note.Id, NoteParts.TAP, Configuration.MaximumAccuracy);
     }
 
     public InputCandidate? GetCandidate(NoteContext context, InputEvent input, int noteIndex)

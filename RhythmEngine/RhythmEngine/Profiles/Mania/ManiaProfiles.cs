@@ -33,18 +33,18 @@ public static class ManiaProfiles
         bounds = bounds.Select(w => Math.Floor(w * scale) + 0.5).ToArray();
         var windows = ProfileSupport.Symmetric((ManiaResults.PERFECT, bounds[0]), (ManiaResults.GREAT, bounds[1]), (ManiaResults.GOOD, bounds[2]),
             (ManiaResults.OK, bounds[3]), (ManiaResults.MEH, bounds[4]), (ManiaResults.MISS, bounds[5]));
-        var laneStarts = source.Notes.GroupBy(n => n.Lane).ToDictionary(g => g.Key, g => g.Select(n => n.StartTime).Distinct().Order().ToImmutableArray());
-        var chart = source.Compile(note => stable
-            ? createRule(note, windows, bounds, true)
-            : new OrderedNoteRule(createRule(note, windows, bounds, false),
-                laneStarts[note.Lane], laneStarts[note.Lane].BinarySearch(note.StartTime) + 1, windows));
+        var chart = compileChart(source, windows, bounds, stable);
         var score = stable ? stableScore(chart.ScorePlan) : lazerScore(chart.ScorePlan);
         var health = createHealth(source, options.DrainRate, stable, ManiaHealthCalibration.ComputeRecoveryMultiplier(source, options.DrainRate, options.DrainStartTime, !stable));
         var id = stable ? "osu-stable-mania-score-v1" : "osu-lazer-mania-standardised";
         var descriptor = new ProfileDescriptor(id, stable ? "osu-stable-3adc2d001aac" : "9a10d935b05a3b896f4bd811d620f2023331db93",
             stable ? EvidenceLevel.StaticBinary : EvidenceLevel.PublicSource,
             stable
-                ? ["https://m1.ppy.sh/r/osu!install.exe", "https://github.com/ppy/osu-wiki/blob/master/wiki/Gameplay/Judgement/osu!mania/en.md", "https://github.com/ppy/osu-wiki/blob/master/wiki/Gameplay/Score/ScoreV1/osu!mania/en.md"]
+                ?
+                [
+                    "https://m1.ppy.sh/r/osu!install.exe", "https://github.com/ppy/osu-wiki/blob/master/wiki/Gameplay/Judgement/osu!mania/en.md",
+                    "https://github.com/ppy/osu-wiki/blob/master/wiki/Gameplay/Score/ScoreV1/osu!mania/en.md"
+                ]
                 : ["https://github.com/ppy/osu/tree/9a10d935b05a3b896f4bd811d620f2023331db93/osu.Game.Rulesets.Mania"],
             [
                 stable
@@ -55,26 +55,47 @@ public static class ManiaProfiles
             !stable && context.State.Held == context.State.PreviouslyHeld ? [] : ProfileSupport.Oldest(context)), descriptor);
     }
 
-    private static INoteRule createRule(KeyNote note, TimingWindows windows, double[] bounds, bool stable)
+    // Release compilation-only lane/rule lookups before creating runtime delegates.
+    private static Chart compileChart(KeyChart source, TimingWindows windows, double[] bounds, bool stable)
     {
-        var late = Time.FromMilliseconds(stable ? bounds[3] : bounds[4]);
-        if (note.Kind == KeyNoteKind.Tap)
-            return new TapRule(new TapConfiguration(windows, stable ? Time.FromMilliseconds(bounds[3] - 0.5) - 1 : late, ManiaResults.MISS, stable ? 300 : 305,
-                BlockResolvedUntilStart: stable));
+        if (stable && source.Notes.Any(n => n.Kind == KeyNoteKind.Hold && n.EndTime <= n.StartTime))
+            throw new ArgumentException("Mania holds require a positive duration.", nameof(source));
 
-        if (note.Kind != KeyNoteKind.Hold)
-            throw ProfileSupport.Unsupported(stable ? "osu!stable mania" : "osu!lazer mania", note.Kind);
-
-        if (stable)
+        var laneStarts = stable
+            ? null
+            : source.Notes.GroupBy(n => n.Lane)
+                .ToDictionary(g => g.Key, g => g.Select(n => n.StartTime).Distinct().Order().ToImmutableArray());
+        ImmutableArray<long> stableWindows = stable ? [.. bounds.Select(b => Time.FromMilliseconds(b - 0.5))] : [];
+        var tail = stable ? null : new TimingWindows(windows.Entries.Select(w => w with { Early = w.Early * 3 / 2, Late = w.Late * 3 / 2 }));
+        var rules = new Dictionary<KeyNoteKind, INoteRule>();
+        return source.Compile(note =>
         {
-            if (note.EndTime <= note.StartTime)
-                throw new ArgumentException("Mania holds require a positive duration.", nameof(note));
+            if (!rules.TryGetValue(note.Kind, out var rule))
+                rules.Add(note.Kind, rule = createRule(note.Kind, windows, tail, stableWindows, stable));
+            return stable
+                ? rule
+                : new OrderedNoteRule(rule,
+                    laneStarts![note.Lane], laneStarts[note.Lane].BinarySearch(note.StartTime) + 1, windows);
+        });
+    }
 
-            return new StableManiaHoldRule([..bounds.Select(b => Time.FromMilliseconds(b - 0.5))]);
+    private static INoteRule createRule(KeyNoteKind kind, TimingWindows windows, TimingWindows? tail, ImmutableArray<long> stableWindows, bool stable)
+    {
+        var late = windows.Entries[stable ? 3 : 4].Late;
+
+        if (kind == KeyNoteKind.Tap)
+        {
+            return new TapRule(new TapConfiguration(windows, stable ? stableWindows[3] - 1 : late, ManiaResults.MISS, stable ? 300 : 305,
+                BlockResolvedUntilStart: stable));
         }
 
-        var tail = new TimingWindows(windows.Entries.Select(w => w with { Early = w.Early * 3 / 2, Late = w.Late * 3 / 2 }));
-        var config = new HoldConfiguration(windows, tail, late, late * 3 / 2, ManiaResults.MISS, ManiaResults.PERFECT, ManiaResults.MISS,
+        if (kind != KeyNoteKind.Hold)
+            throw ProfileSupport.Unsupported(stable ? "osu!stable mania" : "osu!lazer mania", kind);
+
+        if (stable)
+            return new StableManiaHoldRule(stableWindows);
+
+        var config = new HoldConfiguration(windows, tail!, late, late * 3 / 2, ManiaResults.MISS, ManiaResults.PERFECT, ManiaResults.MISS,
             305, 305, HoldEndMode.Release, HoldDropMode.Recover,
             evaluation => new NoteEmission(NoteParts.TAIL, resolveGrade(evaluation), evaluation.Note.EndTime, evaluation.TailOffset))
         {
@@ -106,12 +127,16 @@ public static class ManiaProfiles
         {
             var nativeCombo = state.Combo & ushort.MaxValue;
             var resetBonus = nativeCombo != 0 && nativeCombo % 384 == 0;
+
             if (context.Event.Result == ManiaResults.HOLD_TICK)
+            {
                 return state with
                 {
                     Combo = state.Combo + 1, MaximumCombo = Math.Max(state.MaximumCombo, state.Combo + 1),
                     Bonus = resetBonus ? 100 : state.Bonus,
                 };
+            }
+
             if (context.Event.Result == ManiaResults.HOLD_BREAK)
                 return state with { Combo = 0, Bonus = resetBonus ? 100 : state.Bonus };
             if (context.Opportunity == null)

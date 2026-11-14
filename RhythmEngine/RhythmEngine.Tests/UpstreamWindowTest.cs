@@ -12,6 +12,26 @@ namespace RhythmEngine.Tests;
 [TestFixture]
 public class UpstreamWindowTest
 {
+    [TestCase(-1)]
+    [TestCase(0)]
+    [TestCase(1)]
+    public void EtternaSearchAtTempoBoundaryKeepsOutOfWindowFutureTarget(int offset)
+    {
+        var profile = EtternaProfile.Create(new KeyChart(1,
+        [
+            new KeyNote(0, 0, 1400000, 1400000, KeyNoteKind.Mine),
+            new KeyNote(1, 0, 1800000, 1800000),
+            new KeyNote(2, 0, 1800000, 1800000),
+        ], [new TempoPoint(long.MinValue, 120), new TempoPoint(-1000000, 90), new TempoPoint(1500000, 240)]));
+        var session = profile.CreateSession();
+        var blocked = session.AdvanceTo(1500000 + offset, [new InputEvent(1500000 + offset, 0, true)]);
+        Assert.That(blocked.Transitions.Last().After.Id, Is.EqualTo(1));
+        Assert.That(blocked.Transitions.SelectMany(t => t.Judgements), Is.Empty);
+        var hit = session.AdvanceTo(1800000, [new InputEvent(1799999, 0, false), new InputEvent(1800000, 0, true)]);
+        Assert.That(hit.Transitions.SelectMany(t => t.Judgements).Last().Event.NoteId, Is.EqualTo(1));
+        Assert.That(hit.Transitions.SelectMany(t => t.Judgements).Last().Event.Result, Is.EqualTo(EtternaResults.W1));
+    }
+
     public static IEnumerable<TestCaseData> BeatorajaTables()
     {
         foreach (var row in read("beatoraja-windows.json"))
@@ -21,7 +41,10 @@ public class UpstreamWindowTest
     public static IEnumerable<TestCaseData> ManiaTables()
     {
         foreach (var row in read("mania-windows.json"))
-            yield return new TestCaseData(row).SetName($"ManiaSource_{row.GetProperty("classic")}_{row.GetProperty("convert")}_OD{row.GetProperty("od")}_Rate{row.GetProperty("rate")}_Difficulty{row.GetProperty("difficulty")}");
+        {
+            yield return new TestCaseData(row).SetName(
+                $"ManiaSource_{row.GetProperty("classic")}_{row.GetProperty("convert")}_OD{row.GetProperty("od")}_Rate{row.GetProperty("rate")}_Difficulty{row.GetProperty("difficulty")}");
+        }
     }
 
     public static IEnumerable<TestCaseData> GaugeTables()
@@ -53,6 +76,7 @@ public class UpstreamWindowTest
         var health = configuration.InitialState;
         string[] grades = ["pgreat", "great", "good", "bad", "poor", "empty-poor"];
         var step = 0;
+
         foreach (var expected in row.GetProperty("states").EnumerateArray())
         {
             var judge = expected.GetProperty("judge").GetInt32();
@@ -93,12 +117,14 @@ public class UpstreamWindowTest
     {
         using var stream = typeof(UpstreamWindowTest).Assembly.GetManifestResourceStream("RhythmEngine.Tests.Reference.etterna-life.json")!;
         using var document = JsonDocument.Parse(stream);
+
         foreach (var group in document.RootElement.GetProperty("states").EnumerateArray().GroupBy(r => r.GetProperty("difficulty").GetDouble()))
         {
             var profile = EtternaProfile.Create(new KeyChart(1, [new KeyNote(0, 0, 1000000, 1000000)]), new EtternaOptions(LifeDifficulty: group.Key));
             var configuration = profile.Configuration.Health;
             var health = configuration.InitialState;
             string[] results = ["w1", "w2", "w3", "w4", "w5", "miss", "mine-hit", "held", "let-go", "missed-hold"];
+
             foreach (var row in group)
             {
                 var index = row.GetProperty("index").GetInt32();
@@ -121,6 +147,7 @@ public class UpstreamWindowTest
         var minimum = row.GetProperty("minimum").GetDouble();
         Assert.That(gauge.InitialState.Value, Is.EqualTo(row.GetProperty("initial").GetDouble()));
         string[] grades = ["pgreat", "great", "good", "bad", "poor", "empty-poor"];
+
         for (var i = 0; i < grades.Length; i++)
         {
             var judgement = new JudgementEvent(0, 0, 0, new PartId(i == 5 ? "empty" : "tap"), new ResultId(grades[i]), 0, 0, null);

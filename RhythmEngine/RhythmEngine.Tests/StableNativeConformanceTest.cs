@@ -25,8 +25,9 @@ public class StableNativeConformanceTest
     public void ReleasedHoldMatchesOriginalCil(JsonElement row)
     {
         var profile = ManiaProfiles.CreateStable(new KeyChart(1, [new KeyNote(0, 0, ms(1000), ms(2000), KeyNoteKind.Hold)]));
-        var session = profile.CreateSession();
+        var session = profile.CreateRecordingSession();
         var inputs = new List<InputEvent>();
+
         if (row.GetProperty("broken").GetBoolean())
         {
             inputs.Add(new InputEvent(ms(837), 0, true));
@@ -45,7 +46,7 @@ public class StableNativeConformanceTest
     public void BodyTicksRecoverHealthAndIncrementComboWithoutAccuracyCredit()
     {
         var source = new KeyChart(1, [new KeyNote(0, 0, ms(500), ms(500)), new KeyNote(1, 0, ms(1000), ms(2000), KeyNoteKind.Hold)]);
-        var session = ManiaProfiles.CreateStable(source).CreateSession();
+        var session = ManiaProfiles.CreateStable(source).CreateRecordingSession();
         session.AdvanceTo(ms(1900), [new InputEvent(ms(1000), 0, true)]);
         Assert.That(session.Score.Combo, Is.EqualTo(9));
         Assert.That(session.Score.AccuracyMaximum, Is.EqualTo(300));
@@ -59,7 +60,7 @@ public class StableNativeConformanceTest
     public void AShortRecoveredHoldCanReachGoodAfterAnEarlyDrop()
     {
         var source = new KeyChart(1, [new KeyNote(0, 0, ms(1000), ms(1200), KeyNoteKind.Hold)]);
-        var session = ManiaProfiles.CreateStable(source).CreateSession();
+        var session = ManiaProfiles.CreateStable(source).CreateRecordingSession();
         session.AdvanceTo(ms(1300), [
             new InputEvent(ms(1000), 0, true), new InputEvent(ms(1050), 0, false),
             new InputEvent(ms(1060), 0, true), new InputEvent(ms(1200), 0, false)
@@ -71,8 +72,9 @@ public class StableNativeConformanceTest
     [Test]
     public void HeldTailWaitsForMehAndResolvesItsCombinedError()
     {
-        var session = ManiaProfiles.CreateStable(new KeyChart(1, [new KeyNote(0, 0, ms(1000), ms(2000), KeyNoteKind.Hold)])).CreateSession();
+        var session = ManiaProfiles.CreateStable(new KeyChart(1, [new KeyNote(0, 0, ms(1000), ms(2000), KeyNoteKind.Hold)])).CreateRecordingSession();
         session.AdvanceTo(ms(1000), [new InputEvent(ms(1000), 0, true)]);
+
         foreach (var row in read("held"))
         {
             session.AdvanceTo(ms(2000 + row.GetProperty("tailOffset").GetInt32()));
@@ -86,10 +88,10 @@ public class StableNativeConformanceTest
     public void ManagerExpiresTapAtTheExactLateOkBoundary()
     {
         var source = new KeyChart(1, [new KeyNote(0, 0, ms(1000), ms(1000))]);
-        var atBoundary = ManiaProfiles.CreateStable(source).CreateSession();
+        var atBoundary = ManiaProfiles.CreateStable(source).CreateRecordingSession();
         atBoundary.AdvanceTo(ms(1103), [new InputEvent(ms(1103), 0, true)]);
         Assert.That(atBoundary.GetEventsSince(0).Single().Result.Value, Is.EqualTo("miss"));
-        var before = ManiaProfiles.CreateStable(source).CreateSession();
+        var before = ManiaProfiles.CreateStable(source).CreateRecordingSession();
         before.AdvanceTo(ms(1102), [new InputEvent(ms(1102), 0, true)]);
         Assert.That(before.GetEventsSince(0).Single().Result.Value, Is.EqualTo("ok"));
     }
@@ -98,7 +100,7 @@ public class StableNativeConformanceTest
     public void LiveScoreTruncatesHitIncrementsAndFinalScoreRoundsTheRawTotal()
     {
         var source = new KeyChart(1, Enumerable.Range(0, 4).Select(i => new KeyNote(i, 0, ms((i + 1) * 1000), ms((i + 1) * 1000))));
-        var session = ManiaProfiles.CreateStable(source).CreateSession();
+        var session = ManiaProfiles.CreateStable(source).CreateRecordingSession();
         session.AdvanceTo(ms(1100), [new InputEvent(ms(1030), 0, true), new InputEvent(ms(1031), 0, false)]);
         Assert.That(session.Score.Score, Is.EqualTo(242187));
         Assert.That(session.Score.Counters["score-v1-unrounded"], Is.EqualTo(242187.5));
@@ -113,7 +115,7 @@ public class StableNativeConformanceTest
     public void BodyComboTriggersTheOriginal384ComboBonusReset()
     {
         var source = new KeyChart(1, [new KeyNote(0, 0, ms(1000), ms(1000)), new KeyNote(1, 0, ms(2000), ms(42000), KeyNoteKind.Hold)]);
-        var session = ManiaProfiles.CreateStable(source).CreateSession();
+        var session = ManiaProfiles.CreateStable(source).CreateRecordingSession();
         session.AdvanceTo(ms(40300), [new InputEvent(ms(1060), 0, true), new InputEvent(ms(1061), 0, false), new InputEvent(ms(2000), 0, true)]);
         Assert.That(session.Score.Combo, Is.EqualTo(384));
         Assert.That(session.Score.Bonus, Is.EqualTo(92));
@@ -134,6 +136,7 @@ public class StableNativeConformanceTest
             var configuration = profile.Configuration.Score;
             var state = configuration.InitialState;
             var index = 0;
+
             foreach (var expected in row.GetProperty("samples").EnumerateArray())
             {
                 var result = expected.GetProperty("code").GetInt32() switch
@@ -169,6 +172,7 @@ public class StableNativeConformanceTest
         var configuration = profile.Configuration;
         var health = configuration.Health.InitialState;
         var index = 0;
+
         foreach (var expected in row.GetProperty("samples").EnumerateArray())
         {
             var result = expected.GetProperty("code").GetInt32() switch

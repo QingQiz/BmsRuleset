@@ -3,10 +3,10 @@ using NUnit.Framework;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
+using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
@@ -17,7 +17,6 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Result.Statistic;
 [TestFixture]
 public class BmsHitOffsetStatisticTest
 {
-
     [TestCase(BmsLongNoteMode.LongNote)]
     [TestCase(BmsLongNoteMode.ChargeNote)]
     [TestCase(BmsLongNoteMode.HellChargeNote)]
@@ -39,13 +38,13 @@ public class BmsHitOffsetStatisticTest
                 new BmsLongNoteEndpointResult(longNote, BmsLongNoteEndpointKind.Head, 987, 1, HitResult.Great),
                 new BmsLongNoteEndpointResult(longNote, BmsLongNoteEndpointKind.Tail, 1519, 1, HitResult.Great),
             };
-            processor.ApplyResult(new BmsLongNoteJudgementResult(longNote, longNote.CreateJudgement(), endpoints) { Type = HitResult.Great });
+            processor.ApplyTestResult(new BmsLongNoteJudgementResult(longNote, longNote.CreateJudgement(), endpoints) { Type = HitResult.Great });
         }
         else
         {
-            processor.ApplySyntheticLongNoteEndpoint(
+            processor.ApplyTestSyntheticEndpoint(
                 new BmsLongNoteEndpointResult(longNote, BmsLongNoteEndpointKind.Head, 987, 1, HitResult.Great));
-            processor.ApplySyntheticLongNoteEndpoint(
+            processor.ApplyTestSyntheticEndpoint(
                 new BmsLongNoteEndpointResult(longNote, BmsLongNoteEndpointKind.Tail, 1519, 1, HitResult.Great));
         }
 

@@ -15,7 +15,7 @@ internal sealed class MalodyVHoldRule(TimingWindows windows) : INoteRule
 
     public IEnumerable<ScoringOpportunity> GetScoringOpportunities(ChartNote note)
     {
-        yield return new ScoringOpportunity(note.Id, NoteParts.HEAD, note.StartTime, 1000);
+        yield return new ScoringOpportunity(note.Id, NoteParts.HEAD, 1000);
     }
 
     public InputCandidate? GetCandidate(NoteContext context, InputEvent input, int noteIndex)
@@ -33,6 +33,7 @@ internal sealed class MalodyVHoldRule(TimingWindows windows) : INoteRule
     {
         var state = (MalodyHoldState)context.State;
         var emissions = ImmutableArray.CreateBuilder<NoteEmission>();
+
         if (!state.HeadResolved)
         {
             var offset = context.Time - context.Note.StartTime;
@@ -61,6 +62,7 @@ internal sealed class MalodyVHoldRule(TimingWindows windows) : INoteRule
     {
         var state = (MalodyHoldState)context.State;
         var emissions = ImmutableArray.CreateBuilder<NoteEmission>();
+
         if (!state.HeadResolved)
         {
             state = state with { HeadResolved = true };

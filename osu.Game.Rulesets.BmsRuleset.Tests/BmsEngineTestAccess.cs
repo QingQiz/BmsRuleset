@@ -7,10 +7,10 @@ using System.Reflection;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+using osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.Presentation;
 using osu.Game.Rulesets.Scoring;
 using RhythmEngine.Core;
-using RhythmEngine.Profiles.Bms;
 using RhythmEngine.Profiles.Common;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests;
@@ -47,18 +47,43 @@ internal static class BmsEngineTestAccess
         => BmsLongNoteState.From(note, column.GetNote(note), column.Engine().CurrentTime);
 
     internal static PressOutcome HandleNotePress(this BmsJudgementView column, in BmsPressContext press,
-        BmsJudgementAlgorithm? algorithm = BmsJudgementAlgorithm.Combo)
+                                                 BmsJudgementAlgorithm? algorithm = BmsJudgementAlgorithm.Combo)
     {
         var engine = column.Engine();
-        var sessionField = typeof(BmsJudgementEngine).GetField("session", BindingFlags.Instance | BindingFlags.NonPublic)!;
-        var start = ((JudgementSession?)sessionField.GetValue(engine))?.TransitionCount ?? 0;
-        engine.QueueInput(press.InputTime, column.Index, true, press.ReverseScratch);
-        engine.ProcessFrame(press.Frame with { SimulationTime = Math.Max(press.InputTime, press.Frame.SimulationTime) }, 0, algorithm);
-        var transitions = ((JudgementSession)sessionField.GetValue(engine)!).GetTransitionsSince(start)
-            .Where(t => t.Input is { Pressed: true }).ToArray();
-        var empty = transitions.SelectMany(t => t.Judgements).FirstOrDefault(j => j.Event.Part == NoteParts.EMPTY && j.Event.Result == BmsResults.EMPTY_POOR);
-        return empty != null ? PressOutcome.ForEmptyPoor(empty.Event.ExpectedTime / 1000.0, column.Index)
-            : transitions.Length > 0 ? PressOutcome.Hit : PressOutcome.Empty;
+        var outputs = (Dictionary<int, IBmsJudgementOutput>)typeof(BmsJudgementEngine).GetField("outputs", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(engine)!;
+        var output = (BmsRecordingJudgementOutput)outputs[column.Index];
+        var outcome = PressOutcome.Empty;
+        var inputTime = press.InputTime;
+        output.NonConsumingJudgement += nonConsuming;
+        output.Feedback += feedback;
+        output.StatePublished += statePublished;
+
+        try
+        {
+            engine.QueueInput(inputTime, column.Index, true, press.ReverseScratch);
+            engine.ProcessFrame(press.Frame with { SimulationTime = Math.Max(inputTime, press.Frame.SimulationTime) }, 0, algorithm);
+            return outcome;
+        }
+        finally
+        {
+            output.NonConsumingJudgement -= nonConsuming;
+            output.Feedback -= feedback;
+            output.StatePublished -= statePublished;
+        }
+
+        void nonConsuming(double expected, int lane, HitResult result)
+            => outcome = result == HitResult.Miss ? PressOutcome.ForEmptyPoor(expected, lane) : PressOutcome.Hit;
+
+        void feedback(string value)
+        {
+            if (value.StartsWith("sample:", StringComparison.Ordinal)) outcome = PressOutcome.Hit;
+            else if (value == "keysound" && outcome.Kind != PressOutcomeKind.EmptyPoor) outcome = PressOutcome.Empty;
+        }
+
+        void statePublished(BmsLongNote note, BmsLongNoteState state, BmsFrameContext frame)
+        {
+            if (frame.SimulationTime == inputTime) outcome = PressOutcome.Hit;
+        }
     }
 
     internal static void HandleExecutionRelease(this BmsJudgementView column, double time, in BmsFrameContext frame, bool reverseScratch = false)
@@ -69,13 +94,12 @@ internal static class BmsEngineTestAccess
     }
 }
 
-internal readonly record struct BmsMainResultState(HitResult Type, double TimeAbsolute, double TimeOffset, double? GameplayRate, bool SuppressPenalty)
+internal readonly record struct BmsMainResultState(HitResult Type, double TimeOffset)
 {
     internal bool HasResult => Type != HitResult.None;
 }
 
 internal readonly record struct BmsPressContext(double InputTime, BmsFrameContext Frame, bool ReverseScratch = false);
-
 
 internal enum PressOutcomeKind
 {

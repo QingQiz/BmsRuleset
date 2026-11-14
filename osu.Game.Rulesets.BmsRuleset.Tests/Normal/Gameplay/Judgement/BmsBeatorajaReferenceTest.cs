@@ -11,7 +11,6 @@ using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 using osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
-using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 
@@ -26,7 +25,7 @@ public class BmsBeatorajaReferenceTest
         var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Popn9K, TotalColumns = 9 };
         using var processor = new BmsScoreProcessor();
         processor.ApplyBeatmap(beatmap);
-        processor.RegisterNonConsumingJudgement(HitResult.Ok, 850, 1000, 1);
+        processor.ApplyTestNonConsumingJudgement(HitResult.Ok, 850, 1000, 1);
         var saved = new ScoreInfo();
         processor.PopulateScore(saved);
         var statistics = BmsHitScatterStatistic.CreateStatistics(beatmap, saved.HitEvents);
@@ -63,8 +62,8 @@ public class BmsBeatorajaReferenceTest
                 var column = fields[1].Contains("SCRATCH") ? 0 : 1;
                 var table = BmsJudgementProfileProvider.GetTable(layout, column, int.Parse(fields[2]), fields[1].Contains("END"));
                 var result = results[int.Parse(fields[3])];
-                Assert.That(table.SlowWindowFor(result), Is.EqualTo(-long.Parse(fields[4])/1000d), line + " slow");
-                Assert.That(table.FastWindowFor(result), Is.EqualTo(long.Parse(fields[5])/1000d), line + " fast");
+                Assert.That(table.SlowWindowFor(result), Is.EqualTo(-long.Parse(fields[4]) / 1000d), line + " slow");
+                Assert.That(table.FastWindowFor(result), Is.EqualTo(long.Parse(fields[5]) / 1000d), line + " fast");
             }
         });
     }
@@ -72,15 +71,20 @@ public class BmsBeatorajaReferenceTest
     [Test]
     public void SuppressedPmsPoorKeepsPersonalBestNotePosition()
     {
-        var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Popn9K,
-            HitObjects = [new BmsNote { StartTime = 1000 }, new BmsNote { StartTime = 2000 }, new BmsNote { StartTime = 3000 }] };
+        var beatmap = new BmsBeatmap
+        {
+            LayoutVariant = BmsLayoutVariant.Popn9K,
+            HitObjects = [new BmsNote { StartTime = 1000 }, new BmsNote { StartTime = 2000 }, new BmsNote { StartTime = 3000 }]
+        };
+        foreach (var note in beatmap.HitObjects)
+            note.Beatmap = beatmap;
         using var processor = new BmsScoreProcessor();
         processor.ApplyBeatmap(beatmap);
         var notes = beatmap.HitObjects;
-        processor.ApplyResult(new JudgementResult(notes[0], notes[0].CreateJudgement()) { Type = HitResult.Perfect });
-        processor.RegisterEmptyPoor(1600, 2000, 0);
-        processor.ApplyResult(new BmsJudgementResult(notes[1], notes[1].CreateJudgement()) { Type = HitResult.Meh, SuppressPenalty = true });
-        processor.ApplyResult(new JudgementResult(notes[2], notes[2].CreateJudgement()) { Type = HitResult.Perfect });
+        processor.ApplyTestResult(new BmsJudgementResult(notes[0], notes[0].CreateJudgement()) { Type = HitResult.Perfect });
+        processor.ApplyTestEmptyPoor(1600, 2000, 0);
+        processor.ApplyTestResult(new BmsJudgementResult(notes[1], notes[1].CreateJudgement()) { Type = HitResult.Meh, SuppressPenalty = true });
+        processor.ApplyTestResult(new BmsJudgementResult(notes[2], notes[2].CreateJudgement()) { Type = HitResult.Perfect });
         Assert.That(BmsScoreGraph.ScoreAtProgress(4, BmsExScore.CreateProgression(processor.JudgementEvents), 2, 3), Is.EqualTo(2),
             "After two consumed notes the recorded PB has only its first PGREAT; the third note must not advance early.");
     }
@@ -93,12 +97,14 @@ public class BmsBeatorajaReferenceTest
         run.Press(1000);
         run.Release(1500);
         run.Frame(1700, 200, false);
-        Assert.That((mode == BmsLongNoteMode.LongNote ? run.MainResults.Last().Endpoints.Last() : run.Output.SyntheticEndpoints.Last()).TimeOffset, Is.EqualTo(-1500), "JudgeManager uses tailTime - releasetime when the grace period expires.");
+        Assert.That((mode == BmsLongNoteMode.LongNote ? run.MainResults.Last().Endpoints.Last() : run.Output.SyntheticEndpoints.Last()).TimeOffset, Is.EqualTo(-1500),
+            "JudgeManager uses tailTime - releasetime when the grace period expires.");
     }
 
     [Test]
     public void ExactEarlySearchLimitDoesNotCauseEmptyPoor(
-        [Values(BmsLayoutVariant.Bms5K, BmsLayoutVariant.Bme7K, BmsLayoutVariant.Popn9K)] BmsLayoutVariant layout,
+        [Values(BmsLayoutVariant.Bms5K, BmsLayoutVariant.Bme7K, BmsLayoutVariant.Popn9K)]
+        BmsLayoutVariant layout,
         [Values(499.999, 500, 500.001)] double pressTime)
     {
         var candidate = new BmsJudgementCandidate(1000, 1000, 1, BmsJudgementProfileProvider.RateForRank(layout, 2), false);
@@ -136,8 +142,11 @@ public class BmsBeatorajaReferenceTest
     [TestCase(BmsLongNoteMode.HellChargeNote)]
     public void ScratchChargeTailWaitsForReversePress(BmsLongNoteMode mode)
     {
-        var note = new BmsLongNote { StartTime = 1000, Duration = 1000, Column = 0,
-            Beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, Rank = 2, LockedLongNoteMode = mode } };
+        var note = new BmsLongNote
+        {
+            StartTime = 1000, Duration = 1000, Column = 0,
+            Beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, Rank = 2, LockedLongNoteMode = mode }
+        };
         var run = new BmsLongNoteTestContext(note);
         run.Press(1000);
         run.Release(2000);
@@ -161,11 +170,11 @@ public class BmsBeatorajaReferenceTest
     {
         // Keep checking the executed Java window rows independently of its integer EXRANK conversion.
         var table = BmsJudgementProfileProvider.GetTable(layout, 1, rate, false);
+
         foreach (var direction in new[] { -1, 1 })
         {
             Assert.That(table.ResultForOffset(direction * pgreat), Is.EqualTo(HitResult.Perfect));
             Assert.That(table.ResultForOffset(direction * (pgreat + 0.001)), Is.EqualTo(HitResult.Great));
         }
     }
-
 }

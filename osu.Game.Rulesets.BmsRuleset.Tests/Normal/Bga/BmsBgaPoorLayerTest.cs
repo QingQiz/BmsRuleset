@@ -9,9 +9,9 @@ using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
+using osu.Game.Rulesets.BmsRuleset.Tests.Normal.BeatmapTest.Decoding;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
-using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 
@@ -40,6 +40,9 @@ public partial class BmsBgaPoorLayerTest
             Bga = new BmsBgaTimeline(new Dictionary<int, string> { [0] = "poor.png" },
                 new Dictionary<int, BmsBgaDefinition>(), [], [], BmsPoorBgaMode.Replace),
         };
+        foreach (var note in beatmap.HitObjects)
+            note.Beatmap = beatmap;
+
         ruleset = new TestDrawableRuleset(beatmap);
         scoreProcessor = new BmsScoreProcessor { Clock = ruleset.FrameStableClock };
         scoreProcessor.ApplyBeatmap(beatmap);
@@ -68,10 +71,10 @@ public partial class BmsBgaPoorLayerTest
     [Test]
     public void TestBmsonStaticEventReplacesTriggeredAnimation()
     {
-        var bytes = osu.Game.Rulesets.BmsRuleset.Tests.Normal.BeatmapTest.Decoding.BmsonParserTest.Chart(events: """
-            ,"bga":{"bga_header":[{"id":1,"name":"layer.png"}],
-            "layer_events":[{"y":0,"id":1,"condition":"play"},{"y":720,"id":1}]}
-            """);
+        var bytes = BmsonParserTest.Chart(events: """
+                                                  ,"bga":{"bga_header":[{"id":1,"name":"layer.png"}],
+                                                  "layer_events":[{"y":0,"id":1,"condition":"play"},{"y":720,"id":1}]}
+                                                  """);
         setTimeline(BmsonParser.Parse(bytes).Bga);
         advanceTo(0);
         advanceTo(1000);
@@ -87,11 +90,11 @@ public partial class BmsBgaPoorLayerTest
     [Test]
     public void TestBmsonPoorSequenceKeepsItsDurationAndClearsOnSeek()
     {
-        var bytes = osu.Game.Rulesets.BmsRuleset.Tests.Normal.BeatmapTest.Decoding.BmsonParserTest.Chart(events: """
-            ,"bga":{"bga_header":[{"id":1,"name":"poor.png"}],
-            "bga_sequence":[{"id":2,"sequence":[{"time":0,"id":1},{"time":900}]}],
-            "poor_events":[{"y":0,"id":2}]}
-            """);
+        var bytes = BmsonParserTest.Chart(events: """
+                                                  ,"bga":{"bga_header":[{"id":1,"name":"poor.png"}],
+                                                  "bga_sequence":[{"id":2,"sequence":[{"time":0,"id":1},{"time":900}]}],
+                                                  "poor_events":[{"y":0,"id":2}]}
+                                                  """);
         setTimeline(BmsonParser.Parse(bytes).Bga);
         advanceTo(0);
         advanceTo(1000);
@@ -134,7 +137,7 @@ public partial class BmsBgaPoorLayerTest
         if (hasCombo)
             applyResult(0, HitResult.Perfect);
 
-        scoreProcessor.RegisterEmptyPoor(1000, 2000, 1);
+        scoreProcessor.ApplyTestEmptyPoor(1000, 2000, 1);
 
         Assert.That(layer(BmsBgaLayer.Poor).Alpha, Is.EqualTo(hasCombo ? 0 : 1));
     }
@@ -190,7 +193,7 @@ public partial class BmsBgaPoorLayerTest
     {
         applyResult(0, HitResult.Ok);
         advanceTo(1400);
-        scoreProcessor.RegisterEmptyPoor(1400, 2000, 1);
+        scoreProcessor.ApplyTestEmptyPoor(1400, 2000, 1);
         advanceTo(1501);
         Assert.That(layer(BmsBgaLayer.Poor).Alpha, Is.EqualTo(1));
 
@@ -209,7 +212,7 @@ public partial class BmsBgaPoorLayerTest
         advanceTo(1200);
         applyResult(1, HitResult.Perfect);
         advanceTo(1400);
-        scoreProcessor.RegisterEmptyPoor(1400, 2000, 1);
+        scoreProcessor.ApplyTestEmptyPoor(1400, 2000, 1);
         advanceTo(1501);
 
         Assert.That(layer(BmsBgaLayer.Poor).Alpha, Is.Zero);
@@ -219,9 +222,9 @@ public partial class BmsBgaPoorLayerTest
     public void TestSyntheticLongNotePoorTriggersLayer([Values] BmsLongNoteEndpointKind kind)
     {
         applyResult(0, HitResult.Perfect);
-        var longNote = new BmsLongNote { StartTime = 2000, Duration = 500, Column = 1, Beatmap = beatmap };
+        var longNote = new BmsLongNote { StartTime = 2000, Duration = 500, Column = 1, Beatmap = beatmap, Mode = BmsLongNoteMode.ChargeNote };
 
-        scoreProcessor.ApplySyntheticLongNoteEndpoint(new BmsLongNoteEndpointResult(longNote, kind, 2000, 1, HitResult.Meh));
+        scoreProcessor.ApplyTestSyntheticEndpoint(new BmsLongNoteEndpointResult(longNote, kind, 2000, 1, HitResult.Meh));
 
         Assert.That(layer(BmsBgaLayer.Poor).Alpha, Is.EqualTo(1));
     }
@@ -232,27 +235,27 @@ public partial class BmsBgaPoorLayerTest
         beatmap.LayoutVariant = BmsLayoutVariant.Popn9K;
         scoreProcessor.ApplyBeatmap(beatmap);
         advanceTo(850);
-        scoreProcessor.RegisterNonConsumingJudgement(HitResult.Ok, 850, 1000, 1);
+        scoreProcessor.ApplyTestNonConsumingJudgement(HitResult.Ok, 850, 1000, 1);
         Assert.That(scoreProcessor.ScoringJudgementEventCount, Is.Zero);
         Assert.That(layer(BmsBgaLayer.Poor).Alpha, Is.EqualTo(1));
         advanceTo(1200);
         var note = beatmap.HitObjects[0];
         var suppressed = new BmsJudgementResult(note, note.CreateJudgement()) { Type = HitResult.Meh, SuppressPenalty = true };
-        scoreProcessor.ApplyResult(suppressed);
+        scoreProcessor.ApplyTestResult(suppressed);
         Assert.That(getDisplayField<double>("poorLayerUntil"), Is.EqualTo(1350));
         advanceTo(1350);
         Assert.That(layer(BmsBgaLayer.Poor).Alpha, Is.EqualTo(1));
         advanceTo(1351);
         Assert.That(layer(BmsBgaLayer.Poor).Alpha, Is.Zero);
         scoreProcessor.RevertResult(suppressed);
-        scoreProcessor.ApplyResult(suppressed);
+        scoreProcessor.ApplyTestResult(suppressed);
         Assert.That(layer(BmsBgaLayer.Poor).Alpha, Is.Zero, "suppressed replay must not restart an expired poor layer");
         advanceTo(800);
         scoreProcessor.RevertResult(suppressed);
         scoreProcessor.ResetReplayState();
         Assert.That(layer(BmsBgaLayer.Poor).Alpha, Is.Zero);
         advanceTo(850);
-        scoreProcessor.RegisterNonConsumingJudgement(HitResult.Ok, 850, 1000, 1);
+        scoreProcessor.ApplyTestNonConsumingJudgement(HitResult.Ok, 850, 1000, 1);
         Assert.That(layer(BmsBgaLayer.Poor).Alpha, Is.EqualTo(1));
         advanceTo(1000);
         applyResult(0, HitResult.Perfect);
@@ -269,11 +272,13 @@ public partial class BmsBgaPoorLayerTest
     {
         var events = new BmsBgaEvent[130];
         var opacityEvents = new BmsBgaOpacityEvent[130];
+
         for (var i = 0; i < events.Length; i++)
         {
             events[i] = new BmsBgaEvent(1001 + i, i, (ushort)(i + 1), BmsBgaLayer.Base, i);
             opacityEvents[i] = new BmsBgaOpacityEvent(1001 + i, i, BmsBgaLayer.Base, (i + 1) / 130f, i);
         }
+
         typeof(BmsBgaDisplay).GetField("events", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(display, events);
         typeof(BmsBgaDisplay).GetField("opacityEvents", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(display, opacityEvents);
 
@@ -302,7 +307,7 @@ public partial class BmsBgaPoorLayerTest
     private void applyResult(int index, HitResult type)
     {
         var note = beatmap.HitObjects[index];
-        scoreProcessor.ApplyResult(new JudgementResult(note, note.CreateJudgement()) { Type = type });
+        scoreProcessor.ApplyTestResult(new BmsJudgementResult(note, note.CreateJudgement()) { Type = type });
     }
 
     private Container layer(BmsBgaLayer layer) => getDisplayField<Dictionary<BmsBgaLayer, Container>>("layerHosts")[layer];

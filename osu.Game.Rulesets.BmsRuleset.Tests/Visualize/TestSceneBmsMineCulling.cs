@@ -46,13 +46,18 @@ public partial class TestSceneBmsMineCulling : BmsPlayerTestScene
         AddStep("seek before mine", () =>
         {
             mine = ((BmsBeatmap)Player.GameplayState.Beatmap).HitObjects.OfType<BmsLandmine>().Single();
+            Player.GameplayClockContainer.Stop();
             Player.GameplayClockContainer.Seek(4800);
         });
-        AddStep("freeze clock", () => Player.GameplayClockContainer.Stop());
+        AddUntilStep("clock reached mine approach", () => Player.DrawableRuleset.FrameStableClock.CurrentTime == 4800);
         AddUntilStep("mine alive", () =>
         {
-            drawable = Playfield.AllColumnAliveObjects().OfType<DrawableBmsHitObject>().SingleOrDefault(d => d.HitObject == mine)!;
-            return drawable != null;
+            var candidate = Playfield.AllColumnAliveObjects().OfType<DrawableBmsHitObject>().SingleOrDefault(d => d.HitObject == mine);
+            if (candidate == null)
+                return false;
+
+            drawable = candidate;
+            return true;
         });
         AddUntilStep("mine visible", () => drawable.IsPresent);
     }
@@ -67,8 +72,12 @@ public partial class TestSceneBmsMineCulling : BmsPlayerTestScene
         AddStep("bring mine back", () => mine.ScrollPositionAtStartTime = Playfield.ScrollController.CurrentScrollPosition + 100);
         AddUntilStep("mine visible again", () =>
         {
-            drawable = Playfield.AllColumnAliveObjects().OfType<DrawableBmsHitObject>().SingleOrDefault(d => d.HitObject == mine)!;
-            return drawable?.IsPresent == true;
+            var candidate = Playfield.AllColumnAliveObjects().OfType<DrawableBmsHitObject>().SingleOrDefault(d => d.HitObject == mine);
+            if (candidate == null)
+                return false;
+
+            drawable = candidate;
+            return drawable.IsPresent;
         });
         AddAssert("position refreshed on return", () => drawable.Y < 0 && drawable.Y > -drawable.Parent!.DrawHeight);
         AddStep("move mine above viewport", () => mine.ScrollPositionAtStartTime = 1_000_000);

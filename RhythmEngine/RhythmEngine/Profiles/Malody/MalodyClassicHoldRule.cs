@@ -27,7 +27,7 @@ internal sealed class MalodyClassicHoldRule(TimingWindows windows, long headDead
 
     public IEnumerable<ScoringOpportunity> GetScoringOpportunities(ChartNote note)
     {
-        yield return new ScoringOpportunity(note.Id, NoteParts.HEAD, note.StartTime, 1000);
+        yield return new ScoringOpportunity(note.Id, NoteParts.HEAD, 1000);
     }
 
     public InputCandidate? GetCandidate(NoteContext context, InputEvent input, int noteIndex)
@@ -45,6 +45,7 @@ internal sealed class MalodyClassicHoldRule(TimingWindows windows, long headDead
     public NoteUpdate ApplyInput(NoteContext context, InputEvent input)
     {
         var state = (MalodyHoldState)context.State;
+
         if (!state.HeadResolved)
         {
             var offset = context.Time - context.Note.StartTime;

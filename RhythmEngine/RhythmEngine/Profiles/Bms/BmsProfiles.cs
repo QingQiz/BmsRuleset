@@ -90,6 +90,11 @@ public static partial class BmsProfiles
         (BmsResults.PGREAT, 2, 2, ComboChange.Increment), (BmsResults.GREAT, 1, 1, ComboChange.Increment),
         (BmsResults.GOOD, 0, 0, ComboChange.Increment), (BmsResults.BAD, 0, 0, ComboChange.Reset), (BmsResults.POOR, 0, 0, ComboChange.Reset));
 
+    private static readonly ImmutableHashSet<ResultId> empty_poor_results = [BmsResults.EMPTY_POOR];
+    private static readonly ImmutableHashSet<ResultId> non_consuming_results = [BmsResults.EMPTY_POOR, BmsResults.BAD];
+    private static readonly ImmutableHashSet<ResultId> bad_results = [BmsResults.BAD];
+    private static readonly ImmutableHashSet<ResultId> recovery_results = [BmsResults.PGREAT, BmsResults.GREAT, BmsResults.GOOD];
+
     public static CompiledProfile CreateBeatoraja(KeyChart source, BmsOptions? options = null) => compile(source, options ?? new BmsOptions(), false);
 
     public static CompiledProfile CreateLr2(KeyChart source, BmsOptions? options = null) => compile(source, options ?? new BmsOptions(), true);
@@ -100,10 +105,13 @@ public static partial class BmsProfiles
         if (!Enum.IsDefined(options.Rank) || !Enum.IsDefined(options.Gauge) || !Enum.IsDefined(options.Selection))
             throw new ArgumentOutOfRangeException(nameof(options));
 
+        if (lr2 && options.Rank == BmsRank.VeryEasy)
+            throw new NotSupportedException("The LR2 reference has no VeryEasy timing table.");
+
         if (options.Selection == BmsSelection.Default)
             options = options with { Selection = lr2 ? BmsSelection.Oldest : BmsSelection.Combo };
 
-        var chart = source.Compile(note => createRule(note, options.Rank, lr2));
+        var chart = compileChart(source, options.Rank, lr2);
         var score = new ScoreConfiguration(new ScoreState(), (state, context) => ProfileSupport.Accumulate(state, context, values),
             plan => plan.MaximumAccuracy);
         var health = createHealth(source, chart.ScorePlan, options, lr2);
@@ -122,10 +130,20 @@ public static partial class BmsProfiles
                 : ["Seven-key judgement and gauge rules; five-key and PMS tables are separate modes and are not selected implicitly."]);
 
         return new CompiledProfile(chart, new SessionConfiguration(id, score, health,
-            context =>
-            {
-                return SelectCandidates(context, chart, options.Selection);
-            }), descriptor);
+            context => SelectCandidates(context, chart, options.Selection)), descriptor);
+    }
+
+    // Compilation lookups must not be retained by the runtime arbitration closure.
+    private static Chart compileChart(KeyChart source, BmsRank rank, bool lr2)
+    {
+        var rules = new Dictionary<(KeyNoteKind Kind, bool Directional), INoteRule>();
+        return source.Compile(note =>
+        {
+            var key = (note.Kind, note.Directional);
+            if (!rules.TryGetValue(key, out var rule))
+                rules.Add(key, rule = createRule(note, rank, lr2));
+            return rule;
+        });
     }
 
     private static InputCandidate? selectCandidate(ImmutableArray<InputCandidate> candidates, BmsSelection selection, Chart chart)
@@ -191,43 +209,46 @@ public static partial class BmsProfiles
         if (lr2 && note.Kind is KeyNoteKind.ReleaseHold or KeyNoteKind.SustainHold)
             throw ProfileSupport.Unsupported("LR2", note.Kind);
 
-        var windows = createWindows(rank, note.Directional, false, lr2);
-        var tailWindows = createWindows(rank, note.Directional, true, lr2);
+        var windows = note.Kind == KeyNoteKind.Mine ? null : createWindows(rank, note.Directional, false, lr2);
+        var tailWindows = note.Kind is KeyNoteKind.Hold or KeyNoteKind.ReleaseHold or KeyNoteKind.SustainHold
+            ? createWindows(rank, note.Directional, true, lr2)
+            : null;
         return CreateRule(note, windows, tailWindows, new BmsRuleOptions(
             RetainResolvedHeads: !lr2, ImmediateBadHead: lr2, ShareLateBad: lr2));
     }
 
-    public static INoteRule CreateRule(KeyNote note, TimingWindows windows, TimingWindows tailWindows, BmsRuleOptions options)
+    public static INoteRule CreateRule(KeyNote note, TimingWindows? windows, TimingWindows? tailWindows, BmsRuleOptions options)
     {
-        var empty = windows.Entries.FirstOrDefault(w => w.Result == BmsResults.EMPTY_POOR);
-        var bad = windows.Entries.Single(w => w.Result == BmsResults.BAD);
-        var ghosts = options.RetainResolvedHeads && !options.NonConsumingBad && empty.Result != null ? new TimingWindows([empty]) : null;
-        var priority = new Func<ResultId, int>(result => result == BmsResults.EMPTY_POOR ? empty_poor_priority : 1);
-        var nonResolving = options.NonConsumingBad ? ImmutableHashSet.Create(BmsResults.EMPTY_POOR, BmsResults.BAD) : ImmutableHashSet.Create(BmsResults.EMPTY_POOR);
-        var recovery = ImmutableHashSet.Create(BmsResults.PGREAT, BmsResults.GREAT, BmsResults.GOOD);
-
         if (note.Kind == KeyNoteKind.Mine)
             return new MineRule(0, 0, BmsResults.MINE_HIT, BmsResults.MINE_AVOIDED, options.MineOrder, acceptsInput: false);
 
+        ArgumentNullException.ThrowIfNull(windows);
+        var empty = windows.Entries.FirstOrDefault(w => w.Result == BmsResults.EMPTY_POOR);
+        var headDeadline = options.HeadDeadline ?? windows.Entries.Single(w => w.Result == BmsResults.BAD).Late;
+        var ghosts = options.RetainResolvedHeads && !options.NonConsumingBad && empty.Result != null ? new TimingWindows([empty]) : null;
+        var nonResolving = options.NonConsumingBad ? non_consuming_results : empty_poor_results;
+
         if (note.Kind == KeyNoteKind.Tap)
         {
-            return new TapRule(new TapConfiguration(windows, bad.Late, BmsResults.POOR, 2,
-                NonResolvingResults: nonResolving, ResolvedWindows: ghosts, CandidatePriority: priority,
+            return new TapRule(new TapConfiguration(windows, headDeadline, BmsResults.POOR, 2,
+                NonResolvingResults: nonResolving, ResolvedWindows: ghosts, CandidatePriority: candidatePriority,
                 ShareInput: options.ShareLateBad ? (result, offset) => result == BmsResults.BAD && offset > 0 : null,
-                SuppressRepeatedMistakes: options.NonConsumingBad, RecoveringResults: recovery, PassiveOrder: options.PassiveOrder));
+                SuppressRepeatedMistakes: options.NonConsumingBad, RecoveringResults: recovery_results, PassiveOrder: options.PassiveOrder));
         }
 
         if (note.Kind is not (KeyNoteKind.Hold or KeyNoteKind.ReleaseHold or KeyNoteKind.SustainHold))
             throw ProfileSupport.Unsupported("BMS", note.Kind);
 
+        ArgumentNullException.ThrowIfNull(tailWindows);
         var aggregate = note.Kind == KeyNoteKind.Hold;
-        var config = new HoldConfiguration(windows, tailWindows, options.HeadDeadline ?? bad.Late, options.TailDeadline ?? tailWindows.Entries[^1].Late,
+        var config = new HoldConfiguration(windows, tailWindows, headDeadline, options.TailDeadline ?? tailWindows.Entries[^1].Late,
             BmsResults.POOR, BmsResults.PGREAT, aggregate ? BmsResults.BAD : BmsResults.POOR, aggregate ? 0 : 2, 2,
             aggregate ? HoldEndMode.ReleaseOrAutomatic : HoldEndMode.Release, HoldDropMode.Resolve,
             evaluation =>
             {
                 var result = evaluation.TailResult;
                 var offset = evaluation.TailOffset;
+
                 if (evaluation.Resolution is HoldResolution.Timeout or HoldResolution.MissedHead)
                     result = BmsResults.POOR;
                 else if (aggregate)
@@ -243,24 +264,26 @@ public static partial class BmsProfiles
             })
         {
             NonResolvingHeadResults = nonResolving,
-            TerminalHeadResults = options.ImmediateBadHead ? ImmutableHashSet.Create(BmsResults.BAD) : ImmutableHashSet<ResultId>.Empty,
+            TerminalHeadResults = options.ImmediateBadHead ? bad_results : ImmutableHashSet<ResultId>.Empty,
             TailOnOppositeControl = note.Directional && !aggregate,
             ReleaseByOwner = note.Directional,
-            CandidatePriority = priority,
+            CandidatePriority = candidatePriority,
             ResolvedHeadWindows = ghosts,
             ReleaseGrace = options.ReleaseGrace,
-            DeferredReleaseResults = ImmutableHashSet.Create(BmsResults.BAD),
+            DeferredReleaseResults = bad_results,
             SuppressRepeatedMistakes = options.NonConsumingBad,
-            RecoveringHeadResults = recovery,
+            RecoveringHeadResults = recovery_results,
             AutomaticEndOffset = 1,
             AutomaticTailUsesHeadOffset = aggregate,
             PassiveOrder = options.PassiveOrder,
             Balance = note.Kind == KeyNoteKind.SustainHold
-                ? new HoldBalance(Time.FromMilliseconds(200), BmsResults.SUSTAIN_GAIN, BmsResults.SUSTAIN_LOSS, ImmutableHashSet.Create(BmsResults.PGREAT, BmsResults.GREAT, BmsResults.GOOD))
+                ? new HoldBalance(Time.FromMilliseconds(200), BmsResults.SUSTAIN_GAIN, BmsResults.SUSTAIN_LOSS, recovery_results)
                 : null,
         };
         return new HoldRule(config);
     }
+
+    private static int candidatePriority(ResultId result) => result == BmsResults.EMPTY_POOR ? empty_poor_priority : 1;
 
     private static TimingWindows createWindows(BmsRank rank, bool directional, bool tail, bool lr2)
     {
@@ -318,12 +341,14 @@ public static partial class BmsProfiles
             BmsGauge.GradeHard => lr2 ? [0.1, 0.1, 0.05, -6, -10, -2] : [0.15, 0.12, 0.03, -3, -6, -3],
             _ => lr2 ? [0.1, 0.1, 0.05, -12, -20, -2] : [0.15, 0.06, 0, -5, -10, -5],
         };
+
         if (!lr2)
         {
             // GrooveGauge freezes float coefficients after applying its chart-wide modifier.
             for (var i = 0; i < deltas.Length; i++)
             {
                 var increment = (float)deltas[i];
+
                 if (increment > 0)
                 {
                     if (normal)
@@ -348,12 +373,16 @@ public static partial class BmsProfiles
                 return 0;
 
             var result = context.Event.Result;
+
             if (result == BmsResults.MINE_HIT)
+            {
                 return lr2
                     ? -mineDamage[context.Event.NoteId] * 0.5
                     : (float)context.Health.Value - (float)mineDamage[context.Event.NoteId] - context.Health.Value;
+            }
+
             if (result == BmsResults.MINE_AVOIDED || (context.Event.Part != NoteParts.EMPTY && context.Event.Part != NoteParts.BODY
-                                                                           && !scoringParts.Contains((context.Event.NoteId, context.Event.Part))))
+                                                                                            && !scoringParts.Contains((context.Event.NoteId, context.Event.Part))))
                 return 0;
 
             var index = result switch

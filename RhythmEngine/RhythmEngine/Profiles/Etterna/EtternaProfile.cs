@@ -25,7 +25,7 @@ public static class EtternaProfile
         var timeline = new EtternaSearchTimeline(source);
         var holdIntervals = source.Notes.Where(n => n.Kind is KeyNoteKind.Hold or KeyNoteKind.Roll)
             .GroupBy(n => n.Lane).ToImmutableDictionary(g => g.Key, g => g.ToImmutableArray());
-        var chart = source.Compile(note => new EtternaNoteRule(createRule(note, windows), timeline, timeline.RowAt(note.StartTime)));
+        var chart = compileChart(source, windows, timeline);
         var lifeDifficulty = (float)options.LifeDifficulty;
         var health = HealthRules.LatchedGauge(0, 1, 0.5, context =>
         {
@@ -52,12 +52,30 @@ public static class EtternaProfile
         {
             var activeHold = holdIntervals.TryGetValue(context.Input.Lane, out var intervals)
                              && intervals.Any(n => n.StartTime <= context.Input.Time && n.EndTime > context.Input.Time);
-            var eligible = context.Candidates.Where(c => !c.Shared).ToArray();
-            var row = timeline.RowAt(context.Input.Time);
-            InputCandidate? previous = eligible.Where(c => rowOf(c) < row).OrderByDescending(c => c.StartTime)
-                .ThenBy(c => c.NoteIndex).Select(c => (InputCandidate?)c).FirstOrDefault();
-            InputCandidate? next = eligible.Where(c => rowOf(c) >= row).OrderBy(c => c.StartTime)
-                .ThenBy(c => c.NoteIndex).Select(c => (InputCandidate?)c).FirstOrDefault();
+            var search = timeline.SearchAt(context.Input.Time);
+            InputCandidate? previous = null;
+            InputCandidate? next = null;
+
+            foreach (var candidate in context.Candidates)
+            {
+                if (candidate.Shared)
+                    continue;
+
+                var row = ((EtternaNoteRule)chart.Notes[candidate.NoteIndex].Rule).Row;
+                if (candidate.Priority != 0 && (row < search.Row - search.Radius || row >= search.Row + search.Radius))
+                    continue;
+
+                if (row < search.Row)
+                {
+                    if (previous is not { } priorCandidate || candidate.StartTime > priorCandidate.StartTime
+                                                           || (candidate.StartTime == priorCandidate.StartTime && candidate.NoteIndex < priorCandidate.NoteIndex))
+                        previous = candidate;
+                }
+                else if (next is not { } nextCandidate || candidate.StartTime < nextCandidate.StartTime
+                                                       || (candidate.StartTime == nextCandidate.StartTime && candidate.NoteIndex < nextCandidate.NoteIndex))
+                    next = candidate;
+            }
+
             var target = previous is { } before && next is { } after
                 ? source.Notes[before.NoteIndex].Kind == KeyNoteKind.Mine || Math.Abs(before.Offset) >= Math.Abs(after.Offset) ? next : previous
                 : previous ?? next;
@@ -66,8 +84,6 @@ public static class EtternaProfile
                 target = null;
 
             return target is { } chosen ? [.. context.Candidates.Where(c => c.Shared), chosen] : [.. context.Candidates.Where(c => c.Shared)];
-
-            int rowOf(InputCandidate candidate) => ((EtternaNoteRule)chart.Notes[candidate.NoteIndex].Rule).Row;
         }), descriptor);
     }
 
@@ -98,27 +114,38 @@ public static class EtternaProfile
         return sign * y;
     }
 
-    private static INoteRule createRule(KeyNote note, TimingWindows windows)
+    private static Chart compileChart(KeyChart source, TimingWindows windows, EtternaSearchTimeline timeline)
     {
-        if (note.Kind == KeyNoteKind.Mine)
+        var rules = new Dictionary<KeyNoteKind, INoteRule>();
+        return source.Compile(note =>
+        {
+            if (!rules.TryGetValue(note.Kind, out var rule))
+                rules.Add(note.Kind, rule = createRule(note.Kind, windows));
+            return new EtternaNoteRule(rule, timeline.RowAt(note.StartTime));
+        });
+    }
+
+    private static INoteRule createRule(KeyNoteKind kind, TimingWindows windows)
+    {
+        if (kind == KeyNoteKind.Mine)
         {
             return new MineRule(Time.FromMilliseconds(75), Time.FromMilliseconds(75), EtternaResults.MINE_HIT, EtternaResults.MINE_AVOIDED, shareInput: false,
                 expiryWindow: Time.FromMilliseconds(180));
         }
 
-        if (note.Kind is KeyNoteKind.Tap or KeyNoteKind.Lift)
-            return new TapRule(new TapConfiguration(windows, Time.FromMilliseconds(180), EtternaResults.MISS, 2, note.Kind == KeyNoteKind.Lift));
+        if (kind is KeyNoteKind.Tap or KeyNoteKind.Lift)
+            return new TapRule(new TapConfiguration(windows, Time.FromMilliseconds(180), EtternaResults.MISS, 2, kind == KeyNoteKind.Lift));
 
-        if (note.Kind is not (KeyNoteKind.Hold or KeyNoteKind.Roll))
-            throw ProfileSupport.Unsupported("Etterna", note.Kind);
+        if (kind is not (KeyNoteKind.Hold or KeyNoteKind.Roll))
+            throw ProfileSupport.Unsupported("Etterna", kind);
 
         var tail = ProfileSupport.Symmetric((EtternaResults.HELD, 0));
         return new HoldRule(new HoldConfiguration(windows, tail, Time.FromMilliseconds(180), 0,
             EtternaResults.MISS, EtternaResults.HELD, EtternaResults.LET_GO, 2, 0, HoldEndMode.Automatic, HoldDropMode.Grace,
             evaluation => new NoteEmission(NoteParts.TAIL, evaluation.HeadResult == EtternaResults.MISS ? EtternaResults.MISSED_HOLD : evaluation.TailResult, evaluation.Note.EndTime))
         {
-            Grace = Time.FromMilliseconds(note.Kind == KeyNoteKind.Roll ? 500 : 250),
-            RequiresRetrigger = note.Kind == KeyNoteKind.Roll,
+            Grace = Time.FromMilliseconds(kind == KeyNoteKind.Roll ? 500 : 250),
+            RequiresRetrigger = kind == KeyNoteKind.Roll,
             ContinueAfterMissedHead = true,
             ObserveActiveInput = true,
         });

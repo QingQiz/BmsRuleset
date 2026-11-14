@@ -18,7 +18,6 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Result.Statistic;
 [TestFixture]
 public class BmsGaugeHistoryGraphTest
 {
-
     private static BmsBeatmap createBeatmap(double duration = 2000) => new()
     {
         LayoutVariant = BmsLayoutVariant.Bme7K,
@@ -231,9 +230,10 @@ public class BmsGaugeHistoryGraphTest
     public void TestEmptyPoorFailureLocksExHardSeriesAtZero()
     {
         var processor = new BmsScoreProcessor();
+        processor.ApplyBeatmap(new BmsBeatmap { TotalColumns = 8 });
 
         for (var i = 0; i < 13; i++)
-            processor.RegisterEmptyPoor(1000 + i * 100);
+            processor.ApplyTestEmptyPoor(1000 + i * 100);
 
         var score = new ScoreInfo { Mods = [new BmsModExHardGauge()] };
         processor.PopulateScore(score);

@@ -43,19 +43,24 @@ public partial class TestSceneBmsCourseSelect
         {
             directory = Path.Combine(LocalStorage.GetFullPath(string.Empty), $"dan-result-{courseId}");
             Directory.CreateDirectory(directory);
+
             for (var stage = 0; stage < 3; stage++)
             {
                 var notes = autoGauge ? stage < 2 ? 6 : 2 : 1;
-                File.WriteAllText(Path.Combine(directory, $"stage-{stage}.bms"), $"""
-                    #PLAYER 1
-                    #TITLE Historical Dan {courseId}
-                    #SUBTITLE Stage {stage}
-                    #ARTIST Test
-                    #BPM 120
-                    #PLAYLEVEL 1
-                    #00111:{string.Concat(Enumerable.Repeat("01", notes))}
-                    """);
+                File.WriteAllText(Path.Combine(
+                        directory,
+                        $"stage-{stage}.bms"),
+                    $"""
+                     #PLAYER 1
+                     #TITLE Historical Dan {courseId}
+                     #SUBTITLE Stage {stage}
+                     #ARTIST Test
+                     #BPM 120
+                     #PLAYLEVEL 1
+                     #00111:{string.Concat(Enumerable.Repeat("01", notes))}
+                     """);
             }
+
             import = new BmsFileImporter(Realm, LocalStorage).Import(directory);
         });
         AddUntilStep("historical charts imported", () => import.IsCompleted);
@@ -83,8 +88,8 @@ public partial class TestSceneBmsCourseSelect
                 foreach (var mod in session.Mods.OfType<IApplicableToHealthProcessor>())
                     mod.ApplyToHealthProcessor(health);
                 openings[stage] = health.CurrentGaugeStates.ToArray();
-                foreach (var note in beatmap.HitObjects)
-                    health.RegisterNonConsumingJudgement(HitResult.Meh);
+                for (var i = 0; i < beatmap.HitObjects.Count; i++)
+                    health.ApplyTestNonConsumingJudgement(HitResult.Meh);
                 Assert.That(health.HasPassedAtEnd(), Is.True);
 
                 var score = new Score
@@ -104,6 +109,7 @@ public partial class TestSceneBmsCourseSelect
                 };
                 replays.Add(score.ScoreInfo.ID, BmsTestReplayArchive.RoundTrip(score, legacy: true));
                 session.CompleteCurrentStage(score.ScoreInfo, health.CurrentGaugeStates);
+
                 if (stage + 1 < stages.Length)
                 {
                     session.RequestAdvance();
@@ -120,6 +126,7 @@ public partial class TestSceneBmsCourseSelect
         {
             var gauges = panel.LoadedStatistics!.Gauges;
             Assert.That(gauges.Select(gauge => gauge.Segments.Count), Is.EqualTo(autoGauge ? new[] { 1, 2, 3 } : new[] { 3 }));
+
             foreach (var gauge in gauges)
             {
                 for (var stage = 1; stage < gauge.Segments.Count; stage++)

@@ -50,7 +50,7 @@ public class MalodyNativeConformanceTest
     {
         var source = new KeyChart(1, [new KeyNote(0, 0, ms(1000), ms(1000))]);
         var options = new MalodyOptions(Client: client, Judge: (MalodyJudge)row.GetProperty("rank").GetInt32());
-        var session = MalodyProfile.Create(source, options).CreateSession();
+        var session = MalodyProfile.Create(source, options).CreateRecordingSession();
         var time = ms(1000 + row.GetProperty("offset").GetInt32());
         session.AdvanceTo(time, [new InputEvent(time, 0, true)]);
 
@@ -66,7 +66,7 @@ public class MalodyNativeConformanceTest
     {
         var source = new KeyChart(1, [new KeyNote(0, 0, ms(1000), ms(2000), KeyNoteKind.Hold)]);
         var options = new MalodyOptions(Client: client, Judge: (MalodyJudge)row.GetProperty("rank").GetInt32());
-        var session = MalodyProfile.Create(source, options).CreateSession();
+        var session = MalodyProfile.Create(source, options).CreateRecordingSession();
         var time = ms(row.GetProperty("time").GetInt32());
         session.AdvanceTo(time, [new InputEvent(ms(1000), 0, true), new InputEvent(time, 0, false)]);
 
@@ -80,7 +80,7 @@ public class MalodyNativeConformanceTest
     public void TicksMatchOriginalInstructionsIncludingTheExactTail(MalodyClient client)
     {
         var source = new KeyChart(1, [new KeyNote(0, 0, ms(1000), ms(2000), KeyNoteKind.Hold)]);
-        var session = MalodyProfile.Create(source, new MalodyOptions(Client: client)).CreateSession();
+        var session = MalodyProfile.Create(source, new MalodyOptions(Client: client)).CreateRecordingSession();
         session.AdvanceTo(ms(2100), [new InputEvent(ms(1000), 0, true)]);
         var expected = read("ticks", client);
         Assert.That(session.GetEventsSince(0).Where(e => e.Result.Value == "hold-tick").Select(e => e.Time),
@@ -94,7 +94,7 @@ public class MalodyNativeConformanceTest
     {
         var rows = read("scores", client).Where(row => row.GetProperty("rank").GetInt32() == (int)judge).ToArray();
         var source = new KeyChart(1, rows.Select((_, i) => new KeyNote(i, 0, ms((i + 1) * 1000), ms((i + 1) * 1000))));
-        var session = MalodyProfile.Create(source, new MalodyOptions(Client: client, Judge: judge, FailOnEmpty: false)).CreateSession();
+        var session = MalodyProfile.Create(source, new MalodyOptions(Client: client, Judge: judge, FailOnEmpty: false)).CreateRecordingSession();
 
         foreach (var row in rows)
         {
@@ -127,7 +127,7 @@ public class MalodyNativeConformanceTest
                 return new KeyNote(i, 0, start, end, end > start ? KeyNoteKind.Hold : KeyNoteKind.Tap);
             }));
             var session = MalodyProfile.Create(source, new MalodyOptions(Client: client,
-                Judge: (MalodyJudge)row.GetProperty("rank").GetInt32())).CreateSession();
+                Judge: (MalodyJudge)row.GetProperty("rank").GetInt32())).CreateRecordingSession();
             var inputs = row.GetProperty("inputs").EnumerateArray().Select(input =>
                 new InputEvent(ms(input.GetProperty("time").GetInt32()), 0, input.GetProperty("pressed").GetBoolean())).ToArray();
             session.AdvanceTo(ms(row.GetProperty("until").GetInt32()), inputs);

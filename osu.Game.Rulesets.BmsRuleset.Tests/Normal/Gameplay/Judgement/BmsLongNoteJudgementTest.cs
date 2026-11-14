@@ -1,16 +1,14 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
-using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.Presentation;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.LnHelper;
-using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
 
@@ -19,13 +17,12 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
 [TestFixture]
 public class BmsLongNoteJudgementTest
 {
-
     [Test]
     public void TestSyntheticHeadUsesHeadOffset()
     {
         var (processor, source) = createLongNoteProcessor(BmsLongNoteMode.HellChargeNote);
 
-        processor.ApplySyntheticLongNoteEndpoint(endpoint(source, BmsLongNoteEndpointKind.Head, 1017, HitResult.Great, 1.5));
+        processor.ApplyTestSyntheticEndpoint(endpoint(source, BmsLongNoteEndpointKind.Head, 1017, HitResult.Great, 1.5));
 
         var hitEvent = processor.HitEvents.Single();
         Assert.Multiple(() =>
@@ -42,7 +39,7 @@ public class BmsLongNoteJudgementTest
     {
         var (processor, source) = createLongNoteProcessor(BmsLongNoteMode.ChargeNote);
 
-        processor.ApplySyntheticLongNoteEndpoint(endpoint(source, BmsLongNoteEndpointKind.Tail, eventTime, HitResult.Great, 0.75));
+        processor.ApplyTestSyntheticEndpoint(endpoint(source, BmsLongNoteEndpointKind.Tail, eventTime, HitResult.Great, 0.75));
 
         var hitEvent = processor.HitEvents.Single();
         Assert.That(hitEvent.TimeOffset, Is.EqualTo(expectedOffset));
@@ -71,7 +68,7 @@ public class BmsLongNoteJudgementTest
         source.Beatmap = beatmap;
         processor.ApplyBeatmap(bindNotes(beatmap));
 
-        processor.ApplySyntheticLongNoteEndpoint(endpoint(source, BmsLongNoteEndpointKind.Head, 1005, HitResult.Great));
+        processor.ApplyTestSyntheticEndpoint(endpoint(source, BmsLongNoteEndpointKind.Head, 1005, HitResult.Great));
 
         Assert.That(processor.HitEvents.Last().GameplayRate, Is.Not.Null);
         Assert.DoesNotThrow(() => processor.HitEvents.CalculateUnstableRate());
@@ -98,7 +95,7 @@ public class BmsLongNoteJudgementTest
         source.Beatmap = beatmap;
         processor.ApplyBeatmap(bindNotes(beatmap));
 
-        processor.ApplySyntheticLongNoteEndpoint(endpoint(source, BmsLongNoteEndpointKind.Tail, 1505, HitResult.Ok));
+        processor.ApplyTestSyntheticEndpoint(endpoint(source, BmsLongNoteEndpointKind.Tail, 1505, HitResult.Ok));
 
         Assert.That(processor.Combo.Value, Is.Zero);
     }
@@ -124,7 +121,7 @@ public class BmsLongNoteJudgementTest
         source.Beatmap = beatmap;
         processor.ApplyBeatmap(bindNotes(beatmap));
 
-        processor.ApplySyntheticLongNoteEndpoint(endpoint(source, BmsLongNoteEndpointKind.Tail, 1505, HitResult.Perfect));
+        processor.ApplyTestSyntheticEndpoint(endpoint(source, BmsLongNoteEndpointKind.Tail, 1505, HitResult.Perfect));
 
         Assert.That(processor.HitEvents.Last().GameplayRate, Is.Not.Null);
         Assert.DoesNotThrow(() => processor.HitEvents.CalculateUnstableRate());
@@ -147,8 +144,8 @@ public class BmsLongNoteJudgementTest
         Assert.DoesNotThrow(() =>
         {
             var endpoint = new BmsNote { StartTime = 2000, Column = 1 };
-            var result = new JudgementResult(endpoint, endpoint.CreateJudgement()) { Type = HitResult.Perfect };
-            processor.ApplyResult(result);
+            var result = new BmsJudgementResult(endpoint, endpoint.CreateJudgement()) { Type = HitResult.Perfect };
+            processor.ApplyTestResult(result);
         });
     }
 
@@ -175,7 +172,7 @@ public class BmsLongNoteJudgementTest
         source.Beatmap = beatmap;
         processor.ApplyBeatmap(bindNotes(beatmap));
 
-        var result = processor.ApplySyntheticLongNoteEndpoint(endpoint(source, BmsLongNoteEndpointKind.Tail, 1505, HitResult.Perfect));
+        var result = processor.ApplyTestSyntheticEndpoint(endpoint(source, BmsLongNoteEndpointKind.Tail, 1505, HitResult.Perfect));
 
         Assert.That(result, Is.Not.Null);
         Assert.That(result.Type, Is.EqualTo(HitResult.Perfect));
@@ -290,13 +287,13 @@ public class BmsLongNoteJudgementTest
         processor.Health.Value = 0.5;
         var source = (BmsLongNote)beatmap.HitObjects[0];
         var endpoint = source.CreateSyntheticEndpoint(1500);
-        var result = new JudgementResult(endpoint, endpoint.CreateJudgement())
+        var result = new BmsJudgementResult(endpoint, endpoint.CreateJudgement())
         {
             Type = HitResult.Meh,
         };
 
         var before = processor.Health.Value;
-        processor.ApplySyntheticLongNoteEndpoint(result);
+        processor.ApplyTestResult(result);
 
         Assert.That(processor.Health.Value, Is.LessThan(before));
     }
@@ -328,12 +325,12 @@ public class BmsLongNoteJudgementTest
         processor.Health.Value = 0.2;
         var source = (BmsLongNote)beatmap.HitObjects[0];
         var endpoint = source.CreateSyntheticEndpoint(1500);
-        var result = new JudgementResult(endpoint, endpoint.CreateJudgement())
+        var result = new BmsJudgementResult(endpoint, endpoint.CreateJudgement())
         {
             Type = HitResult.Perfect,
         };
 
-        processor.ApplySyntheticLongNoteEndpoint(result);
+        processor.ApplyTestResult(result);
 
         Assert.That(processor.Health.Value, Is.GreaterThan(0.2));
     }
@@ -395,12 +392,11 @@ public class BmsLongNoteJudgementTest
         processor.ApplyBeatmap(bindNotes(beatmap));
 
         processor.Health.Value = 0.01;
-        processor.ApplyHellChargeTick(false);
+        processor.ApplyTestBodyTick(false);
 
         Assert.That(processor.Health.Value, Is.Zero);
         Assert.That(processor.HasEverFailed, Is.True);
     }
-
 
     [Test]
     public void TestHellChargeTickClampsAtTwoPercent()
@@ -425,7 +421,7 @@ public class BmsLongNoteJudgementTest
         processor.ApplyBeatmap(bindNotes(beatmap));
 
         processor.Health.Value = 0.005;
-        processor.ApplyHellChargeTick(false);
+        processor.ApplyTestBodyTick(false);
 
         Assert.That(processor.Health.Value, Is.EqualTo(0.02));
     }
@@ -456,7 +452,7 @@ public class BmsLongNoteJudgementTest
 
         processor.Health.Value = 0.5;
         var before = processor.Health.Value;
-        processor.ApplyHellChargeTick(true);
+        processor.ApplyTestBodyTick(true);
 
         Assert.That(processor.Health.Value, Is.GreaterThan(before));
     }
@@ -485,7 +481,7 @@ public class BmsLongNoteJudgementTest
 
         processor.Health.Value = 0.2;
         var before = processor.Health.Value;
-        processor.ApplyHellChargeTick(true);
+        processor.ApplyTestBodyTick(true);
         var after = processor.Health.Value;
         var delta = after - before;
 
@@ -519,7 +515,7 @@ public class BmsLongNoteJudgementTest
 
         processor.Health.Value = 0.5;
         var before = processor.Health.Value;
-        processor.ApplyHellChargeTick(false);
+        processor.ApplyTestBodyTick(false);
         var after = processor.Health.Value;
         var delta = after - before;
 
@@ -552,7 +548,7 @@ public class BmsLongNoteJudgementTest
 
         processor.Health.Value = 0.5;
         var before = processor.Health.Value;
-        processor.ApplyHellChargeTick(false);
+        processor.ApplyTestBodyTick(false);
 
         Assert.That(processor.Health.Value, Is.LessThan(before));
     }
