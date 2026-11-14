@@ -1,32 +1,50 @@
 #nullable enable
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using NUnit.Framework;
+using RhythmEngine.Core;
+using RhythmEngine.Profiles.Bms;
+using RhythmEngine.Profiles.Common;
 using osu.Framework.Graphics;
 using osu.Framework.Timing;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 using osu.Game.Rulesets.Scoring;
-using RhythmEngine.Core;
-using RhythmEngine.Profiles.Bms;
-using RhythmEngine.Profiles.Common;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
 
 [TestFixture]
 public class BmsJudgementEngineTest
 {
+    [TestCase(3000.3779999999997, false)]
+    [TestCase(3000.3779999999997, true)]
+    [TestCase(1000.00075, false)]
+    [TestCase(1000.00075, true)]
+    public void RoundedResultsDoNotPublishBeyondTheHostFrame(double inputTime, bool historicalContext)
+    {
+        var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, Rank = 2 };
+        var note = new BmsNote { Beatmap = beatmap, Column = 1, StartTime = inputTime };
+        double? publishedTime = null;
+        var output = new BmsRecordingJudgementOutput { ResultApplied = (_, frame) => publishedTime = frame.SimulationTime };
+        var engine = new BmsJudgementEngine([note], beatmap.LayoutVariant, 1, output);
+        engine.QueueInput(inputTime, 1, true, false);
+        engine.ProcessFrame(new BmsFrameContext(inputTime, 1), 1,
+            contextAtTime: historicalContext ? time => new BmsFrameContext(time, 1) : null);
+
+        Assert.That(output.GetMainResult(note).Type, Is.EqualTo(HitResult.Perfect));
+        Assert.That(publishedTime, Is.EqualTo(inputTime));
+    }
+
     [Test]
     public void DisabledBadWindowPreservesPassivePoorDeadline()
     {
-        using var windows = BmsJudgementProfileProvider.UseWindowMods([new BmsModNoBad()]);
-        var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, Rank = 2 };
+        var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, Rank = 2, JudgementModifiers = BmsJudgementModifiers.NoBad };
         var note = new BmsNote { Beatmap = beatmap, Column = 1, StartTime = 1000 };
         var output = new BmsRecordingJudgementOutput();
         var engine = new BmsJudgementEngine([note], beatmap.LayoutVariant, 1, output);
@@ -54,17 +72,17 @@ public class BmsJudgementEngineTest
     }
 
     private static IEnumerable<Type> coreTypes => typeof(BmsJudgementEngine).Assembly.GetTypes()
-                                                                            .Where(t => (t.Namespace == typeof(BmsJudgementEngine).Namespace
-                                                                                         || t.Namespace?.StartsWith(typeof(BmsJudgementEngine).Namespace + ".", StringComparison.Ordinal) == true)
-                                                                                        && !t.IsDefined(typeof(CompilerGeneratedAttribute)));
+        .Where(t => (t.Namespace == typeof(BmsJudgementEngine).Namespace
+                     || t.Namespace?.StartsWith(typeof(BmsJudgementEngine).Namespace + ".", StringComparison.Ordinal) == true)
+                    && !t.IsDefined(typeof(CompilerGeneratedAttribute)));
 
     [TestCaseSource(nameof(coreTypes))]
     public void CoreMembersDoNotDependOnDrawablesOrClocks(Type coreType)
     {
         const BindingFlags members = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
         var types = coreType.GetFields(members).Select(f => f.FieldType)
-                            .Concat(coreType.GetMethods(members).SelectMany(m => m.GetParameters().Select(p => p.ParameterType).Append(m.ReturnType)))
-                            .Concat(coreType.GetConstructors(members).SelectMany(c => c.GetParameters().Select(p => p.ParameterType)));
+            .Concat(coreType.GetMethods(members).SelectMany(m => m.GetParameters().Select(p => p.ParameterType).Append(m.ReturnType)))
+            .Concat(coreType.GetConstructors(members).SelectMany(c => c.GetParameters().Select(p => p.ParameterType)));
         Assert.That(types.SelectMany(expand).Where(t => typeof(Drawable).IsAssignableFrom(t) || typeof(IClock).IsAssignableFrom(t)
                                                                                              || t.Namespace?.StartsWith("osu.Game.Rulesets.BmsRuleset.UI", StringComparison.Ordinal) == true),
             Is.Empty);
@@ -302,7 +320,7 @@ public class BmsJudgementEngineTest
         engine.QueueInput(1000 + duration, 1, false, false);
         engine.ProcessFrame(new BmsFrameContext(2000, 1), 2000);
         Assert.That(engine.GetColumn(1).GetNote(note).Parts.Where(p => p.Part == NoteParts.HEAD || p.Part == NoteParts.TAIL)
-                          .All(p => p.Resolved), Is.True);
+            .All(p => p.Resolved), Is.True);
         Assert.That(engine.Session().Score.Score, Is.EqualTo(mode == BmsLongNoteMode.LongNote ? 2 : 4));
         Assert.That(engine.GetColumn(1).GetNote(note).Completed, Is.True);
 

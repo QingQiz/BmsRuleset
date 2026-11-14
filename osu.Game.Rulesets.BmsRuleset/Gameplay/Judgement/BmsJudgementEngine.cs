@@ -2,14 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
-using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
-using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using RhythmEngine.Core;
 using RhythmEngine.Profiles.Bms;
 using RhythmEngine.Profiles.Common;
 using RhythmEngine.Profiles.Patterns;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
+using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 
 namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 
@@ -29,7 +29,7 @@ internal sealed class BmsJudgementEngine
     private readonly ImmutableArray<NoteSnapshot> initialSnapshots;
     private readonly Dictionary<int, BmsLandmineState> mines = [];
     private readonly Dictionary<int, BmsLongNoteEndpointResult> heads = [];
-    private readonly BmsLayoutVariant layout;
+    private readonly BmsJudgementRules rules;
     private readonly Func<BmsHitObject[], (ScoreConfiguration Score, HealthConfiguration Health)>? configurationFactory;
     private JudgementSession? session;
     private bool processing;
@@ -41,7 +41,7 @@ internal sealed class BmsJudgementEngine
         if (definitions.Length == 0 || definitions.Any(d => d.Index < 0) || definitions.Select(d => d.Index).Distinct().Count() != definitions.Length)
             throw new ArgumentException(@"Each judgement column needs a unique non-negative index.", nameof(definitions));
 
-        this.layout = layout;
+        rules = notes.Length > 0 ? BmsEngineRules.ForBeatmap(notes[0].Beatmap) : BmsEngineRules.ForLayout(layout);
         var scratch = layout switch
         {
             BmsLayoutVariant.Bms5K or BmsLayoutVariant.Bms5K2P or BmsLayoutVariant.Bms5KDouble => 5,
@@ -51,7 +51,7 @@ internal sealed class BmsJudgementEngine
         var notesByColumn = notes.Where(n => n is BmsNote or BmsLongNote or BmsLandmine).ToLookup(n => n.Column);
         // The host's chart traversal order is observable when simultaneous results clip a gauge.
         objects = definitions.OrderBy(d => scratch < 0 || d.Index > scratch ? d.Index : d.Index == 0 ? scratch : d.Index - 1)
-                             .SelectMany(d => notesByColumn[d.Index].OrderBy(n => n.StartTime)).ToArray();
+            .SelectMany(d => notesByColumn[d.Index].OrderBy(n => n.StartTime)).ToArray();
         ids = objects.Select((note, id) => (note, id)).ToDictionary(pair => pair.note, pair => pair.id);
         pressed = new int[definitions.Max(d => d.Index) + 1];
         chart = BmsEngineChart.Compile(objects, pressed.Length);
@@ -163,16 +163,15 @@ internal sealed class BmsJudgementEngine
 
     private JudgementSession createSession(BmsJudgementAlgorithm? algorithm)
     {
-        var selected = BmsJudgementProfileProvider.GetBehaviour(layout).Algorithm ?? algorithm;
-        var selection = selected switch
+        var selection = rules.SelectionOverride ?? (algorithm switch
         {
             BmsJudgementAlgorithm.Duration => BmsSelection.Nearest,
             BmsJudgementAlgorithm.Lowest => BmsSelection.Oldest,
             BmsJudgementAlgorithm.Score => BmsSelection.Score,
             _ => BmsSelection.Combo,
-        };
+        });
         var configuration = configurationFactory?.Invoke(objects)
-                            ?? (BmsProfiles.CreateScore(BmsJudgementProfileProvider.EmptyPoorBreaksCombo(layout)), BmsEngineGauge.CreateDefault(objects));
+                            ?? (BmsProfiles.CreateScore(rules.EmptyPoorBreaksCombo), BmsEngineGauge.CreateDefault(objects));
         return new JudgementSession(chart, new SessionConfiguration("bms-ruleset-v1", configuration.Item1, configuration.Item2,
             context => BmsProfiles.SelectCandidates(context, chart, selection)));
     }
@@ -183,7 +182,9 @@ internal sealed class BmsJudgementEngine
         {
             var note = objects[transition.After.Id];
             var output = outputs[note.Column];
-            var step = contextAtTime?.Invoke(transition.Time / 1000.0) ?? frame with { SimulationTime = transition.Time / 1000.0 };
+            // Microsecond rounding must not make the framework revert a result as being ahead of its clock.
+            var eventTime = Math.Min(transition.Time / 1000.0, frame.SimulationTime);
+            var step = contextAtTime?.Invoke(eventTime) ?? frame with { SimulationTime = eventTime };
             snapshots[transition.After.Id] = transition.After;
 
             foreach (var judgement in transition.Judgements)

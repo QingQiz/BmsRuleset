@@ -1,4 +1,5 @@
 #nullable enable
+
 using System.Linq;
 using NUnit.Framework;
 using osu.Game.Beatmaps;
@@ -60,9 +61,9 @@ public class BmsonLayoutTest
             info: $$""", "mode_hint":"{{mode}}" """));
         beatmap.LockedLongNoteMode = BmsLongNoteMode.ChargeNote;
         var note = beatmap.HitObjects.OfType<BmsLongNote>().Single();
-        var windows = BmsJudgementProfileProvider.GetTable(note, false);
-        Assert.That(windows.ResultForOffset(30), Is.EqualTo(HitResult.Perfect));
-        Assert.That(windows.ResultForOffset(31), Is.EqualTo(HitResult.Great));
+        var windows = BmsEngineRules.GetTiming(note, false);
+        Assert.That(windows.HitAt(30), Is.EqualTo(HitResult.Perfect));
+        Assert.That(windows.HitAt(31), Is.EqualTo(HitResult.Great));
         var replay = new BmsAutoGenerator(beatmap).Generate();
         var result = BmsReplaySimulation.Run(beatmap, replay, new ScoreInfo { BeatmapInfo = beatmap.BeatmapInfo });
         Assert.That(result.Judgements.Count(judgement => judgement.Result == HitResult.Perfect), Is.EqualTo(2));

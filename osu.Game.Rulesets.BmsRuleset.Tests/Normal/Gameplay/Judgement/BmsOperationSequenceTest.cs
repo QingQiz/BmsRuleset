@@ -2,15 +2,16 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
+using RhythmEngine.Core;
+using RhythmEngine.Profiles.Bms;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.Scoring;
-using RhythmEngine.Core;
-using RhythmEngine.Profiles.Bms;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
 
@@ -50,7 +51,7 @@ public class BmsOperationSequenceTest
         note.JudgementRate = rate;
         var output = new BmsRecordingJudgementOutput();
         var engine = new BmsJudgementEngine([note], beatmap.LayoutVariant, 1, output);
-        var offset = BmsJudgementProfileProvider.GetTable(beatmap.LayoutVariant, 1, rate, false).SlowWindowFor(HitResult.Ok);
+        var offset = BmsEngineRules.GetTiming(beatmap.LayoutVariant, 1, rate, false).SlowWindowFor(HitResult.Ok);
         var deadline = start + offset;
         double[] times = [deadline - .001, deadline, deadline + .001, deadline + 1];
 
@@ -97,7 +98,7 @@ public class BmsOperationSequenceTest
         var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, Rank = 2 };
         var first = new BmsNote { Beatmap = beatmap, Column = 1, StartTime = 1000 };
         var second = new BmsNote { Beatmap = beatmap, Column = 1, StartTime = 1000 };
-        var inputTime = 1000.001 + BmsJudgementProfileProvider.GetTable(beatmap.LayoutVariant, 1, 2, false).SlowWindowFor(HitResult.Ok);
+        var inputTime = 1000.001 + BmsEngineRules.GetTiming(beatmap.LayoutVariant, 1, 2, false).SlowWindowFor(HitResult.Ok);
         var third = new BmsNote { Beatmap = beatmap, Column = 2, StartTime = inputTime };
         var mine = new BmsLandmine { Beatmap = beatmap, Column = 1, StartTime = inputTime };
         var events = new List<string>();
@@ -220,7 +221,7 @@ public class BmsOperationSequenceTest
             return new BmsJudgementColumnDefinition(column, output);
         }).ToArray();
         var engine = new BmsJudgementEngine(objects, layout, definitions, notes =>
-            (BmsProfiles.CreateScore(BmsJudgementProfileProvider.EmptyPoorBreaksCombo(layout)), health.CreateEngineHealth(notes)));
+            (BmsProfiles.CreateScore(BmsEngineRules.ForBeatmap(beatmap).EmptyPoorBreaksCombo), health.CreateEngineHealth(notes)));
         (double Time, int Column, bool Pressed)[] inputs =
         [
             (1000, 1, true), (1025, 2, true), (1026, 2, false), (1100, 3, true),

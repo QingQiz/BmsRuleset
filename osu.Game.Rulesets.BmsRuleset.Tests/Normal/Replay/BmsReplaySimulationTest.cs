@@ -1,15 +1,17 @@
-#nullable enable
 using System;
 using System.Collections.Generic;
+#nullable enable
 using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using NUnit.Framework;
+using RhythmEngine.Profiles.Bms;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
@@ -87,12 +89,14 @@ public class BmsReplaySimulationTest
             new BmsReplayFrame(1400, BmsAction.Key1), new BmsReplayFrame(3000),
         };
         var dense = new List<BmsReplayFrame>();
+
         for (var i = 0; i < inputs.Length - 1; i++)
         {
             dense.Add(inputs[i]);
             for (var time = inputs[i].Time + 1; time < inputs[i + 1].Time; time++)
                 dense.Add(new BmsReplayFrame(time, inputs[i].Actions.ToArray()));
         }
+
         dense.Add(inputs[^1]);
         var sparseResult = simulate(beatmap, createReplay(inputs));
         var denseResult = simulate(beatmap, createReplay(dense.ToArray()));
@@ -113,7 +117,7 @@ public class BmsReplaySimulationTest
         beatmap.HitObjects.Add(new BmsLongNote { Beatmap = beatmap, Column = 1, StartTime = 1000, Duration = 1000 });
         beatmap.HitObjects.Add(new BmsNote { Beatmap = beatmap, Column = 2, StartTime = 1000 });
         var result = simulate(beatmap, createReplay(new BmsReplayFrame(0), new BmsReplayFrame(1000), new BmsReplayFrame(1500)));
-        var deadline = 1000.001 + BmsJudgementProfileProvider.GetTable(beatmap.LayoutVariant, 1, beatmap.Rank, false).SlowWindowFor(HitResult.Ok);
+        var deadline = 1000.001 + BmsEngineRules.GetTiming(beatmap.LayoutVariant, 1, beatmap.Rank, false).SlowWindowFor(HitResult.Ok);
         Assert.That(result.Judgements.SelectMany(entry => entry.TimingObservations).Single(observation => observation.Kind == BmsTimingObservationKind.LongNoteHead).ActualTime,
             Is.EqualTo(deadline));
     }
@@ -167,6 +171,7 @@ public class BmsReplaySimulationTest
         };
         var sparse = simulate(beatmap, createReplay(inputs));
         var dense = new List<BmsReplayFrame>();
+
         for (var i = 0; i < inputs.Length; i++)
         {
             dense.Add(inputs[i]);
@@ -396,9 +401,10 @@ public class BmsReplaySimulationTest
     }
 
     [Test]
-    public void UsesTheScoresRateAndWindowMods()
+    public void UsesTheScoresRateAndConvertedJudgementConfiguration()
     {
         var beatmap = createBeatmap();
+        beatmap.JudgementModifiers = BmsJudgementModifiers.NoGood;
         beatmap.HitObjects.Add(new BmsNote { Beatmap = beatmap, Column = 1, StartTime = 1000 });
         var result = simulate(beatmap, createReplay(new BmsReplayFrame(1080, BmsAction.Key1)),
             new ScoreInfo { Passed = true, Ruleset = new BmsRuleset().RulesetInfo, Mods = [new BmsModDoubleTime(), new BmsModNoGood()] });
@@ -429,6 +435,7 @@ public class BmsReplaySimulationTest
     {
         foreach (var note in beatmap.HitObjects)
             note.ApplyDefaults(beatmap.ControlPointInfo, beatmap.Difficulty);
+
         if (source == null)
         {
             var last = (BmsReplayFrame)replay.Frames[^1];
@@ -436,6 +443,7 @@ public class BmsReplaySimulationTest
             if (last.Time < endTime)
                 replay.Frames.Add(new BmsReplayFrame(endTime, last.Actions.ToArray()));
         }
+
         var result = BmsReplaySimulation.Run(beatmap, replay, source ?? new ScoreInfo { Passed = true });
         return (result.Judgements, result.Gauges, BmsJudgementEventProjection.CreateTimingHitEvents(result.Judgements));
     }

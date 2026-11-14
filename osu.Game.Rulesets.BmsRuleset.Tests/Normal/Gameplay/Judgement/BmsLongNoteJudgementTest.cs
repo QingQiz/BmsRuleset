@@ -256,10 +256,10 @@ public class BmsLongNoteJudgementTest
     [Test]
     public void TestFastReleaseBeforeTailWindowIsPoor()
     {
-        var tail = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, column: 1, rank: 3, tail: true);
+        var tail = BmsEngineRules.GetTiming(BmsLayoutVariant.Bme7K, column: 1, rank: 3, tail: true);
 
-        Assert.That(tail.ResultForOffset(-500), Is.EqualTo(HitResult.None));
-        Assert.That(tail.IsPastPassivePoorOffset(-500), Is.False);
+        Assert.That(tail.HitAt(-500), Is.EqualTo(HitResult.None));
+        Assert.That(tail.PastDeadline(-500), Is.False);
     }
 
     [Test]
@@ -606,25 +606,25 @@ public class BmsLongNoteJudgementTest
     [Test]
     public void TestScratchTailReleaseUsesScratchTailBadWindow()
     {
-        var tail = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, column: 0, rank: 3, tail: true);
+        var tail = BmsEngineRules.GetTiming(BmsLayoutVariant.Bme7K, column: 0, rank: 3, tail: true);
 
-        Assert.That(tail.ResultForOffset(230), Is.EqualTo(HitResult.Ok));
-        Assert.That(tail.ResultForOffset(231), Is.EqualTo(HitResult.Ok));
-        Assert.That(tail.ResultForOffset(290), Is.EqualTo(HitResult.Ok));
-        Assert.That(tail.ResultForOffset(291), Is.EqualTo(HitResult.None));
-        Assert.That(tail.IsPastPassivePoorOffset(291), Is.True);
+        Assert.That(tail.HitAt(230), Is.EqualTo(HitResult.Ok));
+        Assert.That(tail.HitAt(231), Is.EqualTo(HitResult.Ok));
+        Assert.That(tail.HitAt(290), Is.EqualTo(HitResult.Ok));
+        Assert.That(tail.HitAt(291), Is.EqualTo(HitResult.None));
+        Assert.That(tail.PastDeadline(291), Is.True);
     }
 
     [Test]
     public void TestTailReleaseUsesTailBadWindow()
     {
-        var tail = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, column: 1, rank: 3, tail: true);
+        var tail = BmsEngineRules.GetTiming(BmsLayoutVariant.Bme7K, column: 1, rank: 3, tail: true);
 
-        Assert.That(tail.ResultForOffset(220), Is.EqualTo(HitResult.Ok));
-        Assert.That(tail.ResultForOffset(221), Is.EqualTo(HitResult.Ok));
-        Assert.That(tail.ResultForOffset(280), Is.EqualTo(HitResult.Ok));
-        Assert.That(tail.ResultForOffset(281), Is.EqualTo(HitResult.None));
-        Assert.That(tail.IsPastPassivePoorOffset(281), Is.True);
+        Assert.That(tail.HitAt(220), Is.EqualTo(HitResult.Ok));
+        Assert.That(tail.HitAt(221), Is.EqualTo(HitResult.Ok));
+        Assert.That(tail.HitAt(280), Is.EqualTo(HitResult.Ok));
+        Assert.That(tail.HitAt(281), Is.EqualTo(HitResult.None));
+        Assert.That(tail.PastDeadline(281), Is.True);
     }
 
     private static BmsBeatmap bindNotes(BmsBeatmap beatmap)

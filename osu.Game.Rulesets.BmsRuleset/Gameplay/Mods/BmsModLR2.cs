@@ -1,31 +1,24 @@
-using System.Linq;
 using System;
-using System.Collections.Concurrent;
+using System.Linq;
+using RhythmEngine.Profiles.Bms;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
-using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.LongNoteMode;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.UI.Icons;
 using osu.Game.Rulesets.Mods;
-using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 
 public class BmsModLr2 : Mod, IApplicableToJudgement,
-                         IApplicableToGaugeProfile, IApplicableAfterBeatmapConversion, IApplicableToScoreSelection, IApplicableToScoreProcessor,
-                         IApplicableToDifficulty, IApplicableToBeatmapConverter
+                         IApplicableToGaugeProfile, IApplicableAfterBeatmapConversion, IApplicableToScoreSelection,
+                         IApplicableToDifficulty
 {
-    private readonly ConcurrentDictionary<(double Rate, bool Tail), BmsJudgementWindowTable> windows = new();
-
     public override string Name => BmsStrings.ModLr2Name.ToString();
 
     public override string Acronym => "R2";
@@ -40,31 +33,7 @@ public class BmsModLr2 : Mod, IApplicableToJudgement,
 
     public IScoreSelectionRule ScoreSelectionRule => BmsModTypeScoreSelectionRule<BmsModLr2>.EXACT;
 
-    public bool ReplacesBaseWindows => true;
-
-    public BmsJudgementWindowTable ApplyToJudgementWindow(BmsJudgementWindowTable table, in BmsJudgementWindowContext context)
-        => windows.GetOrAdd((context.Rate, context.Tail), createWindows);
-
-    public Func<BmsLayoutVariant, int, double?, double> JudgementRateCalculator => calculateJudgementRate;
-
-    // Keep LR2's common NORMAL baseline when applying EXRANK to other layouts.
-    private static double calculateJudgementRate(BmsLayoutVariant layout, int rank, double? exRank)
-        => exRank is { } value
-            ? BmsJudgementProfileProvider.RateForExRank(BmsLayoutVariant.Bme7K, value)
-            : rank switch { 0 => 0.25, 1 => 0.5, 3 => 1, _ => 0.75 };
-
-    public void ApplyToBeatmapConverter(IBeatmapConverter beatmapConverter)
-    {
-        if (beatmapConverter is BmsBeatmapConverter bmsConverter)
-            bmsConverter.JudgementRateCalculator = JudgementRateCalculator;
-    }
-
-    public BmsJudgementBehaviour ApplyToJudgement(BmsJudgementBehaviour behaviour) => new()
-    {
-        SearchWindow = 1000,
-        Algorithm = BmsJudgementAlgorithm.Combo,
-        LongNoteBadIsImmediate = true,
-    };
+    public BmsJudgementModifiers JudgementModifier => BmsJudgementModifiers.Lr2oraja;
 
     public void ApplyToBeatmap(IBeatmap beatmap)
     {
@@ -77,12 +46,6 @@ public class BmsModLr2 : Mod, IApplicableToJudgement,
     }
 
     public void ApplyToDifficulty(BeatmapDifficulty difficulty) => difficulty.DrainRate = (float)BmsLongNoteMode.LongNote;
-
-    public void ApplyToScoreProcessor(ScoreProcessor scoreProcessor)
-    {
-        if (scoreProcessor is BmsScoreProcessor score)
-            score.EmptyPoorBreaksCombo = false;
-    }
 
     public ScoreRank AdjustRank(ScoreRank rank, double accuracy) => rank;
 
@@ -123,35 +86,5 @@ public class BmsModLr2 : Mod, IApplicableToJudgement,
             _ => 1,
         };
         return Math.Max(totalScale, noteScale);
-    }
-
-    private static BmsJudgementWindowTable createWindows((double Rate, bool Tail) key)
-    {
-        var (rate, tail) = key;
-        var perfect = interpolate(rate, [0, 8, 15, 18, 21]);
-        var great = interpolate(rate, [0, 24, 30, 40, 60]);
-        var good = interpolate(rate, [0, 40, 60, 100, 120]);
-        if (tail)
-            perfect = great = good;
-
-        BmsJudgementWindow[] rows =
-        [
-            new(HitResult.Perfect, -perfect, perfect),
-            new(HitResult.Great, -great, great),
-            new(HitResult.Good, -good, good),
-            new(HitResult.Ok, -200, 200),
-        ];
-        return tail
-            ? new BmsJudgementWindowTable(rows)
-            : new BmsJudgementWindowTable([.. rows, new BmsJudgementWindow(HitResult.Miss, 0, 1000)]) { LongNoteHeadPoorOffset = good };
-    }
-
-    private static double interpolate(double rate, ReadOnlySpan<double> values)
-    {
-        rate = Math.Max(0, rate);
-        if (rate >= 1) return Math.Min(200, Math.Truncate(values[4] * rate * 1000) / 1000);
-
-        var index = (int)(rate * 4);
-        return Math.Truncate((values[index] + (values[index + 1] - values[index]) * (rate * 4 - index)) * 1000) / 1000;
     }
 }

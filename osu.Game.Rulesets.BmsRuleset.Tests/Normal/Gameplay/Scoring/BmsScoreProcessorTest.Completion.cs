@@ -242,7 +242,7 @@ public partial class BmsScoreProcessorTest
             scoreProcessor.ApplyTestResult(result);
         }
 
-        manualClock.CurrentTime = mine.StartTime + BmsJudgementProfileProvider.GetTable(mine, false).SlowWindowFor(HitResult.Ok) - 1;
+        manualClock.CurrentTime = mine.StartTime + BmsEngineRules.GetTiming(mine, false).SlowWindowFor(HitResult.Ok) - 1;
         framedClock.ProcessFrame();
         scoreProcessor.UpdateCompletion();
         Assert.That(scoreProcessor.HasCompleted.Value, Is.False);

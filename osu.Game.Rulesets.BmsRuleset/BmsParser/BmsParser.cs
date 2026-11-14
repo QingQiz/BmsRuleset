@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using RhythmEngine.Profiles.Bms;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
@@ -19,7 +20,6 @@ internal static partial class BmsChartParser
 
     /// <summary>256-entry lookup: ASCII char → 6-bit value (0–61), 255 = invalid.</summary>
     private static readonly byte[] s_char_to6 = buildCharTo6Table();
-
 
     // ── Internal types ───────────────────────────────────────────────────
 
@@ -50,9 +50,8 @@ internal static partial class BmsChartParser
         IEnumerable<string> lines,
         string? path = null,
         Func<int, int>? randomValueSelector = null,
-        Func<BmsLayoutVariant, int, double?, double>? judgementRateCalculator = null)
+        BmsJudgementModifiers judgementModifiers = BmsJudgementModifiers.None)
     {
-        judgementRateCalculator ??= BmsJudgementProfileProvider.RateForDifficulty;
         var state = new ParseState();
 
         // A single foreach loop replaces iterator layers for control-flow resolution and parsing,
@@ -87,7 +86,7 @@ internal static partial class BmsChartParser
 
         // Long-note endpoints and source cells can disappear during materialisation.
         var mainBpm = BmsTimingMap.FindMainBpm(timingEvents, collectPlayableNoteTicks(state, measureStarts, totalColumns));
-        var judgementRateEvents = collectJudgementRateEvents(state, measureStarts, layoutVariant, judgementRateCalculator);
+        var judgementRateEvents = collectJudgementRateEvents(state, measureStarts, BmsEngineRules.ForLayout(layoutVariant, judgementModifiers));
 
         var timingMap = BmsTimingMap.FromSortedEvents(
             tickResolution,
@@ -166,7 +165,7 @@ internal static partial class BmsChartParser
     {
         var t = new byte[256];
         Array.Fill(t, (byte)255);
-        for (int i = '0'; i <= '9'; i++) t[i] = (byte)(i - '0');      // 0–9
+        for (int i = '0'; i <= '9'; i++) t[i] = (byte)(i - '0'); // 0–9
         for (int i = 'A'; i <= 'Z'; i++) t[i] = (byte)(i - 'A' + 10); // 10–35
         for (int i = 'a'; i <= 'z'; i++) t[i] = (byte)(i - 'a' + 36); // 36–61
         return t;
@@ -202,6 +201,7 @@ internal static partial class BmsChartParser
             if (span.Length == 1) return;
 
             var rest = span[1..];
+
             if (rest.StartsWith("URL", StringComparison.OrdinalIgnoreCase) && rest.Length > 3 && (rest[3] == ' ' || rest[3] == '\t'))
             {
                 state.Url = rest[4..].Trim().ToString();
@@ -226,6 +226,7 @@ internal static partial class BmsChartParser
             var d1 = span[1];
             var d2 = span[2];
             var d3 = span[3];
+
             if (d1 >= '0' && d1 <= '9' && d2 >= '0' && d2 <= '9' && d3 >= '0' && d3 <= '9' && span[6] == ':')
             {
                 var measure = (d1 - '0') * 100 + (d2 - '0') * 10 + (d3 - '0');
@@ -650,6 +651,7 @@ internal static partial class BmsChartParser
         ParseState state, IReadOnlyDictionary<int, long> measureStarts, BmsTimingMap timingMap)
     {
         var events = new List<BmsTextEvent>();
+
         foreach (var line in state.ChannelLines)
         {
             if (line.Channel != CH_99) continue;
@@ -669,6 +671,7 @@ internal static partial class BmsChartParser
     private static int calculateTickResolution(ParseState state)
     {
         var resolution = base_tick_resolution;
+
         foreach (var line in state.ChannelLines)
         {
             state.CancellationToken.ThrowIfCancellationRequested();
@@ -886,6 +889,7 @@ internal static partial class BmsChartParser
 
         double cumulative = 0;
         var stopIndex = 0;
+
         for (var i = 0; i < timingEvents.Count; i++)
         {
             var e = timingEvents[i];
@@ -921,6 +925,7 @@ internal static partial class BmsChartParser
     {
         // A hidden keysound may coexist with a visible note or LNOBJ on the same lane and tick.
         var notes = new Dictionary<(long Tick, int Column), RawCell>();
+
         foreach (var line in state.ChannelLines)
         {
             if (Hi(line.Channel) is not (3 or 4)
@@ -937,12 +942,11 @@ internal static partial class BmsChartParser
     }
 
     private static List<BmsJudgementRateEvent> collectJudgementRateEvents(
-        ParseState state, IReadOnlyDictionary<int, long> measureStarts, BmsLayoutVariant layoutVariant,
-        Func<BmsLayoutVariant, int, double?, double> judgementRateCalculator)
+        ParseState state, IReadOnlyDictionary<int, long> measureStarts, BmsJudgementRules rules)
     {
         var events = new List<BmsJudgementRateEvent>
         {
-            new(long.MinValue, judgementRateCalculator(layoutVariant, state.Rank, state.DefaultExRank), -1),
+            new(long.MinValue, rules.ResolveRate(state.Rank, state.DefaultExRank), -1),
         };
 
         foreach (var line in state.ChannelLines)
@@ -953,7 +957,7 @@ internal static partial class BmsChartParser
             foreach (var cell in expandCells(line, measureStarts, false, state.UseBase62))
             {
                 if (state.ExRankDefinitions.TryGetValue(cell.Value, out var exRank))
-                    events.Add(new BmsJudgementRateEvent(cell.Tick, judgementRateCalculator(layoutVariant, state.Rank, exRank), cell.Sequence));
+                    events.Add(new BmsJudgementRateEvent(cell.Tick, rules.ResolveRate(state.Rank, exRank), cell.Sequence));
             }
         }
 
@@ -989,6 +993,7 @@ internal static partial class BmsChartParser
         foreach (var line in state.ChannelLines)
         {
             state.CancellationToken.ThrowIfCancellationRequested();
+
             if (BmsLayout.TryMapVisibleChannel(line.Channel, totalColumns, out var column))
             {
                 foreach (var cell in expandCells(line, measureStarts, false, state.UseBase62, decodeValues: !importOnly || state.LnObjValues.Count > 0, cancellationToken: state.CancellationToken))
@@ -1190,6 +1195,7 @@ internal static partial class BmsChartParser
     private static bool tryMapLongNoteChannel(ushort channel, int totalColumns, out int column)
     {
         var hi = Hi(channel);
+
         if (hi is not (5 or 6))
         {
             column = -1;
@@ -1203,6 +1209,7 @@ internal static partial class BmsChartParser
     private static bool tryMapLandmineChannel(ushort channel, int totalColumns, out int column)
     {
         var hi = Hi(channel);
+
         if (hi is not (13 or 14))
         {
             column = -1;

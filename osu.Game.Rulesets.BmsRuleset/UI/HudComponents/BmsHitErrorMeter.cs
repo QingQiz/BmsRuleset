@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using RhythmEngine.Profiles.Bms;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -74,7 +75,7 @@ public partial class BmsHitErrorMeter : HitErrorMeter
     private const float bar_height = 3;
 
     private BmsHitErrorMeterDomain domain;
-    private BmsJudgementWindowTable headWindows = null!;
+    private BmsTimingDefinition headWindows = null!;
     private double fastPoorDisplayOffset;
     private double slowPoorDisplayOffset;
     private double floatingAverage;
@@ -103,12 +104,13 @@ public partial class BmsHitErrorMeter : HitErrorMeter
         if (gameplayEvents != null) gameplayEvents.ReplaySeeked += resetReplayDisplay;
         var layout = beatmap?.LayoutVariant ?? BmsLayoutVariant.Bme7K;
         var judgementRate = beatmap?.HitObjects.FirstOrDefault(h => h is not BmsLandmine)?.EffectiveJudgementRate
-                            ?? BmsJudgementProfileProvider.RateForRank(layout, beatmap?.Rank ?? 2);
-        domain = CreateDomain(layout, judgementRate);
+                            ?? BmsEngineRules.RateForRank(layout, beatmap?.Rank ?? 2);
+        var modifiers = beatmap?.JudgementModifiers ?? BmsJudgementModifiers.None;
+        domain = CreateDomain(layout, judgementRate, modifiers);
 
         headWindows = beatmap?.HitObjects.FirstOrDefault(h => h is not BmsLandmine) is { } firstNote
-            ? BmsJudgementProfileProvider.GetTable(layout, 1, firstNote.EffectiveJudgementRate, false)
-            : BmsJudgementProfileProvider.GetTable(layout, 1, beatmap?.Rank ?? 2, tail: false);
+            ? BmsEngineRules.GetTiming(layout, 1, firstNote.EffectiveJudgementRate, false, modifiers)
+            : BmsEngineRules.GetTiming(layout, 1, beatmap?.Rank ?? 2, tail: false, modifiers: modifiers);
 
         // Use legacy's time-to-width scale by default while respecting dimensions saved in user skins.
         if (Width == 0)
@@ -187,7 +189,7 @@ public partial class BmsHitErrorMeter : HitErrorMeter
         Clear();
     }
 
-    private void createColourBar(Container target, BmsJudgementWindowTable windows)
+    private void createColourBar(Container target, BmsTimingDefinition windows)
     {
         HitResult[] results = [HitResult.Ok, HitResult.Good, HitResult.Great, HitResult.Perfect];
 
@@ -278,6 +280,7 @@ public partial class BmsHitErrorMeter : HitErrorMeter
     protected override void Update()
     {
         base.Update();
+
         // The scheduler has delivered this frame's judgements. Preserve every average
         // observation, but create only the final animation before the arrow updates.
         if (averageUpdatePending)
@@ -319,41 +322,33 @@ public partial class BmsHitErrorMeter : HitErrorMeter
 
     internal static bool AffectsMovingAverage(HitResult result) => result.IsHit() && result != HitResult.Meh;
 
-    internal static (double FastOffset, double SlowOffset) GetPoorDisplayOffsets(BmsJudgementWindowTable windows, bool showEmptyPoor)
+    internal static (double FastOffset, double SlowOffset) GetPoorDisplayOffsets(BmsTimingDefinition windows, bool showEmptyPoor)
     {
         var fastOffset = 0d;
         var slowOffset = 0d;
 
-        foreach (var window in windows.HitWindows)
+        foreach (var window in windows.Windows.Entries)
         {
-            // NB retains an inverted BAD interval for passive POOR timing, but that interval has no colour bar.
-            if (window.SlowDTime > window.FastDTime)
-                continue;
+            if (!showEmptyPoor && window.Result == BmsResults.EMPTY_POOR) continue;
 
-            fastOffset = Math.Min(fastOffset, -window.FastOffset);
-            slowOffset = Math.Max(slowOffset, window.SlowOffset);
-        }
-
-        if (showEmptyPoor && windows.EPoorWindow is { } emptyPoor)
-        {
-            fastOffset = Math.Min(fastOffset, -emptyPoor.FastOffset);
-            slowOffset = Math.Max(slowOffset, emptyPoor.SlowOffset);
+            fastOffset = Math.Min(fastOffset, window.Early / 1000.0);
+            slowOffset = Math.Max(slowOffset, window.Late / 1000.0);
         }
 
         return (fastOffset, slowOffset);
     }
 
-    internal static BmsHitErrorMeterDomain CreateDomain(BmsLayoutVariant layout, double judgementRate)
+    internal static BmsHitErrorMeterDomain CreateDomain(BmsLayoutVariant layout, double judgementRate, BmsJudgementModifiers modifiers = BmsJudgementModifiers.None)
     {
         int[] columns = BmsLayout.IsScratchColumn(0, layout) ? [0, 1] : [1];
         var tables = columns.SelectMany(column => new[]
         {
-            BmsJudgementProfileProvider.GetTable(layout, column, judgementRate, tail: false),
-            BmsJudgementProfileProvider.GetTable(layout, column, judgementRate, tail: true),
+            BmsEngineRules.GetTiming(layout, column, judgementRate, tail: false, modifiers: modifiers),
+            BmsEngineRules.GetTiming(layout, column, judgementRate, tail: true, modifiers: modifiers),
         });
 
         var fastExtent = tables.Max(table => Math.Max(table.FastWindowFor(HitResult.Ok), table.FastWindowFor(HitResult.Miss)));
-        var slowExtent = tables.Max(table => Math.Max(table.SlowWindowFor(HitResult.Ok), table.SlowWindowFor(HitResult.Miss)));
+        var slowExtent = tables.Max(table => Math.Max(table.PassiveDeadline / 1000.0, table.SlowWindowFor(HitResult.Miss)));
         var extent = Math.Max(1, Math.Max(fastExtent, slowExtent));
         return new BmsHitErrorMeterDomain(-extent, extent);
     }
@@ -375,7 +370,6 @@ public partial class BmsHitErrorMeter : HitErrorMeter
 
         base.Dispose(isDisposing);
     }
-
 }
 
 internal readonly record struct BmsHitErrorTimingObservation(double TimeOffset, HitResult Result);

@@ -1,15 +1,15 @@
 #nullable enable
 using System.Collections.Immutable;
 using System.Linq;
+using RhythmEngine.Core;
+using RhythmEngine.Profiles.Bms;
+using RhythmEngine.Profiles.Common;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.Scoring;
-using RhythmEngine.Core;
-using RhythmEngine.Profiles.Bms;
-using RhythmEngine.Profiles.Common;
 using JudgementResult = osu.Game.Rulesets.Judgements.JudgementResult;
 using EngineResult = RhythmEngine.Core.JudgementResult;
 
@@ -18,6 +18,18 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests;
 /// <summary>Supplies authoritative reducer output to isolated framework processor tests.</summary>
 internal static class BmsTestJudgements
 {
+    internal static HitResult HitAt(this BmsTimingDefinition timing, double milliseconds)
+    {
+        var result = timing.Windows.ResultFor(Time.FromMilliseconds(milliseconds));
+        return result == BmsResults.EMPTY_POOR ? HitResult.None : BmsEngineChart.HitResultFor(result);
+    }
+
+    internal static bool EmptyPoorAt(this BmsTimingDefinition timing, double milliseconds)
+        => timing.Windows.ResultFor(Time.FromMilliseconds(milliseconds)) == BmsResults.EMPTY_POOR;
+
+    internal static bool PastDeadline(this BmsTimingDefinition timing, double milliseconds)
+        => Time.FromMilliseconds(milliseconds) > timing.PassiveDeadline;
+
     internal static void ApplyTestResult(this BmsScoreProcessor processor, JudgementResult result)
     {
         var bms = (BmsJudgementResult)result;
@@ -41,8 +53,7 @@ internal static class BmsTestJudgements
         var note = new BmsNote { StartTime = expected, Column = column, Beatmap = (BmsBeatmap)processor.Beatmap.Value! };
         var judgement = new JudgementEvent(0, 0, column, NoteParts.EMPTY, BmsEngineChart.ResultId(result),
             Time.FromMilliseconds(time), Time.FromMilliseconds(expected), Time.FromMilliseconds(time - expected));
-        var configuration = BmsProfiles.CreateScore(processor.EmptyPoorBreaksCombo
-                                                    ?? BmsJudgementProfileProvider.EmptyPoorBreaksCombo(note.Beatmap.LayoutVariant));
+        var configuration = BmsProfiles.CreateScore(BmsEngineRules.ForBeatmap(note.Beatmap).EmptyPoorBreaksCombo);
         var state = configuration.Reduce(scoreState(processor), new ScoreContext(judgement, null, chartFor(note).ScorePlan));
         processor.RegisterNonConsumingJudgement(result, time, expected, column, state);
     }
@@ -80,8 +91,7 @@ internal static class BmsTestJudgements
     {
         var (note, judgement) = describe(result);
         var chart = chartFor(note);
-        var configuration = BmsProfiles.CreateScore(processor.EmptyPoorBreaksCombo
-                                                    ?? BmsJudgementProfileProvider.EmptyPoorBreaksCombo(note.Beatmap.LayoutVariant));
+        var configuration = BmsProfiles.CreateScore(BmsEngineRules.ForBeatmap(note.Beatmap).EmptyPoorBreaksCombo);
         var opportunity = chart.ScorePlan.Opportunities.SingleOrDefault(o => o.Part == judgement.Part);
         var state = configuration.Reduce(scoreState(processor), new ScoreContext(judgement, opportunity, chart.ScorePlan));
         return new EngineResult(judgement, state, default);
@@ -92,9 +102,9 @@ internal static class BmsTestJudgements
         var statistics = processor.GetScoreProcessorStatistics();
         var mines = statistics.AccuracyJudgementCount - (int)(statistics.MaximumBaseScore / 2);
         var counters = processor.Statistics.Where(p => p.Key is HitResult.Perfect or HitResult.Great or HitResult.Good or HitResult.Ok or HitResult.Meh or HitResult.Miss)
-                                .ToImmutableDictionary(p => BmsEngineChart.ResultId(p.Key).Value, p => (double)p.Value);
+            .ToImmutableDictionary(p => BmsEngineChart.ResultId(p.Key).Value, p => (double)p.Value);
         counters = counters.SetItem(BmsResults.POOR.Value, counters.GetValueOrDefault(BmsResults.POOR.Value) - mines)
-                           .SetItem(BmsResults.MINE_HIT.Value, mines);
+            .SetItem(BmsResults.MINE_HIT.Value, mines);
         return new ScoreState
         {
             Score = statistics.BaseScore, AccuracyPoints = statistics.BaseScore, AccuracyMaximum = statistics.MaximumBaseScore,

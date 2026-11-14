@@ -1,12 +1,11 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
-using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
-using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.Scoring;
 using RhythmEngine.Core;
 using RhythmEngine.Profiles.Bms;
 using RhythmEngine.Profiles.Common;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
+using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 
@@ -15,12 +14,8 @@ internal static class BmsEngineChart
 {
     internal static Chart Compile(BmsHitObject[] notes, int columns)
     {
-        var windowsByTable = new Dictionary<(BmsJudgementWindowTable Table, double Search), TimingWindows>();
-        var rules = new Dictionary<(KeyNoteKind Kind, bool Directional, TimingWindows? Head, TimingWindows? Tail, BmsRuleOptions Options), INoteRule>();
-        var mineOptions = new BmsRuleOptions(MineOrder: TimerOrder.AfterInput);
         return new Chart(columns, notes.Select((note, id) =>
         {
-            var behaviour = BmsJudgementProfileProvider.GetBehaviour(note.Beatmap.LayoutVariant);
             var longNote = note as BmsLongNote;
             var kind = note switch
             {
@@ -38,50 +33,10 @@ internal static class BmsEngineChart
                 Directional: BmsLayout.IsScratchColumn(note.Column, note.Beatmap.LayoutVariant)
                              && note.Beatmap.LayoutVariant is not (BmsLayoutVariant.Keyboard24K or BmsLayoutVariant.Keyboard24KDouble));
 
-            if (kind == KeyNoteKind.Mine) return new ChartNote(id, source.Lane, source.StartTime, source.EndTime, ruleFor(source, null, null, mineOptions));
-
-            var head = BmsJudgementProfileProvider.GetTable(note, false);
-            var headDeadline = kind == KeyNoteKind.Hold && head.LongNoteHeadPoorOffset is { } deadline
-                ? Math.Min(deadline, longNote!.Duration)
-                : head.SlowWindowFor(HitResult.Ok);
-            var options = new BmsRuleOptions(ImmediateBadHead: behaviour.LongNoteBadIsImmediate,
-                NonConsumingBad: behaviour.NonConsumingBad, HeadDeadline: Time.FromMilliseconds(headDeadline),
-                TailDeadline: Time.FromMilliseconds(head.SlowWindowFor(HitResult.Ok)),
-                ReleaseGrace: Time.FromMilliseconds(behaviour.LongNoteReleaseMargin), MineOrder: TimerOrder.AfterInput,
-                PassiveOrder: TimerOrder.AfterInput);
-            var tail = longNote == null ? null : windowsFor(BmsJudgementProfileProvider.GetTable(note, true), behaviour.SearchWindow);
-            return new ChartNote(id, source.Lane, source.StartTime, source.EndTime,
-                ruleFor(source, windowsFor(head, behaviour.SearchWindow), tail, options));
+            var rule = BmsEngineRules.ForBeatmap(note.Beatmap).GetProfile(note.EffectiveJudgementRate).CreateRule(source);
+            return new ChartNote(id, source.Lane, source.StartTime, source.EndTime, rule);
         }));
-
-        TimingWindows windowsFor(BmsJudgementWindowTable table, double search)
-        {
-            var key = (table, search);
-            if (!windowsByTable.TryGetValue(key, out var converted))
-                windowsByTable.Add(key, converted = windows(table, search));
-            return converted;
-        }
-
-        INoteRule ruleFor(KeyNote note, TimingWindows? head, TimingWindows? tail, BmsRuleOptions options)
-        {
-            var key = (note.Kind, note.Directional, head, tail, options);
-            if (!rules.TryGetValue(key, out var rule))
-                rules.Add(key, rule = BmsProfiles.CreateRule(note, head, tail, options));
-            return rule;
-        }
     }
-
-    private static TimingWindows windows(BmsJudgementWindowTable table, double search)
-        // No Bad retains an inverted row solely to preserve the passive POOR deadline.
-        => new(table.HitWindows.Where(row => row.SlowDTime <= row.FastDTime).Select(row => new TimingWindow(ResultId(row.Result),
-                Time.FromMilliseconds(-row.FastDTime), Time.FromMilliseconds(-row.SlowDTime)))
-            .Concat(table.EPoorWindow is { } empty
-                ?
-                [
-                    new TimingWindow(BmsResults.EMPTY_POOR, Math.Max(Time.FromMilliseconds(-empty.FastDTime), -Time.FromMilliseconds(search) + 1),
-                        Time.FromMilliseconds(-empty.SlowDTime))
-                ]
-                : []));
 
     internal static ResultId ResultId(HitResult result) => result switch
     {

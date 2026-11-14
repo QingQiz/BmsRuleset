@@ -1,26 +1,24 @@
 #nullable enable
+
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
 using NUnit.Framework;
+using Newtonsoft.Json;
+using Realms;
 using osu.Framework.IO.Stores;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Formats;
 using osu.Game.Extensions;
 using osu.Game.IO;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Scoring;
 using osu.Game.Tests.Beatmaps;
-using Realms;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Replay;
 
@@ -37,7 +35,8 @@ public class BmsReplaySimulationCorpusTest
         using var realm = Realm.GetInstance(new RealmConfiguration(Path.Combine(storage!, "client.realm")) { IsReadOnly = true, SchemaVersion = 52 });
         using var files = new StorageFiles(Path.Combine(storage!, "files"));
         var candidates = realm.All<ScoreInfo>().ToArray().Where(score => score.Ruleset.ShortName == Constant.SHORT_NAME
-            && score.BeatmapInfo != null && score.Files.Any(file => file.Filename == BmsReplayArchive.FILENAME)).OrderByDescending(score => score.Date).ToArray();
+                                                                         && score.BeatmapInfo != null && score.Files.Any(file => file.Filename == BmsReplayArchive.FILENAME))
+            .OrderByDescending(score => score.Date).ToArray();
         var reports = new List<object>();
         var compactDifferences = 0;
         var cadenceDifferences = 0;
@@ -56,7 +55,7 @@ public class BmsReplaySimulationCorpusTest
             using var reader = new LineBufferedReader(stream);
             var decoded = Decoder.GetDecoder<Beatmap>(reader).Decode(reader);
             var mods = source.Mods;
-            using var windows = BmsJudgementProfileProvider.UseWindowMods(mods.OfType<IApplicableToJudgement>().ToArray());
+
             var playable = (BmsBeatmap)new TestWorkingBeatmap(decoded).GetPlayableBeatmap(new BmsRuleset().RulesetInfo, mods);
             var simulated = BmsReplaySimulation.Run(playable, archived.Replay, source);
             var compact = BmsTestReplayArchive.RoundTrip(archived);
@@ -115,6 +114,7 @@ public class BmsReplaySimulationCorpusTest
     {
         var frames = replay.Frames.OfType<BmsReplayFrame>().ToArray();
         var sampled = new osu.Game.Replays.Replay { HasReceivedAllFrames = replay.HasReceivedAllFrames };
+
         for (var i = 0; i < frames.Length; i++)
         {
             sampled.Frames.Add(frames[i]);
@@ -132,6 +132,9 @@ public class BmsReplaySimulationCorpusTest
         public Stream GetStream(string name) => File.Exists(Path.Combine(root, name)) ? File.OpenRead(Path.Combine(root, name)) : null!;
         public Task<byte[]> GetAsync(string name, CancellationToken cancellationToken = default) => Task.FromResult(Get(name));
         public IEnumerable<string> GetAvailableResources() => [];
-        public void Dispose() { }
+
+        public void Dispose()
+        {
+        }
     }
 }

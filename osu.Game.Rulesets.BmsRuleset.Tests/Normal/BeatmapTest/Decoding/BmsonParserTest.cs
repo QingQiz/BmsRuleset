@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json.Nodes;
 using System.Threading;
 using NUnit.Framework;
+using RhythmEngine.Profiles.Bms;
 using osu.Game.Beatmaps;
 using osu.Game.Models;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
@@ -163,6 +164,7 @@ public class BmsonParserTest
         var info = new BeatmapInfo { Hash = "chart", BeatmapSet = new BeatmapSetInfo() };
         info.BeatmapSet.Files.Add(new RealmNamedFileUsage(new RealmFile { Hash = info.Hash }, "chart.bmson"));
         var decoded = BmsBeatmapDecoder.DecodeBytes(chart, info);
+
         foreach (var (mode, expected) in new[]
                  {
                      (BmsReferenceBpmMode.StartBpm, 120), (BmsReferenceBpmMode.MainBpm, 180),
@@ -173,6 +175,7 @@ public class BmsonParserTest
             Assert.That(converted.TimingMap!.ScrollReferenceBpm, Is.EqualTo(expected), mode.ToString());
             Assert.That(converted.BeatmapInfo.DifficultyName, Is.EqualTo("chart"));
         }
+
         Assert.That(((IBmsBeatmap)decoded).TimingMap!.ScrollReferenceBpm, Is.EqualTo(120));
     }
 
@@ -253,7 +256,7 @@ public class BmsonParserTest
             info: $$""","mode_hint":"{{mode}}","judge_rank":{{judgeRank.ToString(CultureInfo.InvariantCulture)}}""");
         var parsed = BmsonParser.Parse(bytes);
         Assert.That(parsed.DefaultExRank, Is.EqualTo(expectedExRank).Within(1e-10));
-        Assert.That(BmsJudgementProfileProvider.RateForExRank(parsed.LayoutVariant, parsed.DefaultExRank!.Value), Is.EqualTo(expectedRate).Within(1e-10));
+        Assert.That(BmsEngineRules.RateForExRank(parsed.LayoutVariant, parsed.DefaultExRank!.Value), Is.EqualTo(expectedRate).Within(1e-10));
 
         var info = new BeatmapInfo { Hash = "chart", BeatmapSet = new BeatmapSetInfo() };
         info.BeatmapSet.Files.Add(new RealmNamedFileUsage(new RealmFile { Hash = info.Hash }, "chart.bmson"));
@@ -262,8 +265,9 @@ public class BmsonParserTest
         Assert.That(converted.HitObjects.Single().EffectiveJudgementRate, Is.EqualTo(expectedRate).Within(1e-10));
         Assert.That(BmsDifficultyInfo.FromOsuDifficulty(converted.Difficulty).ExRank, Is.EqualTo(expectedExRank).Within(1e-4));
 
-        var adjusted = (BmsBeatmap)new BmsBeatmapConverter(decoded, new BmsRuleset()) { JudgementRateCalculator = (_, _, _) => .5 }.Convert();
-        Assert.That(adjusted.HitObjects.Single().EffectiveJudgementRate, Is.EqualTo(.5), "The converted chart follows the same calculator contract as BMS.");
+        var adjusted = (BmsBeatmap)new BmsBeatmapConverter(decoded, new BmsRuleset()) { JudgementModifiers = BmsJudgementModifiers.Lr2oraja }.Convert();
+        Assert.That(adjusted.HitObjects.Single().EffectiveJudgementRate, Is.EqualTo(expectedExRank / 100 * .75).Within(1e-10),
+            "BMSON uses the selected engine profile when resolving its header rate.");
         Assert.That(((BmsHitObject)decoded.HitObjects.Single()).JudgementRate, Is.NaN);
     }
 

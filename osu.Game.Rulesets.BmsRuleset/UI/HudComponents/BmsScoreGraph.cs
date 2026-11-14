@@ -14,8 +14,6 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
@@ -360,6 +358,7 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
             return;
 
         var statisticsChanged = !currentDisplayValid || displayedStatisticsVersion != scoreProcessor.StatisticsVersion;
+
         if (statisticsChanged)
         {
             var currentScore = BmsExScore.Calculate(scoreProcessor.Statistics);
@@ -422,10 +421,11 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
 
             var replay = scoreWithReplay.Replay;
             IReadOnlyList<BmsJudgementEvent> judgementEvents = [];
+
             if (beatmapManager != null && replay.HasReceivedAllFrames && replay.Frames.Count > 0)
             {
                 var mods = scoreWithReplay.ScoreInfo.Mods;
-                using var windows = BmsJudgementProfileProvider.UseWindowMods(mods.OfType<IApplicableToJudgement>().ToArray());
+
                 var beatmap = beatmapManager.GetWorkingBeatmap(personalBest.BeatmapInfo).GetPlayableBeatmap(personalBest.Ruleset, mods);
                 if (beatmap is BmsBeatmap bmsBeatmap)
                     judgementEvents = BmsReplaySimulation.Run(bmsBeatmap, replay, scoreWithReplay.ScoreInfo).Judgements;

@@ -1,17 +1,19 @@
 #nullable enable
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
+using RhythmEngine.Profiles.Bms;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Containers;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.LongNoteMode;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
@@ -54,7 +56,9 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
     private const double after_bad_slow_edge = 211;
 
     private static readonly double? normal_release = 0;
+
     private static readonly double? fast_release = -160;
+
     // Keep the release away from a 200ms HCN tick boundary after a frame-rounded head miss.
     private static readonly double? very_fast_release = -260;
     private static readonly double? slow_release = 180;
@@ -118,10 +122,7 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
 
             var startTime = first_case_time + index * case_spacing;
             advanceTo($"before {index + 1:00}: {cases[index].Text}", startTime - text_lead_time - 50);
-            AddStep($"capture baseline {index + 1:00}", () =>
-            {
-                before = takeSnapshot();
-            });
+            AddStep($"capture baseline {index + 1:00}", () => { before = takeSnapshot(); });
 
             if (firstFastReleaseCheckOffset(cases[index], mode) is { } visibilityCheckOffset)
             {
@@ -410,39 +411,39 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
 
     private static bool veryOffsetsAreOutsideBadWindows()
     {
-        var headTable = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, columns[0], rank: 2, tail: false);
-        var tailTable = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, columns[0], rank: 2, tail: true);
+        var headTable = BmsEngineRules.GetTiming(BmsLayoutVariant.Bme7K, columns[0], rank: 2, tail: false);
+        var tailTable = BmsEngineRules.GetTiming(BmsLayoutVariant.Bme7K, columns[0], rank: 2, tail: true);
 
-        return headTable.ResultForOffset(very_fast_press!.Value) == HitResult.None
-               && headTable.ResultForOffset(very_slow_press!.Value) == HitResult.None
-               && tailTable.ResultForOffset(very_fast_release!.Value) == HitResult.None
-               && tailTable.ResultForOffset(very_slow_release!.Value) == HitResult.None;
+        return headTable.HitAt(very_fast_press!.Value) == HitResult.None
+               && headTable.HitAt(very_slow_press!.Value) == HitResult.None
+               && tailTable.HitAt(very_fast_release!.Value) == HitResult.None
+               && tailTable.HitAt(very_slow_release!.Value) == HitResult.None;
     }
 
     private static bool releaseOffsetsMatchTailWindows()
     {
-        var tailTable = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, columns[0], rank: 2, tail: true);
+        var tailTable = BmsEngineRules.GetTiming(BmsLayoutVariant.Bme7K, columns[0], rank: 2, tail: true);
 
-        return tailTable.ResultForOffset(normal_release!.Value) == HitResult.Perfect
-               && tailTable.ResultForOffset(fast_release!.Value) == HitResult.Ok
-               && tailTable.ResultForOffset(slow_release!.Value) == HitResult.Ok
-               && tailTable.ResultForOffset(very_fast_release!.Value) == HitResult.None
-               && tailTable.ResultForOffset(very_slow_release!.Value) == HitResult.None;
+        return tailTable.HitAt(normal_release!.Value) == HitResult.Perfect
+               && tailTable.HitAt(fast_release!.Value) == HitResult.Ok
+               && tailTable.HitAt(slow_release!.Value) == HitResult.Ok
+               && tailTable.HitAt(very_fast_release!.Value) == HitResult.None
+               && tailTable.HitAt(very_slow_release!.Value) == HitResult.None;
     }
 
     private static bool badEdgeOffsetsMatchWindows()
     {
-        var headTable = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, columns[0], rank: 2, tail: false);
-        var tailTable = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, columns[0], rank: 2, tail: true);
+        var headTable = BmsEngineRules.GetTiming(BmsLayoutVariant.Bme7K, columns[0], rank: 2, tail: false);
+        var tailTable = BmsEngineRules.GetTiming(BmsLayoutVariant.Bme7K, columns[0], rank: 2, tail: true);
 
-        return headTable.ResultForOffset(bad_fast_edge) == HitResult.Ok
-               && headTable.ResultForOffset(before_bad_fast_edge) == HitResult.None
-               && headTable.ResultForOffset(bad_slow_edge) == HitResult.Ok
-               && headTable.ResultForOffset(after_bad_slow_edge) == HitResult.None
-               && tailTable.ResultForOffset(bad_fast_edge) == HitResult.Ok
-               && tailTable.ResultForOffset(before_bad_fast_edge) == HitResult.None
-               && tailTable.ResultForOffset(bad_slow_edge) == HitResult.Ok
-               && tailTable.ResultForOffset(after_bad_slow_edge) == HitResult.None;
+        return headTable.HitAt(bad_fast_edge) == HitResult.Ok
+               && headTable.HitAt(before_bad_fast_edge) == HitResult.None
+               && headTable.HitAt(bad_slow_edge) == HitResult.Ok
+               && headTable.HitAt(after_bad_slow_edge) == HitResult.None
+               && tailTable.HitAt(bad_fast_edge) == HitResult.Ok
+               && tailTable.HitAt(before_bad_fast_edge) == HitResult.None
+               && tailTable.HitAt(bad_slow_edge) == HitResult.Ok
+               && tailTable.HitAt(after_bad_slow_edge) == HitResult.None;
     }
 
     private bool isCaseLongNoteAlive(int index)
@@ -483,9 +484,9 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
         if (firstPress == null)
             return null;
 
-        var headTable = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, columns[0], rank: 2, tail: false);
+        var headTable = BmsEngineRules.GetTiming(BmsLayoutVariant.Bme7K, columns[0], rank: 2, tail: false);
 
-        if (headTable.ResultForOffset(firstPress.Value) == HitResult.None)
+        if (headTable.HitAt(firstPress.Value) == HitResult.None)
             return null;
 
         var firstFastRelease = testCase.FirstReleaseOffsetAfter(firstPress.Value, onlyBeforeTail: true);
@@ -493,7 +494,7 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
         if (firstFastRelease == null)
             return null;
 
-        var tailTable = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, columns[0], rank: 2, tail: true);
+        var tailTable = BmsEngineRules.GetTiming(BmsLayoutVariant.Bme7K, columns[0], rank: 2, tail: true);
 
         if (tailResultForRelease(mode, firstPress.Value, firstFastRelease.Value, tailTable) != HitResult.Meh)
             return null;
@@ -586,18 +587,18 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
     // tail table and can replace the head offset when the release-side miss is worse.
     private static IReadOnlyList<HitResult> expectedJudgementSequence(LongNoteVisualCase testCase, BmsLongNoteMode mode)
     {
-        var headTable = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, columns[0], rank: 2, tail: false);
-        var tailTable = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, columns[0], rank: 2, tail: true);
+        var headTable = BmsEngineRules.GetTiming(BmsLayoutVariant.Bme7K, columns[0], rank: 2, tail: false);
+        var tailTable = BmsEngineRules.GetTiming(BmsLayoutVariant.Bme7K, columns[0], rank: 2, tail: true);
         var firstPress = testCase.FirstPressOffset;
 
         if (firstPress == null)
             return missedLongNoteSequence(mode, emptyPoor: false);
 
-        var headResult = headTable.ResultForOffset(firstPress.Value);
+        var headResult = headTable.HitAt(firstPress.Value);
 
         if (headResult == HitResult.None)
         {
-            return missedLongNoteSequence(mode, headTable.IsEmptyPoorOffset(firstPress.Value));
+            return missedLongNoteSequence(mode, headTable.EmptyPoorAt(firstPress.Value));
         }
 
         if (mode == BmsLongNoteMode.LongNote)
@@ -614,15 +615,15 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
         return [headResult, tailResultForRelease(tailRelease, tailTable)];
     }
 
-    private static HitResult tailResultForRelease(double? tailRelease, BmsJudgementWindowTable tailTable)
+    private static HitResult tailResultForRelease(double? tailRelease, BmsTimingDefinition tailTable)
     {
         if (tailRelease == null)
             return HitResult.Meh;
 
         var tailOffset = tailRelease.Value - long_note_duration;
-        var tailResult = tailTable.IsPastPassivePoorOffset(tailOffset)
+        var tailResult = tailTable.PastDeadline(tailOffset)
             ? HitResult.Meh
-            : tailTable.ResultForOffset(tailOffset);
+            : tailTable.HitAt(tailOffset);
 
         return tailResult == HitResult.None ? HitResult.Meh : tailResult;
     }
@@ -631,15 +632,15 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
         BmsLongNoteMode mode,
         double firstPress,
         double releaseFromHead,
-        BmsJudgementWindowTable tailTable)
+        BmsTimingDefinition tailTable)
     {
         if (mode != BmsLongNoteMode.LongNote)
             return tailResultForRelease(releaseFromHead, tailTable);
 
         var tailOffset = releaseFromHead - long_note_duration;
-        var headTable = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, columns[0], rank: 2, tail: false);
-        var headResult = headTable.ResultForOffset(firstPress);
-        var releaseResult = tailTable.ResultForOffset(tailOffset);
+        var headTable = BmsEngineRules.GetTiming(BmsLayoutVariant.Bme7K, columns[0], rank: 2, tail: false);
+        var headResult = headTable.HitAt(firstPress);
+        var releaseResult = tailTable.HitAt(tailOffset);
         var result = (HitResult)Math.Min((int)headResult, (int)(releaseResult == HitResult.None ? HitResult.Meh : releaseResult));
         var heldOffset = Math.Abs(firstPress) > Math.Abs(tailOffset) ? firstPress : tailOffset;
         return heldOffset < 0 && result is HitResult.Meh or HitResult.Ok ? HitResult.Ok : result;
@@ -665,16 +666,15 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
     private static IEnumerable<HealthEvent> healthEvents(LongNoteVisualCase testCase, BmsLongNoteMode mode, IReadOnlyList<HitResult> sequence)
     {
         var firstPress = testCase.FirstPressOffset;
-        var headTable = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, columns[0], rank: 2, tail: false);
+        var headTable = BmsEngineRules.GetTiming(BmsLayoutVariant.Bme7K, columns[0], rank: 2, tail: false);
 
         if (mode == BmsLongNoteMode.HellChargeNote
-            && (firstPress == null || headTable.ResultForOffset(firstPress.Value) == HitResult.None))
+            && (firstPress == null || headTable.HitAt(firstPress.Value) == HitResult.None))
         {
-            var tailTable = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, columns[0], rank: 2, tail: true);
             var headPoorOffset = headTable.SlowWindowFor(HitResult.Ok) + 0.001;
             var sequenceIndex = 0;
 
-            if (firstPress != null && headTable.IsEmptyPoorOffset(firstPress.Value))
+            if (firstPress != null && headTable.EmptyPoorAt(firstPress.Value))
                 yield return new HealthEvent(firstPress.Value, sequence[sequenceIndex++], 1);
 
             yield return new HealthEvent(headPoorOffset, sequence[sequenceIndex++], 1);
@@ -713,12 +713,12 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
         if (bodyStartOffset == null && firstPress == null)
             yield break;
 
-        var headTable = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, columns[0], rank: 2, tail: false);
+        var headTable = BmsEngineRules.GetTiming(BmsLayoutVariant.Bme7K, columns[0], rank: 2, tail: false);
 
-        if (bodyStartOffset == null && headTable.ResultForOffset(firstPress!.Value) == HitResult.None)
+        if (bodyStartOffset == null && headTable.HitAt(firstPress!.Value) == HitResult.None)
             yield break;
 
-        var tailTable = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, columns[0], rank: 2, tail: true);
+        var tailTable = BmsEngineRules.GetTiming(BmsLayoutVariant.Bme7K, columns[0], rank: 2, tail: true);
         var offset = bodyStartOffset ?? Math.Max(0, firstPress!.Value);
         var accumulator = 0d;
         var boundaries = testCase.Inputs
@@ -767,7 +767,7 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
         }
     }
 
-    private static bool hcnBodyRecoveringAt(LongNoteVisualCase testCase, double offset, BmsJudgementWindowTable tailTable)
+    private static bool hcnBodyRecoveringAt(LongNoteVisualCase testCase, double offset, BmsTimingDefinition tailTable)
     {
         if (testCase.IsPressedAt(offset))
             return true;
@@ -782,9 +782,9 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
         if (firstReleaseBeforeTail == null || firstReleaseBeforeTail.Value > offset)
             return false;
 
-        var headTable = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, columns[0], rank: 2, tail: false);
-        return headTable.ResultForOffset(firstPress.Value) != HitResult.None
-               && tailTable.ResultForOffset(firstReleaseBeforeTail.Value - long_note_duration) is HitResult.Perfect or HitResult.Great or HitResult.Good;
+        var headTable = BmsEngineRules.GetTiming(BmsLayoutVariant.Bme7K, columns[0], rank: 2, tail: false);
+        return headTable.HitAt(firstPress.Value) != HitResult.None
+               && tailTable.HitAt(firstReleaseBeforeTail.Value - long_note_duration) is HitResult.Perfect or HitResult.Great or HitResult.Good;
     }
 
     private static IReadOnlyList<LongNoteVisualCase> cases { get; } = createCases();
@@ -816,7 +816,8 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
     private sealed record CaseExpectation(
         IReadOnlyDictionary<HitResult, int> ResultCounts,
         IReadOnlyList<HitResult> JudgementSequence,
-        IReadOnlyList<HealthEvent> HealthEvents, BmsLongNoteMode Mode)
+        IReadOnlyList<HealthEvent> HealthEvents,
+        BmsLongNoteMode Mode)
     {
         public double HealthAfter(double startingHealth)
         {

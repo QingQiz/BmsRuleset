@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using RhythmEngine.Core;
+using RhythmEngine.Profiles.Bms;
 using osu.Framework.Bindables;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
@@ -12,8 +14,6 @@ using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
-using RhythmEngine.Core;
-using RhythmEngine.Profiles.Bms;
 using JudgementResult = osu.Game.Rulesets.Judgements.JudgementResult;
 
 namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
@@ -52,8 +52,6 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
 
     internal bool IsRebuildingReplay { get; set; }
 
-    public bool? EmptyPoorBreaksCombo { get; set; }
-
     internal void ResetReplayState()
     {
         // The framework deliberately locks failed ranks until a new play is created.
@@ -68,7 +66,6 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
 
     public override void ApplyBeatmap(IBeatmap beatmap)
     {
-        using var windows = BmsJudgementProfileProvider.UseWindowMods(Mods.Value.OfType<IApplicableToJudgement>().ToArray());
         base.ApplyBeatmap(beatmap);
 
         if (beatmap.HitObjects.Count == 0)
@@ -77,9 +74,9 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
         {
             // Latest possible judgement time = max object end time + worst-case slow window.
             var maxEndTime = beatmap.HitObjects.Max(h => h.GetEndTime());
-            var slowWindow = beatmap.HitObjects.OfType<BmsHitObject>()
-                .Select(note => BmsJudgementProfileProvider.GetTable(note, false).SlowWindowFor(HitResult.Ok))
-                .DefaultIfEmpty(BmsHitWindows.FALLBACK_BAD_WINDOW).Max();
+            var slowWindow = beatmap.HitObjects.Cast<BmsHitObject>()
+                .Select(note => BmsEngineRules.GetTiming(note, false).PassiveDeadline / 1000.0)
+                .Max();
 
             latestEndTime = maxEndTime + slowWindow;
         }

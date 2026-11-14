@@ -1,8 +1,7 @@
 using System;
 using System.Collections.Generic;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
-using osu.Game.Rulesets.Scoring;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 
 namespace osu.Game.Rulesets.BmsRuleset.Media.Audio.Playback;
 
@@ -32,11 +31,13 @@ public sealed class BmsKeySoundCursor(IReadOnlyList<BmsHitObject> hitObjects, IR
         if (invisibleNotes is { Count: > 0 })
         {
             var invisibleIndex = findFirstAtOrAfter(invisibleNotes, currentTime) - 1;
+
             if (invisibleIndex >= 0)
             {
                 // Like beatoraja, a passed invisible note replaces the empty-press sample until
                 // a newer visible note takes over. Its sound persists after its drawable expires.
                 var sample = invisibleNotes[invisibleIndex];
+
                 for (var i = findFirstSoundCandidateIndex(currentTime) - 1; i >= 0; i--)
                 {
                     var note = hitObjects[i];
@@ -87,7 +88,7 @@ public sealed class BmsKeySoundCursor(IReadOnlyList<BmsHitObject> hitObjects, IR
     /// Mirrors the old centralized player's isPastBadWindow.
     /// </summary>
     private static bool isPastBadWindow(BmsHitObject hitObject, double currentTime)
-        => currentTime > hitObject.StartTime + (hitObject.HitWindows?.WindowFor(HitResult.Ok) ?? BmsHitWindows.FALLBACK_BAD_WINDOW);
+        => currentTime > hitObject.StartTime + BmsEngineRules.GetTiming(hitObject, false).PassiveDeadline / 1000.0;
 
     /// <summary>
     /// Generous lookahead for the binary-search cursor reset, covering the widest possible slow

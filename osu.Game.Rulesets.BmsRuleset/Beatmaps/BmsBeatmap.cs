@@ -1,6 +1,7 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using RhythmEngine.Profiles.Bms;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
@@ -10,6 +11,8 @@ namespace osu.Game.Rulesets.BmsRuleset.Beatmaps;
 
 public class BmsBeatmap : Beatmap<BmsHitObject>, IBmsBeatmap
 {
+    public BmsJudgementModifiers JudgementModifiers { get; set; }
+
     public int TotalColumns { get; set; }
 
     public BmsLayoutVariant LayoutVariant { get; set; } = BmsLayoutVariant.Bms5K;

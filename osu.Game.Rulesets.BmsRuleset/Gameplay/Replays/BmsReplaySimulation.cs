@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using RhythmEngine.Core;
+using RhythmEngine.Profiles.Bms;
 using osu.Framework.Timing;
 using osu.Game.Replays;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
@@ -9,7 +11,6 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
@@ -18,8 +19,6 @@ using osu.Game.Rulesets.BmsRuleset.IO.Input;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
-using RhythmEngine.Core;
-using RhythmEngine.Profiles.Bms;
 
 namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 
@@ -35,7 +34,7 @@ internal static class BmsReplaySimulation
             throw new ArgumentException(@"A complete BMS input replay with finite timestamps is required.", nameof(replay));
 
         var mods = source.Mods.Select(mod => mod.DeepClone()).ToArray();
-        using var windows = BmsJudgementProfileProvider.UseWindowMods(mods.OfType<IApplicableToJudgement>().ToArray());
+
         var manualClock = new ManualClock();
         var clock = new FramedClock(manualClock);
 
@@ -79,7 +78,7 @@ internal static class BmsReplaySimulation
         var engine = new BmsJudgementEngine(
             objects, beatmap.LayoutVariant,
             Enumerable.Range(0, columnCount).Select(index => new BmsJudgementColumnDefinition(index, output)).ToArray(),
-            notes => (BmsProfiles.CreateScore(score.EmptyPoorBreaksCombo ?? BmsJudgementProfileProvider.EmptyPoorBreaksCombo(beatmap.LayoutVariant)),
+            notes => (BmsProfiles.CreateScore(BmsEngineRules.ForBeatmap(beatmap).EmptyPoorBreaksCombo),
                 health.CreateEngineHealth(notes))
         );
 
@@ -114,7 +113,7 @@ internal static class BmsReplaySimulation
         var pressed = new HashSet<BmsAction>();
         var nextInput = 0;
         var time = fromTime ?? Math.Min(targetTime, Math.Min(0, Math.Min(frames.Length > 0 ? frames[0].Time : 0,
-            beatmap.HitObjects.Select(note => note.StartTime - BmsJudgementProfileProvider.GetBehaviour(beatmap.LayoutVariant).SearchWindow).DefaultIfEmpty(0).Min())));
+            beatmap.HitObjects.Select(note => note.StartTime - BmsEngineRules.ForBeatmap(beatmap).SearchWindow / 1000.0).DefaultIfEmpty(0).Min())));
 
         if (fromTime != null)
         {

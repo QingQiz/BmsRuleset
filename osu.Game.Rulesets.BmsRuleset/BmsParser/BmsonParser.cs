@@ -51,7 +51,7 @@ internal static class BmsonParser
         if (judgeRank < 0)
             throw new InvalidDataException($"BMSON judge_rank must be non-negative; received {info.GetProperty("judge_rank").GetRawText()}.");
 
-        var exRank = judgeRank / BmsJudgementProfileProvider.RateForRank(layout, 2);
+        var exRank = judgeRank / BmsEngineRules.RateForRank(layout, 2);
         long lastPulse = 0;
 
         foreach (var channel in array(root, "sound_channels", true))
@@ -60,6 +60,7 @@ internal static class BmsonParser
             var samplePath = resource(channel, "name");
             var groups = array(channel, "notes", true).Select(readNote).GroupBy(note => note.Pulse).OrderBy(group => group.Key).ToArray();
             double sourceOffset = 0;
+
             for (var i = 0; i < groups.Length; i++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -74,6 +75,7 @@ internal static class BmsonParser
                 sampleDefinitions.Add(sampleId, new BmsSampleDefinition(samplePath, sourceOffset, endOffset, ResumeInPreview: true));
 
                 var hasPlayableNote = false;
+
                 foreach (var note in group)
                 {
                     var endPulse = checked(note.Pulse + note.Length);
@@ -84,6 +86,7 @@ internal static class BmsonParser
                     hasPlayableNote = true;
                     var column = mapColumn(note.Lane, layout, note.Pulse, samplePath);
                     var key = (column, note.Pulse);
+
                     if (note.Release)
                     {
                         if (!releases.TryGetValue(key, out var releaseSamples))
@@ -94,6 +97,7 @@ internal static class BmsonParser
                     }
 
                     var mode = note.Length > 0 ? note.Mode : BmsLongNoteMode.Undefined;
+
                     if (objects.TryGetValue(key, out var existing))
                     {
                         if (existing.EndPulse != endPulse
@@ -116,6 +120,7 @@ internal static class BmsonParser
         }
 
         var parsedObjects = new List<BmsParsedHitObject>(objects.Count);
+
         foreach (var (key, note) in objects)
         {
             var time = timing.ProjectTickToTime(key.Pulse);
@@ -136,10 +141,12 @@ internal static class BmsonParser
         readAuxiliaryChannels("key_channels", false);
         readAuxiliaryChannels("mine_channels", true);
         var hitObjects = parsedObjects.OrderBy(note => note.Tick).ThenBy(note => note.Column).ToArray();
+
         foreach (var column in hitObjects.GroupBy(note => note.Column))
         {
             double previousEnd = -1;
             long previousPulse = -1;
+
             foreach (var note in column)
             {
                 if (note.Tick == previousPulse || note.StartTime < previousEnd)
@@ -200,6 +207,7 @@ internal static class BmsonParser
                 var sampleId = checked(nextSampleId++);
                 var samplePath = resource(channel, "name");
                 sampleDefinitions.Add(sampleId, new BmsSampleDefinition(samplePath));
+
                 foreach (var note in array(channel, "notes", true))
                 {
                     var position = pulse(note, "y");
@@ -207,7 +215,8 @@ internal static class BmsonParser
                     var column = mapColumn(lane, layout, position, samplePath);
                     var damage = mine ? number(note, "damage", 0) : 0;
                     if (damage < 0)
-                        throw new InvalidDataException($"BMSON {field}.damage must be non-negative; received {note.GetProperty("damage").GetRawText()} at x={lane}, y={position}, sample=\"{samplePath}\".");
+                        throw new InvalidDataException(
+                            $"BMSON {field}.damage must be non-negative; received {note.GetProperty("damage").GetRawText()} at x={lane}, y={position}, sample=\"{samplePath}\".");
 
                     var parsed = new BmsParsedHitObject(position, timing.ProjectTickToTime(position), 0, column, sampleId,
                         false, mine, damage, null, JudgementRate: double.NaN);
@@ -245,10 +254,12 @@ internal static class BmsonParser
         var bpm = initialBpm;
         double time = 0;
         long previousPulse = 0;
+
         foreach (var position in bpms.Keys.Concat(stops.Keys).Distinct().Order())
         {
             cancellationToken.ThrowIfCancellationRequested();
             time += (position - previousPulse) * 240000d / bpm / resolution;
+
             if (bpms.TryGetValue(position, out var nextBpm))
             {
                 bpm = nextBpm;
@@ -273,6 +284,7 @@ internal static class BmsonParser
         var definitions = new Dictionary<int, string>();
         var ids = new Dictionary<long, int>();
         var events = new List<BmsBgaEvent>();
+
         if (root.TryGetProperty("bga", out var bga) && bga.ValueKind != JsonValueKind.Null)
         {
             foreach (var header in array(bga, "bga_header"))
@@ -285,6 +297,7 @@ internal static class BmsonParser
             }
 
             var sequences = new Dictionary<long, BmsBgaFrame[]>();
+
             foreach (var sequence in array(bga, "bga_sequence"))
             {
                 sequences[pulse(sequence, "id")] = array(sequence, "sequence", true).Select(frame => new BmsBgaFrame(
@@ -313,6 +326,7 @@ internal static class BmsonParser
                     var extended = sourceIds.Length > 1 || sourceIds.Any(sequences.ContainsKey) || condition.Length > 0;
                     BmsBgaAnimation? animation = null;
                     var key = 0;
+
                     if (extended)
                     {
                         var variants = sourceIds.Select(id => sequences.TryGetValue(id, out var frames)

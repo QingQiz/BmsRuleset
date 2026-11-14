@@ -8,6 +8,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.Scoring;
@@ -164,7 +165,7 @@ public partial class BmsGameplayVirtualisationTest
         playfield.RefreshAllLifetimes();
 
         var entry = playfield.Stage.Columns[hitObject.Column].HitObjectContainer.Entries.Single();
-        var table = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, hitObject.Column, hitObject.EffectiveJudgementRate, tail: false);
+        var table = BmsEngineRules.GetTiming(BmsLayoutVariant.Bme7K, hitObject.Column, hitObject.EffectiveJudgementRate, tail: false);
 
         Assert.That(entry.LifetimeStart, Is.LessThanOrEqualTo(hitObject.StartTime - table.FastWindowFor(HitResult.Miss)));
     }
@@ -188,7 +189,7 @@ public partial class BmsGameplayVirtualisationTest
         playfield.RefreshAllLifetimes();
 
         var entry = playfield.Stage.Columns[hitObject.Column].HitObjectContainer.Entries.Single();
-        var table = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, hitObject.Column, hitObject.EffectiveJudgementRate, tail: false);
+        var table = BmsEngineRules.GetTiming(BmsLayoutVariant.Bme7K, hitObject.Column, hitObject.EffectiveJudgementRate, tail: false);
 
         Assert.That(entry.LifetimeEnd, Is.GreaterThan(hitObject.StartTime + table.SlowWindowFor(HitResult.Ok)));
     }
@@ -521,5 +522,4 @@ public partial class BmsGameplayVirtualisationTest
 
         return firstVisible;
     }
-
 }

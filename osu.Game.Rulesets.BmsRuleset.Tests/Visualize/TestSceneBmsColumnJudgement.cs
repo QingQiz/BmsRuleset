@@ -1,4 +1,5 @@
 #nullable enable
+
 using System;
 using System.IO;
 using System.Linq;
@@ -12,6 +13,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
@@ -111,7 +113,7 @@ public partial class TestSceneBmsColumnJudgement : BmsPlayerTestScene
         AddStep("read passive boundary", () =>
         {
             var note = (BmsHitObject)Player.GameplayState.Beatmap.HitObjects.First(h => h.StartTime == 5000);
-            deadline = note.StartTime + BmsJudgementProfileProvider.GetTable(note.Beatmap.LayoutVariant,
+            deadline = note.StartTime + BmsEngineRules.GetTiming(note.Beatmap.LayoutVariant,
                 note.Column, note.EffectiveJudgementRate, false).SlowWindowFor(HitResult.Ok);
         });
         hideNotes();
@@ -120,6 +122,7 @@ public partial class TestSceneBmsColumnJudgement : BmsPlayerTestScene
     private void hideNotes() => AddStep("apply requested visibility", () =>
     {
         if (!culled) return;
+
         foreach (var drawable in Playfield.AllColumnAliveObjects().OfType<DrawableBmsHitObject>())
         {
             if (drawable.HitObject.StartTime != 5000) continue;
@@ -158,16 +161,18 @@ public partial class TestSceneBmsColumnJudgement : BmsPlayerTestScene
             TestContext.WriteLine("P2_TRACE " + trace);
             var expected = baseline.RootElement.GetProperty("traces").GetProperty(scenario).GetProperty(checkpoint);
             var expectedState = JsonNode.Parse(expected.GetRawText())!.AsObject();
+
             if (scenario == nameof(PassiveTraversalSurvivesPoolingAndRewind))
             {
                 // This fixture's four misses share the head's strict +210ms deadline.
                 foreach (var judgement in expectedState["events"]!.AsArray())
-                foreach (var observation in judgement!["TimingObservations"]!.AsArray())
-                {
-                    observation!["ActualTime"] = 5210.001;
-                    observation["TimeOffset"] = 5210.001 - observation["ExpectedTime"]!.GetValue<double>();
-                }
+                    foreach (var observation in judgement!["TimingObservations"]!.AsArray())
+                    {
+                        observation!["ActualTime"] = 5210.001;
+                        observation["TimeOffset"] = 5210.001 - observation["ExpectedTime"]!.GetValue<double>();
+                    }
             }
+
             // The old trace included synthetic endpoint callbacks; seeks now publish the final state.
             expectedState.Remove("results");
             // The recorded trajectory's final snapshot remains the reference for the current gauge layers.
@@ -189,7 +194,7 @@ public partial class TestSceneBmsColumnJudgement : BmsPlayerTestScene
     private static JsonDocument readBaseline()
     {
         using var stream = typeof(TestSceneBmsColumnJudgement).Assembly.GetManifestResourceStream(
-            "osu.Game.Rulesets.BmsRuleset.Tests.reference_fixtures.column_judgement_p1_trace.json")
+                               "osu.Game.Rulesets.BmsRuleset.Tests.reference_fixtures.column_judgement_p1_trace.json")
                            ?? throw new InvalidDataException("Missing P1 column judgement trace.");
         return JsonDocument.Parse(stream);
     }

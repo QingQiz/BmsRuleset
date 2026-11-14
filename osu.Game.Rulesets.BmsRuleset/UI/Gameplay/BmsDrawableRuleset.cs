@@ -11,8 +11,6 @@ using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Practice;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
@@ -98,8 +96,6 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
 
     protected override void Dispose(bool isDisposing)
     {
-        BmsJudgementProfileProvider.ClearActiveWindowMods(windowMods);
-
         var previewRestoreTime = isDisposing ? gameplayClockContainer?.CurrentTime : null;
 
         base.Dispose(isDisposing);
@@ -154,13 +150,8 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
         }
     }
 
-    private IReadOnlyList<IApplicableToJudgement> windowMods = [];
-
     protected override Playfield CreatePlayfield()
     {
-        windowMods = Mods.OfType<IApplicableToJudgement>().ToArray();
-        BmsJudgementProfileProvider.SetActiveWindowMods(windowMods);
-
         return new BmsPlayfield((BmsBeatmap)Beatmap);
     }
 
@@ -200,6 +191,7 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
         // much longer. Give simulation a bounded share of that cost before visiting skins again.
         var catchUpStart = Stopwatch.GetTimestamp();
         var catchUpBudget = Math.Min(50, previousVisualUpdateMs);
+
         while (ReplayScore != null && FrameStableClock is FrameStabilityContainer { IsRunning: true, IsRewinding: false } stability
                                    && FrameStableClock.IsCatchingUp.Value && ((BmsPlayfield)Playfield).HasPendingVisualUpdate
                                    && Stopwatch.GetElapsedTime(catchUpStart).TotalMilliseconds < catchUpBudget)

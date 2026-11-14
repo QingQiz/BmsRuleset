@@ -1,12 +1,13 @@
 using System;
+using System.Linq;
 using NUnit.Framework;
+using RhythmEngine.Profiles.Bms;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Playback;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Audio;
@@ -14,41 +15,51 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Audio;
 [TestFixture]
 public class BmsKeySoundCursorTest
 {
-    [Test]
-    public void ModsSelectedAfterDefaultsUpdateAudioAndFrameworkOffsets()
+    [TestCase(BmsJudgementModifiers.None, 835)]
+    [TestCase(BmsJudgementModifiers.NoBad, 887.5)]
+    [TestCase(BmsJudgementModifiers.NoBad | BmsJudgementModifiers.NoGood, 955)]
+    [TestCase(BmsJudgementModifiers.NoBad | BmsJudgementModifiers.NoGreat, 985)]
+    public void AudioReadinessUsesTheEarliestEnabledHitWindow(BmsJudgementModifiers modifiers, double earliest)
     {
-        var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, Rank = 0, TotalColumns = 8 };
+        var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, Rank = 2, JudgementModifiers = modifiers };
+        beatmap.HitObjects.Add(new BmsNote { Beatmap = beatmap, Column = 1, StartTime = 1000, SampleKey = 1 });
+        beatmap.HitObjects.Add(new BmsNote { Beatmap = beatmap, Column = 1, StartTime = 2000, SampleKey = 2 });
+        var usage = BmsGameplayAudioController.GetSampleUsages(beatmap).Single(item => item.SampleKey == 2);
+        Assert.That(usage.EarliestTriggerTime, Is.EqualTo(earliest));
+        Assert.That(usage.LatestTriggerTime, Is.EqualTo(2210));
+    }
+
+    [Test]
+    public void ConfiguredModsShareAudioAndFrameworkOffsets()
+    {
+        var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, Rank = 0, TotalColumns = 8, JudgementModifiers = BmsJudgementModifiers.Lr2oraja | BmsJudgementModifiers.NoBad };
         var first = new BmsNote { Beatmap = beatmap, Column = 1, StartTime = 1000 };
         var second = new BmsNote { Beatmap = beatmap, Column = 1, StartTime = 2000 };
         first.ApplyDefaults(beatmap.ControlPointInfo, beatmap.Difficulty);
         second.ApplyDefaults(beatmap.ControlPointInfo, beatmap.Difficulty);
-        Assert.That(first.HitWindows.WindowFor(HitResult.Ok), Is.EqualTo(70));
-        using (BmsJudgementProfileProvider.UseWindowMods([new BmsModLr2(), new BmsModNoBad()]))
-        {
-            var cursor = new BmsKeySoundCursor([first, second]);
-            Assert.That(first.HitWindows.WindowFor(HitResult.Ok), Is.EqualTo(200));
-            Assert.That(cursor.Next(1100, _ => false), Is.SameAs(first));
-            Assert.That(cursor.Next(1200, _ => false), Is.SameAs(first));
-            Assert.That(cursor.Next(1200.001, _ => false), Is.SameAs(second));
-            var result = new BmsJudgementResult(first, first.CreateJudgement()) { Type = HitResult.Ok };
-            result.SetTiming(1100, 1);
-            Assert.That(result.TimeOffset, Is.EqualTo(100));
-        }
-        Assert.That(first.HitWindows.WindowFor(HitResult.Ok), Is.EqualTo(70));
+        var cursor = new BmsKeySoundCursor([first, second]);
+        Assert.That(first.HitWindows.WindowFor(HitResult.Ok), Is.EqualTo(200));
+        Assert.That(cursor.Next(1100, _ => false), Is.SameAs(first));
+        Assert.That(cursor.Next(1200, _ => false), Is.SameAs(first));
+        Assert.That(cursor.Next(1200.001, _ => false), Is.SameAs(second));
+        var result = new BmsJudgementResult(first, first.CreateJudgement()) { Type = HitResult.Ok };
+        result.SetTiming(1100, 1);
+        Assert.That(result.TimeOffset, Is.EqualTo(100));
     }
 
-    // HitWindows is only populated by ApplyDefaults at load time, so it stays null in these tests
-    // and isPastBadWindow falls back to BmsHitWindows.FALLBACK_BAD_WINDOW (280 ms) — no beatmap needed.
+    // Seven-key EASY has a 280 ms passive deadline.
     private static BmsNote note(double startTime) => new()
     {
+        Beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, Rank = 3 },
         StartTime = startTime,
-        Column = 0,
+        Column = 1,
     };
 
     private static BmsLandmine mine(double startTime) => new()
     {
+        Beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, Rank = 3 },
         StartTime = startTime,
-        Column = 0,
+        Column = 1,
     };
 
     [Test]

@@ -305,23 +305,8 @@ public static partial class BmsProfiles
             return new TimingWindows(lr2Entries);
         }
 
-        var rate = ((int)rank + 1) * 0.25;
-        var pgreat = (tail ? directional ? 130 : 120 : directional ? 30 : 20) * rate;
-        var great = (tail ? directional ? 170 : 160 : directional ? 70 : 60) * rate;
-        var good = (tail ? directional ? 210 : 200 : directional ? 160 : 150) * rate;
-        var badEarly = (directional ? 230 : 220) * rate;
-        var badLate = (directional ? 290 : 280) * rate;
-        var entries = new List<TimingWindow>
-        {
-            new(BmsResults.PGREAT, -Time.FromMilliseconds(pgreat), Time.FromMilliseconds(pgreat)),
-            new(BmsResults.GREAT, -Time.FromMilliseconds(great), Time.FromMilliseconds(great)),
-            new(BmsResults.GOOD, -Time.FromMilliseconds(good), Time.FromMilliseconds(good)),
-            new(BmsResults.BAD, -Time.FromMilliseconds(badEarly), Time.FromMilliseconds(badLate)),
-        };
-        if (!tail)
-            entries.Add(new TimingWindow(BmsResults.EMPTY_POOR, -Time.FromMilliseconds(500), Time.FromMilliseconds(directional ? 160 : 150), IncludeEarly: false));
-
-        return new TimingWindows(entries);
+        var rules = BmsJudgementRules.For(BmsJudgementMode.SevenKey);
+        return rules.GetProfile(rules.RateForRank((int)rank)).GetTiming(directional, tail).Windows;
     }
 
     private static HealthConfiguration createHealth(KeyChart source, ScorePlan plan, BmsOptions options, bool lr2)

@@ -1,5 +1,7 @@
 using System;
 using System.Linq;
+using RhythmEngine.Core;
+using RhythmEngine.Profiles.Bms;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -29,8 +31,6 @@ using osu.Game.Rulesets.UI;
 using osu.Game.Screens.Play;
 using osu.Game.Skinning;
 using osuTK;
-using RhythmEngine.Core;
-using RhythmEngine.Profiles.Bms;
 using JudgementResult = osu.Game.Rulesets.Judgements.JudgementResult;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
@@ -43,7 +43,6 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 [Cached]
 public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsAction>
 {
-
     #region Constants
 
     private const float minimum_side_padding = 20;
@@ -92,7 +91,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         var judgementObjects = Beatmap.HitObjects.ToArray();
         judgementEngine = new BmsJudgementEngine(judgementObjects, LayoutVariant, judgementColumns.Select(column =>
             new BmsJudgementColumnDefinition(column.Index, column.JudgementBridge)).ToArray(), objects =>
-            (BmsProfiles.CreateScore(scoreProcessor?.EmptyPoorBreaksCombo ?? BmsJudgementProfileProvider.EmptyPoorBreaksCombo(LayoutVariant)),
+            (BmsProfiles.CreateScore(BmsEngineRules.ForBeatmap(Beatmap).EmptyPoorBreaksCombo),
                 healthProcessor?.CreateEngineHealth(objects) ?? BmsEngineGauge.CreateDefault(objects)));
 
         foreach (var column in judgementColumns)
@@ -551,5 +550,4 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     }
 
     #endregion
-
 }

@@ -1,4 +1,5 @@
 #nullable enable
+
 using System;
 using System.Linq;
 using System.Reflection;
@@ -395,7 +396,8 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
         AddAssert("BAD window retains asymmetric BMS edges", () =>
         {
             var domain = BmsHitErrorMeter.CreateDomain(Playfield.Beatmap.LayoutVariant, Playfield.Beatmap.HitObjects[0].EffectiveJudgementRate);
-            var windows = BmsJudgementProfileProvider.GetTable(Playfield.Beatmap.LayoutVariant, 1, Playfield.Beatmap.HitObjects[0].EffectiveJudgementRate, tail: false);
+            var windows = BmsEngineRules.GetTiming(Playfield.Beatmap.LayoutVariant, 1, Playfield.Beatmap.HitObjects[0].EffectiveJudgementRate, tail: false,
+                modifiers: Playfield.Beatmap.JudgementModifiers);
             return Math.Abs(badWindow().X - domain.RelativePosition(-windows.FastWindowFor(HitResult.Ok))) < 0.00001
                    && Math.Abs(badWindow().X + badWindow().Width - domain.RelativePosition(windows.SlowWindowFor(HitResult.Ok))) < 0.00001;
         });
@@ -434,16 +436,16 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
         AddUntilStep("meter loaded", () => meter().IsLoaded);
         AddStep("check visible colours against playable windows", () =>
         {
-            var windows = BmsJudgementProfileProvider.GetTable(Playfield.Beatmap.LayoutVariant, 1,
-                Playfield.Beatmap.HitObjects[0].EffectiveJudgementRate, tail: false);
+            var windows = BmsEngineRules.GetTiming(Playfield.Beatmap.LayoutVariant, 1,
+                Playfield.Beatmap.HitObjects[0].EffectiveJudgementRate, tail: false, modifiers: Playfield.Beatmap.JudgementModifiers);
             var bars = meter().ChildrenOfType<Container>().Single(child => child.Name == "judgement windows").Children.OfType<Box>().ToArray();
 
             // Quarter-millisecond samples avoid shared inclusive boundaries while covering both sides
             // and the unused space beyond E-POOR's finite slow boundary.
             for (var offset = -499.75; offset < 500; offset++)
             {
-                var result = windows.ResultForOffset(offset);
-                if (result == HitResult.None && windows.IsEmptyPoorOffset(offset))
+                var result = windows.HitAt(offset);
+                if (result == HitResult.None && windows.EmptyPoorAt(offset))
                     result = HitResult.Miss;
 
                 var position = (float)((offset + 500) / 1000);

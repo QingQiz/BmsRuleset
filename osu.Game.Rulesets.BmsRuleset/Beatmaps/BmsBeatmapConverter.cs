@@ -1,7 +1,8 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Linq;
 using System.Threading;
+using RhythmEngine.Profiles.Bms;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Conversion;
@@ -29,7 +30,10 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
 
     public BmsReferenceBpmMode? ReferenceBpmMode { get; init; }
 
-    public Func<BmsLayoutVariant, int, double?, double> JudgementRateCalculator { get; set; } = BmsJudgementProfileProvider.RateForDifficulty;
+    public BmsJudgementModifiers JudgementModifiers { get; set; }
+
+    private double judgementRate(BmsLayoutVariant layout, int rank, double? exRank)
+        => BmsEngineRules.ForLayout(layout, JudgementModifiers).ResolveRate(rank, exRank);
 
     public override bool CanConvert()
     {
@@ -54,6 +58,7 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
     protected override Beatmap<BmsHitObject> ConvertBeatmap(IBeatmap original, CancellationToken cancellationToken)
     {
         var converted = convertToBmsBeatmap(original, cancellationToken);
+        converted.JudgementModifiers = JudgementModifiers;
         if (converted.TimingMap is not { TickResolution: > 0, BpmEvents.Count: > 0 }
             || converted.TotalColumns != BmsLayout.GetTotalColumns(converted.LayoutVariant))
             throw new InvalidDataException("BMS conversion requires a complete timing map and layout.");
@@ -79,7 +84,7 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
         {
             note.Beatmap = converted;
             if (double.IsNaN(note.JudgementRate))
-                note.JudgementRate = JudgementRateCalculator(converted.LayoutVariant, converted.Rank, converted.ExRank);
+                note.JudgementRate = judgementRate(converted.LayoutVariant, converted.Rank, converted.ExRank);
         }
 
         return converted;
@@ -139,6 +144,7 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
         else if (original is IBmsBeatmap bmsSource)
         {
             converted.CopyBmsDataFrom(bmsSource);
+
             foreach (var note in original.HitObjects.Cast<BmsHitObject>())
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -167,7 +173,7 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
         if (!string.IsNullOrWhiteSpace(BranchReplayDecisions))
             selector = BmsChartParser.CreateReplayDecisionSelector(BmsChartParser.DeserialiseBranchDecisions(BranchReplayDecisions));
 
-        var parseResult = BmsChartParser.Parse(decoded.RawLines, decoded.BeatmapInfo.Path, selector, JudgementRateCalculator);
+        var parseResult = BmsChartParser.Parse(decoded.RawLines, decoded.BeatmapInfo.Path, selector, JudgementModifiers);
         converted.CopyFrom(parseResult);
         converted.ControlPointInfo = new ControlPointInfo();
         BmsBeatmapDecoder.PopulateTiming(converted, parseResult.TimingMap.BpmEvents);

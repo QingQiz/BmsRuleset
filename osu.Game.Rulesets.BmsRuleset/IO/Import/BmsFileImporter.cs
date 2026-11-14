@@ -201,6 +201,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
     private static IEnumerable<string> expandPathToCharts(string path, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+
         if (Directory.Exists(path))
         {
             foreach (var file in Directory.EnumerateFiles(path, "*.*", SearchOption.AllDirectories))
@@ -277,8 +278,8 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
 
             var layout = summary.Metadata.LayoutVariant;
             var judgementRate = summary.Metadata.ExRank is { } exRank
-                ? BmsJudgementProfileProvider.RateForExRank(layout, exRank)
-                : BmsJudgementProfileProvider.RateForRank(layout, summary.Metadata.Rank);
+                ? BmsEngineRules.RateForExRank(layout, exRank)
+                : BmsEngineRules.RateForRank(layout, summary.Metadata.Rank);
 
             return new BmsStarRatingProcessor()
                 .Compute(summary.StarRatingNoteTimings, summary.Metadata.KeyCount, summary.Metadata.Rank, layout: layout, judgementRate: judgementRate, cancellationToken: cancellationToken)
@@ -345,6 +346,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
     {
         using var bulkUpdate = BmsBulkBeatmapUpdate.Begin(realm);
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(notification.CancellationToken);
+
         try
         {
             var fileStore = new RealmFileStore(realm, storage);
@@ -366,6 +368,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
             var failures = new ConcurrentBag<(string Path, string Reason)>();
             var producer = launchProducer(groups, fileStore, pool, importedBeatmapMd5Hashes, failures, cancellation.Token);
             (int imported, int processed, bool cancelled) result;
+
             try
             {
                 result = drainConsumer(notification, groups, pool, cancellation.Token);
@@ -436,6 +439,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
                 // retain the same metadata winner. No buffering keeps only worker-owned bytes alive.
                 var charts = Partitioner.Create(readCharts(), EnumerablePartitionerOptions.NoBuffering);
                 var partitions = charts.GetPartitions(preparation_concurrency);
+
                 try
                 {
                     // Realm contexts are thread-bound and costly to reopen for every chart.
@@ -449,6 +453,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
                         {
                             var chart = partition.Current;
                             preparation_slots.Wait(cancellationToken);
+
                             try
                             {
                                 chart.directory.Charts[chart.index] = readPreparedChart(chart.path, chart.content, chart.md5, workerRealm, fileStore, cancellationToken);
@@ -494,11 +499,13 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
                 foreach (var group in groups)
                 {
                     var directory = new DirectoryPreparation(group);
+
                     for (var index = 0; index < group.ChartPaths.Length; index++)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
                         var path = group.ChartPaths[index];
                         byte[] content;
+
                         try
                         {
                             content = File.ReadAllBytes(path);
@@ -615,9 +622,11 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
             // Find-or-create RealmFile objects. Files already exist on disk (written by producers);
             // we only need the realm metadata to point at them.
             var realmFileByHash = new Dictionary<string, RealmFile>(StringComparer.OrdinalIgnoreCase);
+
             foreach (var hash in allHashes)
             {
                 var existing = r.Find<RealmFile>(hash);
+
                 if (existing != null)
                     realmFileByHash[hash] = existing;
                 else
@@ -638,6 +647,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
 
             // Attach file usages (dedupe by filename).
             var seenFilenames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
             foreach (var chart in chartImports)
             {
                 var fileName = Path.GetFileName(chart.Path);
@@ -684,6 +694,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
                 BmsBeatmapStatistics.WriteScratchObjectCount(beatmapInfo, chart.ScratchObjectCount);
 
                 DifficultyNameUpdater.GetDifficultyName(beatmapInfo, out var markerStr);
+
                 if (!string.IsNullOrWhiteSpace(markerStr))
                 {
                     beatmapInfo.DifficultyName = DifficultyNameUpdater.AddMarkerSuffix(beatmapInfo.DifficultyName, markerStr);
@@ -765,7 +776,6 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
     private sealed class MemoryBackedFileStream(string path, byte[] content)
         : FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 1)
     {
-
         public override bool CanRead => true;
 
         public override bool CanSeek => true;

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using RhythmEngine.Profiles.Bms;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
@@ -11,17 +12,25 @@ using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests;
 
-internal readonly record struct BmsJudgementCandidate(double StartTime, double EndTime, int Column, double JudgementRate,
-    bool IsLongNote, bool IsJudged = false, bool HasMistake = false);
+internal readonly record struct BmsJudgementCandidate(
+    double StartTime,
+    double EndTime,
+    int Column,
+    double JudgementRate,
+    bool IsLongNote,
+    bool IsJudged = false,
+    bool HasMistake = false);
+
 internal readonly record struct BmsJudgementSelection(BmsJudgementCandidate? Candidate, HitResult Result, bool IsEmptyPoor);
 
 internal static class BmsTestJudgementSelector
 {
     internal static BmsJudgementSelection SelectPress(BmsLayoutVariant layout, int column,
-        IEnumerable<BmsJudgementCandidate> candidates, double inputTime, BmsJudgementAlgorithm? algorithm = BmsJudgementAlgorithm.Combo)
+                                                      IEnumerable<BmsJudgementCandidate> candidates, double inputTime, BmsJudgementAlgorithm? algorithm = BmsJudgementAlgorithm.Combo,
+                                                      BmsJudgementModifiers modifiers = BmsJudgementModifiers.None)
     {
         var ordered = candidates.OrderBy(c => c.StartTime).ThenBy(c => c.Column).ToArray();
-        var beatmap = new BmsBeatmap { LayoutVariant = layout };
+        var beatmap = new BmsBeatmap { LayoutVariant = layout, JudgementModifiers = modifiers };
         var objects = ordered.Select(c =>
         {
             BmsHitObject note = c.IsLongNote ? new BmsLongNote { Duration = c.EndTime - c.StartTime } : new BmsNote();
@@ -33,6 +42,7 @@ internal static class BmsTestJudgementSelector
         }).ToArray();
         var output = new BmsRecordingJudgementOutput();
         var engine = new BmsJudgementEngine(objects, layout, column, output);
+
         foreach (var candidate in ordered.Where(c => c.Column == column && (c.IsJudged || c.HasMistake)))
         {
             var time = candidate.IsJudged ? candidate.StartTime : candidate.StartTime - 180;
@@ -40,6 +50,7 @@ internal static class BmsTestJudgementSelector
             engine.QueueInput(time + .001, column, false, false);
             engine.ProcessFrame(new BmsFrameContext(time + .001, 1), 0, algorithm);
         }
+
         var selection = new BmsJudgementSelection(null, HitResult.None, false);
         output.AfterResultApplied = (note, frame) =>
         {

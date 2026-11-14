@@ -131,12 +131,15 @@ public class BmsRulesetTest
     {
         var beatmap = new BmsBeatmap
         {
+            LayoutVariant = BmsLayoutVariant.Bme7KDouble,
             TotalColumns = 16,
             HitObjects =
             {
                 new BmsHitObject { StartTime = 1000, Column = 15 },
             },
         };
+        beatmap.HitObjects[0].Beatmap = beatmap;
+        beatmap.HitObjects[0].ApplyDefaults(beatmap.ControlPointInfo, beatmap.Difficulty);
 
         var drawableRuleset = (BmsDrawableRuleset)ruleset.CreateDrawableRulesetWith(beatmap);
 
@@ -489,7 +492,7 @@ public class BmsRulesetTest
         new BmsDifficultyInfo { Rank = 3, LayoutVariant = BmsLayoutVariant.Bme7K }.WriteToOsuDifficulty(beatmapInfo);
 
         var rank = ruleset.GetBeatmapAttributesForDisplay(beatmapInfo, Array.Empty<Mod>())
-                          .Single(attribute => attribute.Acronym == "RK");
+            .Single(attribute => attribute.Acronym == "RK");
 
         var metrics = rank.AdditionalMetrics.ToDictionary(metric => metric.Name.ToString(), metric => metric.Value.ToString());
 

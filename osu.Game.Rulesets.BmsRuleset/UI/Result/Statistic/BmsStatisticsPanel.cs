@@ -10,8 +10,6 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Input.Events;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics.Containers;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.Scoring;
@@ -72,7 +70,7 @@ internal partial class BmsStatisticsPanel : VisibilityContainer
         return await Task.Run(() =>
         {
             var mods = replay.ScoreInfo.Mods;
-            using var windows = BmsJudgementProfileProvider.UseWindowMods(mods.OfType<IApplicableToJudgement>().ToArray());
+
             var playableBeatmap = workingBeatmap.GetPlayableBeatmap(score.Ruleset, mods, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             return BmsResultStatisticsData.Load(replay.ScoreInfo, playableBeatmap, replay.Replay, cancellationToken);
@@ -84,6 +82,7 @@ internal partial class BmsStatisticsPanel : VisibilityContainer
         CancelLoading();
         content.Clear();
         statistics = null;
+
         if (change.NewValue is not { } score)
         {
             overview?.Clear();

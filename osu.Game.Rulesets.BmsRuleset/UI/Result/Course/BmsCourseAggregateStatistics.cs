@@ -2,8 +2,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Course;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
@@ -43,6 +41,7 @@ internal partial class BmsCourseAggregateStatistics : BmsStatisticsPanel
         var gaugeStates = gaugeTypes.Select(type => new BmsGaugeStateSnapshot(type, 1, false)).ToArray();
         var profileFamily = BmsCourseSession.ResolveCourseGaugeProfileFamily(session.Course.Constraints);
         var data = new BmsResultStatisticsData[stages.Length];
+
         for (var i = 0; i < stages.Length; i++)
         {
             var stage = stages[i];
@@ -53,7 +52,7 @@ internal partial class BmsCourseAggregateStatistics : BmsStatisticsPanel
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var mods = stageScore.Mods;
-                using var windows = BmsJudgementProfileProvider.UseWindowMods(mods.OfType<IApplicableToJudgement>().ToArray());
+
                 var beatmap = stage.WorkingBeatmap.GetPlayableBeatmap(stageScore.Ruleset, mods, cancellationToken);
                 // Legacy scores lack starting-health settings, so reconstruct each surviving tier from the preceding replay.
                 statistics = replay != null ? BmsResultStatisticsData.Load(stageScore, beatmap, replay.Replay, cancellationToken, gaugeStates, profileFamily) : null;

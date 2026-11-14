@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
-using Decoder = osu.Game.Beatmaps.Formats.Decoder;
 using NUnit.Framework;
+using Decoder = osu.Game.Beatmaps.Formats.Decoder;
 using osu.Game.Beatmaps;
 using osu.Game.IO;
 using osu.Game.Models;
@@ -14,9 +14,9 @@ using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Difficulty;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
-using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
@@ -191,7 +191,7 @@ public class BmsBeatmapDecoderTest
         var hitObjects = beatmap.HitObjects;
 
         var lns = hitObjects.OfType<BmsLongNote>().ToList();
-        var table = BmsJudgementProfileProvider.GetTable(beatmap.LayoutVariant, 1, beatmap.Rank, false);
+        var table = BmsEngineRules.GetTiming(beatmap.LayoutVariant, 1, beatmap.Rank, false);
         var pgreat = table.FrameworkWindowFor(HitResult.Perfect);
         var great = table.FrameworkWindowFor(HitResult.Great);
         var good = table.FrameworkWindowFor(HitResult.Good);
@@ -206,12 +206,12 @@ public class BmsBeatmapDecoderTest
 
             // Check press timing
             var pressOffset = autoplayPress - ln.StartTime; // should be 0
-            var pressJudgement = table.ResultForOffset(pressOffset);
+            var pressJudgement = table.HitAt(pressOffset);
             var pressOk = pressOffset >= -pgreat && pressOffset <= pgreat;
 
             // Check release timing
             var releaseOffset = autoplayRelease - ln.GetEndTime(); // should be 0
-            var releaseJudgement = table.ResultForOffset(releaseOffset);
+            var releaseJudgement = table.HitAt(releaseOffset);
             var releaseOk = releaseOffset >= -pgreat && releaseOffset <= pgreat;
 
             if (!pressOk || !releaseOk || pressJudgement != HitResult.Perfect || releaseJudgement != HitResult.Perfect)

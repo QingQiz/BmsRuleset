@@ -1,8 +1,7 @@
 using NUnit.Framework;
+using RhythmEngine.Profiles.Bms;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
-using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Performance;
 
@@ -16,30 +15,26 @@ public class BmsJudgementProfilePerformanceTest
     public void RepeatedProfileQueries(string modifier)
     {
         const int count = 200000;
-        IApplicableToJudgement[] mods = modifier switch
+        var modifiers = modifier switch
         {
-            "nb" => [new BmsModNoBad()], "ng" => [new BmsModNoGood()], "ne" => [new BmsModNoGreat()], _ => [],
+            "nb" => BmsJudgementModifiers.NoBad, "ng" => BmsJudgementModifiers.NoGood,
+            "ne" => BmsJudgementModifiers.NoGreat, _ => BmsJudgementModifiers.None,
         };
-        BmsJudgementProfileProvider.SetActiveWindowMods(mods);
-        try
+        BmsJudgementPerformanceTest.Measure("Profile-" + modifier, count, () =>
         {
-            BmsJudgementPerformanceTest.Measure("Profile-" + modifier, count, () =>
+            var checksum = 0d;
+            return new BmsJudgementPerformanceTest.Measurement(() =>
             {
-                var checksum = 0d;
-                return new BmsJudgementPerformanceTest.Measurement(() =>
+                for (var i = 0; i < count; i++)
                 {
-                    for (var i = 0; i < count; i++)
-                    {
-                        var table = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, i % 8, .75, (i & 1) == 0);
-                        checksum += table.SlowWindowFor(HitResult.Ok);
-                    }
-                }, () =>
-                {
-                    Assert.That(checksum, Is.EqualTo(42187500));
-                    return new { Checksum = checksum };
-                });
+                    var table = BmsEngineRules.GetTiming(BmsLayoutVariant.Bme7K, i % 8, .75, (i & 1) == 0, modifiers);
+                    checksum += table.PassiveDeadline / 1000.0;
+                }
+            }, () =>
+            {
+                Assert.That(checksum, Is.EqualTo(42187500));
+                return new { Checksum = checksum };
             });
-        }
-        finally { BmsJudgementProfileProvider.ClearActiveWindowMods(mods); }
+        });
     }
 }

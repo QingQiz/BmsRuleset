@@ -60,7 +60,7 @@ public class BmsBeatorajaReferenceTest
                 var fields = line.Split(',');
                 var layout = fields[0] switch { "FIVEKEYS" => BmsLayoutVariant.Bms5K, "SEVENKEYS" => BmsLayoutVariant.Bme7K, _ => BmsLayoutVariant.Popn9K };
                 var column = fields[1].Contains("SCRATCH") ? 0 : 1;
-                var table = BmsJudgementProfileProvider.GetTable(layout, column, int.Parse(fields[2]), fields[1].Contains("END"));
+                var table = BmsEngineRules.GetTiming(layout, column, int.Parse(fields[2]), fields[1].Contains("END"));
                 var result = results[int.Parse(fields[3])];
                 Assert.That(table.SlowWindowFor(result), Is.EqualTo(-long.Parse(fields[4]) / 1000d), line + " slow");
                 Assert.That(table.FastWindowFor(result), Is.EqualTo(long.Parse(fields[5]) / 1000d), line + " fast");
@@ -107,7 +107,7 @@ public class BmsBeatorajaReferenceTest
         BmsLayoutVariant layout,
         [Values(499.999, 500, 500.001)] double pressTime)
     {
-        var candidate = new BmsJudgementCandidate(1000, 1000, 1, BmsJudgementProfileProvider.RateForRank(layout, 2), false);
+        var candidate = new BmsJudgementCandidate(1000, 1000, 1, BmsEngineRules.RateForRank(layout, 2), false);
         Assert.That(BmsTestJudgementSelector.SelectPress(layout, 1, [candidate], pressTime).Result, Is.EqualTo(pressTime > 500 ? HitResult.Miss : HitResult.None),
             "JudgeManager exits the search at dmtime >= mjudgeend (500000us). The row itself has an inclusive boundary.");
     }
@@ -169,12 +169,12 @@ public class BmsBeatorajaReferenceTest
     public void ValidatedJavaRatesMatchPgreatBoundaries(BmsLayoutVariant layout, double rate, double pgreat)
     {
         // Keep checking the executed Java window rows independently of its integer EXRANK conversion.
-        var table = BmsJudgementProfileProvider.GetTable(layout, 1, rate, false);
+        var table = BmsEngineRules.GetTiming(layout, 1, rate, false);
 
         foreach (var direction in new[] { -1, 1 })
         {
-            Assert.That(table.ResultForOffset(direction * pgreat), Is.EqualTo(HitResult.Perfect));
-            Assert.That(table.ResultForOffset(direction * (pgreat + 0.001)), Is.EqualTo(HitResult.Great));
+            Assert.That(table.HitAt(direction * pgreat), Is.EqualTo(HitResult.Perfect));
+            Assert.That(table.HitAt(direction * (pgreat + 0.001)), Is.EqualTo(HitResult.Great));
         }
     }
 }

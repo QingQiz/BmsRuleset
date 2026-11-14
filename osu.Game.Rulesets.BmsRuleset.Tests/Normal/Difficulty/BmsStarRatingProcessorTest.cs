@@ -9,11 +9,13 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Difficulty;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 using osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 using osu.Game.Rulesets.Difficulty;
 using osu.Game.Rulesets.Difficulty.Skills;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Rulesets.Scoring;
 using osu.Game.Tests.Beatmaps;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Difficulty;
@@ -35,11 +37,13 @@ public class BmsStarRatingProcessorTest
         new BmsDifficultyInfo { Rank = 2, ExRank = exRank, LayoutVariant = BmsLayoutVariant.Bme7K }.WriteToOsuDifficulty(beatmap);
         var calculator = new BmsDifficultyCalculator(new BmsRuleset().RulesetInfo, new TestWorkingBeatmap(beatmap));
         Mod[] mods = lr2 ? [new BmsModLr2()] : [];
-        var ratings = timed ? calculator.CalculateTimed(mods).Select(result => result.Attributes.StarRating).ToArray()
+        var ratings = timed
+            ? calculator.CalculateTimed(mods).Select(result => result.Attributes.StarRating).ToArray()
             : [calculator.Calculate(mods).StarRating];
         Assert.That(ratings, Is.Not.Empty);
-        using var windows = BmsJudgementProfileProvider.UseWindowMods(mods.OfType<IApplicableToJudgement>().ToArray());
-        var greatWindow = BmsJudgementProfileProvider.GetTable(beatmap.HitObjects[0], false).FrameworkWindowFor(osu.Game.Rulesets.Scoring.HitResult.Great);
+
+        var greatWindow = BmsEngineRules.GetTiming(beatmap.HitObjects[0], false).FrameworkWindowFor(HitResult.Great);
+
         if (exRank == 0)
         {
             Assert.That(ratings, Is.All.EqualTo(0));
@@ -76,15 +80,17 @@ public class BmsStarRatingProcessorTest
 
     [Test]
     public void ResultConstraintsPreserveFiniteBaseRatings([Values] bool lr2, [Values] bool timed,
-                                                          [Values(0, 1, 2, 3)] int constraintKind, [Values(0, 1, 2)] int pattern)
+                                                           [Values(0, 1, 2, 3)] int constraintKind, [Values(0, 1, 2)] int pattern)
     {
         var beatmap = new BmsBeatmap
         {
             BeatmapInfo = new BeatmapInfo(new BmsRuleset().RulesetInfo),
             LayoutVariant = BmsLayoutVariant.Bme7K, TotalColumns = 8, Rank = 2,
         };
-        var timings = pattern == 0 ? createSparseNoteTimings()
+        var timings = pattern == 0
+            ? createSparseNoteTimings()
             : Enumerable.Range(0, 20).Select(i => new BmsNoteTiming(1 + i % 7, i * 75, i * 75 + (pattern == 2 ? 200 : 0))).ToList();
+
         foreach (var timing in timings)
         {
             BmsHitObject note = timing.EndTime > timing.StartTime ? new BmsLongNote { Duration = timing.EndTime - timing.StartTime } : new BmsNote();
@@ -93,6 +99,7 @@ public class BmsStarRatingProcessorTest
             note.StartTime = timing.StartTime;
             beatmap.HitObjects.Add(note);
         }
+
         BmsTestBeatmaps.SetupBeatmapInfo(beatmap, beatmap.BeatmapInfo.Ruleset);
         new BmsDifficultyInfo { Rank = 2, LayoutVariant = BmsLayoutVariant.Bme7K }.WriteToOsuDifficulty(beatmap);
         var calculator = new BmsDifficultyCalculator(new BmsRuleset().RulesetInfo, new TestWorkingBeatmap(beatmap));
@@ -104,9 +111,11 @@ public class BmsStarRatingProcessorTest
             2 => [new BmsModNoGreat()],
             _ => [new BmsModNoGreat(), new BmsModNoBad()],
         };
-        var baseline = timed ? calculator.CalculateTimed(baseMods).Select(result => result.Attributes.StarRating).ToArray()
+        var baseline = timed
+            ? calculator.CalculateTimed(baseMods).Select(result => result.Attributes.StarRating).ToArray()
             : [calculator.Calculate(baseMods).StarRating];
-        var actual = timed ? calculator.CalculateTimed([.. constraints, .. baseMods]).Select(result => result.Attributes.StarRating).ToArray()
+        var actual = timed
+            ? calculator.CalculateTimed([.. constraints, .. baseMods]).Select(result => result.Attributes.StarRating).ToArray()
             : [calculator.Calculate([.. constraints, .. baseMods]).StarRating];
         Assert.That(actual, Is.Not.Empty);
         Assert.That(actual.All(double.IsFinite), Is.True);
@@ -119,7 +128,7 @@ public class BmsStarRatingProcessorTest
     {
         var timings = createSparseNoteTimings();
         var expected = new BmsStarRatingProcessor().ComputeStarRating(timings, 8, 2);
-        using var windows = BmsJudgementProfileProvider.UseWindowMods([new BmsModLr2(), new BmsModNoGreat()]);
+
         var processor = new BmsStarRatingProcessor();
         Assert.That(processor.Compute(timings, 8, 2).StarRating, Is.EqualTo(expected));
         Assert.That(processor.ComputeStarRating(timings, 8, 2), Is.EqualTo(expected));
@@ -207,6 +216,7 @@ public class BmsStarRatingProcessorTest
         {
             double walk = 0;
             double maxWalk = 0;
+
             for (var i = 0; i < nonZeroCount - 1; i++)
             {
                 var ratio = counts[i + 1] / counts[i];
@@ -337,7 +347,8 @@ public class BmsStarRatingProcessorTest
     [Test]
     public void TestStarRatingProcessorCornerHelpersPreserveExactSemantics()
     {
-        var dedupeMethod = typeof(BmsStarRatingProcessor).GetMethod("toDedupedFilteredArray", BindingFlags.NonPublic | BindingFlags.Static, null, [typeof(double[]), typeof(int), typeof(double)], null);
+        var dedupeMethod = typeof(BmsStarRatingProcessor).GetMethod("toDedupedFilteredArray", BindingFlags.NonPublic | BindingFlags.Static, null, [typeof(double[]), typeof(int), typeof(double)],
+            null);
         var mergeMethod = typeof(BmsStarRatingProcessor).GetMethod("mergeSortedUnique", BindingFlags.NonPublic | BindingFlags.Static, null, [typeof(double[]), typeof(double[])], null);
 
         Assert.Multiple(() =>
@@ -363,7 +374,7 @@ public class BmsStarRatingProcessorTest
         var totalColumns = BmsLayout.GetTotalColumns(layout);
         var noteTimings = createSimpleNoteTimings(totalColumns);
         var processor = new BmsStarRatingProcessor();
-        var judgementRate = BmsJudgementProfileProvider.RateForExRank(layout, 200);
+        var judgementRate = BmsEngineRules.RateForExRank(layout, 200);
 
         processor.Compute(noteTimings, totalColumns, 2, 1.0, layout, judgementRate);
 
@@ -449,7 +460,8 @@ public class BmsStarRatingProcessorTest
     [Test]
     public void TestStarRatingProcessorSortedPercentileHelperPreservesExactThresholdCrossingSemantics()
     {
-        var helperMethod = typeof(BmsStarRatingProcessor).GetMethod("computePercentileSumsFromSorted", BindingFlags.NonPublic | BindingFlags.Static, null, [typeof(double[]), typeof(double[]), typeof(int), typeof(double)], null);
+        var helperMethod = typeof(BmsStarRatingProcessor).GetMethod("computePercentileSumsFromSorted", BindingFlags.NonPublic | BindingFlags.Static, null,
+            [typeof(double[]), typeof(double[]), typeof(int), typeof(double)], null);
 
         Assert.That(helperMethod, Is.Not.Null);
 
@@ -478,6 +490,7 @@ public class BmsStarRatingProcessorTest
             for (var i = 0; i < sortedDifficulty.Length; i++)
             {
                 cumulativeWeight += sortedWeights[i];
+
                 while (percentileIdx >= 0 && cumulativeWeight >= nextTarget)
                 {
                     if (percentileIdx < 4)
@@ -494,6 +507,7 @@ public class BmsStarRatingProcessorTest
             if (percentileIdx >= 0)
             {
                 var last = sortedDifficulty[^1];
+
                 while (percentileIdx >= 0)
                 {
                     if (percentileIdx < 4)

@@ -1,6 +1,7 @@
 using System;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Difficulty;
@@ -8,10 +9,10 @@ namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Difficulty;
 internal static class BmsHitLeniency
 {
     public static double FromRank(int rank, BmsLayoutVariant layout)
-        => FromGreatWindow(getGreatWindow(new BmsJudgementWindowContext(layout, BmsJudgementProfileProvider.RateForRank(layout, rank), false)));
+        => FromGreatWindow(getGreatWindow(layout, BmsEngineRules.RateForRank(layout, rank)));
 
     public static double FromJudgementRate(double judgementRate, BmsLayoutVariant layout)
-        => FromGreatWindow(getGreatWindow(new BmsJudgementWindowContext(layout, judgementRate, false)));
+        => FromGreatWindow(getGreatWindow(layout, judgementRate));
 
     public static double FromGreatWindow(double greatWindowMs)
     {
@@ -19,12 +20,12 @@ internal static class BmsHitLeniency
         return Math.Min(x, 0.6 * (x - 0.09) + 0.09);
     }
 
-    private static double getGreatWindow(BmsJudgementWindowContext context)
+    private static double getGreatWindow(BmsLayoutVariant layout, double rate)
     {
         // Standalone rating calls have no selected mods; the caller supplies a resolved scalar for modded rules.
-        using var windows = BmsJudgementProfileProvider.UseWindowMods([]);
-        var column = BmsLayout.IsScratchColumn(0, context.Layout) ? 1 : 0;
-        var table = BmsJudgementProfileProvider.GetTable(context, column);
+
+        var column = BmsLayout.IsScratchColumn(0, layout) ? 1 : 0;
+        var table = BmsEngineRules.GetTiming(layout, column, rate, false);
         return table.FrameworkWindowFor(HitResult.Great);
     }
 }

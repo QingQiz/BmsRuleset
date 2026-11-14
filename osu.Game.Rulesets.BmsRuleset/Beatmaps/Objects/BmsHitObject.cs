@@ -31,7 +31,7 @@ public class BmsHitObject : HitObject
     public double JudgementRate { get; set; } = double.NaN;
 
     public double EffectiveJudgementRate => double.IsNaN(JudgementRate)
-        ? BmsJudgementProfileProvider.RateForDifficulty(Beatmap.LayoutVariant, Beatmap.Rank, Beatmap.ExRank)
+        ? BmsEngineRules.ForBeatmap(Beatmap).ResolveRate(Beatmap.Rank, Beatmap.ExRank)
         : JudgementRate;
 
     /// <summary>

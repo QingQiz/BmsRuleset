@@ -77,7 +77,7 @@ internal readonly record struct BmsLongNotePresentation(
             AnimateBody = state.LongNoteStarted,
             // An out-of-window break keeps the released appearance until the remaining body passes.
             ReleasedStyle = !presentation.Retired && (state.LongNoteStarted || (state.TailJudged && state.HeadResult != HitResult.Meh))
-                            && context.Time < note.EndTime && !presentation.HoldingBody,
+                                                  && context.Time < note.EndTime && !presentation.HoldingBody,
             PrepareHeadPin = state.HeadJudged && !state.TailJudged,
             RestoreHeadPin = state.LongNoteStarted,
             HeadReached = context.Time >= note.StartTime,
@@ -88,5 +88,5 @@ internal readonly record struct BmsLongNotePresentation(
         => state.LongNoteStarted && !state.TailJudged && time >= note.StartTime && time <= note.EndTime;
 
     private static double chargeLifetimeEnd(BmsLongNote note)
-        => note.EndTime + BmsJudgementProfileProvider.GetTable(note, tail: false).SlowWindowFor(HitResult.Ok) + 100;
+        => note.EndTime + BmsEngineRules.GetTiming(note, tail: false).PassiveDeadline / 1000.0 + 100;
 }

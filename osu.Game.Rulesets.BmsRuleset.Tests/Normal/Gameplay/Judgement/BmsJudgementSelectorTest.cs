@@ -1,12 +1,9 @@
-using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using NUnit.Framework;
+using RhythmEngine.Profiles.Bms;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
-using osu.Game.Rulesets.BmsRuleset.Tests.Performance;
 using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
@@ -26,7 +23,7 @@ public class BmsJudgementSelectorTest
         Assert.That(selection.Result, Is.EqualTo(HitResult.Perfect));
     }
 
-    private static double rankRate(int rank) => BmsJudgementProfileProvider.RateForRank(rank);
+    private static double rankRate(int rank) => BmsEngineRules.RateForRank(BmsLayoutVariant.Bme7K, rank);
 
     [TestCase(BmsJudgementAlgorithm.Combo, 1000, HitResult.Good)]
     [TestCase(BmsJudgementAlgorithm.Duration, 1100, HitResult.Perfect)]
@@ -126,23 +123,15 @@ public class BmsJudgementSelectorTest
     [Test]
     public void TestAlgorithmsUseModifiedWindows()
     {
-        IReadOnlyList<IApplicableToJudgement> mods = [new BmsModNoGreat()];
-        BmsJudgementProfileProvider.SetActiveWindowMods(mods);
-        try
-        {
-            BmsJudgementAlgorithm[] algorithms = [BmsJudgementAlgorithm.Combo, BmsJudgementAlgorithm.Score];
-            foreach (var algorithm in algorithms)
-            {
-                var future = BmsTestJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [note(1000), note(1060)], 1050, algorithm);
-                var past = BmsTestJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [note(1000), note(1060)], 1060, algorithm);
+        BmsJudgementAlgorithm[] algorithms = [BmsJudgementAlgorithm.Combo, BmsJudgementAlgorithm.Score];
 
-                Assert.That(future.Candidate?.StartTime, Is.EqualTo(1000), algorithm.ToString());
-                Assert.That(past.Candidate?.StartTime, Is.EqualTo(1060), algorithm.ToString());
-            }
-        }
-        finally
+        foreach (var algorithm in algorithms)
         {
-            BmsJudgementProfileProvider.ClearActiveWindowMods(mods);
+            var future = BmsTestJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [note(1000), note(1060)], 1050, algorithm, BmsJudgementModifiers.NoGreat);
+            var past = BmsTestJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [note(1000), note(1060)], 1060, algorithm, BmsJudgementModifiers.NoGreat);
+
+            Assert.That(future.Candidate?.StartTime, Is.EqualTo(1000), algorithm.ToString());
+            Assert.That(past.Candidate?.StartTime, Is.EqualTo(1060), algorithm.ToString());
         }
     }
 

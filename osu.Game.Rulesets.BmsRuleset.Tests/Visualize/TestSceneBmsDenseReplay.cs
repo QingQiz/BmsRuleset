@@ -46,9 +46,9 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
 {
     private const int note_count = 512;
     private static int columnUpdates;
-    private static readonly FrameTraversalCounter columnTraversals = new();
-    private static readonly FrameTraversalCounter noteMaskingTraversals = new();
-    private static readonly FrameTraversalCounter explosionMaskingTraversals = new();
+    private static readonly FrameTraversalCounter column_traversals = new();
+    private static readonly FrameTraversalCounter note_masking_traversals = new();
+    private static readonly FrameTraversalCounter explosion_masking_traversals = new();
     private bool allNotesVisible;
     private ScopedMethodProbe? probe;
     private ScopedMethodProbe? maskingProbe;
@@ -64,8 +64,9 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
     protected override IBeatmap CreateBeatmap(RulesetInfo ruleset)
     {
         var chart = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, TotalColumns = 8, Rank = 3 };
+        // The engine uses integral microseconds; keep distinct presses representable in its time domain.
         for (var i = 0; i < note_count; i++)
-            chart.HitObjects.Add(new BmsNote { StartTime = 3000 + i * 0.0001, Column = i % 8 });
+            chart.HitObjects.Add(new BmsNote { StartTime = 3000 + i * 0.001, Column = i % 8 });
         if (!allNotesVisible)
             chart.HitObjects.Add(new BmsNote { StartTime = 60000, Column = 1 });
         BmsTestBeatmaps.SetupBeatmapInfo(chart, ruleset);
@@ -75,7 +76,11 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
     [Test]
     public void FullyActivatedTapChartCatchesUpWithoutRepeatedSkinTraversal()
     {
-        AddStep("load chart with all taps visible", () => { allNotesVisible = true; LoadPlayer(); });
+        AddStep("load chart with all taps visible", () =>
+        {
+            allNotesVisible = true;
+            LoadPlayer();
+        });
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.LoadedBeatmapSuccessfully);
         seek(2999);
         AddStep("advance within one frame beyond the visual deferral budget", () =>
@@ -89,12 +94,14 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
             column.Clock = framed;
             columnUpdates = 0;
             column.BeginGameplayFrame();
+
             for (var time = 3000; time <= 3040; time += 10)
             {
                 manual.CurrentTime = time;
                 framed.ProcessFrame();
                 column.UpdateSubTree();
             }
+
             column.EndGameplayFrame();
             column.Clock = previousClock;
             Assert.That(columnUpdates, Is.EqualTo(1), "All candidates already exist; update their skins at the final timestamp.");
@@ -105,7 +112,7 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
     public void ComboWakesAfterAutoHideAndDisplaysOnlyTheFinalBurstCount()
     {
         BmsComboCounter counter = null!;
-        AddStep("load player", () => LoadPlayer());
+        AddStep("load player", LoadPlayer);
         AddUntilStep("HUD loaded", () => Player.IsLoaded && (counter = Player.HUDOverlay.ChildrenOfType<BmsComboCounter>().SingleOrDefault()!) != null && counter.IsLoaded);
         seek(0);
         AddStep("hide combo below threshold", () => counter.Current.Value = 1);
@@ -121,7 +128,7 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
     [Test]
     public void TapActivationIncludesTheEarliestInputWindow()
     {
-        AddStep("load player", () => LoadPlayer());
+        AddStep("load player", LoadPlayer);
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.LoadedBeatmapSuccessfully);
         seek(0);
         AddStep("use maximum scroll speed", () =>
@@ -134,7 +141,7 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
             foreach (var entry in Playfield.Stage.Columns.SelectMany(c => c.HitObjectContainer.Entries))
             {
                 var note = (BmsNote)entry.HitObject;
-                var table = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, note.Column, note.EffectiveJudgementRate, false);
+                var table = BmsEngineRules.GetTiming(BmsLayoutVariant.Bme7K, note.Column, note.EffectiveJudgementRate, false);
                 Assert.That(entry.LifetimeStart, Is.LessThanOrEqualTo(note.StartTime - table.FastWindowFor(HitResult.Miss)));
             }
         });
@@ -144,10 +151,14 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
     public void ComboBatchPreservesBreakFlashAndIncrementAnimation()
     {
         BmsComboCounter counter = null!;
-        AddStep("load player", () => LoadPlayer());
+        AddStep("load player", LoadPlayer);
         AddUntilStep("HUD loaded", () => Player.IsLoaded && (counter = Player.HUDOverlay.ChildrenOfType<BmsComboCounter>().SingleOrDefault()!) != null && counter.IsLoaded);
         seek(0);
-        AddStep("set existing combo", () => { counter.Current.Value = 100; counter.UpdateSubTree(); });
+        AddStep("set existing combo", () =>
+        {
+            counter.Current.Value = 100;
+            counter.UpdateSubTree();
+        });
         AddStep("break and recover before the next HUD frame", () =>
         {
             counter.Current.Value = 0;
@@ -164,7 +175,7 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
     public void ComboJumpDoesNotBecomeAnIncrementPulse()
     {
         BmsComboCounter counter = null!;
-        AddStep("load player", () => LoadPlayer());
+        AddStep("load player", LoadPlayer);
         AddUntilStep("HUD loaded", () => Player.IsLoaded && (counter = Player.HUDOverlay.ChildrenOfType<BmsComboCounter>().SingleOrDefault()!) != null && counter.IsLoaded);
         seek(0);
         AddStep("jump directly to a restored combo", () =>
@@ -183,7 +194,7 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
         LegacyBmsColumnLight light = null!;
         var press = new KeyBindingPressEvent<BmsAction>(new InputState(), BmsAction.Key1);
         var release = new KeyBindingReleaseEvent<BmsAction>(new InputState(), BmsAction.Key1);
-        AddStep("load player", () => LoadPlayer());
+        AddStep("load player", LoadPlayer);
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.LoadedBeatmapSuccessfully);
         seek(1000);
         AddStep("press and release in one frame", () =>
@@ -200,16 +211,25 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
         AddAssert("column light fades over 250 ms", () => Math.Abs(feedbackDrawable(light, "light").Alpha - 0.84) < 0.001);
         seek(1100);
         AddAssert("key release delay ends", () => feedbackDrawable(key, "downSprite").Alpha == 0);
-        AddStep("retrigger during fade", () => { key.OnPressed(press); light.OnPressed(press); });
+        AddStep("retrigger during fade", () =>
+        {
+            key.OnPressed(press);
+            light.OnPressed(press);
+        });
         seek(1200);
         AddAssert("new press restores feedback", () => feedbackDrawable(key, "downSprite").Alpha == 1 && feedbackDrawable(light, "light").Alpha == 1);
-        AddStep("release again", () => { key.OnReleased(release); light.OnReleased(release); });
+        AddStep("release again", () =>
+        {
+            key.OnReleased(release);
+            light.OnReleased(release);
+        });
         seek(1500);
         AddAssert("released feedback disappears", () => feedbackDrawable(key, "downSprite").Alpha == 0 && feedbackDrawable(light, "light").Alpha == 0);
     }
 
     private T feedbackForColumn<T>() where T : Drawable => Player.ChildrenOfType<T>().First(k => typeof(T)
-        .GetField("lookup", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(k) is BmsSkinComponentLookup { ColumnIndex: 1 });
+        .GetField("lookup", BindingFlags.Instance | BindingFlags.NonPublic)!
+        .GetValue(k) is BmsSkinComponentLookup { ColumnIndex: 1 });
 
     private static Drawable feedbackDrawable<T>(T feedback, string field) =>
         (Drawable)typeof(T).GetField(field, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(feedback)!;
@@ -217,7 +237,7 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
     [Test]
     public void DenseKeyFeedbackDoesNotAllocatePerInputAnimations()
     {
-        AddStep("load player", () => LoadPlayer());
+        AddStep("load player", LoadPlayer);
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.LoadedBeatmapSuccessfully);
         seek(2999);
         AddStep("measure key feedback burst", () =>
@@ -231,6 +251,7 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
             light.OnPressed(press);
             light.OnReleased(release);
             var before = GC.GetAllocatedBytesForCurrentThread();
+
             for (var i = 0; i < 1000; i++)
             {
                 key.OnPressed(press);
@@ -238,6 +259,7 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
                 light.OnPressed(press);
                 light.OnReleased(release);
             }
+
             Assert.That(GC.GetAllocatedBytesForCurrentThread() - before, Is.LessThan(32_000));
         });
     }
@@ -248,13 +270,14 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
         BmsHitErrorMeter meter = null!;
         var onJudgement = typeof(BmsHitErrorMeter).GetMethod("OnNewJudgement", BindingFlags.Instance | BindingFlags.NonPublic)!
             .CreateDelegate<Action<BmsHitErrorMeter, JudgementResult>>();
-        AddStep("load player", () => LoadPlayer());
+        AddStep("load player", LoadPlayer);
         AddUntilStep("meter loaded", () => Player.IsLoaded && (meter = Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter>().SingleOrDefault()!) != null && meter.IsLoaded);
         seek(0);
         AddStep("apply timing burst", () =>
         {
             meter.Clear();
             var note = Playfield.Beatmap.HitObjects[0];
+
             for (var i = 0; i < 100; i++)
             {
                 var result = new JudgementResult(note, note.CreateJudgement()) { Type = HitResult.Perfect };
@@ -293,8 +316,7 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
             LoadPlayer();
             Add(reference = new Triangle { Clock = clock });
         });
-        AddUntilStep("arrows loaded", () => reference.IsLoaded && Player.IsLoaded
-            && (meter = Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter>().SingleOrDefault()!)?.IsLoaded == true);
+        AddUntilStep("arrows loaded", () => reference.IsLoaded && Player.IsLoaded && (meter = Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter>().SingleOrDefault()!) != null && meter.IsLoaded);
         seek(0);
         AddStep("compare burst targets and in-flight retargeting", () =>
         {
@@ -327,17 +349,19 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
             void applyBurst(double time, double offset)
             {
                 manual.CurrentTime = time;
-                schedule.Invoke(meter, [new Action(() =>
-                {
-                    for (var i = 0; i < 100; i++)
+                schedule.Invoke(meter, [
+                    new Action(() =>
                     {
-                        var result = new JudgementResult(note, note.CreateJudgement()) { Type = HitResult.Perfect };
-                        typeof(JudgementResult).GetProperty(nameof(JudgementResult.TimeOffset))!.SetValue(result, offset);
-                        onJudgement(meter, result);
-                        average = average * 0.8 + (domain.RelativePosition(offset) - 0.5f) * 0.2;
-                        reference.MoveToX((float)average + 0.5f, 800, Easing.Out);
-                    }
-                })]);
+                        for (var i = 0; i < 100; i++)
+                        {
+                            var result = new JudgementResult(note, note.CreateJudgement()) { Type = HitResult.Perfect };
+                            typeof(JudgementResult).GetProperty(nameof(JudgementResult.TimeOffset))!.SetValue(result, offset);
+                            onJudgement(meter, result);
+                            average = average * 0.8 + (domain.RelativePosition(offset) - 0.5f) * 0.2;
+                            reference.MoveToX((float)average + 0.5f, 800, Easing.Out);
+                        }
+                    })
+                ]);
                 assertFrame(time);
             }
 
@@ -354,7 +378,7 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
     [Test]
     public void NotesDoNotActivateUnusedFrameworkSamplePlayers()
     {
-        AddStep("load player", () => LoadPlayer());
+        AddStep("load player", LoadPlayer);
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.LoadedBeatmapSuccessfully);
         seek(2999);
         AddAssert("notes are alive", () => Playfield.AllColumnAliveObjects().Count() >= note_count);
@@ -365,7 +389,7 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
     [Test]
     public void AdjacentGameplayFramesDoNotRepeatTheSameInitialColumnTraversal()
     {
-        AddStep("load player", () => LoadPlayer());
+        AddStep("load player", LoadPlayer);
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.LoadedBeatmapSuccessfully);
         seek(2999);
         AddStep("measure successive frames at the same simulation time", () =>
@@ -374,6 +398,7 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
             using var counter = new ScopedMethodProbe(typeof(BmsColumnHitObjectContainer).GetMethod("UpdateAfterChildrenLife", BindingFlags.Instance | BindingFlags.NonPublic),
                 typeof(TestSceneBmsDenseReplay).GetMethod(nameof(countUpdate), BindingFlags.Static | BindingFlags.NonPublic));
             columnUpdates = 0;
+
             for (var i = 0; i < 10; i++)
             {
                 column.BeginGameplayFrame();
@@ -381,6 +406,7 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
                 column.UpdateSubTree();
                 column.EndGameplayFrame();
             }
+
             Assert.That(columnUpdates, Is.LessThanOrEqualTo(11));
         });
     }
@@ -388,7 +414,7 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
     [Test]
     public void DenseReplayPreloadsEveryOverlappingHitPulse()
     {
-        AddStep("load player", () => LoadPlayer());
+        AddStep("load player", LoadPlayer);
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.LoadedBeatmapSuccessfully);
         seek(2999);
         AddStep("burst does not construct skin trees on the update thread", () =>
@@ -409,7 +435,7 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
     {
         BmsCachedSkinnableDrawable skin = null!;
         Drawable previous = null!;
-        AddStep("load player", () => LoadPlayer());
+        AddStep("load player", LoadPlayer);
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.LoadedBeatmapSuccessfully);
         seek(0);
         AddStep("capture idle pulse skin and reload source", () =>
@@ -445,6 +471,7 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
             LoadPlayer(mods);
         });
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.LoadedBeatmapSuccessfully);
+
         for (var run = 0; run < 2; run++)
         {
             seek(2999);
@@ -458,12 +485,12 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
                     typeof(TestSceneBmsDenseReplay).GetMethod(nameof(countMasking), BindingFlags.Static | BindingFlags.NonPublic));
                 maskingProbe = new ScopedMethodProbe(typeof(CompositeDrawable).GetMethod(nameof(CompositeDrawable.UpdateSubTreeMasking)),
                     typeof(TestSceneBmsDenseReplay).GetMethod(nameof(countMasking), BindingFlags.Static | BindingFlags.NonPublic));
-                noteMaskingTraversals.Reset();
+                note_masking_traversals.Reset();
                 Playfield.AllColumnAliveObjects().OfType<DrawableBmsHitObject>().First().UpdateSubTreeMasking();
-                Assert.That(noteMaskingTraversals.MaxPerFrame, Is.EqualTo(1), "Observe a live note before measuring the burst.");
-                columnTraversals.Reset();
-                noteMaskingTraversals.Reset();
-                explosionMaskingTraversals.Reset();
+                Assert.That(note_masking_traversals.MaxPerFrame, Is.EqualTo(1), "Observe a live note before measuring the burst.");
+                column_traversals.Reset();
+                note_masking_traversals.Reset();
+                explosion_masking_traversals.Reset();
                 frameProbe = new ScopedMethodProbe(typeof(BmsPlayfield).GetMethod("BeginGameplayFrame", BindingFlags.Instance | BindingFlags.NonPublic),
                     typeof(TestSceneBmsDenseReplay).GetMethod(nameof(beginGameplayFrame), BindingFlags.Static | BindingFlags.NonPublic));
                 AdvanceReplayClock(3001);
@@ -474,7 +501,9 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
             {
                 var expectedResults = mode is BmsLongNoteMode.ChargeNote or BmsLongNoteMode.HellChargeNote ? note_count * 2 - 8 : note_count;
                 Assert.That(Player.Results.Count, Is.EqualTo(expectedResults));
-                Assert.That(Player.Results.All(r => r.Type == HitResult.Perfect), Is.True);
+                Assert.That(Player.Results.Where(r => r.Type != HitResult.Perfect)
+                    .Select(r => $"{r.Type} at {r.HitObject.StartTime:R}, offset={r.TimeOffset:R}, " +
+                                 (r is BmsLongNoteJudgementResult ln ? string.Join(", ", ln.EndpointResults) : string.Empty)), Is.Empty);
                 var chart = (BmsBeatmap)Player.GameplayState.Beatmap;
                 Assert.That(BmsGameplayDiagnosticScene.CheckJudgementCompleteness(chart.HitObjects.ToHashSet(), Player.Results), Is.Null);
                 if (mode == BmsLongNoteMode.Undefined)
@@ -483,10 +512,10 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
                     Assert.That(Player.Results.OfType<BmsLongNoteJudgementResult>().SelectMany(r => r.EndpointResults)
                         .Max(e => Math.Abs(e.TimeOffset)), Is.LessThan(0.000001));
             });
-            AddAssert("each column is traversed at most once per game frame", () => columnTraversals.MaxPerFrame, () => Is.EqualTo(1));
+            AddAssert("each column is traversed at most once per game frame", () => column_traversals.MaxPerFrame, () => Is.EqualTo(1));
             // A fast catch-up can retire all taps before the first outer masking pass.
-            AddAssert("each note is masked at most once per game frame", () => noteMaskingTraversals.MaxPerFrame, () => Is.LessThanOrEqualTo(1));
-            AddAssert("static pulses need no per-pulse masking traversal", () => explosionMaskingTraversals.MaxPerFrame, () => Is.Zero);
+            AddAssert("each note is masked at most once per game frame", () => note_masking_traversals.MaxPerFrame, () => Is.LessThanOrEqualTo(1));
+            AddAssert("static pulses need no per-pulse masking traversal", () => explosion_masking_traversals.MaxPerFrame, () => Is.Zero);
         }
     }
 
@@ -502,22 +531,21 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
     // Measure each drawable within its game frame to detect repeated work independently of that budget.
     private static void beginGameplayFrame()
     {
-        columnTraversals.BeginFrame();
-        noteMaskingTraversals.BeginFrame();
-        explosionMaskingTraversals.BeginFrame();
+        column_traversals.BeginFrame();
+        note_masking_traversals.BeginFrame();
+        explosion_masking_traversals.BeginFrame();
     }
 
     // ReSharper disable once InconsistentNaming
-    private static void countColumnTraversal(BmsColumnHitObjectContainer __instance) => columnTraversals.Count(__instance);
-
+    private static void countColumnTraversal(BmsColumnHitObjectContainer __instance) => column_traversals.Count(__instance);
 
     // ReSharper disable once InconsistentNaming
     private static void countMasking(CompositeDrawable __instance)
     {
         if (__instance is DrawableBmsHitObject)
-            noteMaskingTraversals.Count(__instance);
+            note_masking_traversals.Count(__instance);
         if (__instance is BmsHitExplosion)
-            explosionMaskingTraversals.Count(__instance);
+            explosion_masking_traversals.Count(__instance);
     }
 
     private void stopCounting()

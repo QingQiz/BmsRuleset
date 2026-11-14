@@ -17,7 +17,6 @@ internal sealed class BmsHitObjectLifetimeEntry(
     Func<double> getVisualOffset)
     : HitObjectLifetimeEntry(hitObject)
 {
-
     /// <summary>
     ///     Set to true once <see cref="RefreshLifetime"/> has run.
     ///     Guards against framework code overwriting our
@@ -242,7 +241,7 @@ internal sealed class BmsHitObjectLifetimeEntry(
     {
         if (hitObject is BmsLandmine or BmsInvisibleNote) return 0;
 
-        var table = BmsJudgementProfileProvider.GetTable(hitObject, tail: false);
+        var table = BmsEngineRules.GetTiming(hitObject, tail: false);
         return Math.Max(table.FastWindowFor(HitResult.Ok), table.FastWindowFor(HitResult.Miss));
     }
 
@@ -380,12 +379,12 @@ internal sealed class BmsHitObjectLifetimeEntry(
 
         if (hitObject is BmsLongNote)
         {
-            var tailTable = BmsJudgementProfileProvider.GetTable(hitObject, tail: true);
-            return tailTable.SlowWindowFor(HitResult.Ok) + passive_poor_lifetime_margin;
+            var tailTable = BmsEngineRules.GetTiming(hitObject, tail: true);
+            return tailTable.PassiveDeadline / 1000.0 + passive_poor_lifetime_margin;
         }
 
-        var table = BmsJudgementProfileProvider.GetTable(hitObject, tail: false);
-        return table.SlowWindowFor(HitResult.Ok) + passive_poor_lifetime_margin;
+        var table = BmsEngineRules.GetTiming(hitObject, tail: false);
+        return table.PassiveDeadline / 1000.0 + passive_poor_lifetime_margin;
     }
 
     #endregion
@@ -400,5 +399,4 @@ internal sealed class BmsHitObjectLifetimeEntry(
         baseLifetimeStart - Math.Max(0, getVisualOffset()) * scrollController.PlaybackRate;
 
     #endregion
-
 }

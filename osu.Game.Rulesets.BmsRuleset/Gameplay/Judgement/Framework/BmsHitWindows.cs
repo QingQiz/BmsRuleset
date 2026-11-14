@@ -1,3 +1,4 @@
+using RhythmEngine.Profiles.Bms;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.Scoring;
@@ -11,16 +12,8 @@ public class BmsHitWindows(
     int column = 1,
     double? judgementRate = null) : HitWindows
 {
-    /// <summary>Fallback BAD window (ms) used when <see cref="HitWindows" /> is unavailable.</summary>
-    public const double FALLBACK_BAD_WINDOW = 280;
-
-    // Actual notes already reference their shared chart data; only standalone windows need configuration storage.
-    private readonly WindowConfiguration? configuration = source == null
-        ? new WindowConfiguration(layout, column, rank, judgementRate)
-        : null;
-
     // HitWindows validates WindowFor() in its constructor, so this must run before the base constructor.
-    private BmsJudgementWindowTable? table = source == null
+    private readonly BmsTimingDefinition? table = source == null
         ? createTable(rank, layout, column, judgementRate)
         : null;
 
@@ -37,8 +30,6 @@ public class BmsHitWindows(
 
     public override void SetDifficulty(double difficulty)
     {
-        if (source == null)
-            table = createTable(configuration!.Rank, configuration.Layout, configuration.Column, configuration.Rate);
     }
 
     /// <summary>
@@ -51,22 +42,19 @@ public class BmsHitWindows(
     /// </summary>
     public override double WindowFor(HitResult result)
     {
-        // Gameplay mods are selected after ApplyDefaults; framework consumers must observe the same table as the engine.
-        var current = source != null ? BmsJudgementProfileProvider.GetTable(source, false) : table!;
+        var current = source != null ? BmsEngineRules.GetTiming(source, false) : table!;
         return result switch
         {
             HitResult.Perfect => current.FrameworkWindowFor(HitResult.Perfect),
             HitResult.Great => current.FrameworkWindowFor(HitResult.Great),
             HitResult.Good => current.FrameworkWindowFor(HitResult.Good),
-            HitResult.Ok or HitResult.Meh or HitResult.Miss => current.SlowWindowFor(HitResult.Ok),
+            HitResult.Ok or HitResult.Meh or HitResult.Miss => current.PassiveDeadline / 1000.0,
             _ => 0,
         };
     }
 
-    private static BmsJudgementWindowTable createTable(int rank, BmsLayoutVariant layout, int column, double? judgementRate)
+    private static BmsTimingDefinition createTable(int rank, BmsLayoutVariant layout, int column, double? judgementRate)
         => judgementRate is { } rate
-            ? BmsJudgementProfileProvider.GetTable(layout, column, rate, false)
-            : BmsJudgementProfileProvider.GetTable(layout, column, rank, false);
-
-    private sealed record WindowConfiguration(BmsLayoutVariant Layout, int Column, int Rank, double? Rate);
+            ? BmsEngineRules.GetTiming(layout, column, rate, false)
+            : BmsEngineRules.GetTiming(layout, column, rank, false);
 }

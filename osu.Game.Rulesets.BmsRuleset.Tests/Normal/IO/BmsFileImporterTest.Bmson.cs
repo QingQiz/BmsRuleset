@@ -3,19 +3,19 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
-using osu.Game.Collections;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.DifficultyTable;
 using NUnit.Framework;
 using osu.Framework.Bindables;
 using osu.Framework.IO.Stores;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Game.Beatmaps;
+using osu.Game.Collections;
 using osu.Game.Database;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.DifficultyTable;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.IO.Import;
 using osu.Game.Rulesets.BmsRuleset.Tests.Normal.BeatmapTest.Decoding;
@@ -46,6 +46,7 @@ public partial class BmsFileImporterTest
             Logger.Flush();
             Logger.Storage = logs;
             Logger.Enabled = true;
+
             try
             {
                 await new BmsFileImporter(realm, storage, notifications).Import(root).ConfigureAwait(false);
@@ -68,6 +69,7 @@ public partial class BmsFileImporterTest
                 Assert.That(skipped.Activated!(), Is.True);
                 Assert.That(logs.OpenedFile, Is.EqualTo(Logger.GetLogger("bms").Filename));
                 Assert.That(File.ReadAllText(logs.GetFullPath(logs.OpenedFile)), Does.Contain("invalid-6.bmson"));
+
                 if (!validSibling)
                 {
                     Assert.That(progress.CompletionClickAction, Is.Not.Null);
@@ -113,6 +115,7 @@ public partial class BmsFileImporterTest
         public IBindable<int> UnreadCount { get; } = new Bindable<int>();
         public IEnumerable<Notification> AllNotifications => Posted;
         public void Post(Notification notification) => Posted.Add(notification);
+
         public void Hide()
         {
         }
@@ -142,6 +145,7 @@ public partial class BmsFileImporterTest
         {
             addBmsRuleset(realm);
             var root = Path.Combine(storage.GetFullPath(string.Empty), "mixed-bmson");
+
             for (var index = 0; index < 3; index++)
             {
                 var directory = Path.Combine(root, index.ToString());
@@ -149,6 +153,7 @@ public partial class BmsFileImporterTest
                 File.WriteAllBytes(Path.Combine(directory, "valid.bmson"), BmsonParserTest.Chart(info: $",\"level\":{index + 1}"));
                 File.WriteAllText(Path.Combine(directory, "invalid.bmson"), "{ invalid json }");
             }
+
             using var notifications = new ImportNotificationOverlay();
             await new BmsFileImporter(realm, storage, notifications).Import(root).ConfigureAwait(false);
             Assert.That(realm.Run(r => r.All<BeatmapInfo>().Count()), Is.EqualTo(3));
@@ -181,6 +186,7 @@ public partial class BmsFileImporterTest
             store.RestoreTable(table);
             var previous = BmsRulesetRuntime.DifficultyTableStore;
             BmsRulesetRuntime.DifficultyTableStore = store;
+
             try
             {
                 await new BmsFileImporter(realm, storage).Import(directory).ConfigureAwait(false);
@@ -238,6 +244,7 @@ public partial class BmsFileImporterTest
                 info: ",\"chart_name\":\"ANOTHER\",\"eyecatch_image\":\"stage.png\""));
             await new BmsFileImporter(realm, storage).Import(directory).ConfigureAwait(false);
             var info = realm.Run(r => r.All<BeatmapSetInfo>().Single().Beatmaps.Single().Detach());
+
             if (missingExternal || invalidExternal)
             {
                 // Replacing the external file leaves any hard-linked imported copy intact.
@@ -287,7 +294,7 @@ public partial class BmsFileImporterTest
                 var difficulty = BmsDifficultyInfo.FromOsuDifficulty(chart.Difficulty);
                 return (Count: set.Beatmaps.Count, Title: chart.Metadata.Title, chart.DifficultyName, chart.MD5Hash,
                     chart.Metadata.Source, chart.TotalObjectCount, chart.StarRating,
-                    Rate: BmsJudgementProfileProvider.RateForExRank(BmsLayout.VariantFromTotalColumns(difficulty.KeyCount), difficulty.ExRank!.Value));
+                    Rate: BmsEngineRules.RateForExRank(BmsLayout.VariantFromTotalColumns(difficulty.KeyCount), difficulty.ExRank!.Value));
             });
             Assert.That(imported.Count, Is.EqualTo(2));
             Assert.That(imported.Title, Is.EqualTo("Song [title]"));

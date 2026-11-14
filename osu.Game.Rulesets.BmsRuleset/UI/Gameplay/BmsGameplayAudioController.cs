@@ -9,7 +9,6 @@ using osu.Game.Rulesets.BmsRuleset.Media.Audio.Playback;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Preview;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 using osu.Game.Rulesets.Mods;
-using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 
@@ -109,6 +108,7 @@ internal sealed class BmsGameplayAudioController
             // Judged LNs do not replace them, so retain them through intervening long notes.
             var changes = beatmap.HitObjects.Where(n => n.Column == invisibleColumn.Key && n is not (BmsLongNote or BmsLandmine))
                 .Concat(invisibleColumn).OrderBy(n => n.StartTime).ThenBy(n => n is BmsInvisibleNote ? 0 : 1).ToArray();
+
             for (var i = 0; i < changes.Length; i++)
             {
                 var note = changes[i];
@@ -148,8 +148,8 @@ internal sealed class BmsGameplayAudioController
     }
 
     private static double getFastJudgementWindow(BmsHitObject hitObject) =>
-        BmsJudgementProfileProvider.GetTable(hitObject, tail: false).FastWindowFor(HitResult.Ok);
+        -BmsEngineRules.GetTiming(hitObject, tail: false).EarliestHitOffset / 1000.0;
 
     private static double getSlowJudgementWindow(BmsHitObject hitObject) =>
-        BmsJudgementProfileProvider.GetTable(hitObject, tail: false).SlowWindowFor(HitResult.Ok);
+        BmsEngineRules.GetTiming(hitObject, tail: false).PassiveDeadline / 1000.0;
 }
