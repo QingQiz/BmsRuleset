@@ -41,7 +41,7 @@ public class MalodyVNativeConformanceTest
         {
             var offset = row.GetProperty("offset").GetInt32();
             var code = row.GetProperty("code").GetUInt32();
-            Assert.That(windows.ResultFor(ms(offset)), Is.EqualTo(grade(code)), $"offset {offset}, code 0x{code:x}");
+            Assert.That(windows.ResultFor(ms(offset))?.Value, Is.EqualTo(grade(code)), $"offset {offset}, code 0x{code:x}");
         }
     }
 
@@ -71,7 +71,7 @@ public class MalodyVNativeConformanceTest
             session.AdvanceTo(ms(release), [new InputEvent(ms(1000), 0, true), new InputEvent(ms(release), 0, false)]);
             var outputs = row.GetProperty("outputs").EnumerateArray().ToArray();
             var expected = outputs.Select(o => o.GetProperty("code").GetUInt32()).Select(result).Where(r => r != null);
-            Assert.That(session.GetEventsSince(0).Where(e => e.Part != "head" && e.Result != "critical").Select(e => e.Result),
+            Assert.That(session.GetEventsSince(0).Where(e => e.Part.Value != "head" && e.Result.Value != "critical").Select(e => e.Result.Value),
                 Is.EqualTo(expected), $"release {release}");
             Assert.That(session.Completed, Is.EqualTo(outputs[^1].GetProperty("finished").GetBoolean()), $"release {release}");
             var criticals = outputs.Count(o => (o.GetProperty("code").GetUInt32() & 0x4000000) != 0) + 1;
@@ -103,7 +103,7 @@ public class MalodyVNativeConformanceTest
                 var part = grade(code) != null ? tail ? "tail" : "head" : "body";
                 return (e.GetProperty("note").GetInt32(), part, result(code));
             }).Where(e => e.Item3 != null);
-            Assert.That(session.GetEventsSince(0).Where(e => e.Result != "critical").Select(e => (e.NoteId, e.Part, e.Result)),
+            Assert.That(session.GetEventsSince(0).Where(e => e.Result.Value != "critical").Select(e => (e.NoteId, e.Part.Value, e.Result.Value)),
                 Is.EqualTo(expected), row.GetProperty("scenario").GetString());
         }
     }
@@ -127,14 +127,14 @@ public class MalodyVNativeConformanceTest
                 var resultId = result(code)!;
                 var part = grade(code) != null ? (code & 0x800) != 0 ? "tail" : "head" : "body";
                 var time = ms(++sequence * 1000);
-                var emission = new JudgementEvent(sequence, 0, 0, part, resultId, time, time, 0);
-                ScoringOpportunity? opportunity = part == "body" ? null : profile.Chart.ScorePlan.Opportunities.Single(o => o.Part == part);
+                var emission = new JudgementEvent(sequence, 0, 0, new PartId(part), new ResultId(resultId), time, time, 0);
+                ScoringOpportunity? opportunity = part == "body" ? null : profile.Chart.ScorePlan.Opportunities.Single(o => o.Part.Value == part);
                 state = configuration.Score.Reduce(state, new ScoreContext(emission, opportunity, profile.Chart.ScorePlan));
                 health = configuration.Health.Reduce(new HealthContext(emission, health, state, profile.Chart.ScorePlan));
                 if ((code & 0x4000000) != 0)
                 {
                     criticals++;
-                    var critical = emission with { Part = "critical", Result = "critical" };
+                    var critical = emission with { Part = MalodyParts.CRITICAL, Result = MalodyResults.CRITICAL };
                     state = configuration.Score.Reduce(state, new ScoreContext(critical, null, profile.Chart.ScorePlan));
                 }
 

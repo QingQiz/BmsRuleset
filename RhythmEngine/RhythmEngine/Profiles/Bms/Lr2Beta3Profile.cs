@@ -47,8 +47,8 @@ public static class Lr2Beta3Profile
 
             return new Lr2Beta3NoteRule([..bounds], note.Kind == KeyNoteKind.Hold);
         });
-        var values = ProfileSupport.Values(("pgreat", 2, 2, ComboChange.Increment), ("great", 1, 1, ComboChange.Increment),
-            ("good", 0, 0, ComboChange.Increment), ("bad", 0, 0, ComboChange.Reset), ("poor", 0, 0, ComboChange.Reset));
+        var values = ProfileSupport.Values((BmsResults.PGREAT, 2, 2, ComboChange.Increment), (BmsResults.GREAT, 1, 1, ComboChange.Increment),
+            (BmsResults.GOOD, 0, 0, ComboChange.Increment), (BmsResults.BAD, 0, 0, ComboChange.Reset), (BmsResults.POOR, 0, 0, ComboChange.Reset));
         var score = new ScoreConfiguration(new ScoreState(), (state, context) => ProfileSupport.Accumulate(state, context, values), p => p.MaximumAccuracy);
         var descriptor = new ProfileDescriptor("lr2-beta3-100201", "LR2body-a46ef15343e4", EvidenceLevel.StaticBinary,
             ["https://www.mediafire.com/file/96m0wbp0aw343pu/LR2_100201.zip/file", "https://archive.org/details/lr2beta3"],
@@ -85,7 +85,16 @@ public static class Lr2Beta3Profile
         };
         return HealthRules.LatchedGauge(normal ? 2 : 0, 100, normal ? 20 : 100, context =>
         {
-            var index = context.Event.Result switch { "empty-poor" => 0, "poor" => 1, "bad" => 2, "good" => 3, "great" => 4, "pgreat" => 5, _ => -1 };
+            var index = context.Event.Result switch
+            {
+                var id when id == BmsResults.EMPTY_POOR => 0,
+                var id when id == BmsResults.POOR => 1,
+                var id when id == BmsResults.BAD => 2,
+                var id when id == BmsResults.GOOD => 3,
+                var id when id == BmsResults.GREAT => 4,
+                var id when id == BmsResults.PGREAT => 5,
+                _ => -1,
+            };
             if (index < 0)
                 throw new InvalidOperationException($"Undefined LR2 result {context.Event.Result}.");
 
@@ -109,7 +118,7 @@ public static class Lr2Beta3Profile
     };
 }
 
-internal sealed record Lr2Beta3NoteState(NoteTimer? Timer, string? Head, long? Offset, bool Done) : NoteState
+internal sealed record Lr2Beta3NoteState(NoteTimer? Timer, ResultId? Head, long? Offset, bool Done) : NoteState
 {
     public override NoteTimer? NextTimer => Timer;
 
@@ -122,8 +131,8 @@ internal sealed class Lr2Beta3NoteRule(ImmutableArray<int> bounds, bool hold) : 
     {
         var current = (Lr2Beta3NoteState)context.State;
         return hold
-            ? [new NotePartState("head", current.Head != null || current.Done), new("body", current.Done, current.Head != null && !current.Done), new("note", current.Done)]
-            : [new NotePartState("note", current.Done)];
+            ? [new NotePartState(NoteParts.HEAD, current.Head != null || current.Done), new(NoteParts.BODY, current.Done, current.Head != null && !current.Done), new(NoteParts.NOTE, current.Done)]
+            : [new NotePartState(NoteParts.NOTE, current.Done)];
     }
 
     public NoteState CreateState(ChartNote note) => new Lr2Beta3NoteState(
@@ -131,7 +140,7 @@ internal sealed class Lr2Beta3NoteRule(ImmutableArray<int> bounds, bool hold) : 
 
     public IEnumerable<ScoringOpportunity> GetScoringOpportunities(ChartNote note)
     {
-        yield return new ScoringOpportunity(note.Id, "note", note.StartTime, 2);
+        yield return new ScoringOpportunity(note.Id, NoteParts.NOTE, note.StartTime, 2);
     }
 
     public InputCandidate? GetCandidate(NoteContext context, InputEvent input, int noteIndex)
@@ -156,14 +165,14 @@ internal sealed class Lr2Beta3NoteRule(ImmutableArray<int> bounds, bool hold) : 
         var state = (Lr2Beta3NoteState)context.State;
         if (state.Head is { } head && !input.Pressed)
         {
-            var result = clockTime(context.Time) < context.Note.EndTime - bounds[2] * 1000L ? "bad" : head;
+            var result = clockTime(context.Time) < context.Note.EndTime - bounds[2] * 1000L ? BmsResults.BAD : head;
             return resolve(context, state, result, state.Offset);
         }
 
         var offset = clockTime(context.Time) - context.Note.StartTime;
         var resultId = grade(offset);
-        if (resultId == "empty-poor")
-            return new NoteUpdate(state, [new NoteEmission("empty", resultId, context.Note.StartTime, offset)]);
+        if (resultId == BmsResults.EMPTY_POOR)
+            return new NoteUpdate(state, [new NoteEmission(NoteParts.EMPTY, resultId, context.Note.StartTime, offset)]);
         if (!hold)
             return resolve(context, state, resultId, offset);
 
@@ -174,20 +183,20 @@ internal sealed class Lr2Beta3NoteRule(ImmutableArray<int> bounds, bool hold) : 
     public NoteUpdate ApplyTimer(NoteContext context)
     {
         var state = (Lr2Beta3NoteState)context.State;
-        return resolve(context, state, state.Head ?? "poor", state.Offset);
+        return resolve(context, state, state.Head ?? BmsResults.POOR, state.Offset);
     }
 
-    private string grade(long offset)
+    private ResultId grade(long offset)
     {
         var error = Math.Abs(offset);
-        return error <= bounds[0] * 1000L ? "pgreat"
-            : error <= bounds[1] * 1000L ? "great"
-            : error <= bounds[2] * 1000L ? "good"
-            : error <= 200_000 ? "bad" : "empty-poor";
+        return error <= bounds[0] * 1000L ? BmsResults.PGREAT
+            : error <= bounds[1] * 1000L ? BmsResults.GREAT
+            : error <= bounds[2] * 1000L ? BmsResults.GOOD
+            : error <= 200_000 ? BmsResults.BAD : BmsResults.EMPTY_POOR;
     }
 
     private static long clockTime(long time) => time / 1000 * 1000;
 
-    private static NoteUpdate resolve(NoteContext context, Lr2Beta3NoteState state, string result, long? offset)
-        => new(state with { Timer = null, Done = true }, [new NoteEmission("note", result, context.Note.StartTime, offset)]);
+    private static NoteUpdate resolve(NoteContext context, Lr2Beta3NoteState state, ResultId result, long? offset)
+        => new(state with { Timer = null, Done = true }, [new NoteEmission(NoteParts.NOTE, result, context.Note.StartTime, offset)]);
 }

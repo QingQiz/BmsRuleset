@@ -21,7 +21,7 @@ public class ProfileConformanceTest
         session.AdvanceTo(ms(500), [press(500)]);
         Assert.That(session.EventCount, Is.Zero);
         session.AdvanceTo(ms(500) + 2, [new InputEvent(ms(500) + 1, 0, false), new InputEvent(ms(500) + 2, 0, true)]);
-        Assert.That(session.GetEventsSince(0).Single().Result, Is.EqualTo("empty-poor"));
+        Assert.That(session.GetEventsSince(0).Single().Result.Value, Is.EqualTo("empty-poor"));
     }
 
     [Test]
@@ -43,7 +43,7 @@ public class ProfileConformanceTest
                 : []);
             Assert.Multiple(() =>
             {
-                Assert.That(session.GetEventsSince(0).Last().Result, Is.EqualTo(expected.GetProperty("result").GetString()!.ToLowerInvariant()), $"result {i}");
+                Assert.That(session.GetEventsSince(0).Last().Result.Value, Is.EqualTo(expected.GetProperty("result").GetString()!.ToLowerInvariant()), $"result {i}");
                 Assert.That(session.Score.Score, Is.EqualTo(expected.GetProperty("score").GetInt32()), $"score {i}");
                 Assert.That(session.Score.Counters["jam"], Is.EqualTo(expected.GetProperty("jam").GetInt32()), $"JAM {i}");
                 Assert.That(session.Score.Counters["jam-progress"], Is.EqualTo(expected.GetProperty("progress").GetInt32()), $"progress {i}");
@@ -76,7 +76,7 @@ public class ProfileConformanceTest
             var expected = rows[i];
             Assert.Multiple(() =>
             {
-                Assert.That(session.GetEventsSince(i).Single().Result, Is.EqualTo(expected.GetProperty("result").GetString()), $"result {i}");
+                Assert.That(session.GetEventsSince(i).Single().Result.Value, Is.EqualTo(expected.GetProperty("result").GetString()), $"result {i}");
                 Assert.That(session.Score.Score, Is.EqualTo(expected.GetProperty("score").GetDouble()).Within(1), $"score {i}");
                 Assert.That(session.Score.Accuracy, Is.EqualTo(expected.GetProperty("accuracy").GetDouble()).Within(1e-10), $"accuracy {i}");
                 Assert.That(session.Score.Combo, Is.EqualTo(expected.GetProperty("combo").GetInt32()), $"combo {i}");
@@ -90,7 +90,7 @@ public class ProfileConformanceTest
     {
         var session = BmsProfiles.CreateBeatoraja(new KeyChart(1, [hold(kind)])).CreateSession();
         session.AdvanceTo(ms(1210) + 1);
-        Assert.That(session.GetEventsSince(0).Select(e => (e.Part, e.Result, e.Time)),
+        Assert.That(session.GetEventsSince(0).Select(e => (e.Part.Value, e.Result.Value, e.Time)),
             Is.EqualTo([("head", "poor", ms(1210) + 1), ("tail", "poor", ms(1210) + 1)]));
         Assert.That(session.Score.AccuracyMaximum, Is.EqualTo(4));
     }
@@ -102,7 +102,7 @@ public class ProfileConformanceTest
     {
         var session = BmsProfiles.CreateBeatoraja(new KeyChart(1, [hold(kind)])).CreateSession();
         session.AdvanceTo(ms(1500), [press(1000), release(1500)]);
-        Assert.That(session.GetEventsSince(0).Last().Result, Is.EqualTo(result));
+        Assert.That(session.GetEventsSince(0).Last().Result.Value, Is.EqualTo(result));
     }
 
     [Test]
@@ -111,7 +111,7 @@ public class ProfileConformanceTest
         var session = BmsProfiles.CreateBeatoraja(new KeyChart(1, [hold(KeyNoteKind.Hold)])).CreateSession();
         session.AdvanceTo(ms(2000), [press(1040), release(1990)]);
         var result = session.GetEventsSince(0).Last();
-        Assert.That((result.Result, result.ExpectedTime, result.Offset), Is.EqualTo(("great", ms(1000), (long?)ms(40))));
+        Assert.That((result.Result.Value, result.ExpectedTime, result.Offset), Is.EqualTo(("great", ms(1000), (long?)ms(40))));
     }
 
     [TestCase(true, "mine-hit")]
@@ -120,7 +120,7 @@ public class ProfileConformanceTest
     {
         var session = BmsProfiles.CreateBeatoraja(new KeyChart(1, [note(0, 1000) with { Kind = KeyNoteKind.Mine }])).CreateSession();
         session.AdvanceTo(ms(1000), pressed ? [press(1000)] : [press(999), release(1000)]);
-        Assert.That(session.GetEventsSince(0).Single().Result, Is.EqualTo(expected));
+        Assert.That(session.GetEventsSince(0).Single().Result.Value, Is.EqualTo(expected));
     }
 
     [Test]
@@ -130,7 +130,7 @@ public class ProfileConformanceTest
         session.AdvanceTo(ms(1150), [press(1150)]);
         Assert.That(session.Score.AccuracyMaximum, Is.EqualTo(2));
         Assert.That(session.Completed, Is.True);
-        Assert.That(session.GetEventsSince(0).Last().Result, Is.EqualTo("bad"));
+        Assert.That(session.GetEventsSince(0).Last().Result.Value, Is.EqualTo("bad"));
     }
 
     [Test]
@@ -138,11 +138,11 @@ public class ProfileConformanceTest
     {
         var session = ManiaProfiles.CreateLazer(new KeyChart(1, [hold(KeyNoteKind.Hold)])).CreateSession();
         session.AdvanceTo(ms(1500), [press(1000), release(1500)]);
-        Assert.That(session.GetEventsSince(0).Select(e => e.Result), Is.EqualTo(["perfect", "combo-break"]));
+        Assert.That(session.GetEventsSince(0).Select(e => e.Result.Value), Is.EqualTo(["perfect", "combo-break"]));
         Assert.That(session.Score.Combo, Is.Zero);
         Assert.That(session.Score.AccuracyMaximum, Is.EqualTo(305));
         session.AdvanceTo(ms(2000), [press(1700), release(2000)]);
-        Assert.That(session.GetEventsSince(0).Last().Result, Is.EqualTo("meh"));
+        Assert.That(session.GetEventsSince(0).Last().Result.Value, Is.EqualTo("meh"));
         Assert.That(session.Score.Combo, Is.EqualTo(1));
     }
 
@@ -151,7 +151,7 @@ public class ProfileConformanceTest
     {
         var session = ManiaProfiles.CreateLazer(new KeyChart(1, [hold(KeyNoteKind.Hold)])).CreateSession();
         session.AdvanceTo(ms(2000), [press(1500), release(2000)]);
-        Assert.That(session.GetEventsSince(0).Select(e => e.Result), Is.EqualTo(["miss", "meh"]));
+        Assert.That(session.GetEventsSince(0).Select(e => e.Result.Value), Is.EqualTo(["miss", "meh"]));
     }
 
     [Test]
@@ -159,7 +159,7 @@ public class ProfileConformanceTest
     {
         var session = ManiaProfiles.CreateLazer(new KeyChart(1, [hold(KeyNoteKind.Hold)])).CreateSession();
         session.AdvanceTo(ms(2500), [press(1000), release(1500), press(2140), release(2150)]);
-        Assert.That(session.GetEventsSince(0).Last().Result, Is.EqualTo("miss"));
+        Assert.That(session.GetEventsSince(0).Last().Result.Value, Is.EqualTo("miss"));
     }
 
     [Test]
@@ -168,7 +168,7 @@ public class ProfileConformanceTest
         var source = new KeyChart(1, [note(0, 1000), note(1, 1050)]);
         var session = ManiaProfiles.CreateLazer(source).CreateSession();
         session.AdvanceTo(ms(1050), [press(1050)]);
-        Assert.That(session.GetEventsSince(0).Select(e => (e.NoteId, e.Result)), Is.EqualTo([(0, "miss"), (1, "perfect")]));
+        Assert.That(session.GetEventsSince(0).Select(e => (e.NoteId, e.Result.Value)), Is.EqualTo([(0, "miss"), (1, "perfect")]));
     }
 
     [TestCase(5)]
@@ -180,7 +180,7 @@ public class ProfileConformanceTest
     {
         var session = EtternaProfile.Create(new KeyChart(1, [note(0, 1000)]), new EtternaOptions(judge)).CreateSession();
         session.AdvanceTo(ms(1180), [press(1180)]);
-        Assert.That(session.GetEventsSince(0).Single().Result, Is.EqualTo("w5"));
+        Assert.That(session.GetEventsSince(0).Single().Result.Value, Is.EqualTo("w5"));
         Assert.That(session.Score.AccuracyPoints, Is.EqualTo(-5.5));
     }
 
@@ -189,7 +189,7 @@ public class ProfileConformanceTest
     {
         var session = EtternaProfile.Create(new KeyChart(1, [hold(KeyNoteKind.Hold)])).CreateSession();
         session.AdvanceTo(ms(2500));
-        Assert.That(session.GetEventsSince(0).Select(e => (e.Result, e.Time)), Is.EqualTo([("miss", ms(1180) + 1), ("missed-hold", ms(2000))]));
+        Assert.That(session.GetEventsSince(0).Select(e => (e.Result.Value, e.Time)), Is.EqualTo([("miss", ms(1180) + 1), ("missed-hold", ms(2000))]));
         Assert.That(session.Score.AccuracyPoints, Is.EqualTo(-10));
     }
 
@@ -199,7 +199,7 @@ public class ProfileConformanceTest
         var session = EtternaProfile.Create(new KeyChart(1, [hold(KeyNoteKind.Roll)])).CreateSession();
         session.AdvanceTo(ms(1800), [press(1000), release(1499)]);
         Assert.That(session.GetEventsSince(0).Last().Time, Is.EqualTo(ms(1500)));
-        Assert.That(session.GetEventsSince(0).Last().Result, Is.EqualTo("let-go"));
+        Assert.That(session.GetEventsSince(0).Last().Result.Value, Is.EqualTo("let-go"));
     }
 
     [Test]
@@ -207,7 +207,7 @@ public class ProfileConformanceTest
     {
         var session = EtternaProfile.Create(new KeyChart(1, [hold(KeyNoteKind.Roll), note(1, 1400)])).CreateSession();
         session.AdvanceTo(ms(2100), [press(1000), release(1300), press(1400), release(1700), press(1800)]);
-        Assert.That(session.GetEventsSince(0).Select(e => (e.NoteId, e.Result)), Is.EqualTo([(0, "w1"), (1, "w1"), (0, "held")]));
+        Assert.That(session.GetEventsSince(0).Select(e => (e.NoteId, e.Result.Value)), Is.EqualTo([(0, "w1"), (1, "w1"), (0, "held")]));
     }
 
     [Test]
@@ -223,7 +223,7 @@ public class ProfileConformanceTest
     {
         var session = ManiaProfiles.CreateLazer(new KeyChart(1, [hold(KeyNoteKind.Hold)])).CreateSession();
         session.AdvanceTo(ms(2500), [press(1000)]);
-        Assert.That(session.GetEventsSince(0).Select(e => e.Result), Is.EqualTo(["perfect", "miss", "combo-break"]));
+        Assert.That(session.GetEventsSince(0).Select(e => e.Result.Value), Is.EqualTo(["perfect", "miss", "combo-break"]));
     }
 
     [TestCase(0.5, 0.004)]
@@ -242,7 +242,7 @@ public class ProfileConformanceTest
         var session = EtternaProfile.Create(new KeyChart(1, [hold(KeyNoteKind.Hold)])).CreateSession();
         session.AdvanceTo(ms(3000), [press(1000), release(1400), press(1649)]);
 
-        Assert.That(session.GetEventsSince(0).Last().Result, Is.EqualTo("held"));
+        Assert.That(session.GetEventsSince(0).Last().Result.Value, Is.EqualTo("held"));
         Assert.That(session.Health.Value, Is.EqualTo(0.516).Within(1e-7));
     }
 
@@ -255,7 +255,7 @@ public class ProfileConformanceTest
         Assert.That(session.EventCount, Is.Zero);
         session.AdvanceTo(ms(1000));
         Assert.That(session.GetEventsSince(0).Single().Time, Is.EqualTo(ms(1000)));
-        Assert.That(session.GetEventsSince(0).Single().Result, Is.EqualTo("mine-hit"));
+        Assert.That(session.GetEventsSince(0).Single().Result.Value, Is.EqualTo("mine-hit"));
     }
 
     [Test]
@@ -264,7 +264,7 @@ public class ProfileConformanceTest
         var source = new KeyChart(1, [note(0, 1000) with { Kind = KeyNoteKind.Mine }]);
         var session = EtternaProfile.Create(source).CreateSession();
         session.AdvanceTo(ms(1200), [press(900), release(950), new InputEvent(ms(1075) + 1, 0, true)]);
-        Assert.That(session.GetEventsSince(0).Single().Result, Is.EqualTo("mine-avoided"));
+        Assert.That(session.GetEventsSince(0).Single().Result.Value, Is.EqualTo("mine-avoided"));
         Assert.That(session.Score.AccuracyPoints, Is.Zero);
     }
 
@@ -276,7 +276,7 @@ public class ProfileConformanceTest
         var source = new KeyChart(1, [note(0, 1000) with { Kind = KeyNoteKind.Mine }]);
         var session = EtternaProfile.Create(source).CreateSession();
         session.AdvanceTo(ms(1200), [press(1000 + offset)]);
-        Assert.That(session.GetEventsSince(0).Single().Result, Is.EqualTo(result));
+        Assert.That(session.GetEventsSince(0).Single().Result.Value, Is.EqualTo(result));
     }
 
     [Test]
@@ -285,7 +285,7 @@ public class ProfileConformanceTest
         var source = new KeyChart(1, [note(0, 1000), note(1, 1060) with { Kind = KeyNoteKind.Mine }]);
         var session = EtternaProfile.Create(source).CreateSession();
         session.AdvanceTo(ms(1300), [press(1000), release(1001)]);
-        Assert.That(session.GetEventsSince(0).Select(e => (e.NoteId, e.Result)), Is.EqualTo([(0, "w1"), (1, "mine-avoided")]));
+        Assert.That(session.GetEventsSince(0).Select(e => (e.NoteId, e.Result.Value)), Is.EqualTo([(0, "w1"), (1, "mine-avoided")]));
     }
 
     [Test]
@@ -294,7 +294,7 @@ public class ProfileConformanceTest
         var source = new KeyChart(1, [note(0, 1000) with { Kind = KeyNoteKind.Mine }, note(1, 1050) with { Kind = KeyNoteKind.Mine }]);
         var session = EtternaProfile.Create(source).CreateSession();
         session.AdvanceTo(ms(1200), [press(1020), release(1030)]);
-        Assert.That(session.GetEventsSince(0).Select(e => (e.NoteId, e.Result)), Is.EqualTo([(1, "mine-hit"), (0, "mine-avoided")]));
+        Assert.That(session.GetEventsSince(0).Select(e => (e.NoteId, e.Result.Value)), Is.EqualTo([(1, "mine-hit"), (0, "mine-avoided")]));
     }
 
     [Test]
@@ -303,7 +303,7 @@ public class ProfileConformanceTest
         var source = new KeyChart(1, [note(0, 1000) with { Kind = KeyNoteKind.Mine }, note(1, 1150) with { Kind = KeyNoteKind.Mine }]);
         var session = EtternaProfile.Create(source).CreateSession();
         session.AdvanceTo(ms(1400), [press(1020), release(1030)]);
-        Assert.That(session.GetEventsSince(0).Select(e => e.Result), Is.All.EqualTo("mine-avoided"));
+        Assert.That(session.GetEventsSince(0).Select(e => e.Result.Value), Is.All.EqualTo("mine-avoided"));
         Assert.That(session.EventCount, Is.EqualTo(2));
     }
 
@@ -322,7 +322,7 @@ public class ProfileConformanceTest
         session.AdvanceTo(ms(1850), [press(1000), release(1850)]);
         Assert.That(session.Completed, Is.False);
         session.AdvanceTo(ms(2500), [press(1900), release(2000)]);
-        Assert.That(session.GetEventsSince(0).Last().Result, Is.EqualTo("meh"));
+        Assert.That(session.GetEventsSince(0).Last().Result.Value, Is.EqualTo("meh"));
     }
 
     [Test]

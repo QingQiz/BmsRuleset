@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using RhythmEngine.Core;
+using RhythmEngine.Profiles.Common;
 
 namespace RhythmEngine.Profiles.Malody;
 
@@ -14,7 +15,7 @@ internal sealed class MalodyVHoldRule(TimingWindows windows) : INoteRule
 
     public IEnumerable<ScoringOpportunity> GetScoringOpportunities(ChartNote note)
     {
-        yield return new ScoringOpportunity(note.Id, "head", note.StartTime, 1000);
+        yield return new ScoringOpportunity(note.Id, NoteParts.HEAD, note.StartTime, 1000);
     }
 
     public InputCandidate? GetCandidate(NoteContext context, InputEvent input, int noteIndex)
@@ -36,8 +37,8 @@ internal sealed class MalodyVHoldRule(TimingWindows windows) : INoteRule
         {
             var offset = context.Time - context.Note.StartTime;
             var result = windows.ResultFor(offset)!;
-            emissions.Add(new NoteEmission("head", result, context.Note.StartTime, offset));
-            state = state with { HeadResolved = true, TickTime = result == "miss" ? null : context.Note.StartTime + tick_interval };
+            emissions.Add(new NoteEmission(NoteParts.HEAD, result, context.Note.StartTime, offset));
+            state = state with { HeadResolved = true, TickTime = result == MalodyResults.MISS ? null : context.Note.StartTime + tick_interval };
             state = emitTicks(context.Note, state, context.Time, emissions);
         }
         else if (input.Pressed)
@@ -49,7 +50,7 @@ internal sealed class MalodyVHoldRule(TimingWindows windows) : INoteRule
             if (context.Time >= context.Note.EndTime - windows.Entries[2].Late)
                 return new NoteUpdate(state with { Timer = null, Done = true, TickTime = null }, emissions.ToImmutable());
 
-            emissions.Add(new NoteEmission("body", "hold-drop", context.Note.EndTime, context.Time - context.Note.EndTime));
+            emissions.Add(new NoteEmission(NoteParts.BODY, MalodyResults.HOLD_DROP, context.Note.EndTime, context.Time - context.Note.EndTime));
             state = state with { TickTime = null };
         }
 
@@ -63,7 +64,7 @@ internal sealed class MalodyVHoldRule(TimingWindows windows) : INoteRule
         if (!state.HeadResolved)
         {
             state = state with { HeadResolved = true };
-            emissions.Add(new NoteEmission("head", "miss", context.Note.StartTime));
+            emissions.Add(new NoteEmission(NoteParts.HEAD, MalodyResults.MISS, context.Note.StartTime));
         }
         else
             state = emitTicks(context.Note, state, context.Time, emissions);
@@ -75,7 +76,7 @@ internal sealed class MalodyVHoldRule(TimingWindows windows) : INoteRule
     {
         while (state.TickTime is { } tick && tick <= until && tick <= note.EndTime)
         {
-            emissions.Add(new NoteEmission("body", "hold-tick", tick));
+            emissions.Add(new NoteEmission(NoteParts.BODY, MalodyResults.HOLD_TICK, tick));
             state = state with { TickTime = tick + tick_interval };
         }
 

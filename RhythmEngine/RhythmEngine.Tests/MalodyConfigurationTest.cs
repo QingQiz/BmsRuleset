@@ -53,7 +53,7 @@ public class MalodyConfigurationTest
     {
         var session = MalodyProfile.Create(tapChart(), new MalodyCalibration(testHealth()), new MalodyOptions(Client: client)).CreateSession();
         session.AdvanceTo(ms(2000), [new InputEvent(ms(1040), 0, true)]);
-        Assert.That(session.GetEventsSince(0).Single().Result, Is.EqualTo("cool"));
+        Assert.That(session.GetEventsSince(0).Single().Result.Value, Is.EqualTo("cool"));
         Assert.That(session.Score.Score, Is.EqualTo(1485));
         Assert.That(session.Score.Accuracy, Is.EqualTo(0.75));
     }
@@ -63,14 +63,14 @@ public class MalodyConfigurationTest
     {
         Assert.That(MalodyProfile.VWindows(MalodyJudge.Climber, false).Entries[0].Late, Is.EqualTo(ms(45)));
         var measuredWindows = new TimingWindows([
-            new TimingWindow("best", -50000, 50000), new TimingWindow("cool", -80000, 80000),
-            new TimingWindow("good", -120000, 120000), new TimingWindow("miss", -150000, 150000)
+            new TimingWindow(new ResultId("best"), -50000, 50000), new TimingWindow(new ResultId("cool"), -80000, 80000),
+            new TimingWindow(new ResultId("good"), -120000, 120000), new TimingWindow(new ResultId("miss"), -150000, 150000)
         ]);
         var calibration = new MalodyCalibration(testHealth(), ImmutableDictionary<MalodyJudge, TimingWindows>.Empty.Add(MalodyJudge.Climber, measuredWindows));
         var profile = MalodyProfile.Create(tapChart(), calibration, new MalodyOptions(Client: client));
         var calibrated = profile.CreateSession();
         calibrated.AdvanceTo(ms(1049), [new InputEvent(ms(1049), 0, true)]);
-        Assert.That(calibrated.GetEventsSince(0).First().Result, Is.EqualTo("best"));
+        Assert.That(calibrated.GetEventsSince(0).First().Result.Value, Is.EqualTo("best"));
     }
 
     [Test]
@@ -79,7 +79,7 @@ public class MalodyConfigurationTest
         var notes = new KeyChart(1, [new KeyNote(0, 0, ms(1000), ms(1000)), new KeyNote(1, 0, ms(2000), ms(3000), KeyNoteKind.Hold)]);
         var session = MalodyProfile.Create(notes, new MalodyCalibration(testHealth())).CreateSession();
         session.AdvanceTo(ms(4000), [new InputEvent(ms(2000), 0, true), new InputEvent(ms(2500), 0, false)]);
-        Assert.That(session.GetEventsSince(0).Where(e => e.Result != "hold-tick").Select(e => e.Result), Is.EqualTo(["miss", "best", "hold-drop"]));
+        Assert.That(session.GetEventsSince(0).Where(e => e.Result.Value != "hold-tick").Select(e => e.Result.Value), Is.EqualTo(["miss", "best", "hold-drop"]));
         Assert.That(session.Score.Score, Is.EqualTo(1690).Within(1e-7));
         Assert.That(session.Score.AccuracyMaximum, Is.EqualTo(2000));
         Assert.That(session.Score.Bonus, Is.EqualTo(0.37).Within(1e-7));
@@ -98,12 +98,12 @@ public class MalodyConfigurationTest
         var goodOffset = (Time.ToMilliseconds(windows.Entries[1].Late) + Time.ToMilliseconds(windows.Entries[2].Late)) / 2;
         var goodSession = MalodyProfile.Create(singleTap, new MalodyCalibration(testHealth()), new MalodyOptions(Judge: judge)).CreateSession();
         goodSession.AdvanceTo(ms(1500), [new InputEvent(ms(1000 + goodOffset), 0, true)]);
-        Assert.That(goodSession.GetEventsSince(0).Single().Result, Is.EqualTo("good"));
+        Assert.That(goodSession.GetEventsSince(0).Single().Result.Value, Is.EqualTo("good"));
         Assert.That(goodSession.Score.Bonus, Is.EqualTo(0.92).Within(1e-12));
 
         var missSession = MalodyProfile.Create(singleTap, new MalodyCalibration(testHealth()), new MalodyOptions(Judge: judge)).CreateSession();
         missSession.AdvanceTo(ms(1500));
-        Assert.That(missSession.GetEventsSince(0).Single().Result, Is.EqualTo("miss"));
+        Assert.That(missSession.GetEventsSince(0).Single().Result.Value, Is.EqualTo("miss"));
         Assert.That(missSession.Score.Bonus, Is.EqualTo(0.68).Within(1e-12));
     }
 
@@ -113,22 +113,22 @@ public class MalodyConfigurationTest
         var chart = new KeyChart(1, Enumerable.Range(0, 4).Select(i => new KeyNote(i, 0, ms((i + 1) * 1000), ms((i + 1) * 1000))));
         var session = MalodyProfile.Create(chart, new MalodyCalibration(testHealth()), new MalodyOptions(Judge: MalodyJudge.Climber)).CreateSession();
         session.AdvanceTo(ms(1500), [new InputEvent(ms(1100), 0, true), new InputEvent(ms(1101), 0, false)]);
-        Assert.That(session.GetEventsSince(0).Last().Result, Is.EqualTo("good"));
+        Assert.That(session.GetEventsSince(0).Last().Result.Value, Is.EqualTo("good"));
         Assert.That(session.Score.Bonus, Is.EqualTo(0.92).Within(1e-12));
         Assert.That(session.Score.Score, Is.EqualTo(768).Within(1e-9));
 
         session.AdvanceTo(ms(2500), [new InputEvent(ms(2050), 0, true), new InputEvent(ms(2051), 0, false)]);
-        Assert.That(session.GetEventsSince(1).Last().Result, Is.EqualTo("cool"));
+        Assert.That(session.GetEventsSince(1).Last().Result.Value, Is.EqualTo("cool"));
         Assert.That(session.Score.Bonus, Is.EqualTo(0.90).Within(1e-12));
         Assert.That(session.Score.Score, Is.EqualTo(2193).Within(1e-9));
 
         session.AdvanceTo(ms(3500), [new InputEvent(ms(3100), 0, true), new InputEvent(ms(3101), 0, false)]);
-        Assert.That(session.GetEventsSince(2).Last().Result, Is.EqualTo("good"));
+        Assert.That(session.GetEventsSince(2).Last().Result.Value, Is.EqualTo("good"));
         Assert.That(session.Score.Bonus, Is.EqualTo(0.82).Within(1e-12));
         Assert.That(session.Score.Score, Is.EqualTo(2921).Within(1e-9));
 
         session.AdvanceTo(ms(4500));
-        Assert.That(session.GetEventsSince(3).Last().Result, Is.EqualTo("miss"));
+        Assert.That(session.GetEventsSince(3).Last().Result.Value, Is.EqualTo("miss"));
         Assert.That(session.Score.Bonus, Is.EqualTo(0.50).Within(1e-12));
         Assert.That(session.Score.Score, Is.EqualTo(2921).Within(1e-9));
     }
@@ -145,12 +145,12 @@ public class MalodyConfigurationTest
         Assert.That(windows.Entries.Take(3).Select(w => Time.ToMilliseconds(w.Late)), Is.EqualTo([best, cool, good]));
         foreach (var sign in new[] { -1, 1 })
         {
-            Assert.That(windows.ResultFor(ms(sign * best)), Is.EqualTo("best"));
-            Assert.That(windows.ResultFor(ms(sign * (best + 1))), Is.EqualTo("cool"));
-            Assert.That(windows.ResultFor(ms(sign * cool)), Is.EqualTo("cool"));
-            Assert.That(windows.ResultFor(ms(sign * (cool + 1))), Is.EqualTo("good"));
-            Assert.That(windows.ResultFor(ms(sign * good)), Is.EqualTo("good"));
-            Assert.That(windows.ResultFor(ms(sign * (good + 1))), Is.EqualTo("miss"));
+            Assert.That(windows.ResultFor(ms(sign * best))?.Value, Is.EqualTo("best"));
+            Assert.That(windows.ResultFor(ms(sign * (best + 1)))?.Value, Is.EqualTo("cool"));
+            Assert.That(windows.ResultFor(ms(sign * cool))?.Value, Is.EqualTo("cool"));
+            Assert.That(windows.ResultFor(ms(sign * (cool + 1)))?.Value, Is.EqualTo("good"));
+            Assert.That(windows.ResultFor(ms(sign * good))?.Value, Is.EqualTo("good"));
+            Assert.That(windows.ResultFor(ms(sign * (good + 1)))?.Value, Is.EqualTo("miss"));
         }
     }
 
@@ -187,12 +187,12 @@ public class MalodyConfigurationTest
         var profile = MalodyProfile.Create(source, new MalodyOptions(Client: client));
         var early = profile.CreateSession();
         early.AdvanceTo(ms(2200), [new InputEvent(ms(1000), 0, true), new InputEvent(ms(2000 - lenience) - 1, 0, false)]);
-        Assert.That(early.GetEventsSince(0).Last().Result, Is.EqualTo("hold-drop"));
+        Assert.That(early.GetEventsSince(0).Last().Result.Value, Is.EqualTo("hold-drop"));
         Assert.That(early.Score.Bonus, Is.EqualTo(0.68));
 
         var atBoundary = profile.CreateSession();
         atBoundary.AdvanceTo(ms(2200), [new InputEvent(ms(1000), 0, true), new InputEvent(ms(2000 - lenience), 0, false)]);
-        Assert.That(atBoundary.GetEventsSince(0).Any(e => e.Result == "hold-drop"), Is.False);
+        Assert.That(atBoundary.GetEventsSince(0).Any(e => e.Result.Value == "hold-drop"), Is.False);
         Assert.That(atBoundary.Score.Score, Is.EqualTo(2000));
         Assert.That(atBoundary.Score.AccuracyMaximum, Is.EqualTo(1000));
         Assert.That(atBoundary.Score.Combo, Is.EqualTo(1 + (1000 - lenience) / 100));
@@ -211,8 +211,8 @@ public class MalodyConfigurationTest
         session.AdvanceTo(ms(2200), regrab);
         clone.AdvanceTo(ms(1550), regrab);
         clone.AdvanceTo(ms(2200));
-        Assert.That(session.GetEventsSince(0).Count(e => e.Part == "head"), Is.EqualTo(1));
-        Assert.That(session.GetEventsSince(0).Where(e => e.Result == "hold-tick").Select(e => Time.ToMilliseconds(e.Time)),
+        Assert.That(session.GetEventsSince(0).Count(e => e.Part.Value == "head"), Is.EqualTo(1));
+        Assert.That(session.GetEventsSince(0).Where(e => e.Result.Value == "hold-tick").Select(e => Time.ToMilliseconds(e.Time)),
             Is.EqualTo(new double[] { 1100, 1200, 1500, 1600, 1700, 1800, 1900, 2000 }));
         Assert.That(session.Score.Combo, Is.EqualTo(6));
         Assert.That(session.Score.MaximumCombo, Is.EqualTo(6));
@@ -230,10 +230,10 @@ public class MalodyConfigurationTest
         var windows = MalodyProfile.VWindows(MalodyJudge.Climber, client == MalodyClient.VPro);
         foreach (var sign in new[] { -1, 1 })
         {
-            Assert.That(windows.ResultFor(ms(sign * (best - 1))), Is.EqualTo("best"));
-            Assert.That(windows.ResultFor(ms(sign * best)), Is.EqualTo("cool"));
-            Assert.That(windows.ResultFor(ms(sign * cool)), Is.EqualTo("good"));
-            Assert.That(windows.ResultFor(ms(sign * good)), Is.EqualTo("miss"));
+            Assert.That(windows.ResultFor(ms(sign * (best - 1)))?.Value, Is.EqualTo("best"));
+            Assert.That(windows.ResultFor(ms(sign * best))?.Value, Is.EqualTo("cool"));
+            Assert.That(windows.ResultFor(ms(sign * cool))?.Value, Is.EqualTo("good"));
+            Assert.That(windows.ResultFor(ms(sign * good))?.Value, Is.EqualTo("miss"));
         }
     }
 
@@ -245,7 +245,7 @@ public class MalodyConfigurationTest
         session.AdvanceTo(ms(850), [new InputEvent(ms(850), 0, true)]);
         Assert.That(session.EventCount, Is.Zero);
         session.AdvanceTo(ms(1000), [new InputEvent(ms(900), 0, false), new InputEvent(ms(1000), 0, true)]);
-        Assert.That(session.GetEventsSince(0).Single().Result, Is.EqualTo("best"));
+        Assert.That(session.GetEventsSince(0).Single().Result.Value, Is.EqualTo("best"));
     }
 
     [TestCase(MalodyClient.VStandard, 130)]
@@ -268,7 +268,7 @@ public class MalodyConfigurationTest
         var source = new KeyChart(1, [new KeyNote(0, 0, ms(1000), ms(2000), KeyNoteKind.Hold)]);
         var session = MalodyProfile.Create(source).CreateSession();
         session.AdvanceTo(ms(2100), [new InputEvent(ms(1400), 0, true)]);
-        Assert.That(session.GetEventsSince(0).First().Result, Is.EqualTo("miss"));
+        Assert.That(session.GetEventsSince(0).First().Result.Value, Is.EqualTo("miss"));
         Assert.That(session.Score.Combo, Is.EqualTo(6));
         Assert.That(session.Score.Score, Is.Zero);
         Assert.That(session.Score.AccuracyMaximum, Is.EqualTo(1000));
@@ -311,7 +311,7 @@ public class MalodyConfigurationTest
         Assert.That(session.Score.Score, Is.EqualTo(1485));
         Assert.That(session.Score.AccuracyMaximum, Is.EqualTo(1000));
         session.AdvanceTo(ms(2050), [new InputEvent(ms(2050), 0, false)]);
-        Assert.That(session.GetEventsSince(0).Where(e => e.Part is "head" or "tail").Select(e => e.Result), Is.EqualTo(["cool", "best"]));
+        Assert.That(session.GetEventsSince(0).Where(e => e.Part.Value is "head" or "tail").Select(e => e.Result.Value), Is.EqualTo(["cool", "best"]));
         Assert.That(session.Score.AccuracyMaximum, Is.EqualTo(2000));
         Assert.That(session.Completed, Is.True);
     }
@@ -324,7 +324,7 @@ public class MalodyConfigurationTest
         session.AdvanceTo(ms(1110));
         Assert.That(session.EventCount, Is.Zero);
         session.AdvanceTo(ms(1110) + 1);
-        Assert.That(session.GetEventsSince(0).Select(e => (e.Part, e.Result)), Is.EqualTo([("head", "miss"), ("tail", "miss")]));
+        Assert.That(session.GetEventsSince(0).Select(e => (e.Part.Value, e.Result.Value)), Is.EqualTo([("head", "miss"), ("tail", "miss")]));
         Assert.That(session.Score.AccuracyMaximum, Is.EqualTo(2000));
         Assert.That(session.Health.Value, Is.EqualTo(0.7).Within(1e-7));
         Assert.That(session.Completed, Is.True);
@@ -337,9 +337,9 @@ public class MalodyConfigurationTest
         var session = MalodyProfile.Create(source, new MalodyOptions(Client: MalodyClient.VPro, JudgeAtEnd: true, WindowScale: 2)).CreateSession();
         session.AdvanceTo(ms(2160), [new InputEvent(ms(1000), 0, true)]);
         Assert.That(session.Completed, Is.False);
-        Assert.That(session.GetEventsSince(0).Count(e => e.Part == "tail"), Is.Zero);
+        Assert.That(session.GetEventsSince(0).Count(e => e.Part.Value == "tail"), Is.Zero);
         session.AdvanceTo(ms(2160) + 1);
-        Assert.That(session.GetEventsSince(0).Last().Result, Is.EqualTo("miss"));
+        Assert.That(session.GetEventsSince(0).Last().Result.Value, Is.EqualTo("miss"));
         Assert.That(session.Completed, Is.True);
     }
 
@@ -349,7 +349,7 @@ public class MalodyConfigurationTest
     {
         var session = MalodyProfile.Create(tapChart(), new MalodyCalibration(testHealth()), new MalodyOptions(Judge: judge)).CreateSession();
         session.AdvanceTo(ms(2000), [new InputEvent(ms(1000 + offset), 0, true)]);
-        return session.GetEventsSince(0).Single().Result;
+        return session.GetEventsSince(0).Single().Result.Value;
     }
 
     private static long ms(double time) => Time.FromMilliseconds(time);

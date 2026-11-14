@@ -1,21 +1,22 @@
 using System.Collections.Immutable;
 using RhythmEngine.Core;
+using RhythmEngine.Profiles.Common;
 
 namespace RhythmEngine.Profiles.Patterns;
 
 public sealed record TapConfiguration(
     TimingWindows Windows,
     long LateDeadline,
-    string MissResult,
+    ResultId MissResult,
     double MaximumAccuracy,
     bool OnRelease = false,
-    ImmutableHashSet<string>? NonResolvingResults = null,
+    ImmutableHashSet<ResultId>? NonResolvingResults = null,
     TimingWindows? ResolvedWindows = null,
-    Func<string, int>? CandidatePriority = null,
-    Func<string, long, bool>? ShareInput = null,
+    Func<ResultId, int>? CandidatePriority = null,
+    Func<ResultId, long, bool>? ShareInput = null,
     bool BlockResolvedUntilStart = false,
     bool SuppressRepeatedMistakes = false,
-    ImmutableHashSet<string>? RecoveringResults = null,
+    ImmutableHashSet<ResultId>? RecoveringResults = null,
     TimerOrder PassiveOrder = TimerOrder.BeforeInput);
 
 public sealed record TapState(NoteTimer? Timer, bool Done, bool Resolved, bool Mistake = false) : NoteState
@@ -28,7 +29,7 @@ public sealed record TapState(NoteTimer? Timer, bool Done, bool Resolved, bool M
 public sealed class TapRule : INoteRule
 {
     public ImmutableArray<NotePartState> GetParts(NoteContext context)
-        => [new("tap", ((TapState)context.State).Resolved)];
+        => [new(NoteParts.TAP, ((TapState)context.State).Resolved)];
 
     public TapConfiguration Configuration { get; }
 
@@ -44,7 +45,7 @@ public sealed class TapRule : INoteRule
 
     public IEnumerable<ScoringOpportunity> GetScoringOpportunities(ChartNote note)
     {
-        yield return new ScoringOpportunity(note.Id, "tap", note.StartTime, Configuration.MaximumAccuracy);
+        yield return new ScoringOpportunity(note.Id, NoteParts.TAP, note.StartTime, Configuration.MaximumAccuracy);
     }
 
     public InputCandidate? GetCandidate(NoteContext context, InputEvent input, int noteIndex)
@@ -81,7 +82,7 @@ public sealed class TapRule : INoteRule
         else if (Configuration.SuppressRepeatedMistakes)
             state = state with { Mistake = true };
 
-        return new NoteUpdate(state, [new NoteEmission(nonResolving ? "empty" : "tap", result, context.Note.StartTime, offset)]);
+        return new NoteUpdate(state, [new NoteEmission(nonResolving ? NoteParts.EMPTY : NoteParts.TAP, result, context.Note.StartTime, offset)]);
     }
 
     public NoteUpdate ApplyTimer(NoteContext context)
@@ -91,7 +92,7 @@ public sealed class TapRule : INoteRule
             return NoteUpdate.Silent(new TapState(null, true, true));
 
         return new NoteUpdate(resolvedState(context.Note, context.Time), [
-            new NoteEmission("tap", Configuration.MissResult, context.Note.StartTime,
+            new NoteEmission(NoteParts.TAP, Configuration.MissResult, context.Note.StartTime,
                 SuppressPenalty: state.Mistake && Configuration.SuppressRepeatedMistakes)
         ]);
     }

@@ -8,6 +8,8 @@ using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using RhythmEngine.Core;
 using RhythmEngine.Profiles.Bms;
+using RhythmEngine.Profiles.Common;
+using RhythmEngine.Profiles.Patterns;
 
 namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 
@@ -32,14 +34,17 @@ internal sealed class BmsJudgementEngine
     private bool processing;
 
     internal BmsJudgementEngine(params BmsJudgementColumnDefinition[] definitions)
-        : this(definitions, null) { }
+        : this(definitions, null)
+    {
+    }
 
     internal BmsJudgementEngine(BmsJudgementColumnDefinition[] definitions,
-        Func<BmsHitObject[], (ScoreConfiguration Score, HealthConfiguration Health)>? configurationFactory)
+                                Func<BmsHitObject[], (ScoreConfiguration Score, HealthConfiguration Health)>? configurationFactory)
     {
         this.configurationFactory = configurationFactory;
         if (definitions.Length == 0 || definitions.Any(d => d.Index < 0) || definitions.Select(d => d.Index).Distinct().Count() != definitions.Length)
-            throw new ArgumentException("Each judgement column needs a unique non-negative index.", nameof(definitions));
+            throw new ArgumentException(@"Each judgement column needs a unique non-negative index.", nameof(definitions));
+
         layout = definitions[0].Layout;
         var scratch = layout switch
         {
@@ -60,13 +65,20 @@ internal sealed class BmsJudgementEngine
     }
 
     internal BmsJudgementEngine(BmsHitObject[] notes, BmsLayoutVariant layout, int column, IBmsJudgementOutput output)
-        : this(new BmsJudgementColumnDefinition(notes, layout, column, output)) { }
+        : this(new BmsJudgementColumnDefinition(notes, layout, column, output))
+    {
+    }
 
     internal bool HasPendingInputs => pendingInputs.Count > 0;
+
     internal double CurrentTime => session?.CurrentTime / 1000.0 ?? double.NaN;
+
     internal BmsJudgementView GetColumn(int index) => columns[index];
+
     internal NoteSnapshot GetNote(BmsHitObject note) => snapshots[ids[note]];
+
     internal int GetPressedDirections(int column) => pressed[column];
+
     internal BmsLandmineState GetLandmineState(BmsLandmine note) => mines.GetValueOrDefault(ids[note]);
 
     internal void QueueInput(double time, int column, bool down, bool reverseScratch)
@@ -76,7 +88,13 @@ internal sealed class BmsJudgementEngine
                                Func<double, BmsFrameContext>? contextAtTime = null)
     {
         if (processing) throw new InvalidOperationException("Result observers cannot recursively process a frame.");
-        if (frame.IsRewinding || elapsed < 0) { pendingInputs.Clear(); return; }
+
+        if (frame.IsRewinding || elapsed < 0)
+        {
+            pendingInputs.Clear();
+            return;
+        }
+
         session ??= createSession(algorithm);
         var count = pendingInputs.Count;
         processing = true;
@@ -104,8 +122,10 @@ internal sealed class BmsJudgementEngine
                     contextAtTime?.Invoke(input.Time / 1000.0);
                     outputs[input.Lane].PlayKeySound();
                 }
+
                 cursor = first + dispatch.TransitionCount;
             }
+
             publish(transitions[cursor..], frame, contextAtTime);
         }
         finally
@@ -134,7 +154,7 @@ internal sealed class BmsJudgementEngine
             _ => BmsSelection.Combo,
         };
         var configuration = configurationFactory?.Invoke(objects)
-            ?? (BmsProfiles.CreateScore(BmsJudgementProfileProvider.EmptyPoorBreaksCombo(layout)), BmsEngineGauge.CreateDefault(objects));
+                            ?? (BmsProfiles.CreateScore(BmsJudgementProfileProvider.EmptyPoorBreaksCombo(layout)), BmsEngineGauge.CreateDefault(objects));
         return new JudgementSession(chart, new SessionConfiguration("bms-ruleset-v1", configuration.Item1, configuration.Item2,
             context => BmsProfiles.SelectCandidates(context, chart, selection)));
     }
@@ -152,21 +172,39 @@ internal sealed class BmsJudgementEngine
                 step = step with { EngineResult = judgement };
                 var result = judgement.Event;
                 var type = BmsEngineChart.HitResultFor(result.Result);
-                if (result.Part == "empty")
+                if (result.Part == NoteParts.EMPTY)
                 {
-                    if (result.Result == "bad") { output.ApplyNonConsumingBad(note, step); output.PlaySample(note); }
-                    else { output.ApplyEmptyPoor(note.StartTime, note.Column, step); output.PlayKeySound(); }
+                    if (result.Result == BmsResults.BAD)
+                    {
+                        output.ApplyNonConsumingBad(note, step);
+                        output.PlaySample(note);
+                    }
+                    else
+                    {
+                        output.ApplyEmptyPoor(note.StartTime, note.Column, step);
+                        output.PlayKeySound();
+                    }
                 }
                 else if (note is BmsLandmine mine)
                 {
-                    mines[result.NoteId] = new BmsLandmineState(step.SimulationTime, result.Result == "mine-hit");
-                    if (result.Result == "mine-hit") { output.PlayLandmineSample(mine); output.ApplyMainResult(mine, type, step, false); }
+                    mines[result.NoteId] = new BmsLandmineState(step.SimulationTime, result.Result == BmsResults.MINE_HIT);
+                    if (result.Result == BmsResults.MINE_HIT)
+                    {
+                        output.PlayLandmineSample(mine);
+                        output.ApplyMainResult(mine, type, step, false);
+                    }
+
                     output.PublishState(mine, mines[result.NoteId], step);
                 }
                 else if (note is BmsLongNote hold)
                 {
-                    if (result.Part == "body") { output.ApplyBodyTick(hold, result.Result == "sustain-gain", 0.5, step); continue; }
-                    var kind = result.Part == "head" ? BmsLongNoteEndpointKind.Head : BmsLongNoteEndpointKind.Tail;
+                    if (result.Part == NoteParts.BODY)
+                    {
+                        output.ApplyBodyTick(hold, result.Result == BmsResults.SUSTAIN_GAIN, 0.5, step);
+                        continue;
+                    }
+
+                    var kind = result.Part == NoteParts.HEAD ? BmsLongNoteEndpointKind.Head : BmsLongNoteEndpointKind.Tail;
                     var part = transition.After.Parts.Single(p => p.Part == result.Part);
                     var expected = kind == BmsLongNoteEndpointKind.Head ? hold.StartTime : hold.EndTime;
                     var endpoint = new BmsLongNoteEndpointResult(hold, kind,
@@ -181,10 +219,11 @@ internal sealed class BmsJudgementEngine
                     else if (hold.EffectiveMode == BmsLongNoteMode.LongNote)
                     {
                         var head = heads[result.NoteId];
-                        output.ApplyMainResult(hold, type, part.Reason is "MissedHead" or "Head" ? [head] : [head, endpoint], step, result.SuppressPenalty);
+                        output.ApplyMainResult(hold, type, (part.Reason == HoldReasons.MISSED_HEAD || part.Reason == HoldReasons.HEAD) ? [head] : [head, endpoint], step, result.SuppressPenalty);
                     }
                     else output.ApplySyntheticEndpoint(endpoint, step, result.SuppressPenalty);
-                    if (kind == BmsLongNoteEndpointKind.Tail && transition.Input != null && part.Reason is "Release" or "Drop")
+
+                    if (kind == BmsLongNoteEndpointKind.Tail && transition.Input != null && (part.Reason == HoldReasons.RELEASE || part.Reason == HoldReasons.DROP))
                         output.PlayTailSample(hold);
                 }
                 else
@@ -193,6 +232,7 @@ internal sealed class BmsJudgementEngine
                     if (transition.Input is { Pressed: true }) output.PlaySample(note);
                 }
             }
+
             if (note is BmsLongNote longNote) output.PublishState(longNote, transition.After, step);
         }
     }

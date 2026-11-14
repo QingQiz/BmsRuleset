@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using RhythmEngine.Core;
+using RhythmEngine.Profiles.Common;
 
 namespace RhythmEngine.Profiles.Malody;
 
@@ -25,14 +26,14 @@ internal sealed record MalodyVTiming(TimingWindows Windows, long GoodWindow, lon
 
         var inverseScale = 1 / scale;
         var entries = ImmutableArray.CreateBuilder<TimingWindow>();
-        foreach (var (result, bound) in new[] { ("best", best), ("cool", cool), ("good", good) })
+        foreach (var (result, bound) in new[] { (MalodyResults.BEST, best), (MalodyResults.COOL, cool), (MalodyResults.GOOD, good) })
         {
             var edge = firstOutside(bound, false);
             entries.Add(new TimingWindow(result, -edge, edge, false, false));
         }
 
         var missEdge = firstOutside(Math.Min(miss, good + 34), true) - 1;
-        entries.Add(new TimingWindow("miss", allowEarlyMiss ? -missEdge : 0, missEdge));
+        entries.Add(new TimingWindow(MalodyResults.MISS, allowEarlyMiss ? -missEdge : 0, missEdge));
         return new MalodyVTiming(new TimingWindows(entries), Time.FromMilliseconds(good), Time.FromMilliseconds(miss), firstOutside(20, true) - 1);
 
         long firstOutside(int bound, bool inclusive)
@@ -70,10 +71,10 @@ internal sealed class MalodyVCurrentRule(MalodyVTiming timing, bool hold, bool j
 
     public IEnumerable<ScoringOpportunity> GetScoringOpportunities(ChartNote note)
     {
-        yield return new ScoringOpportunity(note.Id, "head", note.StartTime, 1000);
+        yield return new ScoringOpportunity(note.Id, NoteParts.HEAD, note.StartTime, 1000);
 
         if (hold && judgeAtEnd)
-            yield return new ScoringOpportunity(note.Id, "tail", note.EndTime, 1000);
+            yield return new ScoringOpportunity(note.Id, NoteParts.TAIL, note.EndTime, 1000);
     }
 
     public InputCandidate? GetCandidate(NoteContext context, InputEvent input, int noteIndex)
@@ -98,11 +99,11 @@ internal sealed class MalodyVCurrentRule(MalodyVTiming timing, bool hold, bool j
         {
             var offset = context.Time - context.Note.StartTime;
             var result = timing.Windows.ResultFor(offset)!;
-            emitGrade(emissions, "head", result, context.Note.StartTime, offset);
-            state = state with { HeadResolved = true, TickTime = result == "miss" || !hold ? null : context.Note.StartTime + tick_interval };
-            if (result == "miss" && hold && judgeAtEnd)
+            emitGrade(emissions, NoteParts.HEAD, result, context.Note.StartTime, offset);
+            state = state with { HeadResolved = true, TickTime = result == MalodyResults.MISS || !hold ? null : context.Note.StartTime + tick_interval };
+            if (result == MalodyResults.MISS && hold && judgeAtEnd)
             {
-                emissions.Add(new NoteEmission("tail", "miss", context.Note.EndTime));
+                emissions.Add(new NoteEmission(NoteParts.TAIL, MalodyResults.MISS, context.Note.EndTime));
                 return new NoteUpdate(finish(state), emissions.ToImmutable());
             }
 
@@ -117,15 +118,21 @@ internal sealed class MalodyVCurrentRule(MalodyVTiming timing, bool hold, bool j
             if (judgeAtEnd)
             {
                 var offset = context.Time - context.Note.EndTime;
-                var grade = timing.Windows.ResultFor(offset) switch { "cool" => "best", "good" => "cool", { } result => result, _ => "miss" };
-                emitGrade(emissions, "tail", grade, context.Note.EndTime, offset);
+                var grade = timing.Windows.ResultFor(offset) switch
+                {
+                    var id when id == MalodyResults.COOL => MalodyResults.BEST,
+                    var id when id == MalodyResults.GOOD => MalodyResults.COOL,
+                    { } result => result,
+                    _ => MalodyResults.MISS,
+                };
+                emitGrade(emissions, NoteParts.TAIL, grade, context.Note.EndTime, offset);
                 return new NoteUpdate(finish(state), emissions.ToImmutable());
             }
 
             if (context.Time >= context.Note.EndTime - timing.GoodWindow)
                 return new NoteUpdate(finish(state), emissions.ToImmutable());
 
-            emissions.Add(new NoteEmission("body", "hold-drop", context.Note.EndTime, context.Time - context.Note.EndTime));
+            emissions.Add(new NoteEmission(NoteParts.BODY, MalodyResults.HOLD_DROP, context.Note.EndTime, context.Time - context.Note.EndTime));
             state = state with { TickTime = null };
         }
 
@@ -140,9 +147,9 @@ internal sealed class MalodyVCurrentRule(MalodyVTiming timing, bool hold, bool j
         if (!state.HeadResolved)
         {
             state = state with { HeadResolved = true };
-            emissions.Add(new NoteEmission("head", "miss", context.Note.StartTime));
+            emissions.Add(new NoteEmission(NoteParts.HEAD, MalodyResults.MISS, context.Note.StartTime));
             if (hold && judgeAtEnd)
-                emissions.Add(new NoteEmission("tail", "miss", context.Note.EndTime));
+                emissions.Add(new NoteEmission(NoteParts.TAIL, MalodyResults.MISS, context.Note.EndTime));
             if (!hold || judgeAtEnd)
                 return new NoteUpdate(finish(state), emissions.ToImmutable());
         }
@@ -152,7 +159,7 @@ internal sealed class MalodyVCurrentRule(MalodyVTiming timing, bool hold, bool j
             if (judgeAtEnd && context.Time > context.Note.EndTime + timing.MissWindow)
             {
                 if (state.TickTime != null && context.Input.Held)
-                    emissions.Add(new NoteEmission("tail", "miss", context.Note.EndTime));
+                    emissions.Add(new NoteEmission(NoteParts.TAIL, MalodyResults.MISS, context.Note.EndTime));
                 return new NoteUpdate(finish(state), emissions.ToImmutable());
             }
         }
@@ -160,19 +167,19 @@ internal sealed class MalodyVCurrentRule(MalodyVTiming timing, bool hold, bool j
         return new NoteUpdate(schedule(context, state), emissions.ToImmutable());
     }
 
-    private void emitGrade(ImmutableArray<NoteEmission>.Builder emissions, string part, string result, long expectedTime, long offset)
+    private void emitGrade(ImmutableArray<NoteEmission>.Builder emissions, PartId part, ResultId result, long expectedTime, long offset)
     {
         emissions.Add(new NoteEmission(part, result, expectedTime, offset));
         // A converted Cool tail is Best without acquiring the separate critical flag.
-        if (result == "best" && timing.Windows.ResultFor(offset) == "best" && Math.Abs(offset) <= timing.CriticalWindow)
-            emissions.Add(new NoteEmission("critical", "critical", expectedTime, offset));
+        if (result == MalodyResults.BEST && timing.Windows.ResultFor(offset) == MalodyResults.BEST && Math.Abs(offset) <= timing.CriticalWindow)
+            emissions.Add(new NoteEmission(MalodyParts.CRITICAL, MalodyResults.CRITICAL, expectedTime, offset));
     }
 
     private static MalodyHoldState emitTicks(ChartNote note, MalodyHoldState state, long until, ImmutableArray<NoteEmission>.Builder emissions)
     {
         while (state.TickTime is { } tick && tick <= until && tick <= note.EndTime)
         {
-            emissions.Add(new NoteEmission("body", "hold-tick", tick));
+            emissions.Add(new NoteEmission(NoteParts.BODY, MalodyResults.HOLD_TICK, tick));
             state = state with { TickTime = tick + tick_interval };
         }
 

@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using RhythmEngine.Core;
+using RhythmEngine.Profiles.Common;
 
 namespace RhythmEngine.Profiles.Mania;
 
@@ -17,7 +18,7 @@ internal sealed class StableManiaHoldRule(ImmutableArray<long> windows) : INoteR
     public ImmutableArray<NotePartState> GetParts(NoteContext context)
     {
         var hold = (StableManiaHoldState)context.State;
-        return [new NotePartState("head", hold.PressTime != null || hold.Done), new("body", hold.Done, hold.Held && !hold.Done), new("tail", hold.Done)];
+        return [new NotePartState(NoteParts.HEAD, hold.PressTime != null || hold.Done), new(NoteParts.BODY, hold.Done, hold.Held && !hold.Done), new(NoteParts.TAIL, hold.Done)];
     }
 
     public NoteState CreateState(ChartNote note) => new StableManiaHoldState(new NoteTimer(note.EndTime + windows[3], TimerOrder.BeforeInput),
@@ -25,7 +26,7 @@ internal sealed class StableManiaHoldRule(ImmutableArray<long> windows) : INoteR
 
     public IEnumerable<ScoringOpportunity> GetScoringOpportunities(ChartNote note)
     {
-        yield return new ScoringOpportunity(note.Id, "tail", note.EndTime, 300);
+        yield return new ScoringOpportunity(note.Id, NoteParts.TAIL, note.EndTime, 300);
     }
 
     public InputCandidate? GetCandidate(NoteContext context, InputEvent input, int noteIndex)
@@ -53,7 +54,7 @@ internal sealed class StableManiaHoldRule(ImmutableArray<long> windows) : INoteR
 
         state = state with { Held = false, ReleaseTime = time, TickTime = null };
         if (time < context.Note.EndTime - windows[4])
-            return new NoteUpdate(schedule(context, state with { Broken = true }), [new NoteEmission("body", "hold-break", context.Note.EndTime, time - context.Note.EndTime)]);
+            return new NoteUpdate(schedule(context, state with { Broken = true }), [new NoteEmission(NoteParts.BODY, ManiaResults.HOLD_BREAK, context.Note.EndTime, time - context.Note.EndTime)]);
 
         return resolve(context, state);
     }
@@ -64,7 +65,7 @@ internal sealed class StableManiaHoldRule(ImmutableArray<long> windows) : INoteR
         if (state.TickTime == context.Time && context.Time <= context.Note.EndTime)
         {
             var next = schedule(context, state with { TickTime = context.Time + tick_interval });
-            return new NoteUpdate(next, [new NoteEmission("body", "hold-tick", context.Time)]);
+            return new NoteUpdate(next, [new NoteEmission(NoteParts.BODY, ManiaResults.HOLD_TICK, context.Time)]);
         }
 
         if (state.Held && context.Time < context.Note.EndTime + windows[4])
@@ -83,25 +84,25 @@ internal sealed class StableManiaHoldRule(ImmutableArray<long> windows) : INoteR
             : tail <= note.EndTime ? tail : 2 * note.EndTime - tail;
         var headError = Math.Abs(press - note.StartTime);
         var combined = headError + Math.Abs(release - note.EndTime);
-        var result = "meh";
+        var result = ManiaResults.MEH;
         if (release < note.EndTime - windows[4])
-            result = "miss";
+            result = ManiaResults.MISS;
         else
         {
-            string[] grades = ["perfect", "great", "good", "ok"];
+            ResultId[] grades = [ManiaResults.PERFECT, ManiaResults.GREAT, ManiaResults.GOOD, ManiaResults.OK];
             for (var i = 0; i < grades.Length; i++)
             {
                 var factor = i == 0 ? 1.2 : i == 1 ? 1.1 : 1;
                 if (headError <= windows[i] * factor && combined <= windows[i] * factor * 2)
                 {
-                    result = state.Broken && i < 2 ? "good" : grades[i];
+                    result = state.Broken && i < 2 ? ManiaResults.GOOD : grades[i];
                     break;
                 }
             }
         }
 
         return new NoteUpdate(state with { Done = true, Timer = null, TickTime = null },
-            [new NoteEmission("tail", result, note.EndTime, (state.Held ? clockTime(context.Time) : state.ReleaseTime) - note.EndTime)]);
+            [new NoteEmission(NoteParts.TAIL, result, note.EndTime, (state.Held ? clockTime(context.Time) : state.ReleaseTime) - note.EndTime)]);
     }
 
     private StableManiaHoldState schedule(NoteContext context, StableManiaHoldState state)

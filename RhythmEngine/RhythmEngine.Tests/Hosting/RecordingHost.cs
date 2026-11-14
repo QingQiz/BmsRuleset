@@ -11,7 +11,7 @@ internal sealed class RecordingHost
 {
     public Dictionary<int, NoteSnapshot> Notes { get; } = [];
 
-    public List<(long Time, int NoteId, string Part, bool Active)> Audio { get; } = [];
+    public List<(long Time, int NoteId, PartId Part, bool Active)> Audio { get; } = [];
 
     public List<JudgementResult> Judgements { get; } = [];
 

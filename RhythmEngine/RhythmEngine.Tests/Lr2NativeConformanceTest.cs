@@ -29,7 +29,7 @@ public class Lr2NativeConformanceTest
         var session = profile.CreateSession();
         var time = ms(row.GetProperty("time").GetInt32());
         session.AdvanceTo(time, [new InputEvent(time, 0, true)]);
-        Assert.That(session.GetEventsSince(0).Select(e => e.Result), Is.EqualTo(row.GetProperty("events").EnumerateArray().Select(grade)));
+        Assert.That(session.GetEventsSince(0).Select(e => e.Result.Value), Is.EqualTo(row.GetProperty("events").EnumerateArray().Select(grade)));
         Assert.That(session.Completed, Is.EqualTo(row.GetProperty("index").GetInt32() > 0));
     }
 
@@ -41,11 +41,11 @@ public class Lr2NativeConformanceTest
         var session = profile.CreateSession();
         var headTime = ms(2000 + row.GetProperty("offset").GetInt32());
         session.AdvanceTo(headTime, [new InputEvent(headTime, 0, true)]);
-        Assert.That(session.GetEventsSince(0).Select(e => e.Result), Is.EqualTo(row.GetProperty("head").GetProperty("events").EnumerateArray().Select(grade)));
+        Assert.That(session.GetEventsSince(0).Select(e => e.Result.Value), Is.EqualTo(row.GetProperty("head").GetProperty("events").EnumerateArray().Select(grade)));
         var release = row.GetProperty("release");
         var time = ms(row.GetProperty("tail").GetProperty("time").GetInt32());
         session.AdvanceTo(time, release.ValueKind == JsonValueKind.Null ? [] : [new InputEvent(time, 0, false)]);
-        Assert.That(session.GetEventsSince(0).Select(e => e.Result), Is.EqualTo(row.GetProperty("tail").GetProperty("events").EnumerateArray().Select(grade)));
+        Assert.That(session.GetEventsSince(0).Select(e => e.Result.Value), Is.EqualTo(row.GetProperty("tail").GetProperty("events").EnumerateArray().Select(grade)));
         Assert.That(session.Completed, Is.True);
     }
 
@@ -59,7 +59,7 @@ public class Lr2NativeConformanceTest
             var session = Lr2Beta3Profile.Create(source).CreateSession();
             var time = ms(row.GetProperty("time").GetInt32());
             session.AdvanceTo(time, [new InputEvent(time, 0, true)]);
-            Assert.That(session.GetEventsSince(0).Select(e => e.Result), Is.EqualTo(row.GetProperty("events").EnumerateArray().Select(grade)), row.ToString());
+            Assert.That(session.GetEventsSince(0).Select(e => e.Result.Value), Is.EqualTo(row.GetProperty("events").EnumerateArray().Select(grade)), row.ToString());
         }
     }
 
@@ -80,7 +80,7 @@ public class Lr2NativeConformanceTest
                 var result = grade(expected);
                 var opportunity = result == "empty-poor" ? null : profile.Chart.ScorePlan.Opportunities[index];
                 var time = ms((index + 1) * 2000);
-                var judgement = new JudgementEvent(index, index, 0, opportunity == null ? "empty" : "note", result, time, time, 0);
+                var judgement = new JudgementEvent(index, index, 0, new PartId(opportunity == null ? "empty" : "note"), new ResultId(result), time, time, 0);
                 score = configuration.Score.Reduce(score, new ScoreContext(judgement, opportunity, profile.Chart.ScorePlan));
                 health = configuration.Health.Reduce(new HealthContext(judgement, health, score, profile.Chart.ScorePlan));
                 using var scope = Assert.EnterMultipleScope();

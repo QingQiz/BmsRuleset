@@ -1,4 +1,3 @@
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,18 +8,34 @@ using osu.Framework.Timing;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+using osu.Game.Rulesets.Scoring;
+using RhythmEngine.Core;
+using RhythmEngine.Profiles.Bms;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
 
 [TestFixture]
 public class BmsJudgementEngineTest
 {
-    private static IEnumerable<Type> CoreTypes => typeof(BmsJudgementEngine).Assembly.GetTypes()
+    [Test]
+    public void ResultMappingDistinguishesUnresolvedAndSilentResultsFromUnknownIds()
+    {
+        Assert.That(BmsEngineChart.HitResultFor(null), Is.EqualTo(HitResult.None));
+        Assert.That(BmsEngineChart.HitResultFor(BmsResults.MINE_AVOIDED), Is.EqualTo(HitResult.None));
+        Assert.That(BmsEngineChart.HitResultFor(BmsResults.SUSTAIN_GAIN), Is.EqualTo(HitResult.None));
+        Assert.That(BmsEngineChart.HitResultFor(BmsResults.SUSTAIN_LOSS), Is.EqualTo(HitResult.None));
+        Assert.That(BmsEngineChart.HitResultFor(BmsResults.MINE_HIT), Is.EqualTo(HitResult.Meh));
+        Assert.That(BmsEngineChart.HitResultFor(new ResultId("pgreat")), Is.EqualTo(HitResult.Perfect));
+        Assert.Throws<ArgumentOutOfRangeException>(() => BmsEngineChart.HitResultFor(new ResultId("custom-result")));
+    }
+
+    private static IEnumerable<Type> coreTypes => typeof(BmsJudgementEngine).Assembly.GetTypes()
         .Where(t => (t.Namespace == typeof(BmsJudgementEngine).Namespace
                      || t.Namespace?.StartsWith(typeof(BmsJudgementEngine).Namespace + ".", StringComparison.Ordinal) == true)
                     && !t.IsDefined(typeof(System.Runtime.CompilerServices.CompilerGeneratedAttribute)));
 
-    [TestCaseSource(nameof(CoreTypes))]
+    [TestCaseSource(nameof(coreTypes))]
     public void CoreMembersDoNotDependOnDrawablesOrClocks(Type coreType)
     {
         const BindingFlags members = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
@@ -132,8 +147,6 @@ public class BmsJudgementEngineTest
         var second = new BmsNote { Beatmap = beatmap, Column = 1, StartTime = 1000 };
         var output = new BmsRecordingJudgementOutput();
         var engine = new BmsJudgementEngine([first, second], beatmap.LayoutVariant, 1, output);
-        var column = engine.GetColumn(1);
-
 
         output.ResultApplied = (note, _) =>
         {
@@ -258,7 +271,7 @@ public class BmsJudgementEngineTest
         engine.QueueInput(1000, 1, true, false);
         engine.QueueInput(1000 + duration, 1, false, false);
         engine.ProcessFrame(new BmsFrameContext(2000, 1), 2000);
-        Assert.That(engine.Session().GetEventsSince(0).Select(e => e.Part), Is.EqualTo(new[] { "head", "tail" }));
+        Assert.That(engine.Session().GetEventsSince(0).Select(e => e.Part.Value), Is.EqualTo(new[] { "head", "tail" }));
         Assert.That(engine.Session().Score.Score, Is.EqualTo(mode == BmsLongNoteMode.LongNote ? 2 : 4));
         Assert.That(engine.GetColumn(1).GetNote(note).Completed, Is.True);
         if (mode == BmsLongNoteMode.LongNote)

@@ -98,10 +98,10 @@ public static class MalodyProfile
             throw new ArgumentOutOfRangeException(nameof(judge));
 
         var offset = new[] { 20, 10, 0, -8, -16 }[(int)judge];
-        var entries = ProfileSupport.Symmetric(("best", (mobile ? 45 : 36) + offset), ("cool", (mobile ? 85 : 76) + offset),
-            ("good", (mobile ? 130 : 110) + offset)).Entries;
+        var entries = ProfileSupport.Symmetric((MalodyResults.BEST, (mobile ? 45 : 36) + offset), (MalodyResults.COOL, (mobile ? 85 : 76) + offset),
+            (MalodyResults.GOOD, (mobile ? 130 : 110) + offset)).Entries;
         return new TimingWindows([
-            .. entries, new TimingWindow("miss", -Time.FromMilliseconds((mobile ? 170 : 160) + offset),
+            .. entries, new TimingWindow(MalodyResults.MISS, -Time.FromMilliseconds((mobile ? 170 : 160) + offset),
                 Time.FromMilliseconds(mobile ? 170 : 160)),
         ]);
     }
@@ -177,7 +177,7 @@ public static class MalodyProfile
             _ => windows.Entries[^1].Late,
         };
         if (note.Kind == KeyNoteKind.Tap)
-            return new TapRule(new TapConfiguration(windows, deadline, "miss", 1000));
+            return new TapRule(new TapConfiguration(windows, deadline, MalodyResults.MISS, 1000));
 
         if (note.Kind != KeyNoteKind.Hold)
             throw ProfileSupport.Unsupported("Malody Key", note.Kind);
@@ -192,24 +192,24 @@ public static class MalodyProfile
 
     private static ScoreConfiguration createScore(int multiplier, bool vScore)
     {
-        var values = ProfileSupport.Values(("best", 1000, 1000, ComboChange.Increment), ("cool", 750, 750, ComboChange.Increment),
-            ("good", 400, 400, ComboChange.Increment), ("miss", 0, 0, ComboChange.Reset));
+        var values = ProfileSupport.Values((MalodyResults.BEST, 1000, 1000, ComboChange.Increment), (MalodyResults.COOL, 750, 750, ComboChange.Increment),
+            (MalodyResults.GOOD, 400, 400, ComboChange.Increment), (MalodyResults.MISS, 0, 0, ComboChange.Reset));
         return new ScoreConfiguration(new ScoreState { Bonus = 1 }, (state, context) =>
         {
-            if (context.Event.Result == "critical")
-                return state with { Counters = state.Counters.SetItem("critical", state.Counters.GetValueOrDefault("critical") + 1) };
-            if (context.Event.Result == "hold-tick")
+            if (context.Event.Result == MalodyResults.CRITICAL)
+                return state with { Counters = state.Counters.SetItem(MalodyCounters.CRITICAL, state.Counters.GetValueOrDefault(MalodyCounters.CRITICAL) + 1) };
+            if (context.Event.Result == MalodyResults.HOLD_TICK)
                 return state with { Combo = state.Combo + 1, MaximumCombo = Math.Max(state.MaximumCombo, state.Combo + 1) };
-            if (context.Event.Result == "hold-drop")
+            if (context.Event.Result == MalodyResults.HOLD_DROP)
                 return state with { Bonus = Math.Max(0, (int)Math.Round(state.Bonus * 100) - 32) / 100.0, Combo = 0 };
             if (context.Opportunity == null)
                 return state;
 
             var change = context.Event.Result switch
             {
-                "best" => 1,
-                "cool" => -2,
-                "good" => -8,
+                var id when id == MalodyResults.BEST => 1,
+                var id when id == MalodyResults.COOL => -2,
+                var id when id == MalodyResults.GOOD => -8,
                 _ => -32,
             };
             // The native client's bonus is an integer percentage, independent of its float HP field.
@@ -218,19 +218,19 @@ public static class MalodyProfile
             if (vScore)
             {
                 // V multiplies by a single-precision bonus factor before accumulating a double score.
-                var raw = state.Counters.GetValueOrDefault("malody-raw-score")
+                var raw = state.Counters.GetValueOrDefault(MalodyCounters.MALODY_RAW_SCORE)
                           + values[context.Event.Result].Score * (multiplier / 100.0) * ((float)(bonus * 100) / 100 + 1);
-                return next with { Score = Math.Floor(raw), Bonus = bonus, Counters = state.Counters.SetItem("malody-raw-score", raw) };
+                return next with { Score = Math.Floor(raw), Bonus = bonus, Counters = state.Counters.SetItem(MalodyCounters.MALODY_RAW_SCORE, raw) };
             }
 
             // All built-in multipliers have two decimal places; fixed units preserve fractional credit across hits.
-            var units = state.Counters.GetValueOrDefault("malody-score-units")
+            var units = state.Counters.GetValueOrDefault(MalodyCounters.MALODY_SCORE_UNITS)
                         + values[context.Event.Result].Score * (100 + (int)Math.Round(bonus * 100)) * multiplier;
             return next with
             {
                 Score = Math.Floor(units / 10000),
                 Bonus = bonus,
-                Counters = state.Counters.SetItem("malody-score-units", units),
+                Counters = state.Counters.SetItem(MalodyCounters.MALODY_SCORE_UNITS, units),
             };
         }, plan => plan.Opportunities.Length * 2000.0 * multiplier / 100);
     }
@@ -242,11 +242,11 @@ public static class MalodyProfile
         {
             var delta = context.Event.Result switch
             {
-                "best" => 0.012f,
-                "cool" => 0.004f,
-                "good" => -0.02f * judgeScale,
-                "miss" => -0.05f * judgeScale,
-                "hold-drop" or "hold-tick" or "critical" => 0,
+                var id when id == MalodyResults.BEST => 0.012f,
+                var id when id == MalodyResults.COOL => 0.004f,
+                var id when id == MalodyResults.GOOD => -0.02f * judgeScale,
+                var id when id == MalodyResults.MISS => -0.05f * judgeScale,
+                var id when id == MalodyResults.HOLD_DROP || id == MalodyResults.HOLD_TICK || id == MalodyResults.CRITICAL => 0,
                 _ => throw new InvalidOperationException($"Undefined Malody health result {context.Event.Result}."),
             };
             return (float)context.Health.Value + delta - context.Health.Value;

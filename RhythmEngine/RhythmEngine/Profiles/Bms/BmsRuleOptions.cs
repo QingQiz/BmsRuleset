@@ -36,12 +36,12 @@ public static partial class BmsProfiles
         if (result.SuppressPenalty)
             return state with { AccuracyMaximum = state.AccuracyMaximum + (context.Opportunity?.MaximumAccuracy ?? 0) };
 
-        if (context.Opportunity != null || result.Part == "empty" || result.Result == "mine-hit")
-            state = state with { Counters = state.Counters.SetItem(result.Result, state.Counters.GetValueOrDefault(result.Result) + 1) };
-        if (result.Result == "mine-hit")
+        if (context.Opportunity != null || result.Part == NoteParts.EMPTY || result.Result == BmsResults.MINE_HIT)
+            state = state with { Counters = state.Counters.SetItem(result.Result.Value, state.Counters.GetValueOrDefault(result.Result.Value) + 1) };
+        if (result.Result == BmsResults.MINE_HIT)
             return state with { Combo = 0 };
-        if (result.Part == "empty")
-            return state with { Combo = emptyPoorBreaksCombo || result.Result == "bad" ? 0 : state.Combo };
+        if (result.Part == NoteParts.EMPTY)
+            return state with { Combo = emptyPoorBreaksCombo || result.Result == BmsResults.BAD ? 0 : state.Combo };
 
         return ProfileSupport.Accumulate(state, context, values);
     }, plan => plan.MaximumAccuracy);

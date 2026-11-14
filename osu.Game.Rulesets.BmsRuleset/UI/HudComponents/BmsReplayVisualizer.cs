@@ -24,6 +24,7 @@ using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Screens.Play.HUD;
 using osuTK;
+using RhythmEngine.Profiles.Common;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 
@@ -332,7 +333,7 @@ public sealed partial class BmsReplayVisualizer : BmsHudComponent
 
         // Normal LN heads are committed to the score ledger with the tail. Reading the
         // current state lets this independent HUD colour a held note immediately.
-        var part = columns[note.Column].Judgements.GetNote(longNote).Parts.Single(p => p.Part == (tail ? "tail" : "head"));
+        var part = columns[note.Column].Judgements.GetNote(longNote).Parts.Single(p => p.Part == (tail ? NoteParts.TAIL : NoteParts.HEAD));
         var actualTime = part.Time / 1000.0;
         var result = BmsEngineChart.HitResultFor(part.Result);
         return actualTime is { } time && time <= now && result != HitResult.None

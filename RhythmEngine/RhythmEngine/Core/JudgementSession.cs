@@ -13,7 +13,7 @@ public sealed class JudgementSession
     private readonly SessionConfiguration configuration;
     private readonly ImmutableArray<int>[] laneNotes;
     private readonly Dictionary<int, int> noteIndices;
-    private readonly Dictionary<(int, string), ScoringOpportunity> opportunities;
+    private readonly Dictionary<(int, PartId), ScoringOpportunity> opportunities;
     private readonly NoteState[] states;
     private readonly int[] revisions;
     private readonly HashSet<int>[] heldControls;

@@ -6,13 +6,13 @@ public sealed record JudgementEvent(
     long Sequence,
     int NoteId,
     int Lane,
-    string Part,
-    string Result,
+    PartId Part,
+    ResultId Result,
     long Time,
     long ExpectedTime,
     long? Offset)
 {
-    public string OriginalResult { get; init; } = Result;
+    public ResultId OriginalResult { get; init; } = Result;
 
     public bool SuppressPenalty { get; init; }
 }

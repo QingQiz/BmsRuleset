@@ -16,7 +16,6 @@ using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
 using osu.Game.Rulesets.Mods;
-using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 using RhythmEngine.Core;
@@ -39,8 +38,14 @@ internal static class BmsReplaySimulation
         using var windows = BmsJudgementProfileProvider.UseWindowMods(mods.OfType<IApplicableToJudgement>().ToArray());
         var manualClock = new ManualClock();
         var clock = new FramedClock(manualClock);
-        using var score = new BmsScoreProcessor { Clock = clock };
-        using var health = new BmsHealthProcessor { Clock = clock, Mods = mods };
+
+        using var score = new BmsScoreProcessor();
+        score.Clock = clock;
+
+        using var health = new BmsHealthProcessor();
+        health.Clock = clock;
+        health.Mods = mods;
+
         score.Mods.Value = mods;
         score.ApplyBeatmap(beatmap);
         foreach (var mod in mods.OfType<IApplicableToScoreProcessor>())

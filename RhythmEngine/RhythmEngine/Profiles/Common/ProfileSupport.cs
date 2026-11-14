@@ -20,13 +20,13 @@ public sealed record ResultValue(double Score, double Accuracy, ComboChange Comb
 
 internal static class ProfileSupport
 {
-    internal static TimingWindows Symmetric(params (string Result, double Milliseconds)[] windows)
+    internal static TimingWindows Symmetric(params (ResultId Result, double Milliseconds)[] windows)
         => new(windows.Select(w => new TimingWindow(w.Result, -Time.FromMilliseconds(w.Milliseconds), Time.FromMilliseconds(w.Milliseconds))));
 
     internal static ImmutableArray<InputCandidate> Oldest(InputArbitrationContext context)
         => [.. context.Candidates.Where(c => c.Shared), .. context.Candidates.Where(c => !c.Shared).OrderBy(c => c.Priority).ThenBy(c => c.StartTime).ThenBy(c => c.NoteIndex).Take(1)];
 
-    internal static ScoreState Accumulate(ScoreState state, ScoreContext context, ImmutableDictionary<string, ResultValue> values)
+    internal static ScoreState Accumulate(ScoreState state, ScoreContext context, ImmutableDictionary<ResultId, ResultValue> values)
     {
         if (context.Opportunity is not { } opportunity)
             return state;
@@ -48,7 +48,7 @@ internal static class ProfileSupport
         };
     }
 
-    internal static ImmutableDictionary<string, ResultValue> Values(params (string Id, double Score, double Accuracy, ComboChange Combo)[] values)
+    internal static ImmutableDictionary<ResultId, ResultValue> Values(params (ResultId Id, double Score, double Accuracy, ComboChange Combo)[] values)
         => values.ToImmutableDictionary(v => v.Id, v => new ResultValue(v.Score, v.Accuracy, v.Combo));
 
     internal static double DifficultyRange(double value, double low, double middle, double high)

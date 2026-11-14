@@ -1,5 +1,6 @@
 using NUnit.Framework;
 using RhythmEngine.Core;
+using RhythmEngine.Profiles.Common;
 using RhythmEngine.Profiles.Patterns;
 
 namespace RhythmEngine.Tests;
@@ -17,21 +18,21 @@ public class EngineContractTest
     [TestCase(30001, null)]
     public void AsymmetricWindowBoundaries(long offset, string? expected)
     {
-        var windows = new TimingWindows([new TimingWindow("inner", -10000, 10000), new TimingWindow("outer", -20000, 30000)]);
-        Assert.That(windows.ResultFor(offset), Is.EqualTo(expected));
+        var windows = new TimingWindows([new TimingWindow(new ResultId("inner"), -10000, 10000), new TimingWindow(new ResultId("outer"), -20000, 30000)]);
+        Assert.That(windows.ResultFor(offset)?.Value, Is.EqualTo(expected));
     }
 
     [Test]
     public void NonNestedWindowsAndExclusiveEndpoints()
     {
-        var windows = new TimingWindows([new TimingWindow("late", 10, 20, false, false), new TimingWindow("early", -20, -10)]);
+        var windows = new TimingWindows([new TimingWindow(new ResultId("late"), 10, 20, false, false), new TimingWindow(new ResultId("early"), -20, -10)]);
         Assert.Multiple(() =>
         {
-            Assert.That(windows.ResultFor(10), Is.Null);
-            Assert.That(windows.ResultFor(11), Is.EqualTo("late"));
-            Assert.That(windows.ResultFor(20), Is.Null);
-            Assert.That(windows.ResultFor(-15), Is.EqualTo("early"));
-            Assert.That(windows.ResultFor(0), Is.Null);
+            Assert.That(windows.ResultFor(10)?.Value, Is.Null);
+            Assert.That(windows.ResultFor(11)?.Value, Is.EqualTo("late"));
+            Assert.That(windows.ResultFor(20)?.Value, Is.Null);
+            Assert.That(windows.ResultFor(-15)?.Value, Is.EqualTo("early"));
+            Assert.That(windows.ResultFor(0)?.Value, Is.Null);
         });
     }
 
@@ -43,15 +44,15 @@ public class EngineContractTest
         Assert.That(session.EventCount, Is.Zero);
         session.AdvanceTo(1030001);
         session.AdvanceTo(2000000);
-        Assert.That(session.GetEventsSince(0).Select(e => (e.Time, e.Result)), Is.EqualTo([(1030001L, "miss")]));
+        Assert.That(session.GetEventsSince(0).Select(e => (e.Time, e.Result.Value)), Is.EqualTo([(1030001L, "miss")]));
 
         var atBoundary = createTapSession();
         atBoundary.AdvanceTo(1030000, [new InputEvent(1030000, 0, true)]);
-        Assert.That(atBoundary.GetEventsSince(0).Single().Result, Is.EqualTo("hit"));
+        Assert.That(atBoundary.GetEventsSince(0).Single().Result.Value, Is.EqualTo("hit"));
 
         var afterBoundary = createTapSession();
         afterBoundary.AdvanceTo(1030001, [new InputEvent(1030001, 0, true)]);
-        Assert.That(afterBoundary.GetEventsSince(0).Single().Result, Is.EqualTo("miss"));
+        Assert.That(afterBoundary.GetEventsSince(0).Single().Result.Value, Is.EqualTo("miss"));
     }
 
     [Test]
@@ -91,12 +92,12 @@ public class EngineContractTest
     public void SameTimeTimerOrderIsConfigured(TimerOrder order, string expectedMine)
     {
         var chart = new Chart(1, [
-            new ChartNote(0, 0, 1000000, 1000000, new MineRule(0, 0, "mine", "avoided", order)),
+            new ChartNote(0, 0, 1000000, 1000000, new MineRule(0, 0, new ResultId("mine"), new ResultId("avoided"), order)),
             new ChartNote(1, 0, 1000000, 1000000, tapRule())
         ]);
         var session = new JudgementSession(chart, configuration());
         session.AdvanceTo(1000000, [new InputEvent(1000000, 0, true)]);
-        Assert.That(session.GetEventsSince(0).Select(e => e.Result), Is.EqualTo([expectedMine, "hit"]));
+        Assert.That(session.GetEventsSince(0).Select(e => e.Result.Value), Is.EqualTo([expectedMine, "hit"]));
     }
 
     [Test]
@@ -125,8 +126,8 @@ public class EngineContractTest
         var clone = session.Clone();
         session.AdvanceTo(2000000);
         clone.AdvanceTo(2000000, [new InputEvent(999999, 0, false), new InputEvent(1000000, 0, true)]);
-        Assert.That(session.GetEventsSince(0).Single().Result, Is.EqualTo("miss"));
-        Assert.That(clone.GetEventsSince(0).Single().Result, Is.EqualTo("hit"));
+        Assert.That(session.GetEventsSince(0).Single().Result.Value, Is.EqualTo("miss"));
+        Assert.That(clone.GetEventsSince(0).Single().Result.Value, Is.EqualTo("hit"));
         var expected = clone.GetEventsSince(0);
         session.Reset();
         session.AdvanceTo(2000000, [new InputEvent(900000, 0, true), new InputEvent(999999, 0, false), new InputEvent(1000000, 0, true)]);
@@ -151,7 +152,7 @@ public class EngineContractTest
     {
         var rule = tapRule();
         var chart = new Chart(1, [new ChartNote(0, 0, 1000000, 1000000, rule), new ChartNote(1, 0, 2000000, 2000000, rule)]);
-        var config = configuration() with { Health = HealthRules.LatchedGauge(0, 1, 0.5, c => c.Event.Result == "hit" ? 2 : -2, v => v <= 0, v => v > 0) };
+        var config = configuration() with { Health = HealthRules.LatchedGauge(0, 1, 0.5, c => c.Event.Result.Value == "hit" ? 2 : -2, v => v <= 0, v => v > 0) };
         var session = new JudgementSession(chart, config);
         session.AdvanceTo(1500000);
         Assert.That(session.Health, Is.EqualTo(new HealthState(0, true)));
@@ -163,15 +164,15 @@ public class EngineContractTest
     [Test]
     public void ChartAndWindowsSnapshotCallerCollections()
     {
-        var windows = new[] { new TimingWindow("hit", -30000, 30000) };
+        var windows = new[] { new TimingWindow(new ResultId("hit"), -30000, 30000) };
         var table = new TimingWindows(windows);
-        windows[0] = new TimingWindow("changed", 0, 0);
-        var notes = new List<ChartNote> { new(0, 0, 1000000, 1000000, new TapRule(new TapConfiguration(table, 30000, "miss", 1))) };
+        windows[0] = new TimingWindow(new ResultId("changed"), 0, 0);
+        var notes = new List<ChartNote> { new(0, 0, 1000000, 1000000, new TapRule(new TapConfiguration(table, 30000, new ResultId("miss"), 1))) };
         var chart = new Chart(1, notes);
         notes.Clear();
         var session = new JudgementSession(chart, configuration());
         session.AdvanceTo(1000000, [new InputEvent(1000000, 0, true)]);
-        Assert.That(session.GetEventsSince(0).Single().Result, Is.EqualTo("hit"));
+        Assert.That(session.GetEventsSince(0).Single().Result.Value, Is.EqualTo("hit"));
     }
 
     [Test]
@@ -187,7 +188,7 @@ public class EngineContractTest
         ]);
         Assert.That(dispatched.Select(d => (d.FirstTransitionIndex, d.TransitionCount)),
             Is.EqualTo([(0, 1), (1, 0), (1, 0), (1, 0), (2, 0)]));
-        Assert.That(session.GetEventsSince(0).Select(e => e.Result), Is.EqualTo(["hit", "miss"]));
+        Assert.That(session.GetEventsSince(0).Select(e => e.Result.Value), Is.EqualTo(["hit", "miss"]));
         Assert.That(session.GetNote(0).Held, Is.True);
     }
 
@@ -198,14 +199,14 @@ public class EngineContractTest
         [
             new ChartNote(0, 0, 1000000, 1000000, tapRule()),
             new ChartNote(1, 0, 1000000, 1000000, tapRule()),
-            new ChartNote(2, 0, 1000000, 1000000, new MineRule(0, 0, "mine", "avoided", acceptsInput: false)),
+            new ChartNote(2, 0, 1000000, 1000000, new MineRule(0, 0, new ResultId("mine"), new ResultId("avoided"), acceptsInput: false)),
         ]), configuration());
         session.AdvanceTo(1000000, [new InputEvent(1000000, 0, true)]);
         Assert.Throws<ArgumentException>(() => session.AppendInputs([new InputEvent(1000000, 0, false), new InputEvent(999999, 0, true)]));
         Assert.That(session.GetNote(0).Held, Is.True);
         var dispatched = session.AppendInputs([new InputEvent(1000000, 0, false), new InputEvent(1000000, 0, true)]);
         Assert.That(dispatched.Select(d => d.TransitionCount), Is.EqualTo([0, 1]));
-        Assert.That(session.GetEventsSince(0).Select(e => e.Result), Is.EqualTo(["hit", "mine", "hit"]));
+        Assert.That(session.GetEventsSince(0).Select(e => e.Result.Value), Is.EqualTo(["hit", "mine", "hit"]));
     }
 
     [Test]
@@ -216,7 +217,7 @@ public class EngineContractTest
         {
             Health = new HealthConfiguration(initial, c => c.Health with
             {
-                Layers = [.. c.Health.Layers.Select(layer => layer with { Value = layer.Value + (c.Event.Result == "hit" ? .1 : -.2) })],
+                Layers = [.. c.Health.Layers.Select(layer => layer with { Value = layer.Value + (c.Event.Result.Value == "hit" ? .1 : -.2) })],
             }, _ => SessionOutcome.InProgress),
         };
         var session = new JudgementSession(new Chart(1, [new ChartNote(0, 0, 1000000, 1000000, tapRule())]), config);
@@ -234,12 +235,50 @@ public class EngineContractTest
     [TestCase(double.PositiveInfinity)]
     public void InvalidClockInputIsRejected(double time) => Assert.Throws<ArgumentOutOfRangeException>(() => Time.FromMilliseconds(time));
 
-    private static TapRule tapRule() => new(new TapConfiguration(new TimingWindows([new TimingWindow("hit", -30000, 30000)]), 30000, "miss", 1));
+    [TestCase(1500, false)]
+    [TestCase(1500, true)]
+    [TestCase(1950, false)]
+    [TestCase(1950, true)]
+    public void HostEndAndReleaseKeepTailResolutionSeparateFromBodyShutdown(long time, bool hostEnd)
+    {
+        var hit = new ResultId("hit");
+        var drop = new ResultId("drop");
+        var windows = new TimingWindows([new(hit, -100, 100)]);
+        var rule = new HoldRule(new HoldConfiguration(windows, windows, 100, 100, new ResultId("miss"), hit, drop, 0, 1,
+            HoldEndMode.Release, HoldDropMode.Resolve, e => new NoteEmission(new PartId("tail"), e.TailResult, e.Note.EndTime)));
+        var session = new JudgementSession(new Chart(1, [new ChartNote(7, 0, 1000, 2000, rule)]), configuration());
+        session.AdvanceTo(1000, [new InputEvent(1000, 0, true)]);
+        var active = session.GetNote(7);
+
+        if (hostEnd)
+            session.EndAt(time);
+        else
+            session.AdvanceTo(time, [new InputEvent(time, 0, false)]);
+
+        var snapshot = session.GetNote(7);
+        var tail = snapshot.Parts.Single(p => p.Part == NoteParts.TAIL);
+        var body = snapshot.Parts.Single(p => p.Part == NoteParts.BODY);
+        Assert.That(snapshot.Completed, Is.True);
+        Assert.That(body.Active, Is.False);
+        Assert.That(body.Reason, Is.EqualTo(hostEnd ? HoldReasons.HOST_END : null));
+        Assert.That(tail.Reason, Is.EqualTo(time < 1900 ? HoldReasons.DROP : HoldReasons.RELEASE));
+        Assert.That(tail.Result, Is.EqualTo(time < 1900 ? drop : hit));
+        Assert.That(session.GetEventsSince(0).Single(e => e.Part == NoteParts.TAIL).Result, Is.EqualTo(tail.Result));
+        Assert.That(session.Score.Score, Is.EqualTo(time < 1900 ? 0 : 1));
+        Assert.That(active.Parts.Single(p => p.Part == NoteParts.TAIL).Reason, Is.Null);
+
+        var clone = session.Clone();
+        session.Reset();
+        Assert.That(clone.GetNote(7).Parts, Is.EqualTo(snapshot.Parts));
+        Assert.That(session.GetNote(7).Parts.All(p => !p.Resolved && p.Reason == null), Is.True);
+    }
+
+    private static TapRule tapRule() => new(new TapConfiguration(new TimingWindows([new TimingWindow(new ResultId("hit"), -30000, 30000)]), 30000, new ResultId("miss"), 1));
 
     private static JudgementSession createTapSession() => new(new Chart(1, [new ChartNote(0, 0, 1000000, 1000000, tapRule())]), configuration());
 
     private static SessionConfiguration configuration() => new("test-unfamiliar-results", new ScoreConfiguration(new ScoreState(),
-            (state, context) => context.Opportunity == null ? state : state with { Score = state.Score + (context.Event.Result == "hit" ? 1 : 0) },
+            (state, context) => context.Opportunity == null ? state : state with { Score = state.Score + (context.Event.Result.Value == "hit" ? 1 : 0) },
             plan => plan.MaximumAccuracy), HealthRules.LatchedGauge(0, 1, 1, _ => 0, _ => false, _ => true),
         context => [.. context.Candidates.Where(c => c.Shared), .. context.Candidates.Where(c => !c.Shared).OrderBy(c => c.Priority).ThenBy(c => c.StartTime).ThenBy(c => c.NoteIndex).Take(1)]);
 }

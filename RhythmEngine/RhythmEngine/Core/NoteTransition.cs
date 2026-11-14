@@ -8,14 +8,14 @@ namespace RhythmEngine.Core;
 /// Part IDs belong to the rule, not to an engine note-kind enumeration.
 /// </summary>
 public readonly record struct NotePartState(
-    string Part,
+    PartId Part,
     bool Resolved,
     bool Active = false,
     long? Time = null,
     long? Offset = null,
-    string? Result = null,
+    ResultId? Result = null,
     long? PendingTime = null,
-    string? Reason = null);
+    ReasonId? Reason = null);
 
 public sealed record NoteSnapshot(int Id, int Lane, bool Completed, ImmutableArray<NotePartState> Parts, bool Held = false);
 

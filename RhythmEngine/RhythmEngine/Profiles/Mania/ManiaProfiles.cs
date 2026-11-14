@@ -31,8 +31,8 @@ public static class ManiaProfiles
             ? new[] { 16.0, Math.Round(od) > 4 ? 34 : 47, Math.Round(od) > 4 ? 67 : 77, 97, 121, 158 }
             : [stable ? 16 : ProfileSupport.DifficultyRange(od, 22.4, 19.4, 13.9), 64 - 3 * od, 97 - 3 * od, 127 - 3 * od, 151 - 3 * od, 188 - 3 * od];
         bounds = bounds.Select(w => Math.Floor(w * scale) + 0.5).ToArray();
-        var windows = ProfileSupport.Symmetric(("perfect", bounds[0]), ("great", bounds[1]), ("good", bounds[2]),
-            ("ok", bounds[3]), ("meh", bounds[4]), ("miss", bounds[5]));
+        var windows = ProfileSupport.Symmetric((ManiaResults.PERFECT, bounds[0]), (ManiaResults.GREAT, bounds[1]), (ManiaResults.GOOD, bounds[2]),
+            (ManiaResults.OK, bounds[3]), (ManiaResults.MEH, bounds[4]), (ManiaResults.MISS, bounds[5]));
         var laneStarts = source.Notes.GroupBy(n => n.Lane).ToDictionary(g => g.Key, g => g.Select(n => n.StartTime).Distinct().Order().ToImmutableArray());
         var chart = source.Compile(note => stable
             ? createRule(note, windows, bounds, true)
@@ -59,7 +59,7 @@ public static class ManiaProfiles
     {
         var late = Time.FromMilliseconds(stable ? bounds[3] : bounds[4]);
         if (note.Kind == KeyNoteKind.Tap)
-            return new TapRule(new TapConfiguration(windows, stable ? Time.FromMilliseconds(bounds[3] - 0.5) - 1 : late, "miss", stable ? 300 : 305,
+            return new TapRule(new TapConfiguration(windows, stable ? Time.FromMilliseconds(bounds[3] - 0.5) - 1 : late, ManiaResults.MISS, stable ? 300 : 305,
                 BlockResolvedUntilStart: stable));
 
         if (note.Kind != KeyNoteKind.Hold)
@@ -74,24 +74,24 @@ public static class ManiaProfiles
         }
 
         var tail = new TimingWindows(windows.Entries.Select(w => w with { Early = w.Early * 3 / 2, Late = w.Late * 3 / 2 }));
-        var config = new HoldConfiguration(windows, tail, late, late * 3 / 2, "miss", "perfect", "miss",
+        var config = new HoldConfiguration(windows, tail, late, late * 3 / 2, ManiaResults.MISS, ManiaResults.PERFECT, ManiaResults.MISS,
             305, 305, HoldEndMode.Release, HoldDropMode.Recover,
-            evaluation => new NoteEmission("tail", resolveGrade(evaluation), evaluation.Note.EndTime, evaluation.TailOffset))
+            evaluation => new NoteEmission(NoteParts.TAIL, resolveGrade(evaluation), evaluation.Note.EndTime, evaluation.TailOffset))
         {
             RecoverMissedHead = true,
             LatestRecoveryOffset = late,
-            BreakResult = "combo-break",
+            BreakResult = ManiaResults.COMBO_BREAK,
         };
         return new HoldRule(config);
 
-        string resolveGrade(HoldEvaluation evaluation)
+        ResultId resolveGrade(HoldEvaluation evaluation)
         {
             if (evaluation.Resolution is HoldResolution.Timeout or HoldResolution.MissedHead or HoldResolution.Drop)
-                return "miss";
-            if (evaluation.TailResult == "miss")
-                return "miss";
-            if (evaluation.Broken || evaluation.HeadResult == "miss")
-                return "meh";
+                return ManiaResults.MISS;
+            if (evaluation.TailResult == ManiaResults.MISS)
+                return ManiaResults.MISS;
+            if (evaluation.Broken || evaluation.HeadResult == ManiaResults.MISS)
+                return ManiaResults.MEH;
 
             return evaluation.TailResult;
         }
@@ -99,20 +99,20 @@ public static class ManiaProfiles
 
     private static ScoreConfiguration stableScore(ScorePlan plan)
     {
-        var values = ProfileSupport.Values(("perfect", 320, 300, ComboChange.Increment), ("great", 300, 300, ComboChange.Increment),
-            ("good", 200, 200, ComboChange.Increment), ("ok", 100, 100, ComboChange.Increment),
-            ("meh", 50, 50, ComboChange.Increment), ("miss", 0, 0, ComboChange.Reset));
+        var values = ProfileSupport.Values((ManiaResults.PERFECT, 320, 300, ComboChange.Increment), (ManiaResults.GREAT, 300, 300, ComboChange.Increment),
+            (ManiaResults.GOOD, 200, 200, ComboChange.Increment), (ManiaResults.OK, 100, 100, ComboChange.Increment),
+            (ManiaResults.MEH, 50, 50, ComboChange.Increment), (ManiaResults.MISS, 0, 0, ComboChange.Reset));
         return new ScoreConfiguration(new ScoreState { Bonus = 100 }, (state, context) =>
         {
             var nativeCombo = state.Combo & ushort.MaxValue;
             var resetBonus = nativeCombo != 0 && nativeCombo % 384 == 0;
-            if (context.Event.Result == "hold-tick")
+            if (context.Event.Result == ManiaResults.HOLD_TICK)
                 return state with
                 {
                     Combo = state.Combo + 1, MaximumCombo = Math.Max(state.MaximumCombo, state.Combo + 1),
                     Bonus = resetBonus ? 100 : state.Bonus,
                 };
-            if (context.Event.Result == "hold-break")
+            if (context.Event.Result == ManiaResults.HOLD_BREAK)
                 return state with { Combo = 0, Bonus = resetBonus ? 100 : state.Bonus };
             if (context.Opportunity == null)
                 return state;
@@ -120,48 +120,58 @@ public static class ManiaProfiles
             var result = context.Event.Result;
             var bonus = result switch
             {
-                "perfect" => Math.Min(100, state.Bonus + 2), "great" => Math.Min(100, state.Bonus + 1),
-                "good" => Math.Max(0, state.Bonus - 8), "ok" => Math.Max(0, state.Bonus - 24),
-                "meh" => Math.Max(0, state.Bonus - 44), _ => 0,
+                var id when id == ManiaResults.PERFECT => Math.Min(100, state.Bonus + 2),
+                var id when id == ManiaResults.GREAT => Math.Min(100, state.Bonus + 1),
+                var id when id == ManiaResults.GOOD => Math.Max(0, state.Bonus - 8),
+                var id when id == ManiaResults.OK => Math.Max(0, state.Bonus - 24),
+                var id when id == ManiaResults.MEH => Math.Max(0, state.Bonus - 44),
+                _ => 0,
             };
             if (resetBonus)
                 bonus = 100;
-            var bonusValue = result switch { "perfect" or "great" => 32, "good" => 16, "ok" => 8, "meh" => 4, _ => 0 };
+            var bonusValue = result switch
+            {
+                var id when id == ManiaResults.PERFECT || id == ManiaResults.GREAT => 32,
+                var id when id == ManiaResults.GOOD => 16,
+                var id when id == ManiaResults.OK => 8,
+                var id when id == ManiaResults.MEH => 4,
+                _ => 0,
+            };
             var value = values[result].Score;
             var next = ProfileSupport.Accumulate(state, context, values);
             var delta = 500000.0 / plan.Opportunities.Length * (value + bonusValue * Math.Sqrt(bonus)) / 320;
-            var unrounded = state.Counters.GetValueOrDefault("score-v1-unrounded") + delta;
+            var unrounded = state.Counters.GetValueOrDefault(ManiaCounters.SCORE_V1_UNROUNDED) + delta;
             // Stable displays truncated hit increments, then recomputes its rounded total when play finishes.
             var displayed = next.AccuracyMaximum == plan.MaximumAccuracy ? Math.Round(unrounded)
-                : result == "miss" ? state.Score : (int)state.Counters.GetValueOrDefault("score-v1-unrounded") + (int)delta;
+                : result == ManiaResults.MISS ? state.Score : (int)state.Counters.GetValueOrDefault(ManiaCounters.SCORE_V1_UNROUNDED) + (int)delta;
             if (next.AccuracyMaximum == plan.MaximumAccuracy && displayed == 999999)
                 displayed = 1000000;
-            return next with { Score = displayed, Bonus = bonus, Counters = state.Counters.SetItem("score-v1-unrounded", unrounded) };
+            return next with { Score = displayed, Bonus = bonus, Counters = state.Counters.SetItem(ManiaCounters.SCORE_V1_UNROUNDED, unrounded) };
         }, p => p.Opportunities.IsEmpty ? 0 : 1000000);
     }
 
     private static ScoreConfiguration lazerScore(ScorePlan plan)
     {
-        var values = ProfileSupport.Values(("perfect", 305, 305, ComboChange.Increment), ("great", 300, 300, ComboChange.Increment),
-            ("good", 200, 200, ComboChange.Increment), ("ok", 100, 100, ComboChange.Increment),
-            ("meh", 50, 50, ComboChange.Increment), ("miss", 0, 0, ComboChange.Reset));
+        var values = ProfileSupport.Values((ManiaResults.PERFECT, 305, 305, ComboChange.Increment), (ManiaResults.GREAT, 300, 300, ComboChange.Increment),
+            (ManiaResults.GOOD, 200, 200, ComboChange.Increment), (ManiaResults.OK, 100, 100, ComboChange.Increment),
+            (ManiaResults.MEH, 50, 50, ComboChange.Increment), (ManiaResults.MISS, 0, 0, ComboChange.Reset));
         var maximumCombo = Enumerable.Range(1, plan.Opportunities.Length).Sum(combo => 300 * comboFactor(combo));
         return new ScoreConfiguration(new ScoreState(), (state, context) =>
         {
-            if (context.Event.Result == "combo-break")
+            if (context.Event.Result == ManiaResults.COMBO_BREAK)
                 return state with { Combo = 0 };
 
             if (context.Opportunity == null)
                 return state;
 
             var next = ProfileSupport.Accumulate(state, context, values);
-            var baseCombo = context.Event.Result == "perfect" ? 300 : values[context.Event.Result].Score;
-            var comboPortion = state.Counters.GetValueOrDefault("combo-portion") + baseCombo * comboFactor(next.Combo);
+            var baseCombo = context.Event.Result == ManiaResults.PERFECT ? 300 : values[context.Event.Result].Score;
+            var comboPortion = state.Counters.GetValueOrDefault(ManiaCounters.COMBO_PORTION) + baseCombo * comboFactor(next.Combo);
             var progress = next.AccuracyMaximum / plan.MaximumAccuracy;
             return next with
             {
                 Score = Math.Round(150000 * comboPortion / maximumCombo + 850000 * Math.Pow(next.Accuracy, 2 + 2 * next.Accuracy) * progress),
-                Counters = state.Counters.SetItem("combo-portion", comboPortion),
+                Counters = state.Counters.SetItem(ManiaCounters.COMBO_PORTION, comboPortion),
             };
         }, p => p.Opportunities.IsEmpty ? 0 : 1000000);
     }
@@ -173,21 +183,21 @@ public static class ManiaProfiles
         var holds = source.Notes.Where(n => n.Kind == KeyNoteKind.Hold).Select(n => n.Id).ToImmutableHashSet();
         return HealthRules.LatchedGauge(0, 1, 1, context =>
         {
-            if (stable && context.Event.Part == "head")
+            if (stable && context.Event.Part == NoteParts.HEAD)
                 return 0;
 
             var endpoint = !stable && holds.Contains(context.Event.NoteId);
             return context.Event.Result switch
             {
-                "combo-break" => 0,
-                "hold-break" => 0,
-                "hold-tick" => (0.5 - drain * 0.05) / 200,
-                "miss" => -(drain + 1) * (endpoint ? 0.00375 : 0.0075),
-                "meh" => -(drain + 1) * 0.0016,
-                "ok" => 0,
-                "good" => recoveryMultiplier * (0.004 - drain * 0.0004),
-                "great" => recoveryMultiplier * (0.005 - drain * 0.0005),
-                "perfect" => recoveryMultiplier * (0.0055 - drain * 0.0005),
+                var id when id == ManiaResults.COMBO_BREAK => 0,
+                var id when id == ManiaResults.HOLD_BREAK => 0,
+                var id when id == ManiaResults.HOLD_TICK => (0.5 - drain * 0.05) / 200,
+                var id when id == ManiaResults.MISS => -(drain + 1) * (endpoint ? 0.00375 : 0.0075),
+                var id when id == ManiaResults.MEH => -(drain + 1) * 0.0016,
+                var id when id == ManiaResults.OK => 0,
+                var id when id == ManiaResults.GOOD => recoveryMultiplier * (0.004 - drain * 0.0004),
+                var id when id == ManiaResults.GREAT => recoveryMultiplier * (0.005 - drain * 0.0005),
+                var id when id == ManiaResults.PERFECT => recoveryMultiplier * (0.0055 - drain * 0.0005),
                 _ => throw new InvalidOperationException($"Undefined mania health result {context.Event.Result}."),
             };
         }, value => value <= 0, value => value > 0);

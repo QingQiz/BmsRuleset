@@ -37,7 +37,7 @@ public class StableNativeConformanceTest
         var release = ms(2000 + row.GetProperty("tailOffset").GetInt32());
         inputs.Add(new InputEvent(release, 0, false));
         session.AdvanceTo(release, inputs.ToArray());
-        Assert.That(session.GetEventsSince(0).Last(e => e.Result != "hold-tick").Result, Is.EqualTo(row.GetProperty("result").GetString()));
+        Assert.That(session.GetEventsSince(0).Last(e => e.Result.Value != "hold-tick").Result.Value, Is.EqualTo(row.GetProperty("result").GetString()));
         Assert.That(session.Completed, Is.EqualTo(row.GetProperty("result").GetString() != "hold-break"));
     }
 
@@ -64,7 +64,7 @@ public class StableNativeConformanceTest
             new InputEvent(ms(1000), 0, true), new InputEvent(ms(1050), 0, false),
             new InputEvent(ms(1060), 0, true), new InputEvent(ms(1200), 0, false)
         ]);
-        Assert.That(session.GetEventsSince(0).Last().Result, Is.EqualTo("good"));
+        Assert.That(session.GetEventsSince(0).Last().Result.Value, Is.EqualTo("good"));
         Assert.That(session.Score.Accuracy, Is.EqualTo(2.0 / 3));
     }
 
@@ -77,7 +77,7 @@ public class StableNativeConformanceTest
         {
             session.AdvanceTo(ms(2000 + row.GetProperty("tailOffset").GetInt32()));
             var expected = row.GetProperty("result").GetString();
-            Assert.That(session.GetEventsSince(0).SingleOrDefault(e => e.Part == "tail")?.Result, Is.EqualTo(expected));
+            Assert.That(session.GetEventsSince(0).SingleOrDefault(e => e.Part.Value == "tail")?.Result.Value, Is.EqualTo(expected));
             Assert.That(session.Completed, Is.EqualTo(expected != null));
         }
     }
@@ -88,10 +88,10 @@ public class StableNativeConformanceTest
         var source = new KeyChart(1, [new KeyNote(0, 0, ms(1000), ms(1000))]);
         var atBoundary = ManiaProfiles.CreateStable(source).CreateSession();
         atBoundary.AdvanceTo(ms(1103), [new InputEvent(ms(1103), 0, true)]);
-        Assert.That(atBoundary.GetEventsSince(0).Single().Result, Is.EqualTo("miss"));
+        Assert.That(atBoundary.GetEventsSince(0).Single().Result.Value, Is.EqualTo("miss"));
         var before = ManiaProfiles.CreateStable(source).CreateSession();
         before.AdvanceTo(ms(1102), [new InputEvent(ms(1102), 0, true)]);
-        Assert.That(before.GetEventsSince(0).Single().Result, Is.EqualTo("ok"));
+        Assert.That(before.GetEventsSince(0).Single().Result.Value, Is.EqualTo("ok"));
     }
 
     [Test]
@@ -144,7 +144,7 @@ public class StableNativeConformanceTest
                 var part = result is "hold-tick" or "hold-break" ? "body" : "tap";
                 var opportunity = part == "body" ? null : profile.Chart.ScorePlan.Opportunities[index];
                 var time = ms(index * 1000);
-                var judgement = new JudgementEvent(index, index, index % 4, part, result, time, time, 0);
+                var judgement = new JudgementEvent(index, index, index % 4, new PartId(part), new ResultId(result), time, time, 0);
                 state = configuration.Reduce(state, new ScoreContext(judgement, opportunity, profile.Chart.ScorePlan));
                 using var scope = Assert.EnterMultipleScope();
                 Assert.That(state.Score, Is.EqualTo(expected.GetProperty("displayScore").GetInt32()), $"score {index}");
@@ -176,7 +176,7 @@ public class StableNativeConformanceTest
                 268435456 => "perfect", 134217728 => "great", 67108864 => "good", 33554432 => "ok",
                 16777216 => "meh", -65536 => "miss", 7 => "hold-tick", -1048576 => "hold-break", _ => throw new InvalidOperationException(),
             };
-            var judgement = new JudgementEvent(index, index, index % 4, "tap", result, ms(index), ms(index), 0);
+            var judgement = new JudgementEvent(index, index, index % 4, new PartId("tap"), new ResultId(result), ms(index), ms(index), 0);
             health = configuration.Health.Reduce(new HealthContext(judgement, health, configuration.Score.InitialState, profile.Chart.ScorePlan));
             Assert.That(health.Value, Is.EqualTo(expected.GetProperty("hp").GetDouble() / 200).Within(1e-12), $"health {index}");
             index++;

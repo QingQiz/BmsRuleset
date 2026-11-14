@@ -4,7 +4,7 @@ namespace RhythmEngine.Core;
 
 public sealed record ChartNote(int Id, int Lane, long StartTime, long EndTime, INoteRule Rule);
 
-public sealed record ScoringOpportunity(int NoteId, string Part, long Time, double MaximumAccuracy, double Weight = 1);
+public sealed record ScoringOpportunity(int NoteId, PartId Part, long Time, double MaximumAccuracy, double Weight = 1);
 
 public sealed class ScorePlan
 {
@@ -40,8 +40,8 @@ public sealed class Chart
             throw new ArgumentException("Notes require unique IDs, valid lanes, rules and ordered endpoints.", nameof(notes));
 
         var opportunities = Notes.SelectMany(n => n.Rule.GetScoringOpportunities(n)).ToImmutableArray();
-        if (opportunities.Any(o => string.IsNullOrWhiteSpace(o.Part) || !double.IsFinite(o.MaximumAccuracy)
-                                                                     || o.MaximumAccuracy < 0 || !double.IsFinite(o.Weight) || o.Weight <= 0)
+        if (opportunities.Any(o => o.Part == null || !double.IsFinite(o.MaximumAccuracy)
+                                  || o.MaximumAccuracy < 0 || !double.IsFinite(o.Weight) || o.Weight <= 0)
             || opportunities.Select(o => (o.NoteId, o.Part)).Distinct().Count() != opportunities.Length)
             throw new ArgumentException("Scoring opportunities require unique part IDs and finite nonnegative potential.", nameof(notes));
 

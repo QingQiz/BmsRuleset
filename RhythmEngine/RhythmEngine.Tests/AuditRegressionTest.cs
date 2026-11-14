@@ -20,7 +20,7 @@ public class AuditRegressionTest
         session.AdvanceTo(ms(2020), [input(2020, true)]);
         Assert.That(session.EventCount, Is.Zero);
         session.AdvanceTo(ms(2021));
-        Assert.That(session.GetEventsSince(0).Select(e => (e.Result, e.Time)), Is.EqualTo([(grade, ms(2021))]));
+        Assert.That(session.GetEventsSince(0).Select(e => (e.Result.Value, e.Time)), Is.EqualTo([(grade, ms(2021))]));
         Assert.That(session.Completed, Is.True);
     }
 
@@ -32,7 +32,7 @@ public class AuditRegressionTest
     {
         var session = EtternaProfile.Create(chart(hold(0, 1000, 2000))).CreateSession();
         session.AdvanceTo(ms(2200), [input(850, true), input(release, false), input(regrab, true)]);
-        Assert.That(session.GetEventsSince(0).Last().Result, Is.EqualTo(tail));
+        Assert.That(session.GetEventsSince(0).Last().Result.Value, Is.EqualTo(tail));
     }
 
     [TestCase(KeyNoteKind.Hold)]
@@ -43,7 +43,7 @@ public class AuditRegressionTest
         session.AdvanceTo(ms(1350), [input(1350, true)]);
         Assert.That(session.GetEventsSince(0).Any(e => e.NoteId == 1), Is.False);
         session.AdvanceTo(ms(1500), [input(1400, false), input(1500, true)]);
-        Assert.That(session.GetEventsSince(0).Single(e => e.NoteId == 1).Result, Is.EqualTo("w1"));
+        Assert.That(session.GetEventsSince(0).Single(e => e.NoteId == 1).Result.Value, Is.EqualTo("w1"));
     }
 
     [Test]
@@ -53,7 +53,7 @@ public class AuditRegressionTest
         session.AdvanceTo(ms(1100), [input(1000, true, 1), input(1100, true, 2)]);
         Assert.That(session.GetEventsSince(0).Select(e => e.NoteId), Is.EqualTo([0]));
         session.AdvanceTo(ms(1350), [input(1150, false, 1), input(1200, false, 2), input(1300, true, 1)]);
-        Assert.That(session.GetEventsSince(0).Single(e => e.NoteId == 2).Result, Is.EqualTo("perfect"));
+        Assert.That(session.GetEventsSince(0).Single(e => e.NoteId == 2).Result.Value, Is.EqualTo("perfect"));
     }
 
     [TestCase(KeyNoteKind.Hold)]
@@ -63,7 +63,7 @@ public class AuditRegressionTest
     {
         var session = BmsProfiles.CreateBeatoraja(chart(hold(0, 1000, 1010) with { Kind = kind })).CreateSession();
         session.AdvanceTo(ms(1050), [input(1000, true), input(1010, false), input(1050, true)]);
-        Assert.That(session.GetEventsSince(0).Last().Result, Is.EqualTo("empty-poor"));
+        Assert.That(session.GetEventsSince(0).Last().Result.Value, Is.EqualTo("empty-poor"));
         Assert.That(session.Health.Value, Is.EqualTo(98));
         Assert.That(session.Score.Score, Is.EqualTo(kind == KeyNoteKind.Hold ? 2 : 4));
         session.AdvanceTo(ms(1200));
@@ -75,10 +75,10 @@ public class AuditRegressionTest
     {
         var session = ManiaProfiles.CreateStable(chart(tap(0, 1000), tap(1, 1050))).CreateSession();
         session.AdvanceTo(ms(950), [input(900, true), input(901, false), input(950, true)]);
-        Assert.That(session.GetEventsSince(0).Select(e => (e.NoteId, e.Result)), Is.EqualTo([(0, "ok")]));
+        Assert.That(session.GetEventsSince(0).Select(e => (e.NoteId, e.Result.Value)), Is.EqualTo([(0, "ok")]));
         session.AdvanceTo(ms(1050), [input(951, false), input(1050, true)]);
         Assert.That(session.GetEventsSince(0).Last().NoteId, Is.EqualTo(1));
-        Assert.That(session.GetEventsSince(0).Last().Result, Is.EqualTo("perfect"));
+        Assert.That(session.GetEventsSince(0).Last().Result.Value, Is.EqualTo("perfect"));
     }
 
     private static KeyChart chart(params KeyNote[] notes) => new(1, notes);

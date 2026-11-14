@@ -54,24 +54,24 @@ public enum HoldResolution
 
 public readonly record struct HoldEvaluation(
     ChartNote Note,
-    string HeadResult,
+    ResultId HeadResult,
     long? HeadOffset,
-    string TailResult,
+    ResultId TailResult,
     long? TailOffset,
     bool Broken,
     HoldResolution Resolution);
 
 /// <summary>Integrates held/released time with a signed accumulator, emitting on threshold crossings.</summary>
-public sealed record HoldBalance(long Threshold, string GainResult, string LossResult, ImmutableHashSet<string> SustainingTailResults);
+public sealed record HoldBalance(long Threshold, ResultId GainResult, ResultId LossResult, ImmutableHashSet<ResultId> SustainingTailResults);
 
 public sealed record HoldConfiguration(
     TimingWindows HeadWindows,
     TimingWindows TailWindows,
     long HeadDeadline,
     long TailDeadline,
-    string MissResult,
-    string AutomaticResult,
-    string DropResult,
+    ResultId MissResult,
+    ResultId AutomaticResult,
+    ResultId DropResult,
     double HeadAccuracy,
     double TailAccuracy,
     HoldEndMode EndMode,
@@ -92,7 +92,7 @@ public sealed record HoldConfiguration(
 
     public long? LatestRecoveryOffset { get; init; }
 
-    public string? BreakResult { get; init; }
+    public ResultId? BreakResult { get; init; }
 
     public bool TailOnOppositeControl { get; init; }
 
@@ -102,30 +102,30 @@ public sealed record HoldConfiguration(
 
     public TimerOrder PassiveOrder { get; init; } = TimerOrder.BeforeInput;
 
-    public ImmutableHashSet<string> NonResolvingHeadResults { get; init; } = ImmutableHashSet<string>.Empty;
+    public ImmutableHashSet<ResultId> NonResolvingHeadResults { get; init; } = ImmutableHashSet<ResultId>.Empty;
 
-    public ImmutableHashSet<string> TerminalHeadResults { get; init; } = ImmutableHashSet<string>.Empty;
+    public ImmutableHashSet<ResultId> TerminalHeadResults { get; init; } = ImmutableHashSet<ResultId>.Empty;
 
     public HoldBalance? Balance { get; init; }
 
-    public Func<string, int>? CandidatePriority { get; init; }
+    public Func<ResultId, int>? CandidatePriority { get; init; }
 
     public TimingWindows? ResolvedHeadWindows { get; init; }
 
     public long ReleaseGrace { get; init; }
 
-    public ImmutableHashSet<string> DeferredReleaseResults { get; init; } = ImmutableHashSet<string>.Empty;
+    public ImmutableHashSet<ResultId> DeferredReleaseResults { get; init; } = ImmutableHashSet<ResultId>.Empty;
 
     public bool SuppressRepeatedMistakes { get; init; }
 
-    public ImmutableHashSet<string> RecoveringHeadResults { get; init; } = ImmutableHashSet<string>.Empty;
+    public ImmutableHashSet<ResultId> RecoveringHeadResults { get; init; } = ImmutableHashSet<ResultId>.Empty;
 
 }
 
 public sealed record HoldState(
     NoteTimer? Timer,
     bool Done,
-    string? HeadResult,
+    ResultId? HeadResult,
     long? HeadOffset,
     bool Holding,
     bool Broken,
@@ -138,7 +138,7 @@ public sealed record HoldState(
     long? HeadTime = null,
     long? TailTime = null,
     long? TailOffset = null,
-    string? TailResult = null,
+    ResultId? TailResult = null,
     long? PendingRelease = null,
     bool Mistake = false,
     HoldResolution? Resolution = null,

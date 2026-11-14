@@ -1,6 +1,5 @@
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
-using osu.Framework.Layout;
 using osu.Game.Skinning;
 using osuTK;
 

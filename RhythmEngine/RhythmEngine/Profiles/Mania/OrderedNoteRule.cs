@@ -1,7 +1,9 @@
 using System.Collections.Immutable;
 using RhythmEngine.Core;
+using RhythmEngine.Profiles.Common;
+using RhythmEngine.Profiles.Patterns;
 
-namespace RhythmEngine.Profiles.Patterns;
+namespace RhythmEngine.Profiles.Mania;
 
 public sealed record OrderedNoteState(NoteState Inner, bool Retired = false) : NoteState
 {
@@ -48,15 +50,15 @@ public sealed class OrderedNoteRule(INoteRule inner, ImmutableArray<long> laneSt
             var state = ((OrderedNoteState)context.State).Inner;
             var emissions = ImmutableArray.CreateBuilder<NoteEmission>();
             if (state is TapState { Resolved: false })
-                emissions.Add(new NoteEmission("tap", "miss", context.Note.StartTime));
+                emissions.Add(new NoteEmission(NoteParts.TAP, ManiaResults.MISS, context.Note.StartTime));
             if (state is HoldState hold)
             {
                 if (hold.HeadResult == null)
-                    emissions.Add(new NoteEmission("head", "miss", context.Note.StartTime));
+                    emissions.Add(new NoteEmission(NoteParts.HEAD, ManiaResults.MISS, context.Note.StartTime));
                 if (!hold.TailResolved)
-                    emissions.Add(new NoteEmission("tail", "miss", context.Note.EndTime));
+                    emissions.Add(new NoteEmission(NoteParts.TAIL, ManiaResults.MISS, context.Note.EndTime));
                 if (!hold.Broken)
-                    emissions.Add(new NoteEmission("body", "combo-break", context.Note.EndTime));
+                    emissions.Add(new NoteEmission(NoteParts.BODY, ManiaResults.COMBO_BREAK, context.Note.EndTime));
             }
 
             return new NoteUpdate(new OrderedNoteState(state, true), emissions.ToImmutable());

@@ -57,7 +57,7 @@ public class MalodyNativeConformanceTest
         var expected = row.GetProperty("result").GetString();
         Assert.That(session.EventCount, Is.EqualTo(expected == null ? 0 : 1));
         if (expected != null)
-            Assert.That(session.GetEventsSince(0).Single().Result, Is.EqualTo(expected));
+            Assert.That(session.GetEventsSince(0).Single().Result.Value, Is.EqualTo(expected));
         Assert.That(session.GetNote(0).Completed, Is.EqualTo(row.GetProperty("consumed").GetBoolean()));
     }
 
@@ -70,7 +70,7 @@ public class MalodyNativeConformanceTest
         var time = ms(row.GetProperty("time").GetInt32());
         session.AdvanceTo(time, [new InputEvent(ms(1000), 0, true), new InputEvent(time, 0, false)]);
 
-        Assert.That(session.GetEventsSince(0).Any(e => e.Result == "hold-drop"), Is.EqualTo(row.GetProperty("result").GetString() == "hold-drop"));
+        Assert.That(session.GetEventsSince(0).Any(e => e.Result.Value == "hold-drop"), Is.EqualTo(row.GetProperty("result").GetString() == "hold-drop"));
         Assert.That(session.Completed, Is.EqualTo(row.GetProperty("finished").GetBoolean()));
         Assert.That(session.Score.AccuracyMaximum, Is.EqualTo(1000));
     }
@@ -83,7 +83,7 @@ public class MalodyNativeConformanceTest
         var session = MalodyProfile.Create(source, new MalodyOptions(Client: client)).CreateSession();
         session.AdvanceTo(ms(2100), [new InputEvent(ms(1000), 0, true)]);
         var expected = read("ticks", client);
-        Assert.That(session.GetEventsSince(0).Where(e => e.Result == "hold-tick").Select(e => e.Time),
+        Assert.That(session.GetEventsSince(0).Where(e => e.Result.Value == "hold-tick").Select(e => e.Time),
             Is.EqualTo(expected.Select(row => ms(row.GetProperty("time").GetInt32()))));
         Assert.That(session.Score.Combo, Is.EqualTo(1 + expected.Length));
         Assert.That(session.Completed, Is.True);
@@ -104,7 +104,7 @@ public class MalodyNativeConformanceTest
             session.AdvanceTo(ms(time + 500), [new InputEvent(hitTime, 0, true), new InputEvent(hitTime + ms(1), 0, false)]);
             Assert.Multiple(() =>
             {
-                Assert.That(session.GetEventsSince(index).Single().Result, Is.EqualTo(row.GetProperty("result").GetString()), $"result {index}");
+                Assert.That(session.GetEventsSince(index).Single().Result.Value, Is.EqualTo(row.GetProperty("result").GetString()), $"result {index}");
                 Assert.That(session.Score.Score, Is.EqualTo(row.GetProperty("score").GetDouble()), $"score {index}");
                 Assert.That(session.Score.Accuracy, Is.EqualTo(row.GetProperty("accuracy").GetDouble()).Within(1e-6), $"accuracy {index}");
                 Assert.That(session.Health.Value, Is.EqualTo(row.GetProperty("health").GetDouble()).Within(1e-7), $"health {index}");
@@ -137,7 +137,7 @@ public class MalodyNativeConformanceTest
                 var resultId = (code & 15) switch { 1 => "miss", 2 => "best", 4 => "cool", 8 => "good", _ => code == 128 ? "hold-tick" : code == 0x40000 ? "hold-drop" : null };
                 return (e.GetProperty("note").GetInt32(), resultId);
             }).Where(e => e.Item2 != null);
-            Assert.That(session.GetEventsSince(0).Select(e => (e.NoteId, e.Result)), Is.EqualTo(expected), row.GetProperty("scenario").GetString());
+            Assert.That(session.GetEventsSince(0).Select(e => (e.NoteId, e.Result.Value)), Is.EqualTo(expected), row.GetProperty("scenario").GetString());
         }
     }
 

@@ -86,9 +86,9 @@ public static partial class BmsProfiles
 {
     private const int empty_poor_priority = 2;
 
-    private static readonly ImmutableDictionary<string, ResultValue> values = ProfileSupport.Values(
-        ("pgreat", 2, 2, ComboChange.Increment), ("great", 1, 1, ComboChange.Increment),
-        ("good", 0, 0, ComboChange.Increment), ("bad", 0, 0, ComboChange.Reset), ("poor", 0, 0, ComboChange.Reset));
+    private static readonly ImmutableDictionary<ResultId, ResultValue> values = ProfileSupport.Values(
+        (BmsResults.PGREAT, 2, 2, ComboChange.Increment), (BmsResults.GREAT, 1, 1, ComboChange.Increment),
+        (BmsResults.GOOD, 0, 0, ComboChange.Increment), (BmsResults.BAD, 0, 0, ComboChange.Reset), (BmsResults.POOR, 0, 0, ComboChange.Reset));
 
     public static CompiledProfile CreateBeatoraja(KeyChart source, BmsOptions? options = null) => compile(source, options ?? new BmsOptions(), false);
 
@@ -169,7 +169,7 @@ public static partial class BmsProfiles
             if (selection is not (BmsSelection.Combo or BmsSelection.Score))
                 continue;
 
-            var boundary = selection == BmsSelection.Combo ? "good" : "great";
+            var boundary = selection == BmsSelection.Combo ? BmsResults.GOOD : BmsResults.GREAT;
             var currentWindow = headWindows(current).Entries.FirstOrDefault(w => w.Result == boundary);
             var candidateWindow = headWindows(candidate).Entries.FirstOrDefault(w => w.Result == boundary);
             // The original policy walks notes in time order and can replace one late BAD with another.
@@ -199,21 +199,21 @@ public static partial class BmsProfiles
 
     public static INoteRule CreateRule(KeyNote note, TimingWindows windows, TimingWindows tailWindows, BmsRuleOptions options)
     {
-        var empty = windows.Entries.FirstOrDefault(w => w.Result == "empty-poor");
-        var bad = windows.Entries.Single(w => w.Result == "bad");
+        var empty = windows.Entries.FirstOrDefault(w => w.Result == BmsResults.EMPTY_POOR);
+        var bad = windows.Entries.Single(w => w.Result == BmsResults.BAD);
         var ghosts = options.RetainResolvedHeads && !options.NonConsumingBad && empty.Result != null ? new TimingWindows([empty]) : null;
-        var priority = new Func<string, int>(result => result == "empty-poor" ? empty_poor_priority : 1);
-        var nonResolving = options.NonConsumingBad ? ImmutableHashSet.Create("empty-poor", "bad") : ImmutableHashSet.Create("empty-poor");
-        var recovery = ImmutableHashSet.Create("pgreat", "great", "good");
+        var priority = new Func<ResultId, int>(result => result == BmsResults.EMPTY_POOR ? empty_poor_priority : 1);
+        var nonResolving = options.NonConsumingBad ? ImmutableHashSet.Create(BmsResults.EMPTY_POOR, BmsResults.BAD) : ImmutableHashSet.Create(BmsResults.EMPTY_POOR);
+        var recovery = ImmutableHashSet.Create(BmsResults.PGREAT, BmsResults.GREAT, BmsResults.GOOD);
 
         if (note.Kind == KeyNoteKind.Mine)
-            return new MineRule(0, 0, "mine-hit", "mine-avoided", options.MineOrder, acceptsInput: false);
+            return new MineRule(0, 0, BmsResults.MINE_HIT, BmsResults.MINE_AVOIDED, options.MineOrder, acceptsInput: false);
 
         if (note.Kind == KeyNoteKind.Tap)
         {
-            return new TapRule(new TapConfiguration(windows, bad.Late, "poor", 2,
+            return new TapRule(new TapConfiguration(windows, bad.Late, BmsResults.POOR, 2,
                 NonResolvingResults: nonResolving, ResolvedWindows: ghosts, CandidatePriority: priority,
-                ShareInput: options.ShareLateBad ? (result, offset) => result == "bad" && offset > 0 : null,
+                ShareInput: options.ShareLateBad ? (result, offset) => result == BmsResults.BAD && offset > 0 : null,
                 SuppressRepeatedMistakes: options.NonConsumingBad, RecoveringResults: recovery, PassiveOrder: options.PassiveOrder));
         }
 
@@ -222,41 +222,41 @@ public static partial class BmsProfiles
 
         var aggregate = note.Kind == KeyNoteKind.Hold;
         var config = new HoldConfiguration(windows, tailWindows, options.HeadDeadline ?? bad.Late, options.TailDeadline ?? tailWindows.Entries[^1].Late,
-            "poor", "pgreat", aggregate ? "bad" : "poor", aggregate ? 0 : 2, 2,
+            BmsResults.POOR, BmsResults.PGREAT, aggregate ? BmsResults.BAD : BmsResults.POOR, aggregate ? 0 : 2, 2,
             aggregate ? HoldEndMode.ReleaseOrAutomatic : HoldEndMode.Release, HoldDropMode.Resolve,
             evaluation =>
             {
                 var result = evaluation.TailResult;
                 var offset = evaluation.TailOffset;
                 if (evaluation.Resolution is HoldResolution.Timeout or HoldResolution.MissedHead)
-                    result = "poor";
+                    result = BmsResults.POOR;
                 else if (aggregate)
                 {
                     result = evaluation.Resolution is HoldResolution.Automatic or HoldResolution.Head ? evaluation.HeadResult
-                        : evaluation.Resolution == HoldResolution.Drop ? "bad"
+                        : evaluation.Resolution == HoldResolution.Drop ? BmsResults.BAD
                         : windows.RankOf(evaluation.HeadResult) >= tailWindows.RankOf(evaluation.TailResult) ? evaluation.HeadResult : evaluation.TailResult;
                     if (evaluation.Resolution == HoldResolution.Automatic || Math.Abs(evaluation.HeadOffset ?? 0) > Math.Abs(offset ?? 0))
                         offset = evaluation.HeadOffset;
                 }
 
-                return new NoteEmission("tail", result, aggregate ? evaluation.Note.StartTime : evaluation.Note.EndTime, offset);
+                return new NoteEmission(NoteParts.TAIL, result, aggregate ? evaluation.Note.StartTime : evaluation.Note.EndTime, offset);
             })
         {
             NonResolvingHeadResults = nonResolving,
-            TerminalHeadResults = options.ImmediateBadHead ? ImmutableHashSet.Create("bad") : ImmutableHashSet<string>.Empty,
+            TerminalHeadResults = options.ImmediateBadHead ? ImmutableHashSet.Create(BmsResults.BAD) : ImmutableHashSet<ResultId>.Empty,
             TailOnOppositeControl = note.Directional && !aggregate,
             ReleaseByOwner = note.Directional,
             CandidatePriority = priority,
             ResolvedHeadWindows = ghosts,
             ReleaseGrace = options.ReleaseGrace,
-            DeferredReleaseResults = ImmutableHashSet.Create("bad"),
+            DeferredReleaseResults = ImmutableHashSet.Create(BmsResults.BAD),
             SuppressRepeatedMistakes = options.NonConsumingBad,
             RecoveringHeadResults = recovery,
             AutomaticEndOffset = 1,
             AutomaticTailUsesHeadOffset = aggregate,
             PassiveOrder = options.PassiveOrder,
             Balance = note.Kind == KeyNoteKind.SustainHold
-                ? new HoldBalance(Time.FromMilliseconds(200), "sustain-gain", "sustain-loss", ImmutableHashSet.Create("pgreat", "great", "good"))
+                ? new HoldBalance(Time.FromMilliseconds(200), BmsResults.SUSTAIN_GAIN, BmsResults.SUSTAIN_LOSS, ImmutableHashSet.Create(BmsResults.PGREAT, BmsResults.GREAT, BmsResults.GOOD))
                 : null,
         };
         return new HoldRule(config);
@@ -274,10 +274,10 @@ public static partial class BmsProfiles
                 BmsRank.Easy => [21.0, 60, 116, 200, 800],
                 _ => throw new NotSupportedException("The LR2 reference has no VeryEasy timing table."),
             };
-            var regular = new[] { ("pgreat", bounds[0]), ("great", bounds[1]), ("good", bounds[2]), ("bad", bounds[3]) };
+            var regular = new[] { (BmsResults.PGREAT, bounds[0]), (BmsResults.GREAT, bounds[1]), (BmsResults.GOOD, bounds[2]), (BmsResults.BAD, bounds[3]) };
             var lr2Entries = regular.Select(w => new TimingWindow(w.Item1, -Time.FromMilliseconds(w.Item2), Time.FromMilliseconds(w.Item2) - 1)).ToList();
             if (!tail)
-                lr2Entries.Add(new TimingWindow("empty-poor", -Time.FromMilliseconds(bounds[4]) + 1, -Time.FromMilliseconds(bounds[3]) - 1));
+                lr2Entries.Add(new TimingWindow(BmsResults.EMPTY_POOR, -Time.FromMilliseconds(bounds[4]) + 1, -Time.FromMilliseconds(bounds[3]) - 1));
 
             return new TimingWindows(lr2Entries);
         }
@@ -290,13 +290,13 @@ public static partial class BmsProfiles
         var badLate = (directional ? 290 : 280) * rate;
         var entries = new List<TimingWindow>
         {
-            new("pgreat", -Time.FromMilliseconds(pgreat), Time.FromMilliseconds(pgreat)),
-            new("great", -Time.FromMilliseconds(great), Time.FromMilliseconds(great)),
-            new("good", -Time.FromMilliseconds(good), Time.FromMilliseconds(good)),
-            new("bad", -Time.FromMilliseconds(badEarly), Time.FromMilliseconds(badLate)),
+            new(BmsResults.PGREAT, -Time.FromMilliseconds(pgreat), Time.FromMilliseconds(pgreat)),
+            new(BmsResults.GREAT, -Time.FromMilliseconds(great), Time.FromMilliseconds(great)),
+            new(BmsResults.GOOD, -Time.FromMilliseconds(good), Time.FromMilliseconds(good)),
+            new(BmsResults.BAD, -Time.FromMilliseconds(badEarly), Time.FromMilliseconds(badLate)),
         };
         if (!tail)
-            entries.Add(new TimingWindow("empty-poor", -Time.FromMilliseconds(500), Time.FromMilliseconds(directional ? 160 : 150), IncludeEarly: false));
+            entries.Add(new TimingWindow(BmsResults.EMPTY_POOR, -Time.FromMilliseconds(500), Time.FromMilliseconds(directional ? 160 : 150), IncludeEarly: false));
 
         return new TimingWindows(entries);
     }
@@ -348,23 +348,29 @@ public static partial class BmsProfiles
                 return 0;
 
             var result = context.Event.Result;
-            if (result == "mine-hit")
+            if (result == BmsResults.MINE_HIT)
                 return lr2
                     ? -mineDamage[context.Event.NoteId] * 0.5
                     : (float)context.Health.Value - (float)mineDamage[context.Event.NoteId] - context.Health.Value;
-            if (result == "mine-avoided" || (context.Event.Part != "empty" && context.Event.Part != "body"
+            if (result == BmsResults.MINE_AVOIDED || (context.Event.Part != NoteParts.EMPTY && context.Event.Part != NoteParts.BODY
                                                                            && !scoringParts.Contains((context.Event.NoteId, context.Event.Part))))
                 return 0;
 
             var index = result switch
             {
-                "pgreat" => 0, "great" => 1, "good" => 2, "bad" => 3, "poor" => 4,
-                "empty-poor" => 5, "sustain-gain" => 1, "sustain-loss" => 3,
+                var id when id == BmsResults.PGREAT => 0,
+                var id when id == BmsResults.GREAT => 1,
+                var id when id == BmsResults.GOOD => 2,
+                var id when id == BmsResults.BAD => 3,
+                var id when id == BmsResults.POOR => 4,
+                var id when id == BmsResults.EMPTY_POOR => 5,
+                var id when id == BmsResults.SUSTAIN_GAIN => 1,
+                var id when id == BmsResults.SUSTAIN_LOSS => 3,
                 _ => throw new InvalidOperationException($"Undefined gauge result {result}."),
             };
             var delta = deltas[index];
             if (!lr2)
-                delta = (float)delta * (context.Event.Part == "body" ? 0.5f : 1);
+                delta = (float)delta * (context.Event.Part == NoteParts.BODY ? 0.5f : 1);
             else if (delta < 0)
                 delta *= damageMultiplier;
             if (lr2 && delta > 0)
@@ -384,7 +390,7 @@ public static partial class BmsProfiles
             }
 
             return lr2
-                ? context.Event.Part == "body" ? delta * 0.5 : delta
+                ? context.Event.Part == NoteParts.BODY ? delta * 0.5 : delta
                 : (float)context.Health.Value + (float)delta - context.Health.Value;
         }, value => !normal && value <= 0, value => normal ? value >= (options.Gauge == BmsGauge.AssistEasy ? 60 : 80) : value > 0);
     }

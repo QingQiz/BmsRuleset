@@ -30,7 +30,7 @@ public class O2JamNativeConformanceTest
         session.AdvanceTo(time, [new InputEvent(time, 0, true)]);
         // The native fixture calls the input loop before the separate expiry pass.
         var expected = row.GetProperty("events").EnumerateArray().Select(result).ToArray();
-        Assert.That(session.GetEventsSince(0).Where(e => e.Offset != null).Select(e => e.Result), Is.EqualTo(expected));
+        Assert.That(session.GetEventsSince(0).Where(e => e.Offset != null).Select(e => e.Result.Value), Is.EqualTo(expected));
     }
 
     [TestCaseSource(nameof(Holds))]
@@ -46,7 +46,7 @@ public class O2JamNativeConformanceTest
         if (release)
             inputs.Add(new InputEvent(end, 0, false));
         session.AdvanceTo(end, inputs.ToArray());
-        Assert.That(session.GetEventsSince(0).Select(e => e.Result), Is.EqualTo(row.GetProperty("events").EnumerateArray().Select(result)));
+        Assert.That(session.GetEventsSince(0).Select(e => e.Result.Value), Is.EqualTo(row.GetProperty("events").EnumerateArray().Select(result)));
     }
 
     [Test]
@@ -59,7 +59,7 @@ public class O2JamNativeConformanceTest
             var time = ms(row.GetProperty("time").GetInt32());
             Assert.That(clock.TickAt(time), Is.EqualTo(row.GetProperty("tick").GetInt32()));
             session.AdvanceTo(time, row.GetProperty("heldTail").GetBoolean() ? [new InputEvent(clock.TimeAt(192), 0, true)] : []);
-            Assert.That(session.GetEventsSince(0).Select(e => e.Result), Is.EqualTo(row.GetProperty("events").EnumerateArray().Select(result)), row.ToString());
+            Assert.That(session.GetEventsSince(0).Select(e => e.Result.Value), Is.EqualTo(row.GetProperty("events").EnumerateArray().Select(result)), row.ToString());
         }
     }
 

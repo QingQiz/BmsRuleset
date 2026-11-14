@@ -1,11 +1,11 @@
-using System;
 using System.Collections.Immutable;
 using System.Linq;
-using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.Scoring;
 using RhythmEngine.Core;
+using RhythmEngine.Profiles.Bms;
+using RhythmEngine.Profiles.Common;
 
 namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 
@@ -31,28 +31,35 @@ internal static class BmsEngineGauge
         return new HealthConfiguration(combine(initial), context =>
         {
             var judgement = context.Event;
-            if (judgement.SuppressPenalty || judgement.Result == "mine-avoided"
-                || (judgement.Part == "head" && deferredHeads.Contains(judgement.NoteId)))
+            if (judgement.SuppressPenalty || judgement.Result == BmsResults.MINE_AVOIDED
+                                          || (judgement.Part == NoteParts.HEAD && deferredHeads.Contains(judgement.NoteId)))
                 return context.Health;
+
             var type = judgement.Result switch
             {
-                "sustain-gain" => HitResult.Great,
-                "sustain-loss" => HitResult.Ok,
+                var id when id == BmsResults.SUSTAIN_GAIN => HitResult.Great,
+                var id when id == BmsResults.SUSTAIN_LOSS => HitResult.Ok,
                 _ => BmsEngineChart.HitResultFor(judgement.Result),
             };
             var layers = context.Health.Layers.Select((layer, i) =>
             {
                 if (layer.HasFailed) return layer;
+
                 var calculator = calculators[i];
-                var delta = judgement.Result == "mine-hit" ? -mines[judgement.NoteId]
-                    : calculator.GetDeltaFor(type, layer.Value) * (judgement.Part == "body" ? .5 : 1);
+                var delta = judgement.Result == BmsResults.MINE_HIT
+                    ? -mines[judgement.NoteId]
+                    : calculator.GetDeltaFor(type, layer.Value) * (judgement.Part == NoteParts.BODY ? .5 : 1);
                 var value = calculator.ApplyDelta(layer.Value, delta);
                 return new HealthState(value, calculator.Profile.IsFailed(value));
             }).ToImmutableArray();
             return combine(layers);
-        }, context => context.Health.HasFailed ? SessionOutcome.Failed : !context.Completed ? SessionOutcome.InProgress
-            : context.Health.Layers.Where((layer, i) => !layer.HasFailed && layer.Value >= calculators[i].Profile.ClearThreshold).Any()
-                ? SessionOutcome.Cleared : SessionOutcome.Failed);
+        }, context => context.Health.HasFailed
+            ? SessionOutcome.Failed
+            : !context.Completed
+                ? SessionOutcome.InProgress
+                : context.Health.Layers.Where((layer, i) => !layer.HasFailed && layer.Value >= calculators[i].Profile.ClearThreshold).Any()
+                    ? SessionOutcome.Cleared
+                    : SessionOutcome.Failed);
     }
 
     private static HealthState combine(ImmutableArray<HealthState> layers)

@@ -37,7 +37,7 @@ public readonly record struct LaneInput(bool Held, bool PreviouslyHeld);
 
 public readonly record struct NoteContext(ChartNote Note, NoteState State, long Time, LaneInput Input);
 
-public readonly record struct NoteEmission(string Part, string Result, long ExpectedTime, long? Offset = null, bool SuppressPenalty = false);
+public readonly record struct NoteEmission(PartId Part, ResultId Result, long ExpectedTime, long? Offset = null, bool SuppressPenalty = false);
 
 public sealed record NoteUpdate(NoteState State, ImmutableArray<NoteEmission> Emissions)
 {

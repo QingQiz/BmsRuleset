@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using RhythmEngine.Core;
+using RhythmEngine.Profiles.Common;
 
 namespace RhythmEngine.Profiles.Malody;
 
@@ -11,8 +12,8 @@ internal sealed record MalodyHoldState(NoteTimer? Timer, bool Done, bool HeadRes
 
     internal ImmutableArray<NotePartState> GetParts(bool hold)
         => hold
-            ? [new NotePartState("head", HeadResolved), new NotePartState("body", Done, TickTime != null && !Done), new NotePartState("tail", Done)]
-            : [new NotePartState("head", HeadResolved)];
+            ? [new NotePartState(NoteParts.HEAD, HeadResolved), new NotePartState(NoteParts.BODY, Done, TickTime != null && !Done), new NotePartState(NoteParts.TAIL, Done)]
+            : [new NotePartState(NoteParts.HEAD, HeadResolved)];
 }
 
 internal sealed class MalodyClassicHoldRule(TimingWindows windows, long headDeadline, long releaseLenience) : INoteRule
@@ -26,7 +27,7 @@ internal sealed class MalodyClassicHoldRule(TimingWindows windows, long headDead
 
     public IEnumerable<ScoringOpportunity> GetScoringOpportunities(ChartNote note)
     {
-        yield return new ScoringOpportunity(note.Id, "head", note.StartTime, 1000);
+        yield return new ScoringOpportunity(note.Id, NoteParts.HEAD, note.StartTime, 1000);
     }
 
     public InputCandidate? GetCandidate(NoteContext context, InputEvent input, int noteIndex)
@@ -48,12 +49,12 @@ internal sealed class MalodyClassicHoldRule(TimingWindows windows, long headDead
         {
             var offset = context.Time - context.Note.StartTime;
             var result = windows.ResultFor(offset)!;
-            if (result == "miss")
-                return new NoteUpdate(schedule(context, state with { HeadResolved = true }), [new NoteEmission("head", result, context.Note.StartTime, offset)]);
+            if (result == MalodyResults.MISS)
+                return new NoteUpdate(schedule(context, state with { HeadResolved = true }), [new NoteEmission(NoteParts.HEAD, result, context.Note.StartTime, offset)]);
 
             var tickTime = Math.Max(context.Time, context.Note.StartTime) + tick_interval;
             state = state with { HeadResolved = true, TickTime = tickTime };
-            return new NoteUpdate(schedule(context, state), [new NoteEmission("head", result, context.Note.StartTime, offset)]);
+            return new NoteUpdate(schedule(context, state), [new NoteEmission(NoteParts.HEAD, result, context.Note.StartTime, offset)]);
         }
 
         if (input.Pressed)
@@ -64,18 +65,18 @@ internal sealed class MalodyClassicHoldRule(TimingWindows windows, long headDead
             return NoteUpdate.Silent(state with { Timer = null, Done = true, TickTime = null });
 
         return new NoteUpdate(schedule(context, state with { TickTime = null }),
-            [new NoteEmission("body", "hold-drop", context.Note.EndTime, context.Time - context.Note.EndTime)]);
+            [new NoteEmission(NoteParts.BODY, MalodyResults.HOLD_DROP, context.Note.EndTime, context.Time - context.Note.EndTime)]);
     }
 
     public NoteUpdate ApplyTimer(NoteContext context)
     {
         var state = (MalodyHoldState)context.State;
         if (!state.HeadResolved)
-            return new NoteUpdate(schedule(context, state with { HeadResolved = true }), [new NoteEmission("head", "miss", context.Note.StartTime)]);
+            return new NoteUpdate(schedule(context, state with { HeadResolved = true }), [new NoteEmission(NoteParts.HEAD, MalodyResults.MISS, context.Note.StartTime)]);
 
         var emitsTick = state.TickTime == context.Time;
         state = state with { TickTime = emitsTick ? context.Time + tick_interval : state.TickTime };
-        return new NoteUpdate(schedule(context, state), emitsTick ? [new NoteEmission("body", "hold-tick", context.Time)] : []);
+        return new NoteUpdate(schedule(context, state), emitsTick ? [new NoteEmission(NoteParts.BODY, MalodyResults.HOLD_TICK, context.Time)] : []);
     }
 
     private static MalodyHoldState schedule(NoteContext context, MalodyHoldState state)

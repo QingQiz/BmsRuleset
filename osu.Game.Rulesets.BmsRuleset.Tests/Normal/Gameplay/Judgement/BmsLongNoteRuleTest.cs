@@ -4,8 +4,8 @@ using NUnit.Framework;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
-using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.Presentation;
 using osu.Game.Rulesets.Scoring;
+using RhythmEngine.Profiles.Common;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
 
@@ -201,7 +201,7 @@ public class BmsLongNoteRuleTest
         Assert.That(observed, Is.EqualTo(mode == BmsLongNoteMode.LongNote
             ? new[] { ("main", true, true) }
             : new[] { ("main", true, false), ("synthetic Tail", true, true) }));
-        Assert.That(headSnapshot.Parts.Single(p => p.Part == "tail").Resolved, Is.False);
+        Assert.That(headSnapshot.Parts.Single(p => p.Part == NoteParts.TAIL).Resolved, Is.False);
         Assert.That(run.State.TailJudged, Is.True);
     }
 

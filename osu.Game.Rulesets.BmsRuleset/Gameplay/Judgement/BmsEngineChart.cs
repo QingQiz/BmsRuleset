@@ -35,7 +35,8 @@ internal static class BmsEngineChart
                 Directional: BmsLayout.IsScratchColumn(note.Column, note.Beatmap.LayoutVariant)
                              && note.Beatmap.LayoutVariant is not (BmsLayoutVariant.Keyboard24K or BmsLayoutVariant.Keyboard24KDouble));
             var headDeadline = kind == KeyNoteKind.Hold && head.LongNoteHeadPoorOffset is { } deadline
-                ? Math.Min(deadline, longNote!.Duration) : head.SlowWindowFor(HitResult.Ok);
+                ? Math.Min(deadline, longNote!.Duration)
+                : head.SlowWindowFor(HitResult.Ok);
             var options = new BmsRuleOptions(ImmediateBadHead: behaviour.LongNoteBadIsImmediate,
                 NonConsumingBad: behaviour.NonConsumingBad, HeadDeadline: Time.FromMilliseconds(headDeadline),
                 TailDeadline: Time.FromMilliseconds(head.SlowWindowFor(HitResult.Ok)),
@@ -49,20 +50,30 @@ internal static class BmsEngineChart
         => new(table.HitWindows.Select(row => new TimingWindow(ResultId(row.Result),
                 Time.FromMilliseconds(-row.FastDTime), Time.FromMilliseconds(-row.SlowDTime)))
             .Concat(table.EPoorWindow is { } empty
-                ? [new TimingWindow("empty-poor", Math.Max(Time.FromMilliseconds(-empty.FastDTime), -Time.FromMilliseconds(search) + 1),
-                    Time.FromMilliseconds(-empty.SlowDTime))] : []));
+                ?
+                [
+                    new TimingWindow(BmsResults.EMPTY_POOR, Math.Max(Time.FromMilliseconds(-empty.FastDTime), -Time.FromMilliseconds(search) + 1),
+                        Time.FromMilliseconds(-empty.SlowDTime))
+                ]
+                : []));
 
-    internal static string ResultId(HitResult result) => result switch
+    internal static ResultId ResultId(HitResult result) => result switch
     {
-        HitResult.Perfect => "pgreat", HitResult.Great => "great", HitResult.Good => "good",
-        HitResult.Ok => "bad", HitResult.Meh => "poor", HitResult.Miss => "empty-poor",
+        HitResult.Perfect => BmsResults.PGREAT, HitResult.Great => BmsResults.GREAT, HitResult.Good => BmsResults.GOOD,
+        HitResult.Ok => BmsResults.BAD, HitResult.Meh => BmsResults.POOR, HitResult.Miss => BmsResults.EMPTY_POOR,
         _ => throw new ArgumentOutOfRangeException(nameof(result)),
     };
 
-    internal static HitResult HitResultFor(string? result) => result switch
+    internal static HitResult HitResultFor(ResultId? result) => result switch
     {
-        "pgreat" => HitResult.Perfect, "great" => HitResult.Great, "good" => HitResult.Good,
-        "bad" => HitResult.Ok, "poor" or "mine-hit" => HitResult.Meh, "empty-poor" => HitResult.Miss,
-        _ => HitResult.None,
+        null => HitResult.None,
+        var id when id == BmsResults.PGREAT => HitResult.Perfect,
+        var id when id == BmsResults.GREAT => HitResult.Great,
+        var id when id == BmsResults.GOOD => HitResult.Good,
+        var id when id == BmsResults.BAD => HitResult.Ok,
+        var id when id == BmsResults.POOR || id == BmsResults.MINE_HIT => HitResult.Meh,
+        var id when id == BmsResults.EMPTY_POOR => HitResult.Miss,
+        var id when id == BmsResults.MINE_AVOIDED || id == BmsResults.SUSTAIN_GAIN || id == BmsResults.SUSTAIN_LOSS => HitResult.None,
+        _ => throw new ArgumentOutOfRangeException(nameof(result), result, "The BMS adapter requires a BMS result identity."),
     };
 }

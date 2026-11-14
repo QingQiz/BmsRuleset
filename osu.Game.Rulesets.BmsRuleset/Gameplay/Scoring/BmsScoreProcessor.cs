@@ -16,12 +16,19 @@ using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 using RhythmEngine.Core;
+using RhythmEngine.Profiles.Bms;
 using JudgementResult = osu.Game.Rulesets.Judgements.JudgementResult;
 
 namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 
 public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
 {
+    private static readonly ResultId[] counted_results =
+    [
+        BmsResults.PGREAT, BmsResults.GREAT, BmsResults.GOOD, BmsResults.BAD,
+        BmsResults.POOR, BmsResults.EMPTY_POOR, BmsResults.MINE_HIT,
+    ];
+
     private static readonly Action<JudgementResult, int> set_combo_after = createComboAfterSetter();
 
     private static readonly Action<JudgementResult, int> set_highest_combo_after = typeof(JudgementResult)
@@ -143,6 +150,7 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
             if (result == HitResult.Ok || (EmptyPoorBreaksCombo ?? BmsJudgementProfileProvider.EmptyPoorBreaksCombo(layout)))
                 Combo.Value = 0;
         }
+
         StatisticsVersion++;
         var source = new BmsJudgementSource(eventTime, column,
             result == HitResult.Ok ? BmsJudgementSourceKind.NonConsumingBad : BmsJudgementSourceKind.EmptyPoor);
@@ -161,7 +169,7 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
     ///     Applies a separate CN/HCN endpoint without requiring the source drawable to complete.
     /// </summary>
     public BmsLongNoteJudgementResult ApplySyntheticLongNoteEndpoint(BmsLongNoteEndpointResult endpointResult, bool suppressPenalty = false,
-        RhythmEngine.Core.JudgementResult? engineResult = null)
+                                                                     RhythmEngine.Core.JudgementResult? engineResult = null)
     {
         var endpoint = endpointResult.Source.CreateSyntheticEndpoint(endpointResult.ExpectedTime);
         var result = new BmsLongNoteJudgementResult(endpoint, endpoint.CreateJudgement(), [endpointResult])
@@ -275,12 +283,15 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
             BaseScore = state.Score,
             MaximumBaseScore = state.AccuracyMaximum,
             // Stored ruleset scores include detonated mines in osu!'s progress count, with zero EX potential.
-            AccuracyJudgementCount = (int)(state.AccuracyMaximum / 2 + state.Counters.GetValueOrDefault("mine-hit")),
+            AccuracyJudgementCount = (int)(state.AccuracyMaximum / 2 + state.Counters.GetValueOrDefault(BmsResults.MINE_HIT.Value)),
         });
         ScoreResultCounts.Clear();
-        foreach (var (key, count) in state.Counters)
+        foreach (var id in counted_results)
         {
-            var result = BmsEngineChart.HitResultFor(key);
+            if (!state.Counters.TryGetValue(id.Value, out var count))
+                continue;
+
+            var result = BmsEngineChart.HitResultFor(id);
             ScoreResultCounts[result] = ScoreResultCounts.GetValueOrDefault(result) + (int)count;
         }
     }

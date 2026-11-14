@@ -34,10 +34,10 @@ public static class O2JamProfile
         var maximumLife = 12000 * (2 + (int)options.Difficulty);
         var health = HealthRules.LatchedGauge(0, 1, 1, context => context.Event.Result switch
         {
-            "cool" => (options.Difficulty == O2JamDifficulty.Hard ? 48.0 : 96) / maximumLife,
-            "good" => 0,
-            "bad" => -240.0 / maximumLife,
-            "miss" => -1440.0 / maximumLife,
+            var id when id == O2JamResults.COOL => (options.Difficulty == O2JamDifficulty.Hard ? 48.0 : 96) / maximumLife,
+            var id when id == O2JamResults.GOOD => 0,
+            var id when id == O2JamResults.BAD => -240.0 / maximumLife,
+            var id when id == O2JamResults.MISS => -1440.0 / maximumLife,
             _ => throw new InvalidOperationException($"Undefined O2Jam health result {context.Event.Result}."),
         }, _ => false, _ => true);
         var descriptor = new ProfileDescriptor("o2jam-open2jam-v1", "11384b3ca957828ae66a72c9e28edd42c97952d5", EvidenceLevel.CommunityCompatibility,
@@ -51,41 +51,41 @@ public static class O2JamProfile
         TimingWindows windowsAt(long time)
         {
             if (!options.BeatBasedWindows)
-                return ProfileSupport.Symmetric(("cool", 41), ("good", 125), ("bad", 173));
+                return ProfileSupport.Symmetric((O2JamResults.COOL, 41), (O2JamResults.GOOD, 125), (O2JamResults.BAD, 173));
 
-            return new TimingWindows(new[] { ("cool", 0.2), ("good", 0.5), ("bad", 0.8) }
+            return new TimingWindows(new[] { (O2JamResults.COOL, 0.2), (O2JamResults.GOOD, 0.5), (O2JamResults.BAD, 0.8) }
                 .Select(w => new TimingWindow(w.Item1, source.MoveByBeats(time, -w.Item2 * 0.664) - time,
                     source.MoveByBeats(time, w.Item2 * 0.664) - time)));
         }
 
         var head = windowsAt(note.StartTime);
         if (note.Kind == KeyNoteKind.Tap)
-            return new TapRule(new TapConfiguration(head, head.Entries[^1].Late, "miss", 200));
+            return new TapRule(new TapConfiguration(head, head.Entries[^1].Late, O2JamResults.MISS, 200));
 
         if (note.Kind != KeyNoteKind.Hold)
             throw ProfileSupport.Unsupported("O2Jam", note.Kind);
 
         var tail = windowsAt(note.EndTime);
         return new HoldRule(new HoldConfiguration(head, tail, head.Entries[^1].Late, tail.Entries[^1].Late,
-            "miss", "cool", "miss", 200, 200, HoldEndMode.Release, HoldDropMode.Resolve,
+            O2JamResults.MISS, O2JamResults.COOL, O2JamResults.MISS, 200, 200, HoldEndMode.Release, HoldDropMode.Resolve,
             evaluation => evaluation.Resolution == HoldResolution.MissedHead
                 ? null
-                : new NoteEmission("tail", evaluation.TailResult, evaluation.Note.EndTime, evaluation.TailOffset)));
+                : new NoteEmission(NoteParts.TAIL, evaluation.TailResult, evaluation.Note.EndTime, evaluation.TailOffset)));
     }
 
     private static ScoreConfiguration createScore()
     {
-        var values = ProfileSupport.Values(("cool", 200, 200, ComboChange.Increment), ("good", 100, 100, ComboChange.Increment),
-            ("bad", 4, 4, ComboChange.Reset), ("miss", -10, 0, ComboChange.Reset));
+        var values = ProfileSupport.Values((O2JamResults.COOL, 200, 200, ComboChange.Increment), (O2JamResults.GOOD, 100, 100, ComboChange.Increment),
+            (O2JamResults.BAD, 4, 4, ComboChange.Reset), (O2JamResults.MISS, -10, 0, ComboChange.Reset));
         return new ScoreConfiguration(new ScoreState(), (state, context) =>
             {
                 if (context.Opportunity == null)
                     return state;
 
                 var result = context.Event.Result;
-                var rescued = context.Event.OriginalResult == "bad" && result == "good";
-                var pills = state.Counters.GetValueOrDefault("pills") - (rescued ? 1 : 0);
-                var streak = result == "cool" ? state.Counters.GetValueOrDefault("cool-streak") + 1 : 0;
+                var rescued = context.Event.OriginalResult == O2JamResults.BAD && result == O2JamResults.GOOD;
+                var pills = state.Counters.GetValueOrDefault(O2JamCounters.PILLS) - (rescued ? 1 : 0);
+                var streak = result == O2JamResults.COOL ? state.Counters.GetValueOrDefault(O2JamCounters.COOL_STREAK) + 1 : 0;
 
                 if (streak >= 15 && pills < 5)
                 {
@@ -93,11 +93,16 @@ public static class O2JamProfile
                     pills++;
                 }
 
-                var jam = state.Counters.GetValueOrDefault("jam");
-                var progress = state.Counters.GetValueOrDefault("jam-progress");
-                var scoreDelta = values[result].Score + (result == "cool" ? 10 * jam : 0);
-                progress = result switch { "cool" => progress + 2, "good" => progress + 1, _ => 0 };
-                if (result is "bad" or "miss")
+                var jam = state.Counters.GetValueOrDefault(O2JamCounters.JAM);
+                var progress = state.Counters.GetValueOrDefault(O2JamCounters.JAM_PROGRESS);
+                var scoreDelta = values[result].Score + (result == O2JamResults.COOL ? 10 * jam : 0);
+                progress = result switch
+                {
+                    var id when id == O2JamResults.COOL => progress + 2,
+                    var id when id == O2JamResults.GOOD => progress + 1,
+                    _ => 0,
+                };
+                if (result == O2JamResults.BAD || result == O2JamResults.MISS)
                     jam = 0;
 
                 if (progress >= 50)
@@ -110,12 +115,12 @@ public static class O2JamProfile
                 return next with
                 {
                     Score = Math.Max(0, state.Score + scoreDelta),
-                    Counters = state.Counters.SetItem("pills", pills).SetItem("cool-streak", streak)
-                        .SetItem("jam", jam).SetItem("jam-progress", progress),
+                    Counters = state.Counters.SetItem(O2JamCounters.PILLS, pills).SetItem(O2JamCounters.COOL_STREAK, streak)
+                        .SetItem(O2JamCounters.JAM, jam).SetItem(O2JamCounters.JAM_PROGRESS, progress),
                 };
             }, plan => Enumerable.Range(0, plan.Opportunities.Length).Sum(i => 200 + Math.Floor(i / 25.0) * 10),
-            (state, judgement) => judgement.Result == "bad" && state.Counters.GetValueOrDefault("pills") > 0
-                ? judgement with { Result = "good" }
+            (state, judgement) => judgement.Result == O2JamResults.BAD && state.Counters.GetValueOrDefault(O2JamCounters.PILLS) > 0
+                ? judgement with { Result = O2JamResults.GOOD }
                 : judgement);
     }
 }

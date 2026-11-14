@@ -110,9 +110,12 @@ public static class O2Jam338Profile
             [.. context.Candidates.OrderBy(c => c.Priority).ThenBy(c => Math.Abs(c.Offset)).ThenByDescending(c => c.Offset).ThenBy(c => c.NoteIndex).Take(1)]), descriptor);
     }
 
-    private static int resultIndex(string result) => result switch
+    private static int resultIndex(ResultId result) => result switch
     {
-        "cool" => 0, "good" => 1, "bad" => 2, "miss" => 3,
+        var id when id == O2JamResults.COOL => 0,
+        var id when id == O2JamResults.GOOD => 1,
+        var id when id == O2JamResults.BAD => 2,
+        var id when id == O2JamResults.MISS => 3,
         _ => throw new InvalidOperationException($"Undefined O2Jam result {result}."),
     };
 
@@ -124,9 +127,9 @@ public static class O2Jam338Profile
                 var result = context.Event.Result;
                 var index = resultIndex(result);
                 var raw = context.Event.OriginalResult;
-                var pills = state.Counters.GetValueOrDefault("pills");
-                var streak = state.Counters.GetValueOrDefault("cool-streak");
-                if (raw == "cool" && pills < 5)
+                var pills = state.Counters.GetValueOrDefault(O2JamCounters.PILLS);
+                var streak = state.Counters.GetValueOrDefault(O2JamCounters.COOL_STREAK);
+                if (raw == O2JamResults.COOL && pills < 5)
                 {
                     streak++;
                     if (streak > 14)
@@ -135,16 +138,16 @@ public static class O2Jam338Profile
                         streak = 0;
                     }
                 }
-                else if (raw != "cool")
+                else if (raw != O2JamResults.COOL)
                     streak = 0;
 
-                if (raw == "bad" && result == "cool")
+                if (raw == O2JamResults.BAD && result == O2JamResults.COOL)
                     pills--;
 
-                var jam = state.Counters.GetValueOrDefault("jam");
-                var progress = state.Counters.GetValueOrDefault("jam-progress");
+                var jam = state.Counters.GetValueOrDefault(O2JamCounters.JAM);
+                var progress = state.Counters.GetValueOrDefault(O2JamCounters.JAM_PROGRESS);
                 var scoreDelta = index switch { 0 => 10 * (jam + 20), 1 => 5 * (jam + 20), 2 => 4, _ => -10 };
-                var chain = index < 2 ? state.Counters.GetValueOrDefault("chain") + 1 : 0;
+                var chain = index < 2 ? state.Counters.GetValueOrDefault(O2JamCounters.CHAIN) + 1 : 0;
                 progress = index switch { 0 => progress + 2, 1 => progress + 1, _ => 0 };
                 if (index >= 2)
                     jam = 0;
@@ -158,13 +161,13 @@ public static class O2Jam338Profile
                     AccuracyMaximum = state.AccuracyMaximum + 200,
                     Combo = (int)Math.Max(0, chain - 1),
                     MaximumCombo = Math.Max(state.MaximumCombo, (int)Math.Max(0, chain - 1)),
-                    Counters = state.Counters.SetItem("chain", chain).SetItem("pills", pills).SetItem("cool-streak", streak)
-                        .SetItem("jam", jam).SetItem("jam-progress", progress)
-                        .SetItem(result, state.Counters.GetValueOrDefault(result) + 1),
+                    Counters = state.Counters.SetItem(O2JamCounters.CHAIN, chain).SetItem(O2JamCounters.PILLS, pills).SetItem(O2JamCounters.COOL_STREAK, streak)
+                        .SetItem(O2JamCounters.JAM, jam).SetItem(O2JamCounters.JAM_PROGRESS, progress)
+                        .SetItem(result.Value, state.Counters.GetValueOrDefault(result.Value) + 1),
                 };
             }, plan => Enumerable.Range(0, plan.Opportunities.Length).Sum(i => 200 + 10 * Math.Max(0, Math.Floor((2 * i - 1) / 50.0))),
-            (state, judgement) => judgement.Result == "bad" && state.Counters.GetValueOrDefault("pills") > 0
-                ? judgement with { Result = "cool" }
+            (state, judgement) => judgement.Result == O2JamResults.BAD && state.Counters.GetValueOrDefault(O2JamCounters.PILLS) > 0
+                ? judgement with { Result = O2JamResults.COOL }
                 : judgement);
     }
 }
@@ -182,18 +185,18 @@ internal sealed class O2Jam338NoteRule(O2JamClock clock, int headTick, int? tail
     {
         var current = (O2Jam338NoteState)context.State;
         return tailTick != null
-            ? [new("head", current.HeadResolved), new("body", current.Done, current.HeadResolved && !current.Done), new("tail", current.Done)]
-            : [new("head", current.HeadResolved)];
+            ? [new(NoteParts.HEAD, current.HeadResolved), new(NoteParts.BODY, current.Done, current.HeadResolved && !current.Done), new(NoteParts.TAIL, current.Done)]
+            : [new(NoteParts.HEAD, current.HeadResolved)];
     }
 
     public NoteState CreateState(ChartNote note) => new O2Jam338NoteState(new NoteTimer(clock.TimeAt(headTick + 26)), false, false);
 
     public IEnumerable<ScoringOpportunity> GetScoringOpportunities(ChartNote note)
     {
-        yield return new ScoringOpportunity(note.Id, "head", note.StartTime, 200);
+        yield return new ScoringOpportunity(note.Id, NoteParts.HEAD, note.StartTime, 200);
 
         if (tailTick != null)
-            yield return new ScoringOpportunity(note.Id, "tail", note.EndTime, 200);
+            yield return new ScoringOpportunity(note.Id, NoteParts.TAIL, note.EndTime, 200);
     }
 
     public InputCandidate? GetCandidate(NoteContext context, InputEvent input, int noteIndex)
@@ -215,13 +218,13 @@ internal sealed class O2Jam338NoteRule(O2JamClock clock, int headTick, int? tail
         var state = (O2Jam338NoteState)context.State;
         var tick = state.HeadResolved ? tailTick!.Value : headTick;
         var error = Math.Abs(clock.TickAt(context.Time) - tick);
-        var result = error <= 6 ? "cool" : error <= 18 ? "good" : error <= 25 ? "bad" : "miss";
+        var result = error <= 6 ? O2JamResults.COOL : error <= 18 ? O2JamResults.GOOD : error <= 25 ? O2JamResults.BAD : O2JamResults.MISS;
         var expectedTime = state.HeadResolved ? context.Note.EndTime : context.Note.StartTime;
-        var emission = new NoteEmission(state.HeadResolved ? "tail" : "head", result, expectedTime, context.Time - expectedTime);
+        var emission = new NoteEmission(state.HeadResolved ? NoteParts.TAIL : NoteParts.HEAD, result, expectedTime, context.Time - expectedTime);
         if (state.HeadResolved || tailTick == null)
             return new NoteUpdate(new O2Jam338NoteState(null, true, true), [emission]);
-        if (result == "bad")
-            return new NoteUpdate(new O2Jam338NoteState(null, true, true), [emission, new NoteEmission("tail", "miss", context.Note.EndTime)]);
+        if (result == O2JamResults.BAD)
+            return new NoteUpdate(new O2Jam338NoteState(null, true, true), [emission, new NoteEmission(NoteParts.TAIL, O2JamResults.MISS, context.Note.EndTime)]);
 
         return new NoteUpdate(new O2Jam338NoteState(new NoteTimer(clock.TimeAt(tailTick.Value + 26)), true, false), [emission]);
     }
@@ -230,10 +233,10 @@ internal sealed class O2Jam338NoteRule(O2JamClock clock, int headTick, int? tail
     {
         var state = (O2Jam338NoteState)context.State;
         var emissions = state.HeadResolved
-            ? [new NoteEmission("tail", "miss", context.Note.EndTime)]
+            ? [new NoteEmission(NoteParts.TAIL, O2JamResults.MISS, context.Note.EndTime)]
             : tailTick == null
-                ? [new NoteEmission("head", "miss", context.Note.StartTime)]
-                : ImmutableArray.Create(new NoteEmission("head", "miss", context.Note.StartTime), new NoteEmission("tail", "miss", context.Note.EndTime));
+                ? [new NoteEmission(NoteParts.HEAD, O2JamResults.MISS, context.Note.StartTime)]
+                : ImmutableArray.Create(new NoteEmission(NoteParts.HEAD, O2JamResults.MISS, context.Note.StartTime), new NoteEmission(NoteParts.TAIL, O2JamResults.MISS, context.Note.EndTime));
         return new NoteUpdate(new O2Jam338NoteState(null, true, true), emissions);
     }
 }

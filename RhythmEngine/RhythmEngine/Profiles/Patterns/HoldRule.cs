@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using RhythmEngine.Core;
+using RhythmEngine.Profiles.Common;
 
 namespace RhythmEngine.Profiles.Patterns;
 
@@ -14,10 +15,10 @@ public sealed class HoldRule : INoteRule
         var resolved = Configuration.Balance == null ? hold.TailResolved : hold.Done || hold.BalanceTime >= context.Note.EndTime;
         return
         [
-            new NotePartState("head", hold.HeadResult != null, Time: hold.HeadTime, Offset: hold.HeadOffset, Result: hold.HeadResult),
-            new NotePartState("body", resolved || hold.Ended, active && !hold.Ended, Reason: hold.Ended ? "End" : null),
-            new NotePartState("tail", hold.TailResolved, Time: hold.TailTime, Offset: hold.TailOffset, Result: hold.TailResult,
-                PendingTime: hold.PendingRelease, Reason: hold.Resolution?.ToString()),
+            new NotePartState(NoteParts.HEAD, hold.HeadResult != null, Time: hold.HeadTime, Offset: hold.HeadOffset, Result: hold.HeadResult),
+            new NotePartState(NoteParts.BODY, resolved || hold.Ended, active && !hold.Ended, Reason: hold.Ended ? HoldReasons.HOST_END : null),
+            new NotePartState(NoteParts.TAIL, hold.TailResolved, Time: hold.TailTime, Offset: hold.TailOffset, Result: hold.TailResult,
+                PendingTime: hold.PendingRelease, Reason: hold.Resolution is { } resolution ? HoldReasons.FromResolution(resolution) : null),
         ];
     }
 
@@ -42,9 +43,9 @@ public sealed class HoldRule : INoteRule
     public IEnumerable<ScoringOpportunity> GetScoringOpportunities(ChartNote note)
     {
         if (Configuration.HeadAccuracy > 0)
-            yield return new ScoringOpportunity(note.Id, "head", note.StartTime, Configuration.HeadAccuracy);
+            yield return new ScoringOpportunity(note.Id, NoteParts.HEAD, note.StartTime, Configuration.HeadAccuracy);
         if (Configuration.TailAccuracy > 0)
-            yield return new ScoringOpportunity(note.Id, "tail", note.EndTime, Configuration.TailAccuracy);
+            yield return new ScoringOpportunity(note.Id, NoteParts.TAIL, note.EndTime, Configuration.TailAccuracy);
     }
 
     public InputCandidate? GetCandidate(NoteContext context, InputEvent input, int noteIndex)
@@ -87,7 +88,7 @@ public sealed class HoldRule : INoteRule
         var emissions = ImmutableArray.CreateBuilder<NoteEmission>();
         state = emitBalance(context, state, emissions);
         if (state.TailResolved && input.Pressed && Configuration.ResolvedHeadWindows?.ResultFor(context.Time - context.Note.StartTime) is { } ghost)
-            emissions.Add(new NoteEmission("empty", ghost, context.Note.StartTime, context.Time - context.Note.StartTime));
+            emissions.Add(new NoteEmission(NoteParts.EMPTY, ghost, context.Note.StartTime, context.Time - context.Note.StartTime));
         if (state.TailResolved || (state.HeadResult == Configuration.MissResult && state.HeadOffset == null && !Configuration.RecoverMissedHead))
             return new NoteUpdate(schedule(context.Note, state, context.Time, context.Input.Held), emissions.ToImmutable());
 
@@ -103,7 +104,7 @@ public sealed class HoldRule : INoteRule
             var offset = context.Time - context.Note.StartTime;
             var result = Configuration.HeadWindows.ResultFor(offset)!;
             if (Configuration.NonResolvingHeadResults.Contains(result))
-                return new NoteUpdate(schedule(context.Note, state with { Mistake = true }, context.Time, context.Input.Held), [new NoteEmission("empty", result, context.Note.StartTime, offset)]);
+                return new NoteUpdate(schedule(context.Note, state with { Mistake = true }, context.Time, context.Input.Held), [new NoteEmission(NoteParts.EMPTY, result, context.Note.StartTime, offset)]);
 
             state = state with
             {
@@ -115,7 +116,7 @@ public sealed class HoldRule : INoteRule
                 Broken = false,
                 DropDeadline = Configuration.RequiresRetrigger ? Math.Max(context.Time, context.Note.StartTime) + Configuration.Grace : null,
             };
-            emissions.Add(new NoteEmission("head", result, context.Note.StartTime, offset));
+            emissions.Add(new NoteEmission(NoteParts.HEAD, result, context.Note.StartTime, offset));
             if (Configuration.TerminalHeadResults.Contains(result))
                 return resolve(context, state, result, offset, HoldResolution.Head, emissions);
         }
@@ -152,7 +153,7 @@ public sealed class HoldRule : INoteRule
 
                 case HoldDropMode.Recover:
                     if (!state.Broken && Configuration.BreakResult is { } bodyResult)
-                        emissions.Add(new NoteEmission("body", bodyResult, context.Note.EndTime));
+                        emissions.Add(new NoteEmission(NoteParts.BODY, bodyResult, context.Note.EndTime));
                     state = state with { Broken = true };
                     break;
 
@@ -194,7 +195,7 @@ public sealed class HoldRule : INoteRule
         if (state.HeadResult == null && context.Time > context.Note.StartTime + Configuration.HeadDeadline)
         {
             state = state with { HeadResult = Configuration.MissResult, HeadTime = context.Time, Holding = false };
-            emissions.Add(new NoteEmission("head", Configuration.MissResult, context.Note.StartTime,
+            emissions.Add(new NoteEmission(NoteParts.HEAD, Configuration.MissResult, context.Note.StartTime,
                 SuppressPenalty: state.Mistake && Configuration.SuppressRepeatedMistakes));
             if (!Configuration.ContinueAfterMissedHead && !Configuration.RecoverMissedHead)
                 return resolve(context, state, Configuration.MissResult, null, HoldResolution.MissedHead, emissions);
@@ -227,12 +228,12 @@ public sealed class HoldRule : INoteRule
         {
             if (state.Balance > balance.Threshold)
             {
-                emissions.Add(new NoteEmission("body", balance.GainResult, context.Time));
+                emissions.Add(new NoteEmission(NoteParts.BODY, balance.GainResult, context.Time));
                 state = state with { Balance = state.Balance - balance.Threshold };
             }
             else if (state.Balance < -balance.Threshold)
             {
-                emissions.Add(new NoteEmission("body", balance.LossResult, context.Time));
+                emissions.Add(new NoteEmission(NoteParts.BODY, balance.LossResult, context.Time));
                 state = state with { Balance = state.Balance + balance.Threshold };
             }
         }
@@ -240,7 +241,7 @@ public sealed class HoldRule : INoteRule
         return state;
     }
 
-    private NoteUpdate resolve(NoteContext context, HoldState state, string tailResult, long? offset, HoldResolution reason,
+    private NoteUpdate resolve(NoteContext context, HoldState state, ResultId tailResult, long? offset, HoldResolution reason,
                                ImmutableArray<NoteEmission>.Builder emissions)
     {
         if (reason == HoldResolution.Automatic && Configuration.AutomaticTailUsesHeadOffset)
@@ -263,7 +264,7 @@ public sealed class HoldRule : INoteRule
 
         if (tailResult == Configuration.MissResult && !state.Broken && Configuration.BreakResult is { } bodyResult)
         {
-            emissions.Add(new NoteEmission("body", bodyResult, context.Note.EndTime));
+            emissions.Add(new NoteEmission(NoteParts.BODY, bodyResult, context.Note.EndTime));
             state = state with { Broken = true };
         }
 

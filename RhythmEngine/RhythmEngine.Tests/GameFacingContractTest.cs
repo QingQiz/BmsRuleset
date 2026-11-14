@@ -17,7 +17,7 @@ public class GameFacingContractTest
         var session = createSession();
         var hit = session.AdvanceTo(1000000, [new InputEvent(1000000, 0, true)]);
         var silence = session.AdvanceTo(3000000);
-        Assert.That(hit.Events.Single().Result, Is.EqualTo("perfect"));
+        Assert.That(hit.Events.Single().Result.Value, Is.EqualTo("perfect"));
         Assert.That(hit.Events.Single().Lane, Is.Zero);
         Assert.That(hit.Events.Single().ExpectedTime, Is.EqualTo(1000000));
         Assert.That(hit.IsSnapshot, Is.False);
@@ -33,8 +33,8 @@ public class GameFacingContractTest
         var session = createSession();
         var missed = session.AdvanceTo(3000000);
         var replayed = session.Reconstruct(2000000, [new InputEvent(1000000, 0, true)]);
-        Assert.That(missed.Events.Single().Result, Is.EqualTo("miss"));
-        Assert.That(replayed.Events.Single().Result, Is.EqualTo("perfect"));
+        Assert.That(missed.Events.Single().Result.Value, Is.EqualTo("miss"));
+        Assert.That(replayed.Events.Single().Result.Value, Is.EqualTo("perfect"));
         Assert.That(replayed.Generation, Is.GreaterThan(missed.Generation));
         Assert.That(replayed.IsSnapshot, Is.True);
         Assert.That(replayed.Score.Score, Is.EqualTo(1000000));
@@ -83,8 +83,8 @@ public class GameFacingContractTest
         var prefix = session.GetEventsSince(0);
         session.AdvanceTo(3500000, [new InputEvent(3000000, 0, false)]);
         clone.AdvanceTo(3500000);
-        Assert.That(session.GetEventsSince(0).Single(e => e.Part == "tail").Result, Is.EqualTo(o2Jam ? "cool" : "best"));
-        Assert.That(clone.GetEventsSince(0).Single(e => e.Part == "tail").Result, Is.EqualTo("miss"));
+        Assert.That(session.GetEventsSince(0).Single(e => e.Part.Value == "tail").Result.Value, Is.EqualTo(o2Jam ? "cool" : "best"));
+        Assert.That(clone.GetEventsSince(0).Single(e => e.Part.Value == "tail").Result.Value, Is.EqualTo("miss"));
         Assert.That(session.Score.Score, Is.GreaterThan(clone.Score.Score));
         Assert.That(prefix, Is.EqualTo(session.GetEventsSince(0).Take(prefix.Length)));
         var events = session.GetEventsSince(0);

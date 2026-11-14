@@ -2,7 +2,7 @@ using System.Collections.Immutable;
 
 namespace RhythmEngine.Core;
 
-public readonly record struct TimingWindow(string Result, long Early, long Late, bool IncludeEarly = true, bool IncludeLate = true)
+public readonly record struct TimingWindow(ResultId Result, long Early, long Late, bool IncludeEarly = true, bool IncludeLate = true)
 {
     public bool Contains(long offset) => (IncludeEarly ? offset >= Early : offset > Early)
                                          && (IncludeLate ? offset <= Late : offset < Late);
@@ -16,11 +16,11 @@ public sealed class TimingWindows
     public TimingWindows(IEnumerable<TimingWindow> entries)
     {
         Entries = [..entries];
-        if (Entries.IsEmpty || Entries.Any(w => string.IsNullOrWhiteSpace(w.Result) || w.Early > w.Late))
+        if (Entries.IsEmpty || Entries.Any(w => w.Result == null || w.Early > w.Late))
             throw new ArgumentException("Nonempty, named, ordered time ranges are required.", nameof(entries));
     }
 
-    public string? ResultFor(long offset)
+    public ResultId? ResultFor(long offset)
     {
         foreach (var window in Entries)
         {
@@ -31,7 +31,7 @@ public sealed class TimingWindows
         return null;
     }
 
-    public int RankOf(string result)
+    public int RankOf(ResultId result)
     {
         for (var i = 0; i < Entries.Length; i++)
         {

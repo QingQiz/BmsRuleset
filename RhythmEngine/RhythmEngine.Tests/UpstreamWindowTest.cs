@@ -60,7 +60,7 @@ public class UpstreamWindowTest
             var part = body ? "body" : judge == 5 ? "empty" : "tap";
             var result = body ? judge == 1 ? "sustain-gain" : "sustain-loss" : grades[judge];
             var time = ++step * 1000000L;
-            var judgement = new JudgementEvent(step, body ? 0 : step, 0, part, result, time, time, 0);
+            var judgement = new JudgementEvent(step, body ? 0 : step, 0, new PartId(part), new ResultId(result), time, time, 0);
             health = configuration.Reduce(new HealthContext(judgement, health, profile.Configuration.Score.InitialState, profile.Chart.ScorePlan));
             Assert.That(health.Value, Is.EqualTo(expected.GetProperty("value").GetDouble()), $"step {step}");
             var outcome = configuration.EvaluateOutcome(new SessionOutcomeContext(true, health, profile.Configuration.Score.InitialState, profile.Chart.ScorePlan));
@@ -102,7 +102,7 @@ public class UpstreamWindowTest
             foreach (var row in group)
             {
                 var index = row.GetProperty("index").GetInt32();
-                var judgement = new JudgementEvent(index, 0, 0, "note", results[row.GetProperty("result").GetInt32()], index, index, 0);
+                var judgement = new JudgementEvent(index, 0, 0, new PartId("note"), new ResultId(results[row.GetProperty("result").GetInt32()]), index, index, 0);
                 health = configuration.Reduce(new HealthContext(judgement, health, profile.Configuration.Score.InitialState, profile.Chart.ScorePlan));
                 Assert.That(health.Value, Is.EqualTo(row.GetProperty("hp").GetDouble()), $"state {index}");
                 Assert.That(health.HasFailed, Is.EqualTo(row.GetProperty("failed").GetBoolean()), $"failure {index}");
@@ -123,12 +123,12 @@ public class UpstreamWindowTest
         string[] grades = ["pgreat", "great", "good", "bad", "poor", "empty-poor"];
         for (var i = 0; i < grades.Length; i++)
         {
-            var judgement = new JudgementEvent(0, 0, 0, i == 5 ? "empty" : "tap", grades[i], 0, 0, null);
+            var judgement = new JudgementEvent(0, 0, 0, new PartId(i == 5 ? "empty" : "tap"), new ResultId(grades[i]), 0, 0, null);
             var health = gauge.Reduce(new HealthContext(judgement, new HealthState(60, false), profile.Configuration.Score.InitialState, profile.Chart.ScorePlan));
             Assert.That(health.Value, Is.EqualTo(Math.Clamp(60 + row.GetProperty("changes")[i].GetDouble(), minimum, 100)).Within(0.0002), grades[i]);
         }
 
-        var poor = new JudgementEvent(0, 0, 0, "tap", "poor", 0, 0, null);
+        var poor = new JudgementEvent(0, 0, 0, new PartId("tap"), new ResultId("poor"), 0, 0, null);
         Assert.That(gauge.Reduce(new HealthContext(poor, new HealthState(minimum, false), profile.Configuration.Score.InitialState, profile.Chart.ScorePlan)).Value,
             Is.EqualTo(minimum));
     }
@@ -157,7 +157,7 @@ public class UpstreamWindowTest
     {
         var source = new KeyChart(1, [new KeyNote(0, 0, 1_000_000, 1_000_000)]);
         var profile = BmsProfiles.CreateBeatoraja(source, new BmsOptions(Gauge: gaugeType));
-        var judgement = new JudgementEvent(0, 0, 0, "tap", "bad", 0, 0, null);
+        var judgement = new JudgementEvent(0, 0, 0, new PartId("tap"), new ResultId("bad"), 0, 0, null);
         var health = profile.Configuration.Health.Reduce(new HealthContext(judgement, new HealthState((float)healthValue, false),
             profile.Configuration.Score.InitialState, profile.Chart.ScorePlan));
         var baseDamage = gaugeType == BmsGauge.Hard ? -5 : -1.5;
@@ -174,7 +174,7 @@ public class UpstreamWindowTest
         var source = new KeyChart(1, [new KeyNote(0, 0, 1_000_000, 1_000_000)]);
         var options = new BmsOptions(Gauge: gauge, Total: 130);
         var profile = lr2 ? BmsProfiles.CreateLr2(source, options) : BmsProfiles.CreateBeatoraja(source, options);
-        var judgement = new JudgementEvent(0, 0, 0, "tap", "poor", 0, 0, null);
+        var judgement = new JudgementEvent(0, 0, 0, new PartId("tap"), new ResultId("poor"), 0, 0, null);
         var health = profile.Configuration.Health.Reduce(new HealthContext(judgement, new HealthState(10, false),
             profile.Configuration.Score.InitialState, profile.Chart.ScorePlan));
         Assert.That(health.Value, Is.EqualTo(Math.Max(0, 10 + poorDamage * (lr2 && gauge == BmsGauge.GradeHard ? 0.6 : 1))).Within(0.000001));
@@ -198,7 +198,7 @@ public class UpstreamWindowTest
             var expectedIndex = Array.FindIndex(expected, w => boundary >= w.Item1 && boundary <= w.Item2);
             if (!tail && boundary == -500_000)
                 expectedIndex = -1;
-            Assert.That(windows.ResultFor(boundary), Is.EqualTo(expectedIndex < 0 ? null : windows.Entries[expectedIndex].Result), $"offset {boundary}");
+            Assert.That(windows.ResultFor(boundary)?.Value, Is.EqualTo(expectedIndex < 0 ? null : windows.Entries[expectedIndex].Result.Value), $"offset {boundary}");
         }
     }
 

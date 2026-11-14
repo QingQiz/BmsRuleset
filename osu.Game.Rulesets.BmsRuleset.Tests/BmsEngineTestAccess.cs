@@ -1,14 +1,17 @@
 #nullable enable
-using System.Collections.Generic;
+
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
-using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.Presentation;
+using osu.Game.Rulesets.Scoring;
 using RhythmEngine.Core;
+using RhythmEngine.Profiles.Bms;
+using RhythmEngine.Profiles.Common;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests;
 
@@ -35,7 +38,7 @@ internal static class BmsEngineTestAccess
         => column.Notes().OfType<BmsLongNote>().Where(n => column.GetNote(n).Parts[0].Resolved && !column.GetNote(n).Parts[2].Resolved);
 
     internal static IEnumerable<BmsLongNote> GetHoldingNotes(this BmsJudgementView column)
-        => column.GetPendingLongNoteTails().Where(n => column.GetNote(n).Parts.Single(p => p.Part == "body").Active);
+        => column.GetPendingLongNoteTails().Where(n => column.GetNote(n).Parts.Single(p => p.Part == NoteParts.BODY).Active);
 
     internal static IEnumerable<BmsLongNote> GetActiveBodies(this BmsJudgementView column)
         => column.Notes().OfType<BmsLongNote>().Where(n => n.EffectiveMode == BmsLongNoteMode.HellChargeNote && column.GetNote(n).Parts[0].Resolved && !column.GetNote(n).Parts[1].Resolved);
@@ -53,7 +56,7 @@ internal static class BmsEngineTestAccess
         engine.ProcessFrame(press.Frame with { SimulationTime = Math.Max(press.InputTime, press.Frame.SimulationTime) }, 0, algorithm);
         var transitions = ((JudgementSession)sessionField.GetValue(engine)!).GetTransitionsSince(start)
             .Where(t => t.Input is { Pressed: true }).ToArray();
-        var empty = transitions.SelectMany(t => t.Judgements).FirstOrDefault(j => j.Event.Part == "empty" && j.Event.Result == "empty-poor");
+        var empty = transitions.SelectMany(t => t.Judgements).FirstOrDefault(j => j.Event.Part == NoteParts.EMPTY && j.Event.Result == BmsResults.EMPTY_POOR);
         return empty != null ? PressOutcome.ForEmptyPoor(empty.Event.ExpectedTime / 1000.0, column.Index)
             : transitions.Length > 0 ? PressOutcome.Hit : PressOutcome.Empty;
     }

@@ -20,8 +20,8 @@ public static class EtternaProfile
         };
         scale = Math.Min(1, scale);
         // Etterna caps scaled tap windows at its fixed 180ms search/miss horizon.
-        var windows = ProfileSupport.Symmetric(("w1", Math.Min(180, 22.5 * scale)), ("w2", Math.Min(180, 45 * scale)),
-            ("w3", Math.Min(180, 90 * scale)), ("w4", Math.Min(180, 135 * scale)), ("w5", 180));
+        var windows = ProfileSupport.Symmetric((EtternaResults.W1, Math.Min(180, 22.5 * scale)), (EtternaResults.W2, Math.Min(180, 45 * scale)),
+            (EtternaResults.W3, Math.Min(180, 90 * scale)), (EtternaResults.W4, Math.Min(180, 135 * scale)), (EtternaResults.W5, 180));
         var timeline = new EtternaSearchTimeline(source);
         var holdIntervals = source.Notes.Where(n => n.Kind is KeyNoteKind.Hold or KeyNoteKind.Roll)
             .GroupBy(n => n.Lane).ToImmutableDictionary(g => g.Key, g => g.ToImmutableArray());
@@ -34,12 +34,12 @@ public static class EtternaProfile
 
             var delta = context.Event.Result switch
             {
-                "w1" or "w2" or "held" => 0.008f,
-                "w3" => 0.004f,
-                "w4" or "mine-avoided" or "missed-hold" => 0f,
-                "w5" => -0.04f,
-                "miss" or "let-go" => -0.08f,
-                "mine-hit" => -0.16f,
+                var id when id == EtternaResults.W1 || id == EtternaResults.W2 || id == EtternaResults.HELD => 0.008f,
+                var id when id == EtternaResults.W3 => 0.004f,
+                var id when id == EtternaResults.W4 || id == EtternaResults.MINE_AVOIDED || id == EtternaResults.MISSED_HOLD => 0f,
+                var id when id == EtternaResults.W5 => -0.04f,
+                var id when id == EtternaResults.MISS || id == EtternaResults.LET_GO => -0.08f,
+                var id when id == EtternaResults.MINE_HIT => -0.16f,
                 _ => throw new InvalidOperationException($"Undefined Etterna health result {context.Event.Result}."),
             };
             var change = delta > 0 ? delta * lifeDifficulty : delta / lifeDifficulty;
@@ -102,20 +102,20 @@ public static class EtternaProfile
     {
         if (note.Kind == KeyNoteKind.Mine)
         {
-            return new MineRule(Time.FromMilliseconds(75), Time.FromMilliseconds(75), "mine-hit", "mine-avoided", shareInput: false,
+            return new MineRule(Time.FromMilliseconds(75), Time.FromMilliseconds(75), EtternaResults.MINE_HIT, EtternaResults.MINE_AVOIDED, shareInput: false,
                 expiryWindow: Time.FromMilliseconds(180));
         }
 
         if (note.Kind is KeyNoteKind.Tap or KeyNoteKind.Lift)
-            return new TapRule(new TapConfiguration(windows, Time.FromMilliseconds(180), "miss", 2, note.Kind == KeyNoteKind.Lift));
+            return new TapRule(new TapConfiguration(windows, Time.FromMilliseconds(180), EtternaResults.MISS, 2, note.Kind == KeyNoteKind.Lift));
 
         if (note.Kind is not (KeyNoteKind.Hold or KeyNoteKind.Roll))
             throw ProfileSupport.Unsupported("Etterna", note.Kind);
 
-        var tail = ProfileSupport.Symmetric(("held", 0));
+        var tail = ProfileSupport.Symmetric((EtternaResults.HELD, 0));
         return new HoldRule(new HoldConfiguration(windows, tail, Time.FromMilliseconds(180), 0,
-            "miss", "held", "let-go", 2, 0, HoldEndMode.Automatic, HoldDropMode.Grace,
-            evaluation => new NoteEmission("tail", evaluation.HeadResult == "miss" ? "missed-hold" : evaluation.TailResult, evaluation.Note.EndTime))
+            EtternaResults.MISS, EtternaResults.HELD, EtternaResults.LET_GO, 2, 0, HoldEndMode.Automatic, HoldDropMode.Grace,
+            evaluation => new NoteEmission(NoteParts.TAIL, evaluation.HeadResult == EtternaResults.MISS ? EtternaResults.MISSED_HOLD : evaluation.TailResult, evaluation.Note.EndTime))
         {
             Grace = Time.FromMilliseconds(note.Kind == KeyNoteKind.Roll ? 500 : 250),
             RequiresRetrigger = note.Kind == KeyNoteKind.Roll,
@@ -131,14 +131,14 @@ public static class EtternaProfile
             var result = context.Event.Result;
             var points = result switch
             {
-                "mine-hit" => -7,
-                "let-go" or "missed-hold" => -4.5,
-                "mine-avoided" or "held" => 0,
-                "miss" => -5.5,
+                var id when id == EtternaResults.MINE_HIT => -7,
+                var id when id == EtternaResults.LET_GO || id == EtternaResults.MISSED_HOLD => -4.5,
+                var id when id == EtternaResults.MINE_AVOIDED || id == EtternaResults.HELD => 0,
+                var id when id == EtternaResults.MISS => -5.5,
                 _ => Wife3(Time.ToMilliseconds(context.Event.Offset!.Value), scale),
             };
             var maximum = state.AccuracyMaximum + (context.Opportunity?.MaximumAccuracy ?? 0);
-            var combo = context.Opportunity == null ? state.Combo : result is "w1" or "w2" or "w3" ? state.Combo + 1 : 0;
+            var combo = context.Opportunity == null ? state.Combo : (result == EtternaResults.W1 || result == EtternaResults.W2 || result == EtternaResults.W3) ? state.Combo + 1 : 0;
             var numerator = state.AccuracyPoints + points;
             return state with
             {

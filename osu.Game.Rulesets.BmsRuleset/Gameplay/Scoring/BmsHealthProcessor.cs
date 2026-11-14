@@ -24,10 +24,10 @@ public partial class BmsHealthProcessor : HealthProcessor
         syncActiveStateFromHealth();
         captureInitialGaugeStates();
         var calculators = gaugeStates.Select(state => new BmsGaugeCalculator(
-            state.Profile with { GutsRules = state.Profile.GutsRules.ToImmutableArray() }, state.Calculator!.Total,
+            state.Profile with { GutsRules = [..state.Profile.GutsRules] }, state.Calculator!.Total,
             state.Calculator.NoteCount, effectiveProfileFamily)).ToImmutableArray();
         return BmsEngineGauge.Create(objects, calculators,
-            gaugeStates.Select(state => new HealthState(state.CurrentHp, state.IsHpFailed)).ToImmutableArray());
+            [..gaugeStates.Select(state => new HealthState(state.CurrentHp, state.IsHpFailed))]);
     }
 
     internal void ApplyEngineHealth(HealthState health)
@@ -37,6 +37,7 @@ public partial class BmsHealthProcessor : HealthProcessor
             gaugeStates[i].CurrentHp = health.Layers[i].Value;
             gaugeStates[i].IsHpFailed = health.Layers[i].HasFailed;
         }
+
         resolveActiveState();
         HasEverFailed |= health.HasFailed;
     }
@@ -385,6 +386,7 @@ public partial class BmsHealthProcessor : HealthProcessor
             ApplyEngineHealth(engine.Health);
             return Health.Value - previous;
         }
+
         if (result is BmsJudgementResult { SuppressPenalty: true })
             return 0;
 
