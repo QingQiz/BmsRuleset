@@ -16,16 +16,9 @@ public class BmsAutoGeneratorTest
     [TestCase(9)]
     public void TestShortLongNotesReleaseAtTailBeforeNextPress(double duration)
     {
-        var beatmap = new BmsBeatmap
-        {
-            LayoutVariant = BmsLayoutVariant.Bme7K,
-            TotalColumns = 8,
-            HitObjects =
-            {
-                new BmsLongNote { StartTime = 1000, Column = 1, Duration = duration },
-                new BmsLongNote { StartTime = 1000 + duration * 2, Column = 1, Duration = duration },
-            },
-        };
+        var beatmap = createBeatmap(
+            new BmsLongNote { StartTime = 1000, Column = 1, Duration = duration },
+            new BmsLongNote { StartTime = 1000 + duration * 2, Column = 1, Duration = duration });
 
         var frames = new BmsAutoGenerator(beatmap).Generate().Frames.OfType<BmsReplayFrame>().ToArray();
         Assert.That(frames.Single(f => f.Time == 1000 + duration).Actions, Does.Not.Contain(BmsAction.Key1));
@@ -36,17 +29,10 @@ public class BmsAutoGeneratorTest
     [Test]
     public void TestAutoplayGeneratesPressAndReleaseFrames()
     {
-        var beatmap = new BmsBeatmap
-        {
-            LayoutVariant = BmsLayoutVariant.Bme7K,
-            TotalColumns = 8,
-            HitObjects =
-            {
-                new BmsHitObject { StartTime = 1000, Column = 1 },
-                new BmsHitObject { StartTime = 1200, Column = 1 },
-                new BmsLongNote { StartTime = 2000, Column = 2, Duration = 500 },
-            },
-        };
+        var beatmap = createBeatmap(
+            new BmsHitObject { StartTime = 1000, Column = 1 },
+            new BmsHitObject { StartTime = 1200, Column = 1 },
+            new BmsLongNote { StartTime = 2000, Column = 2, Duration = 500 });
 
         var replay = new BmsAutoGenerator(beatmap).Generate();
         var frames = replay.Frames.OfType<BmsReplayFrame>().ToArray();
@@ -61,20 +47,30 @@ public class BmsAutoGeneratorTest
     [Test]
     public void TestAutoplayReleasesBeforePressingSameActionAtSameTime()
     {
-        var beatmap = new BmsBeatmap
-        {
-            LayoutVariant = BmsLayoutVariant.Bme7K,
-            TotalColumns = 8,
-            HitObjects =
-            {
-                new BmsHitObject { StartTime = 1000, Column = 1 },
-                new BmsHitObject { StartTime = 1100, Column = 1 },
-            },
-        };
+        var beatmap = createBeatmap(
+            new BmsHitObject { StartTime = 1000, Column = 1 },
+            new BmsHitObject { StartTime = 1100, Column = 1 });
 
         var replay = new BmsAutoGenerator(beatmap).Generate();
         var frames = replay.Frames.OfType<BmsReplayFrame>().ToArray();
 
         Assert.That(frames.Single(f => f.Time == 1100).Actions, Contains.Item(BmsAction.Key1));
+    }
+
+    private static BmsBeatmap createBeatmap(params BmsHitObject[] hitObjects)
+    {
+        var beatmap = new BmsBeatmap
+        {
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            TotalColumns = 8,
+        };
+
+        foreach (var hitObject in hitObjects)
+        {
+            hitObject.Beatmap = beatmap;
+            beatmap.HitObjects.Add(hitObject);
+        }
+
+        return beatmap;
     }
 }

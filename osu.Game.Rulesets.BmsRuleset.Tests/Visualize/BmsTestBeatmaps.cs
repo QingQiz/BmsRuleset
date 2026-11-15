@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using osu.Game.Beatmaps;
 using osu.Game.IO;
@@ -99,6 +100,9 @@ public static partial class BmsTestBeatmaps
         beatmap.HitObjects.Add(new BmsLandmine { StartTime = FIRST_NOTE_TIME + 9500, Column = 0, LandmineDamagePercent = 2.5 });
         beatmap.HitObjects.Add(new BmsLandmine { StartTime = FIRST_NOTE_TIME + 11000, Column = 7, LandmineDamagePercent = 2.5 });
 
+        foreach (var hitObject in beatmap.HitObjects)
+            hitObject.Beatmap = beatmap;
+
         beatmap.TimingMap = createTimingMap(beatmap.HitObjects.Max(note => note.GetEndTime()), 130);
         return beatmap;
     }
@@ -117,10 +121,14 @@ public static partial class BmsTestBeatmaps
     /// </summary>
     public static BmsBeatmap CreateBeatmapFromChart(string chart)
     {
-        using var stream = new MemoryStream(Encoding.UTF8.GetBytes(chart));
+        var content = Encoding.UTF8.GetBytes(chart);
+        using var stream = new MemoryStream(content);
         using var reader = new LineBufferedReader(stream);
         var decoded = new BmsBeatmapDecoder().Decode(reader);
-        return (BmsBeatmap)new BmsBeatmapConverter(decoded, new BmsRuleset()).Convert();
+        var beatmap = (BmsBeatmap)new BmsBeatmapConverter(decoded, new BmsRuleset()).Convert();
+        beatmap.BeatmapInfo.Hash = Convert.ToHexStringLower(SHA256.HashData(content));
+        beatmap.BeatmapInfo.MD5Hash = Convert.ToHexStringLower(MD5.HashData(content));
+        return beatmap;
     }
 
     /// <summary>
@@ -141,6 +149,14 @@ public static partial class BmsTestBeatmaps
         float drainRate = 5)
     {
         beatmap.BeatmapInfo.Ruleset = ruleset;
+        if (string.IsNullOrEmpty(beatmap.BeatmapInfo.Hash))
+        {
+            var content = Encoding.UTF8.GetBytes(string.Join('\n', beatmap.HitObjects.Select(hitObject =>
+                FormattableString.Invariant($"{hitObject.GetType().FullName}:{hitObject.StartTime:R}:{hitObject.GetEndTime():R}:{hitObject.Column}"))));
+            beatmap.BeatmapInfo.Hash = Convert.ToHexStringLower(SHA256.HashData(content));
+            beatmap.BeatmapInfo.MD5Hash = Convert.ToHexStringLower(MD5.HashData(content));
+        }
+
         beatmap.BeatmapInfo.Difficulty.CircleSize = beatmap.TotalColumns;
         beatmap.BeatmapInfo.Difficulty.OverallDifficulty = overallDifficulty;
         beatmap.BeatmapInfo.Difficulty.DrainRate = drainRate;

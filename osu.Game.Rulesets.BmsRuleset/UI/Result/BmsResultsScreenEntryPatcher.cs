@@ -1,7 +1,12 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using HarmonyLib;
 using osu.Framework.Screens;
+using osu.Game;
+using osu.Game.Screens.OnlinePlay.DailyChallenge;
 using osu.Game.Screens.Ranking;
+using NativeSongSelect = osu.Game.Screens.Select.SongSelect;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Result;
 
@@ -23,6 +28,9 @@ internal static class BmsResultsScreenEntryPatcher
             // All solo result entry points converge here before the native screen starts loading.
             var target = AccessTools.Method(typeof(ScreenStack), "Push", [typeof(IScreen), typeof(IScreen)]);
             harmony.Patch(target, prefix: new HarmonyMethod(typeof(BmsResultsScreenEntryPatcher), nameof(pushPrefix)));
+
+            var performFromScreen = AccessTools.Method(typeof(OsuGame), nameof(OsuGame.PerformFromScreen), [typeof(Action<IScreen>), typeof(IEnumerable<Type>)]);
+            harmony.Patch(performFromScreen, prefix: new HarmonyMethod(typeof(BmsResultsScreenEntryPatcher), nameof(performFromScreenPrefix)));
             IsInstalled = true;
         }
         catch (Exception exception)
@@ -42,6 +50,20 @@ internal static class BmsResultsScreenEntryPatcher
         newScreen = replacement;
         original.Dispose();
     }
+
+    // ReSharper disable InconsistentNaming
+    private static void performFromScreenPrefix(OsuGame __instance, ref IEnumerable<Type>? validScreens)
+    {
+        if (ShouldUseResultAsReplayOrigin(__instance.ScreenStack.CurrentScreen, validScreens))
+            validScreens = validScreens!.Append(typeof(BmsResultsScreen)).ToArray();
+    }
+    // ReSharper restore InconsistentNaming
+
+    internal static bool ShouldUseResultAsReplayOrigin(IScreen? currentScreen, IEnumerable<Type>? validScreens)
+        => currentScreen is BmsResultsScreen
+           && validScreens is not null
+           && validScreens.Contains(typeof(NativeSongSelect))
+           && validScreens.Contains(typeof(DailyChallenge));
 
     internal static BmsResultsScreen? GetReplacement(IScreen screen)
     {

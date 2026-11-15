@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Security.Cryptography;
 using NUnit.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
@@ -659,13 +660,13 @@ public partial class TestSceneBmsSongSelectLampHack : ScreenTestScene
         var set = new BeatmapSetInfo
         {
             OnlineID = id + 1,
-            Hash = Guid.NewGuid().ToString(),
+            Hash = Convert.ToHexStringLower(SHA256.HashData(Guid.NewGuid().ToByteArray())),
             DateAdded = DateTimeOffset.UtcNow,
         };
 
         for (var i = 0; i < all_lamps.Length; i++)
         {
-            var hash = Guid.NewGuid().ToString();
+            var hashBytes = Guid.NewGuid().ToByteArray();
 
             set.Beatmaps.Add(new BeatmapInfo(ruleset)
             {
@@ -675,8 +676,8 @@ public partial class TestSceneBmsSongSelectLampHack : ScreenTestScene
                 StarRating = 1 + i * 0.5,
                 Length = 30000,
                 BPM = 150,
-                Hash = hash,
-                MD5Hash = hash,
+                Hash = Convert.ToHexStringLower(SHA256.HashData(hashBytes)),
+                MD5Hash = Convert.ToHexStringLower(MD5.HashData(hashBytes)),
                 Metadata = metadata,
                 Difficulty = new BeatmapDifficulty
                 {

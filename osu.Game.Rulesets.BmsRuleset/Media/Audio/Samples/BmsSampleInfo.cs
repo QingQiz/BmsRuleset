@@ -18,4 +18,6 @@ public sealed class BmsSampleInfo(string path, int volume = 100) : ISampleInfo
     }
 
     public int Volume { get; } = volume;
+
+    public bool IsHitsound => false;
 }

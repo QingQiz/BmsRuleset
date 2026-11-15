@@ -6,9 +6,11 @@ using NUnit.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Containers;
 using osu.Framework.Screens;
 using osu.Framework.Testing;
 using osu.Game.Database;
+using osu.Game.Graphics.Sprites;
 using osu.Game.Online.Leaderboards;
 using osu.Game.Overlays;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
@@ -16,9 +18,12 @@ using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Components;
+using osu.Game.Graphics.Cursor;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 using osu.Game.Screens.Play.Leaderboards;
+using osuTK;
+using osuTK.Input;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 
@@ -26,6 +31,81 @@ public partial class TestSceneBmsSongSelectLampHack
 {
     [Cached]
     private readonly OverlayColourProvider leaderboardColourProvider = new(OverlayColourScheme.Aquamarine);
+
+    [Test]
+    public void TestLeaderboardBackgroundPreviewInput()
+    {
+        BmsBeatmapLeaderboardWedge leaderboard = null!;
+        double? clickTime = null;
+
+        importLampBeatmapSet();
+        loadSongSelect();
+
+        AddStep("hold details tab", () =>
+        {
+            var selector = songSelect.ChildrenOfType<BmsBeatmapDetailsArea.WedgeSelector<BmsBeatmapDetailsArea.Header.Selection>>().Single();
+            InputManager.MoveMouseTo(selector.ChildrenOfType<OsuSpriteText>().First());
+            InputManager.PressButton(MouseButton.Left);
+            clickTime = InputManager.Time.Current;
+        });
+        AddUntilStep("wait through preview delay", () => clickTime.HasValue
+            && InputManager.Time.Current > clickTime.Value + 3 * BmsSongSelect.REVEAL_BACKGROUND_DELAY);
+        AddAssert("details tab blocks background preview", () => !((IProvideCursor)songSelect).ProvidingUserCursor);
+        AddStep("release details tab", () => InputManager.ReleaseButton(MouseButton.Left));
+
+        AddStep("hold gap between title and details", () =>
+        {
+            var title = songSelect.TitleWedge.ScreenSpaceDrawQuad.AABBFloat;
+            var details = songSelect.DetailsArea.ScreenSpaceDrawQuad.AABBFloat;
+            InputManager.MoveMouseTo(new Vector2(title.Centre.X, (title.Bottom + details.Top) / 2));
+            InputManager.PressButton(MouseButton.Left);
+            clickTime = InputManager.Time.Current;
+        });
+        AddUntilStep("wait through preview delay", () => clickTime.HasValue
+            && InputManager.Time.Current > clickTime.Value + 3 * BmsSongSelect.REVEAL_BACKGROUND_DELAY);
+        AddAssert("gap blocks background preview", () => !((IProvideCursor)songSelect).ProvidingUserCursor);
+        AddStep("release gap", () => InputManager.ReleaseButton(MouseButton.Left));
+
+        AddStep("show local leaderboard", () =>
+        {
+            var selector = songSelect.ChildrenOfType<BmsBeatmapDetailsArea.WedgeSelector<BmsBeatmapDetailsArea.Header.Selection>>().Single();
+            InputManager.MoveMouseTo(selector.ChildrenOfType<OsuSpriteText>().Last());
+            InputManager.Click(MouseButton.Left);
+            var header = songSelect.ChildrenOfType<BmsBeatmapDetailsArea.Header>().Single();
+            header.Scope.BindTarget = new Bindable<BeatmapLeaderboardScope>(BeatmapLeaderboardScope.Local);
+        });
+        AddUntilStep("ranking tab selected", () => songSelect.ChildrenOfType<BmsBeatmapDetailsArea.Header>().Single().Type.Value == BmsBeatmapDetailsArea.Header.Selection.Ranking);
+        AddUntilStep("local leaderboard created", () => songSelect.ChildrenOfType<BmsBeatmapLeaderboardWedge>().Any());
+        AddStep("capture local leaderboard", () => leaderboard = songSelect.ChildrenOfType<BmsBeatmapLeaderboardWedge>().Single());
+        AddUntilStep("empty local leaderboard ready", () => leaderboard.IsLoaded
+            && leaderboard.ChildrenOfType<osu.Game.Graphics.UserInterface.LoadingLayer>().All(layer => layer.State.Value == Visibility.Hidden)
+            && !leaderboard.ChildrenOfType<BmsLeaderboardScore>().Any());
+        AddStep("hold empty leaderboard", () =>
+        {
+            InputManager.MoveMouseTo(leaderboard.ScreenSpaceDrawQuad.Centre);
+            InputManager.PressButton(MouseButton.Left);
+        });
+        AddUntilStep("empty leaderboard reveals background", () => ((IProvideCursor)songSelect).ProvidingUserCursor);
+        AddStep("release empty leaderboard", () => InputManager.ReleaseButton(MouseButton.Left));
+        AddUntilStep("background preview restored", () => !((IProvideCursor)songSelect).ProvidingUserCursor);
+
+        AddStep("add local score", () =>
+        {
+            scoreManager.Import(createScore(Beatmap.Value.BeatmapInfo, ScoreRank.A, stats((HitResult.Great, 1))));
+        });
+        AddUntilStep("local score displayed", () => leaderboard.ChildrenOfType<BmsLeaderboardScore>().Any());
+        AddStep("hold empty space beside score", () =>
+        {
+            var score = leaderboard.ChildrenOfType<BmsLeaderboardScore>().First();
+            InputManager.MoveMouseTo(new Vector2(score.ScreenSpaceDrawQuad.BottomLeft.X - 5, score.ScreenSpaceDrawQuad.Centre.Y));
+            InputManager.PressButton(MouseButton.Left);
+            clickTime = InputManager.Time.Current;
+        });
+        AddUntilStep("wait through preview delay", () => clickTime.HasValue
+            && InputManager.Time.Current > clickTime.Value + 3 * BmsSongSelect.REVEAL_BACKGROUND_DELAY);
+        AddAssert("space beside score blocks background preview", () => !((IProvideCursor)songSelect).ProvidingUserCursor);
+        AddStep("release empty space beside score", () => InputManager.ReleaseButton(MouseButton.Left));
+    }
 
     [Test]
     public void TestReplayAttachmentOnBackgroundThread()

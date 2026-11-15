@@ -18,8 +18,6 @@ internal partial class BmsLeftSideInteractionContainer(Action resetCarouselPosit
 
     protected override bool OnScroll(ScrollEvent e) => !e.ControlPressed && !e.AltPressed && !e.ShiftPressed && !e.SuperPressed;
 
-    protected override bool OnMouseDown(MouseDownEvent e) => true;
-
     protected override void LoadComplete()
     {
         inputManager = GetContainingInputManager()!;

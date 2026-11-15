@@ -1,8 +1,11 @@
 using NUnit.Framework;
+using osu.Framework.Screens;
 using osu.Game.Rulesets.BmsRuleset.UI.Result;
 using osu.Game.Scoring;
 using osu.Game.Screens.Play;
 using osu.Game.Screens.Ranking;
+using osu.Game.Screens.OnlinePlay.DailyChallenge;
+using NativeSongSelect = osu.Game.Screens.Select.SongSelect;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal;
 
@@ -66,5 +69,17 @@ public class BmsResultsScreenEntryTest
         using var screen = new BmsResultsScreen(null);
         using var request = new BmsResultsScreenRequest(screen);
         Assert.That(BmsResultsScreenEntryPatcher.GetReplacement(request), Is.SameAs(screen));
+    }
+
+    [Test]
+    public void TestMatchingResultCanStartReplayWithoutLeavingScreen()
+    {
+        using var screen = new BmsResultsScreen(score);
+        using var nativeScreen = new SoloResultsScreen(score);
+        var validScreens = new[] { typeof(NativeSongSelect), typeof(DailyChallenge) };
+
+        Assert.That(BmsResultsScreenEntryPatcher.ShouldUseResultAsReplayOrigin(screen, validScreens), Is.True);
+        Assert.That(BmsResultsScreenEntryPatcher.ShouldUseResultAsReplayOrigin(nativeScreen, validScreens), Is.False);
+        Assert.That(BmsResultsScreenEntryPatcher.ShouldUseResultAsReplayOrigin(screen, [typeof(NativeSongSelect)]), Is.False);
     }
 }

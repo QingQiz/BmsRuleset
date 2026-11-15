@@ -37,7 +37,6 @@ internal partial class BmsCourseStageResultsScreen : BmsResultsScreen
     {
         this.nextStage = nextStage;
         this.abandonCourse = abandonCourse;
-        BackButtonVisibility.Value = false;
         AllowWatchingReplay = false;
         AllowRetry = false;
     }

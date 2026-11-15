@@ -86,7 +86,7 @@ public class BmsBeatmapDecoder(Func<int, int>? randomValueSelector = null) : Dec
     }
 
     // An undecoded template has no resolved name; imported BeatmapInfo supplies its own.
-    protected override Beatmap CreateTemplateObject() => new BmsDecodedBeatmap { BeatmapInfo = { DifficultyName = string.Empty } };
+    public override Beatmap CreateTemplateObject() => new BmsDecodedBeatmap { BeatmapInfo = { DifficultyName = string.Empty } };
 
     internal static Beatmap DecodeBytes(byte[] content, BeatmapInfo? beatmapInfo = null, Func<int, int>? randomValueSelector = null)
     {

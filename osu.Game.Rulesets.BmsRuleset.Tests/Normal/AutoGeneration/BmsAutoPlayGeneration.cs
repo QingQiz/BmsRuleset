@@ -25,7 +25,10 @@ public partial class BmsAutoPlayGeneration : OsuTestScene
         };
 
         foreach (var hitObject in objects)
+        {
+            hitObject.Beatmap = beatmap;
             beatmap.HitObjects.Add(hitObject);
+        }
 
         return beatmap;
     }
