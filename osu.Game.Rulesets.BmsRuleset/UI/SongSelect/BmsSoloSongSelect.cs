@@ -338,6 +338,7 @@ public partial class BmsSoloSongSelect : BmsSongSelect
             {
                 footerAvailabilityBeforePractice[button] = button.Enabled.Value;
                 button.Enabled.Value = false;
+                button.DisappearToBottom(0, false);
                 button.FadeOut(150);
             }
         }
@@ -350,6 +351,7 @@ public partial class BmsSoloSongSelect : BmsSongSelect
                 if (footerButtons.Contains(button))
                 {
                     button.Enabled.Value = enabled;
+                    button.AppearFromBottom(0);
                     button.FadeIn(150);
                 }
             }
@@ -443,11 +445,10 @@ public partial class BmsSoloSongSelect : BmsSongSelect
 
     private partial class PlayerLoader : osu.Game.Screens.Play.PlayerLoader
     {
-        public override bool ShowFooter => !QuickRestart;
-
         public PlayerLoader(Func<Player> createPlayer)
             : base(createPlayer)
         {
+            FooterContent.Value = ScreenFooterContent.Argon();
         }
     }
 }

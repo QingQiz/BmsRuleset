@@ -24,6 +24,7 @@ using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.UI.Result.Course;
 using osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
 using osu.Game.Scoring;
+using osu.Game.Screens.Footer;
 using osu.Game.Screens.Play;
 using osu.Game.Screens.Ranking;
 using osu.Game.Skinning;
@@ -39,9 +40,6 @@ internal partial class BmsResultsScreen : ScreenWithBeatmapBackground, IKeyBindi
     public override bool? AllowGlobalTrackControl => true;
 
     protected override OverlayActivation InitialOverlayActivationMode => OverlayActivation.UserTriggered;
-
-    // The global back button lives outside the fixed-scale result content.
-    protected override bool InitialBackButtonVisibility => false;
 
     internal readonly Bindable<ScoreInfo?> SelectedScore = new();
     internal readonly ScoreInfo? Score;
@@ -75,6 +73,7 @@ internal partial class BmsResultsScreen : ScreenWithBeatmapBackground, IKeyBindi
     {
         Score = score;
         SelectedScore.Value = score;
+        FooterContent.Value = ScreenFooterContent.None;
     }
 
     [BackgroundDependencyLoader]
@@ -102,7 +101,7 @@ internal partial class BmsResultsScreen : ScreenWithBeatmapBackground, IKeyBindi
                             {
                                 RelativeSizeAxes = Axes.Both,
                                 Masking = true,
-                                Children = [new GlobalScrollAdjustsVolume(), StatisticsPanel],
+                                Children = [new ScrollAdjustsVolume(), StatisticsPanel],
                             }
                         ],
                         [

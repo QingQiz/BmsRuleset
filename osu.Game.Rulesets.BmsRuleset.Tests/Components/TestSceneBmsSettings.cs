@@ -160,7 +160,7 @@ public partial class TestSceneBmsSettings : OsuTestScene
             && Math.Abs(expandable.Height - toggleItem.Height) < 0.01f);
         AddStep("clear search", () => search.SearchTerm = string.Empty);
         AddUntilStep("full group spacing restored", () => Math.Abs(expandable.Height - toggleItem.Height - fadeInItem.Height - SettingsSection.ITEM_SPACING_V2) < 0.01f);
-        AddStep("search for other setting", () => search.SearchTerm = "judgement");
+        AddStep("search for other setting", () => search.SearchTerm = "BGA");
         AddUntilStep("unmatched slider leaves no gap", () => !expandable.IsPresent && !fadeInItem.MatchingFilter);
         AddStep("restore defaults", () =>
         {

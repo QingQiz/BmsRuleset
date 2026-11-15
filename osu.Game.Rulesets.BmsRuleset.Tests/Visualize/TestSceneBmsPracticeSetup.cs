@@ -1,4 +1,5 @@
 #nullable enable
+using System;
 using System.Linq;
 using NUnit.Framework;
 using osu.Framework.Graphics;
@@ -20,6 +21,29 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 [HeadlessTest]
 public partial class TestSceneBmsPracticeSetup : OsuManualInputManagerTestScene
 {
+    [Test]
+    public void SetupSlidesIntoAndOutOfView()
+    {
+        BmsPracticeSetupOverlay setup = null!;
+        Container panel = null!;
+
+        AddStep("open practice setup", () =>
+        {
+            Ruleset.Value = new BmsRuleset().RulesetInfo;
+            setup = new BmsPracticeSetupOverlay(new TestWorkingBeatmap(BmsTestBeatmaps.CreateBeatmap(), audioManager: Audio), []);
+            Child = setup;
+            panel = setup.ChildrenOfType<Container>().Single(container => container.Name == "Practice setup panel");
+            setup.Show();
+        });
+        AddUntilStep("panel moves into place", () => panel.Y > 0 && panel.Y < panel.DrawHeight);
+        AddUntilStep("panel reaches its resting position", () => Math.Abs(panel.Y) < 0.1f && panel.Alpha > 0.99f);
+        AddStep("close practice setup", () => setup.Hide());
+        AddUntilStep("panel moves out of view", () => panel.Y > 0 && panel.Y < panel.DrawHeight);
+        AddUntilStep("practice setup becomes hidden", () => setup.State.Value == Visibility.Hidden);
+        AddUntilStep("practice setup finishes fading out", () => setup.Alpha < 0.01f);
+        AddAssert("panel finishes below its resting position", () => panel.Y, () => Is.GreaterThan(panel.DrawHeight * 0.5f));
+    }
+
     [Test]
     public void ResizingPreservesSelectionAndKeepsControlsAccessible()
     {

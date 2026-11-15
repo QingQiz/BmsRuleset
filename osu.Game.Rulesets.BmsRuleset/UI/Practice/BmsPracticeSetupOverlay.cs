@@ -121,6 +121,7 @@ public partial class BmsPracticeSetupOverlay : FocusedOverlayContainer, IKeyBind
 
         panel = new Container
         {
+            Name = "Practice setup panel",
             Anchor = Anchor.Centre,
             Origin = Anchor.Centre,
             RelativeSizeAxes = Axes.Y,
@@ -623,12 +624,22 @@ public partial class BmsPracticeSetupOverlay : FocusedOverlayContainer, IKeyBind
     {
     }
 
-    protected override void PopIn() => this.FadeIn(150);
+    protected override void PopIn()
+    {
+        panel.FinishTransforms();
+        panel.MoveToY(panel.DrawHeight)
+             .MoveToY(0, 400, Easing.OutQuint);
+        this.FadeIn(150);
+    }
+
     protected override void PopOut()
     {
         if (ownsModSelect || IsLoaded)
             modSelect.Hide();
-        this.FadeOut(150);
+
+        panel.FinishTransforms();
+        panel.MoveToY(panel.DrawHeight, 300, Easing.InOutCubic);
+        this.FadeOut(300, Easing.InOutCubic);
     }
 
     protected override void Dispose(bool isDisposing)

@@ -124,6 +124,8 @@ public partial class BmsBeatmapDetailsArea
 
             protected override void OnDeactivated() => updateDisplay();
 
+            protected override bool OnMouseDown(MouseDownEvent e) => true;
+
             protected override bool OnHover(HoverEvent e)
             {
                 updateDisplay();

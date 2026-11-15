@@ -763,7 +763,7 @@ public class BmsLegacySkinTransformerTest
         Assert.Multiple(() =>
         {
             Assert.That(stageHud, Is.InstanceOf<ISerialisableDrawable>());
-            Assert.That(((ISerialisableDrawable)stageHud).IsEditable, Is.True);
+            Assert.That(((ISerialisableDrawable)stageHud).CanBeSelected, Is.True);
             Assert.That(SerialisedDrawableInfo.GetAllAvailableDrawables(new BmsRuleset().RulesetInfo), Does.Not.Contain(typeof(BmsStageHud)));
             Assert.That(stageHud.AutoSizeAxes, Is.EqualTo(Axes.None));
             Assert.That(stageHud.Width, Is.Zero);

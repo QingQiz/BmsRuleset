@@ -111,7 +111,7 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
             stack.Push(screen = new TestBmsSoloResultsScreen(createScore()));
         });
         AddUntilStep("charts loaded", () => screen.IsLoaded && ChartsFitViewport(screen));
-        AddAssert("global back button hidden", () => !screen.BackButtonVisibility.Value && footer.BackButton.State.Value == Visibility.Hidden);
+        AddAssert("global back button hidden", () => screen.FooterContent.Value.Mode == ScreenFooterContent.FooterMode.None && footer.BackButton.State.Value == Visibility.Hidden);
         AddStep("find local back button", () => backButton = screen.BottomPanel.ChildrenOfType<BmsCourseResultButton>().Single());
         AddAssert("return to song select label shown", () => backButton.ChildrenOfType<OsuSpriteText>().Single().Text.ToString(),
             () => Is.EqualTo("Return to song select"));

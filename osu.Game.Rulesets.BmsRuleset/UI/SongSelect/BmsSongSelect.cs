@@ -34,6 +34,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Collections;
 using osu.Game.Configuration;
 using osu.Game.Database;
+using osu.Game.Graphics;
 using osu.Game.Graphics.Carousel;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Cursor;
@@ -143,9 +144,12 @@ public abstract partial class BmsSongSelect : ScreenWithBeatmapBackground, IKeyB
 
     public override bool? ApplyModTrackAdjustments => true;
 
-    public override bool ShowFooter => true;
-
     private Sample? errorSample;
+
+    protected BmsSongSelect()
+    {
+        FooterContent.Value = ScreenFooterContent.Argon(leftButtons: CreateFooterButtons);
+    }
 
     [Resolved]
     private OsuGameBase? game { get; set; }
@@ -187,7 +191,7 @@ public abstract partial class BmsSongSelect : ScreenWithBeatmapBackground, IKeyB
         errorSample = audio.Samples.Get(@"UI/generic-error");
 
         AddRangeInternal([
-            new GlobalScrollAdjustsVolume(),
+            new ScrollAdjustsVolume(),
             onlineLookupSource,
             mainContent = new Container
             {
@@ -244,7 +248,6 @@ public abstract partial class BmsSongSelect : ScreenWithBeatmapBackground, IKeyB
                                                 WedgesContainer = new FillFlowContainer
                                                 {
                                                     RelativeSizeAxes = Axes.Both,
-                                                    Spacing = new Vector2(0f, 4f),
                                                     Direction = FillDirection.Vertical,
                                                     Children =
                                                     [
@@ -252,6 +255,11 @@ public abstract partial class BmsSongSelect : ScreenWithBeatmapBackground, IKeyB
                                                         {
                                                             TopPadding = TopPadding,
                                                         }),
+                                                        new InputBlockingContainer
+                                                        {
+                                                            RelativeSizeAxes = Axes.X,
+                                                            Height = 4,
+                                                        },
                                                         new ShearAligningWrapper(DetailsArea = new BmsBeatmapDetailsArea()),
                                                     ],
                                                 },
@@ -366,7 +374,7 @@ public abstract partial class BmsSongSelect : ScreenWithBeatmapBackground, IKeyB
 
     protected virtual Bindable<IReadOnlyList<Mod>> FooterMods => Mods;
 
-    public override IReadOnlyList<ScreenFooterButton> CreateFooterButtons() =>
+    public virtual IReadOnlyList<ScreenFooterButton> CreateFooterButtons() =>
     [
         new FooterButtonMods(ModSelectOverlay)
         {
@@ -1041,6 +1049,8 @@ public abstract partial class BmsSongSelect : ScreenWithBeatmapBackground, IKeyB
     /// </summary>
     public bool IsFiltering => Carousel.IsFiltering || filterDebounce?.State == ScheduledDelegate.RunState.Waiting;
 
+    public const double REVEAL_BACKGROUND_DELAY = 200;
+
     private const double filter_delay = 250;
 
     private ScheduledDelegate? filterDebounce;
@@ -1182,7 +1192,7 @@ public abstract partial class BmsSongSelect : ScreenWithBeatmapBackground, IKeyB
                 updateBackgroundDim();
 
                 Footer?.Hide();
-            }, 200);
+            }, REVEAL_BACKGROUND_DELAY);
         }
 
         return base.OnMouseDown(e);

@@ -39,7 +39,6 @@ internal partial class BmsCourseResultsScreen : BmsResultsScreen
     {
         this.session = session;
         this.recordResult = recordResult;
-        BackButtonVisibility.Value = false;
         AllowWatchingReplay = false;
         AllowRetry = false;
     }

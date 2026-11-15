@@ -121,13 +121,15 @@ public class BmsLocalisationTest
     {
         const string details = "chart.bmson\nBMSON level must be a non-negative integer; received -99.";
         var text = localisation.GetLocalisedBindableString(BmsStrings.ImportSkippedCharts(19, details));
-        Assert.That(text.Value, Does.StartWith("Skipped 19 unreadable or unsupported charts. Details for up to 5 charts:\n"));
-        Assert.That(text.Value, Does.Contain(details));
+        var value = text.Value.ReplaceLineEndings("\n");
+        Assert.That(value, Does.StartWith("Skipped 19 unreadable or unsupported charts. Details for up to 5 charts:\n"));
+        Assert.That(value, Does.Contain(details));
 
         config.SetValue(FrameworkSetting.Locale, "zh");
-        Assert.That(text.Value, Does.StartWith("已跳过 19 张无法读取或不支持的谱面，以下列出最多 5 张的原因：\n"));
-        Assert.That(text.Value, Does.Contain(details));
-        Assert.That(text.Value, Does.EndWith("点击打开 BMS 日志，查看完整列表及错误详情。"));
+        value = text.Value.ReplaceLineEndings("\n");
+        Assert.That(value, Does.StartWith("已跳过 19 张无法读取或不支持的谱面，以下列出最多 5 张的原因：\n"));
+        Assert.That(value, Does.Contain(details));
+        Assert.That(value, Does.EndWith("点击打开 BMS 日志，查看完整列表及错误详情。"));
     }
 
     [TestCase("en", "2.000 s–3.000 s · 12.0 notes/s")]
