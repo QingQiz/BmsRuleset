@@ -10,6 +10,7 @@ using osu.Game.Rulesets.Difficulty;
 using osu.Game.Rulesets.Difficulty.Preprocessing;
 using osu.Game.Rulesets.Difficulty.Skills;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Rulesets.Scoring;
 using osu.Game.Utils;
 
 namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Difficulty;
@@ -25,7 +26,7 @@ public class BmsDifficultyCalculator(IRulesetInfo ruleset, IWorkingBeatmap beatm
 
     internal CancellationToken CalculationCancellationToken { get; set; }
 
-    private Dictionary<BmsHitObject, int> scoringOpportunities = [];
+    private Dictionary<BmsHitObject, int> comboContributions = [];
     private double hitLeniency;
 
     protected override DifficultyAttributes CreateDifficultyAttributes(IBeatmap beatmap, Mod[] mods, Skill[] skills)
@@ -37,7 +38,7 @@ public class BmsDifficultyCalculator(IRulesetInfo ruleset, IWorkingBeatmap beatm
 
         var noteTimings = beatmap.HitObjects
             .OfType<BmsHitObject>()
-            .Where(scoringOpportunities.ContainsKey)
+            .Where(comboContributions.ContainsKey)
             .Select(h => new BmsNoteTiming(h.Column, h.StartTime, h is BmsLongNote ln ? ln.EndTime : h.StartTime))
             .ToList();
 
@@ -52,7 +53,7 @@ public class BmsDifficultyCalculator(IRulesetInfo ruleset, IWorkingBeatmap beatm
 
         return new DifficultyAttributes(mods, sr)
         {
-            MaxCombo = beatmap.HitObjects.OfType<BmsHitObject>().Sum(note => scoringOpportunities.GetValueOrDefault(note)),
+            MaxCombo = beatmap.HitObjects.OfType<BmsHitObject>().Sum(note => comboContributions.GetValueOrDefault(note)),
         };
     }
 
@@ -65,9 +66,10 @@ public class BmsDifficultyCalculator(IRulesetInfo ruleset, IWorkingBeatmap beatm
         var bmsBeatmap = (BmsBeatmap)beatmap;
         var profile = GameplayProfile.FromMods(mods);
         var compiled = new BmsEngineChart(bmsBeatmap, profile);
-        scoringOpportunities = compiled.Chart.ScorePlan.Opportunities.GroupBy(opportunity => compiled.Objects[opportunity.NoteId])
-            .ToDictionary(group => group.Key, group => group.Count());
-        hitLeniency = scoringOpportunities.Count == 0 ? 0 : BmsHitLeniency.FromGreatWindow(profile.RatingWindowFor(bmsBeatmap, compiled));
+        comboContributions = compiled.Chart.ScorePlan.Opportunities.GroupBy(opportunity => opportunity.NoteId)
+            .ToDictionary(group => compiled.Objects[group.Key], group => group.Count() + profile.MaximumAuxiliaryResults(compiled.Chart.Notes[group.Key])
+                .Where(pair => pair.Key.AffectsCombo()).Sum(pair => pair.Value));
+        hitLeniency = comboContributions.Count == 0 ? 0 : BmsHitLeniency.FromGreatWindow(profile.RatingWindowFor(bmsBeatmap));
         return [];
     }
 }

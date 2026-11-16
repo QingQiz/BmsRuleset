@@ -41,7 +41,7 @@ internal sealed partial class BmsGameplayProfile : GameplayProfile
             ? BmsGaugeProfiles.CreateLr2Oraja(BmsGaugeProfileFactory.ToEngineGauge(type))
             : BmsGaugeProfileFactory.Create(type, family);
 
-    internal override double RatingWindowFor(BmsBeatmap beatmap, BmsEngineChart compiled)
+    internal override double RatingWindowFor(BmsBeatmap beatmap)
     {
         // Result constraints must not remove the rating model's base GREAT tolerance.
         var ratingModifiers = modifiers & BmsJudgementModifiers.Lr2oraja;

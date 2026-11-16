@@ -152,9 +152,9 @@ public partial class BmsScoreProcessor : ScoreProcessor
         if (storeResults)
         {
             EngineScore = EngineScore with { Score = EngineChart.MaximumScore };
-            foreach (var (result, count) in profile.MaximumAuxiliaryResults(EngineChart))
+            foreach (var (result, count) in EngineChart.Chart.Notes.SelectMany(profile.MaximumAuxiliaryResults))
             {
-                ScoreResultCounts[result] = count;
+                ScoreResultCounts[result] = ScoreResultCounts.GetValueOrDefault(result) + count;
                 if (result.AffectsCombo())
                     HighestCombo.Value += count;
             }

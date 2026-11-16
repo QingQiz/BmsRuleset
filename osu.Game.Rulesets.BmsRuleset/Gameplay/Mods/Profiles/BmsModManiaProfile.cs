@@ -158,8 +158,12 @@ public partial class BmsModManiaProfile : Mod, IApplicableToGameplayProfile, IAp
 
         internal override INoteRule AutoplayRule(INoteRule rule) => useLazer ? ((OrderedNoteRule)rule).Inner : rule;
 
-        internal override IEnumerable<KeyValuePair<HitResult, int>> MaximumAuxiliaryResults(BmsEngineChart compiled)
-            => useLazer ? [] : [new(HitResult.LargeTickHit, ManiaProfiles.GetStableMaximumCombo(compiled.Chart) - compiled.Chart.ScorePlan.Opportunities.Length)];
+        internal override IEnumerable<KeyValuePair<HitResult, int>> MaximumAuxiliaryResults(ChartNote note)
+            => !useLazer && ManiaProfiles.GetStableHoldTicks(note) is > 0 and var ticks ? [new(HitResult.LargeTickHit, ticks)] : [];
+
+        internal override double RatingWindowFor(BmsBeatmap beatmap)
+            => ManiaProfiles.CreateHitWindows(new ManiaOptions(overallDifficulty ?? originalOd(beatmap.BeatmapInfo)), !useLazer)
+                .Entries.Single(window => window.Result == ManiaResults.GREAT).Late / 1000.0;
 
         internal override (Chart Chart, SessionConfiguration Configuration) Compile(BmsHitObject[] objects, KeyChart source, IBeatmapInfo beatmapInfo)
         {

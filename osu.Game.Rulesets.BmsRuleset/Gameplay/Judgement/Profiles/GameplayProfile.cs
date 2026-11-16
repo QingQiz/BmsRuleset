@@ -48,12 +48,7 @@ internal abstract partial class GameplayProfile
 
     internal abstract IEnumerable<RulesetBeatmapAttribute> BeatmapAttributes(IBeatmapInfo beatmapInfo, IReadOnlyCollection<Mod> mods, BeatmapDifficulty adjustedDifficulty);
 
-    internal virtual double RatingWindowFor(BmsBeatmap beatmap, BmsEngineChart compiled)
-    {
-        var note = compiled.Objects[compiled.Chart.ScorePlan.Opportunities[0].NoteId];
-        var timing = compiled.TimingFor(note);
-        return FrameworkWindowFor(timing.HeadWindows, timing.HeadDeadline, HitResult.Great);
-    }
+    internal abstract double RatingWindowFor(BmsBeatmap beatmap);
 
     internal abstract HitResult HitResultFor(ResultId? result);
 
@@ -115,7 +110,7 @@ internal abstract partial class GameplayProfile
 
     internal virtual int AccuracyJudgementCount(ScoreState score) => score.JudgedOpportunities;
 
-    internal virtual IEnumerable<KeyValuePair<HitResult, int>> MaximumAuxiliaryResults(BmsEngineChart compiled) => [];
+    internal virtual IEnumerable<KeyValuePair<HitResult, int>> MaximumAuxiliaryResults(ChartNote note) => [];
 
     internal abstract ScoreRank RankFromScore(double accuracy, IReadOnlyDictionary<HitResult, int> results);
 

@@ -250,6 +250,21 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Mods
             Assert.That(play.Health.CurrentHealth.Value, Is.EqualTo(1 - (hp + 1) * 0.0075).Within(0.000001));
         }
 
+        [TestCase(true)]
+        [TestCase(false)]
+        public void HoldMissDamageFollowsTheJudgedEndpoints(bool lazer)
+        {
+            using var play = new Play([new BmsModManiaProfile { DrainRate = { Value = 5 }, UseLazer = { Value = lazer } }],
+                new BmsLongNote { StartTime = 1000, Duration = 1000, Column = 1 },
+                new BmsNote { StartTime = 3000, Column = 1 });
+            play.Advance(1500);
+            Assert.That(play.Health.CurrentHealth.Value, Is.EqualTo(lazer ? 1 - 6 * 0.00375 : 1).Within(1e-12));
+            play.Advance(2500);
+            Assert.That(play.Health.CurrentHealth.Value, Is.EqualTo(1 - 6 * 0.0075).Within(1e-12));
+            play.Advance(4000);
+            Assert.That(play.Health.CurrentHealth.Value, Is.EqualTo(1 - 12 * 0.0075).Within(1e-12));
+        }
+
         [Test]
         public void StableHoldBreakAndLateReleaseSurviveReplay()
         {
@@ -900,6 +915,33 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Difficulty
 {
     public partial class BmsStarRatingProcessorTest
     {
+        [Test]
+        [Category("ManiaProfile")]
+        public void ManiaRatingUsesBaseWindowsAndIncludesHoldTicks([Values] bool useLazer, [Values] bool timed, [Values] bool holdFirst)
+        {
+            var beatmap = createSimpleBeatmap();
+            BmsHitObject hold = new BmsLongNote { Column = holdFirst ? 1 : 2, StartTime = holdFirst ? 1000 : 2500, Duration = 1000 };
+            var tap = new BmsNote { Column = holdFirst ? 2 : 1, StartTime = holdFirst ? 2500 : 1000 };
+            beatmap.HitObjects = holdFirst ? [hold, tap] : [tap, hold];
+            foreach (var note in beatmap.HitObjects)
+                note.Beatmap = beatmap;
+            Mod[] mods = [new BmsModManiaProfile { OverallDifficulty = { Value = 5 }, DrainRate = { Value = 5 }, UseLazer = { Value = useLazer } }];
+            var working = new TestWorkingBeatmap(beatmap);
+            var calculator = new BmsDifficultyCalculator(new BmsRuleset().RulesetInfo, working);
+            var attributes = timed ? calculator.CalculateTimed(mods).Select(result => result.Attributes).ToArray() : [calculator.Calculate(mods)];
+            var maximumCombo = useLazer ? 3 : 13;
+            var firstCombo = holdFirst ? maximumCombo - 1 : 1;
+            using var score = new BmsScoreProcessor();
+            score.Mods.Value = mods;
+            score.ApplyBeatmap(working.GetPlayableBeatmap(new BmsRuleset().RulesetInfo, mods));
+            Assert.Multiple(() =>
+            {
+                Assert.That(attributes.Select(result => result.MaxCombo), Is.EqualTo(timed ? new[] { firstCombo, maximumCombo } : [maximumCombo]));
+                Assert.That(attributes[^1].MaxCombo, Is.EqualTo(score.MaximumCombo));
+                Assert.That(calculator.StarRatingProcessor.HitLeniencyX, Is.EqualTo(computeExpectedHitLeniency(49.5)).Within(1e-12));
+            });
+        }
+
         [Test]
         [Category("ManiaProfile")]
         public void SelectedProfileControlsRatingAndScoringOpportunities([Values] bool timed)

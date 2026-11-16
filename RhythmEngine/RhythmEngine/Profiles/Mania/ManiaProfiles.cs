@@ -36,11 +36,7 @@ public static class ManiaProfiles
 
     public static ResultValue GetStableResultValue(ResultId result) => stable_values[result];
 
-    public static int GetStableMaximumCombo(Chart chart)
-    {
-        var ticks = chart.Notes.Sum(note => note.Rule is StableManiaHoldRule hold ? hold.MaximumTicks(note) : 0);
-        return chart.ScorePlan.Opportunities.Length + ticks;
-    }
+    public static int GetStableHoldTicks(ChartNote note) => note.Rule is StableManiaHoldRule hold ? hold.MaximumTicks(note) : 0;
 
     public static CompiledProfile CreateLazer(KeyChart source, ManiaOptions? options = null) => compile(source, options ?? new ManiaOptions(), false);
 
@@ -48,21 +44,11 @@ public static class ManiaProfiles
 
     private static CompiledProfile compile(KeyChart source, ManiaOptions options, bool stable)
     {
-        ProfileSupport.RequireRange(options.OverallDifficulty, 0, 10, nameof(options.OverallDifficulty));
         ProfileSupport.RequireRange(options.DrainRate, 0, 10, nameof(options.DrainRate));
-        ProfileSupport.RequireRange(options.ClockRate, 0.01, 100, nameof(options.ClockRate));
-        ProfileSupport.RequireRange(options.DifficultyMultiplier, 0.01, 100, nameof(options.DifficultyMultiplier));
-        var od = options.OverallDifficulty;
-        var scale = options.ClockRate / options.DifficultyMultiplier;
-        var bounds = stable && options.Converted
-            ? new[] { 16.0, Math.Round(od) > 4 ? 34 : 47, Math.Round(od) > 4 ? 67 : 77, 97, 121, 158 }
-            : [stable ? 16 : ProfileSupport.DifficultyRange(od, 22.4, 19.4, 13.9), 64 - 3 * od, 97 - 3 * od, 127 - 3 * od, 151 - 3 * od, 188 - 3 * od];
-        bounds = bounds.Select(w => Math.Floor(w * scale) + 0.5).ToArray();
-        var windows = ProfileSupport.Symmetric((ManiaResults.PERFECT, bounds[0]), (ManiaResults.GREAT, bounds[1]), (ManiaResults.GOOD, bounds[2]),
-            (ManiaResults.OK, bounds[3]), (ManiaResults.MEH, bounds[4]), (ManiaResults.MISS, bounds[5]));
-        var chart = compileChart(source, windows, bounds, stable);
+        var windows = CreateHitWindows(options, stable);
+        var chart = compileChart(source, windows, stable);
         var score = stable ? stableScore(chart.ScorePlan) : lazerScore(chart.ScorePlan);
-        var health = createHealth(source, options.DrainRate, stable, ManiaHealthCalibration.ComputeRecoveryMultiplier(source, options.DrainRate, options.DrainStartTime, !stable));
+        var health = createHealth(options.DrainRate, stable, ManiaHealthCalibration.ComputeRecoveryMultiplier(source, options.DrainRate, options.DrainStartTime, !stable));
         var id = stable ? "osu-stable-mania-score-v1" : "osu-lazer-mania-standardised";
         var descriptor = new ProfileDescriptor(id, stable ? "osu-stable-3adc2d001aac" : "9a10d935b05a3b896f4bd811d620f2023331db93",
             stable ? EvidenceLevel.StaticBinary : EvidenceLevel.PublicSource,
@@ -78,13 +64,30 @@ public static class ManiaProfiles
                     ? "Pins original CIL hold resolution and score/Bonus/Combo/HP arithmetic, with static manager/calibration comparisons. Binary-equivalent input uses integer millisecond chart times and the stable song clock; complete frame/input routing remains outside the CIL fixture."
                     : "Normal gameplay; mod-specific score multipliers and pre-v8 beatmap break drain are not inferred from difficulty values.",
             ]);
+        var endTime = source.EndTime;
         return new CompiledProfile(chart, new SessionConfiguration(id, score, health, context =>
                 !stable && context.State.Held == context.State.PreviouslyHeld ? [] : ProfileSupport.Oldest(context),
-            context => context.Time >= source.EndTime && context.NotesRetired), descriptor);
+            context => context.Time >= endTime && context.NotesRetired), descriptor);
+    }
+
+    /// <summary>Base press windows shared by rule compilation and chart rating.</summary>
+    public static TimingWindows CreateHitWindows(ManiaOptions options, bool stable)
+    {
+        ProfileSupport.RequireRange(options.OverallDifficulty, 0, 10, nameof(options.OverallDifficulty));
+        ProfileSupport.RequireRange(options.ClockRate, 0.01, 100, nameof(options.ClockRate));
+        ProfileSupport.RequireRange(options.DifficultyMultiplier, 0.01, 100, nameof(options.DifficultyMultiplier));
+        var od = options.OverallDifficulty;
+        var scale = options.ClockRate / options.DifficultyMultiplier;
+        var bounds = stable && options.Converted
+            ? new[] { 16.0, Math.Round(od) > 4 ? 34 : 47, Math.Round(od) > 4 ? 67 : 77, 97, 121, 158 }
+            : [stable ? 16 : ProfileSupport.DifficultyRange(od, 22.4, 19.4, 13.9), 64 - 3 * od, 97 - 3 * od, 127 - 3 * od, 151 - 3 * od, 188 - 3 * od];
+        bounds = bounds.Select(w => Math.Floor(w * scale) + 0.5).ToArray();
+        return ProfileSupport.Symmetric((ManiaResults.PERFECT, bounds[0]), (ManiaResults.GREAT, bounds[1]), (ManiaResults.GOOD, bounds[2]),
+            (ManiaResults.OK, bounds[3]), (ManiaResults.MEH, bounds[4]), (ManiaResults.MISS, bounds[5]));
     }
 
     // Release compilation-only lane/rule lookups before creating runtime delegates.
-    private static Chart compileChart(KeyChart source, TimingWindows windows, double[] bounds, bool stable)
+    private static Chart compileChart(KeyChart source, TimingWindows windows, bool stable)
     {
         if (stable && source.Notes.Any(n => n.Kind == KeyNoteKind.Hold && n.EndTime <= n.StartTime))
             throw new ArgumentException("Mania holds require a positive duration.", nameof(source));
@@ -93,7 +96,7 @@ public static class ManiaProfiles
             ? null
             : source.Notes.GroupBy(n => n.Lane)
                 .ToDictionary(g => g.Key, g => g.Select(n => n.StartTime).Distinct().Order().ToImmutableArray());
-        ImmutableArray<long> stableWindows = stable ? [.. bounds.Select(b => Time.FromMilliseconds(b - 0.5))] : [];
+        ImmutableArray<long> stableWindows = stable ? [.. windows.Entries.Select(window => window.Late - 500)] : [];
         var tail = stable ? null : new TimingWindows(windows.Entries.Select(w => w with { Early = w.Early * 3 / 2, Late = w.Late * 3 / 2 }));
         var rules = new Dictionary<KeyNoteKind, INoteRule>();
         return source.Compile(note =>
@@ -238,15 +241,11 @@ public static class ManiaProfiles
 
     private static double comboFactor(int combo) => Math.Min(Math.Max(0.5, Math.Log(Math.Max(1, combo), 4)), Math.Log(400, 4));
 
-    private static HealthConfiguration createHealth(KeyChart source, double drain, bool stable, double recoveryMultiplier)
+    private static HealthConfiguration createHealth(double drain, bool stable, double recoveryMultiplier)
     {
-        var holds = source.Notes.Where(n => n.Kind == KeyNoteKind.Hold).Select(n => n.Id).ToImmutableHashSet();
         return HealthRules.LatchedGauge(0, 1, 1, context =>
         {
-            if (stable && context.Event.Part == NoteParts.HEAD)
-                return 0;
-
-            var endpoint = !stable && holds.Contains(context.Event.NoteId);
+            var endpoint = !stable && (context.Event.Part == NoteParts.HEAD || context.Event.Part == NoteParts.TAIL);
             return context.Event.Result switch
             {
                 var id when id == ManiaResults.COMBO_BREAK => 0,

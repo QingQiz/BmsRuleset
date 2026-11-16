@@ -13,6 +13,25 @@ namespace RhythmEngine.Tests;
 [TestFixture]
 public class ProfileBehaviourTest
 {
+    [Test]
+    public void ManiaCompletionHonoursExplicitEndAcrossCloneAndReset([Values] bool stable, [Values] bool empty)
+    {
+        var source = new KeyChart(1, empty ? [] : [tap(0, 1000)], endTime: ms(3000));
+        var profile = stable ? ManiaProfiles.CreateStable(source) : ManiaProfiles.CreateLazer(source);
+        var session = new JudgementSession(profile.Chart, profile.Configuration);
+        session.AdvanceTo(ms(1000), empty ? [] : [new InputEvent(ms(1000), 0, true)]);
+        var clone = session.Clone();
+        foreach (var current in new[] { session, clone })
+        {
+            current.AdvanceTo(ms(2999.999));
+            Assert.That(current.Completed, Is.False);
+            current.AdvanceTo(ms(3000));
+            Assert.That(current.Completed, Is.True);
+            current.Reset();
+            Assert.That(current.Completed, Is.False);
+        }
+    }
+
     [TestCase("malody-pc")]
     [TestCase("malody-mobile")]
     [TestCase("malody-v")]
