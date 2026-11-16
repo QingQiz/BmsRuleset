@@ -22,7 +22,7 @@ public sealed class BmsPracticeWorkingBeatmap : WorkingBeatmap
     }
 
     public override IBeatmap GetPlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken token)
-        => BmsPracticeBeatmap.Create(Session.GetFullBeatmap(token), Session.Settings, Session.Mods);
+        => BmsPracticeBeatmap.Create(Session.GetFullBeatmap(token), Session.Settings);
 
     protected override IBeatmap GetBeatmap()
     {

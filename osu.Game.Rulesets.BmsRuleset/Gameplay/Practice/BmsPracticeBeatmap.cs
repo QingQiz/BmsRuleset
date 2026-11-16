@@ -1,11 +1,9 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
+using RhythmEngine.Profiles.Bms;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
-using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
 
 namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Practice;
@@ -40,7 +38,7 @@ public static class BmsPracticeBeatmap
         return beatmap.HitObjects.Count(note => note is not BmsLandmine and not BmsInvisibleNote && settings.Contains(note.StartTime, millisecondPrecision));
     }
 
-    public static BmsBeatmap Create(BmsBeatmap fullBeatmap, BmsPracticeSettings settings, IReadOnlyList<Mod>? mods = null)
+    public static BmsBeatmap Create(BmsBeatmap fullBeatmap, BmsPracticeSettings settings)
     {
         if (!settings.IsValidFor(fullBeatmap))
             throw new ArgumentOutOfRangeException(nameof(settings));
@@ -50,7 +48,8 @@ public static class BmsPracticeBeatmap
         practice.BeatmapInfo = fullBeatmap.BeatmapInfo.Clone();
         practice.Difficulty = fullBeatmap.Difficulty.Clone();
         practice.BeatmapInfo.Difficulty = fullBeatmap.BeatmapInfo.Difficulty.Clone();
-        practice.PracticeFullScoringOpportunities = new BmsEngineChart(fullBeatmap, GameplayProfile.FromMods(mods ?? [])).Chart.ScorePlan.Opportunities.Length;
+        practice.PracticeFullGaugeOpportunities = fullBeatmap.HitObjects.Where(note => note is not BmsInvisibleNote)
+            .Select((note, id) => BmsProfiles.CreateScoringOpportunities(id, BmsEngineChart.KindFor(note)).Length).Sum();
         practice.PracticeEndTime = settings.EndTime;
         practice.HitObjects = fullBeatmap.HitObjects.Where(note => settings.Contains(note.StartTime, millisecondPrecision))
             .Select(note => cloneObject(note, practice)).ToList();

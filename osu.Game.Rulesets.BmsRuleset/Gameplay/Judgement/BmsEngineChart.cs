@@ -48,7 +48,7 @@ internal sealed class BmsEngineChart
 
     internal NoteTiming TimingFor(BmsHitObject note) => ((INoteTiming)Chart.Notes[Ids[note]].Rule).Timing;
 
-    private static KeyNoteKind getKind(BmsHitObject note) => note switch
+    internal static KeyNoteKind KindFor(BmsHitObject note) => note switch
     {
         BmsLandmine => KeyNoteKind.Mine,
         BmsLongNote hold => hold.Kind,
@@ -60,7 +60,7 @@ internal sealed class BmsEngineChart
         var longNote = note as BmsLongNote;
         var layout = note.Beatmap.LayoutVariant;
         return new KeyNote(id, note.Column, Time.FromMilliseconds(note.StartTime),
-            Time.FromMilliseconds(longNote?.EndTime ?? note.StartTime), getKind(note),
+            Time.FromMilliseconds(longNote?.EndTime ?? note.StartTime), KindFor(note),
             Directional: BmsLayout.IsScratchColumn(note.Column, layout)
                          && layout is not (BmsLayoutVariant.Keyboard24K or BmsLayoutVariant.Keyboard24KDouble),
             MineDamage: note is BmsLandmine mine ? mine.LandmineDamagePercent : 0);

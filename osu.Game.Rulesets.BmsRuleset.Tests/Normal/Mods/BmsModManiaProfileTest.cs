@@ -158,7 +158,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Mods
                 Assert.That(mod.DrainRate.Value, Is.EqualTo(hp));
             }
 
-            var practice = BmsPracticeBeatmap.Create(beatmap, BmsPracticeSettings.CreateDefault(beatmap), [mod]);
+            var practice = BmsPracticeBeatmap.Create(beatmap, BmsPracticeSettings.CreateDefault(beatmap));
             var reconverted = (BmsBeatmap)ruleset.CreateBeatmapConverter(beatmap).Convert();
             foreach (var copy in new[] { practice, reconverted })
             {
@@ -1051,7 +1051,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Scoring
         {
             Mod[] mods = [new BmsModManiaProfile { OverallDifficulty = { Value = 5 }, DrainRate = { Value = 5 } }];
             var practice = BmsPracticeBeatmap.Create(createThreeNoteBeatmap(),
-                new BmsPracticeSettings { StartTime = 0, EndTime = 2500 }, mods);
+                new BmsPracticeSettings { StartTime = 0, EndTime = 2500 });
             using var play = new CompletionPlay(practice, selectedMods: mods);
 
             foreach (var note in practice.HitObjects)
@@ -1072,10 +1072,10 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Practice
 {
     public partial class BmsPracticeBeatmapTest
     {
-        [TestCase(false, 2)]
-        [TestCase(true, 3)]
+        [TestCase(false)]
+        [TestCase(true)]
         [Category("ManiaProfile")]
-        public void PracticeWorkingBeatmapUsesSelectedProfilesFullScorePlan(bool mania, int expected)
+        public void PracticeWorkingBeatmapKeepsFullGaugeCountIndependentOfScoreProfile(bool mania)
         {
             var full = createBeatmap(new BmsLongNote { StartTime = 1000, Duration = 500, Column = 1 },
                 new BmsNote { StartTime = 2000, Column = 1 });
@@ -1088,9 +1088,9 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Practice
             using var score = new BmsScoreProcessor();
             score.Mods.Value = session.Mods;
             score.ApplyBeatmap(attempt);
-            Assert.That(attempt.PracticeFullScoringOpportunities, Is.EqualTo(expected));
+            Assert.That(attempt.PracticeFullGaugeOpportunities, Is.EqualTo(2));
             Assert.That(score.EngineChart.Chart.ScorePlan.Opportunities, Has.Length.EqualTo(1));
-            Assert.That(full.PracticeFullScoringOpportunities, Is.Null);
+            Assert.That(full.PracticeFullGaugeOpportunities, Is.Null);
             Assert.That(full.HitObjects, Has.Count.EqualTo(2));
             Assert.That(cachedFull.HitObjects.Select(note => note.HitWindows), Is.EqualTo(cachedWindows));
         }

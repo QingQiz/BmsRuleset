@@ -30,7 +30,7 @@ internal sealed class BmsGaugeController : GameplayHealth
         captureInitialGaugeStates();
         var noteCount = compiled.Chart.ScorePlan.Opportunities.Length;
         var total = (beatmap as BmsBeatmap)?.Total;
-        var fullNoteCount = (beatmap as BmsBeatmap)?.PracticeFullScoringOpportunities ?? noteCount;
+        var fullNoteCount = (beatmap as BmsBeatmap)?.PracticeFullGaugeOpportunities ?? noteCount;
         var calculators = gaugeStates.Select(state => new BmsGaugeCalculator(state.Profile, total, noteCount, effectiveProfileFamily, fullNoteCount))
             .ToImmutableArray();
         return BmsEngineGauge.Create(compiled.Objects, calculators,

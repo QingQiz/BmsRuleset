@@ -103,7 +103,7 @@ public partial class TestSceneBmsCourseSelect
             Assert.That(first.PracticeRuleset.KeyBindingInputManager.UseParentInput, Is.False);
             Assert.That(first.GameplayState.Beatmap.HitObjects.Select(longPracticeObjectIdentity),
                 Is.EqualTo(selected.Select(note => longPracticeObjectIdentity(note))));
-            Assert.That(((BmsBeatmap)first.GameplayState.Beatmap).PracticeFullScoringOpportunities, Is.EqualTo(full.CountScoringNotes()));
+            Assert.That(((BmsBeatmap)first.GameplayState.Beatmap).PracticeFullGaugeOpportunities, Is.EqualTo(full.CountScoringNotes()));
             Assert.That(((BmsBeatmap)first.GameplayState.Beatmap).PracticeEndTime, Is.EqualTo(session.Settings.EndTime));
             Assert.That(scores.ScoringJudgementEventCount, Is.Zero);
             Assert.That(scores.HasCompleted.Value, Is.False);

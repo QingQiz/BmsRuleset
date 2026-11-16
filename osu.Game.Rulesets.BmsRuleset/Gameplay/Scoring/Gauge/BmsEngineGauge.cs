@@ -17,7 +17,7 @@ internal static class BmsEngineGauge
         var profile = gameplayProfile.CreateGaugeProfile(BmsGaugeType.Normal, family);
         var count = plan.Opportunities.Length;
         var calculator = new BmsGaugeCalculator(profile, beatmap?.Total, count, family,
-            (beatmap as BmsBeatmap)?.PracticeFullScoringOpportunities);
+            (beatmap as BmsBeatmap)?.PracticeFullGaugeOpportunities);
         return Create(objects, [calculator], [new HealthState(profile.InitialHealth, false)]);
     }
 

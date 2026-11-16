@@ -150,9 +150,13 @@ public partial class BmsPracticeBeatmapTest
     [TestCase(BmsLongNoteMode.HellChargeNote, 3)]
     public void HealthCountUsesLongNoteMode(BmsLongNoteMode mode, int expected)
     {
-        var full = createBeatmap(new BmsNote(), new BmsLongNote { Kind = mode.ToNoteKind() }, new BmsLandmine());
+        var full = createBeatmap(new BmsNote { StartTime = 1000 },
+            new BmsLongNote { StartTime = 2000, Duration = 500, Kind = mode.ToNoteKind() }, new BmsLandmine { StartTime = 3000 });
         full.LockedLongNoteMode = mode;
         Assert.That(full.CountScoringNotes(), Is.EqualTo(expected));
+        var practice = BmsPracticeBeatmap.Create(full, new BmsPracticeSettings { StartTime = 1000, EndTime = 1500 });
+        Assert.That(practice.PracticeFullGaugeOpportunities, Is.EqualTo(expected));
+        Assert.That(practice.CountScoringNotes(), Is.EqualTo(1));
     }
 
     [Test]
@@ -184,7 +188,7 @@ public partial class BmsPracticeBeatmapTest
         }
 
         Assert.That(practice.Total, Is.EqualTo(full.Total));
-        Assert.That(practice.PracticeFullScoringOpportunities, Is.EqualTo(100));
+        Assert.That(practice.PracticeFullGaugeOpportunities, Is.EqualTo(100));
     }
 
     [Test]

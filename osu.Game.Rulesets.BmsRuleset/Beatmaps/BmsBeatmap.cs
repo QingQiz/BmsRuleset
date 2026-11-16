@@ -36,7 +36,7 @@ public class BmsBeatmap : Beatmap<BmsHitObject>, IBmsBeatmap
 
     internal IReadOnlyList<BmsInvisibleNote> PracticeInitialKeySounds { get; set; } = [];
 
-    internal int? PracticeFullScoringOpportunities { get; set; }
+    internal int? PracticeFullGaugeOpportunities { get; set; }
 
     internal double? PracticeEndTime { get; set; }
 

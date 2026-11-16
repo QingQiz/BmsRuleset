@@ -455,7 +455,7 @@ public class BmsModLr2Test
         var beatmap = createBeatmap();
         beatmap.Total = null;
         for (var i = 0; i < 1000; i++) beatmap.HitObjects.Add(new BmsNote { Beatmap = beatmap, ExRank = 100, Column = 1, StartTime = i * 100 });
-        beatmap = BmsPracticeBeatmap.Create(beatmap, new BmsPracticeSettings { StartTime = 0, EndTime = 10000 }, [new BmsModLr2()]);
+        beatmap = BmsPracticeBeatmap.Create(beatmap, new BmsPracticeSettings { StartTime = 0, EndTime = 10000 });
         using var health = new BmsHealthProcessor();
         health.ApplyBeatmap(beatmap);
         health.Mods = [new BmsModLr2()];
