@@ -95,7 +95,8 @@ public partial class BmsHealthProcessor : HealthProcessor
 
     internal void ApplyEngineState(JudgementSession session)
     {
-        apply(session.Health, session.Score);
+        score = session.Score;
+        Model.Apply(session.Health);
         Outcome = session.Outcome;
         if (!session.Completed && Outcome == SessionOutcome.Failed)
             TriggerFailure();

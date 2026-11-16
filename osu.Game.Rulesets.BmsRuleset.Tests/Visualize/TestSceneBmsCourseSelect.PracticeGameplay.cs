@@ -16,6 +16,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Gauge;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Profiles;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Practice;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
@@ -39,10 +40,12 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 
 public partial class TestSceneBmsCourseSelect
 {
-    [TestCase(BmsLongNoteMode.LongNote)]
-    [TestCase(BmsLongNoteMode.ChargeNote)]
-    [TestCase(BmsLongNoteMode.HellChargeNote)]
-    public void TestPracticeWaitsForSelectedLongNoteTail(BmsLongNoteMode mode)
+    [TestCase(BmsLongNoteMode.LongNote, null)]
+    [TestCase(BmsLongNoteMode.ChargeNote, null)]
+    [TestCase(BmsLongNoteMode.HellChargeNote, null)]
+    [TestCase(BmsLongNoteMode.LongNote, true)]
+    [TestCase(BmsLongNoteMode.LongNote, false)]
+    public void TestPracticeWaitsForSelectedLongNoteTail(BmsLongNoteMode mode, bool? useLazer)
     {
         var directory = string.Empty;
         Task import = null!;
@@ -80,7 +83,8 @@ public partial class TestSceneBmsCourseSelect
             var info = Realm.Run(realm => realm.All<BeatmapInfo>().AsEnumerable().Single(chart => chart.Metadata.Source == directory).Detach());
             var source = beatmaps.GetWorkingBeatmap(info);
             Beatmap.Value = source;
-            session = new BmsPracticeSession(source, new BmsPracticeSettings { StartTime = 1000, EndTime = 1500, CountIn = 0 }, []);
+            session = new BmsPracticeSession(source, new BmsPracticeSettings { StartTime = 1000, EndTime = 1500, CountIn = 0 },
+                useLazer.HasValue ? [new BmsModManiaProfile { UseLazer = { Value = useLazer.Value } }] : []);
             Stack.Push(practice = new PracticeIsolationScreen(session));
         });
         AddUntilStep("practice starts without count-in", () => session.Attempts == 1 && Stack.CurrentScreen is PracticeIsolationPlayer);
@@ -100,7 +104,15 @@ public partial class TestSceneBmsCourseSelect
         AddStep("finish complete tail and judgement window", () => player.ChildrenOfType<GameplayClockContainer>().Single().Seek(4500));
         AddUntilStep("practice result returns", () => Stack.CurrentScreen == practice && practice.LastResult != null);
         AddAssert("long note endpoint count complete", () => practice.LastResult!.Score.Statistics.Values.Sum(),
-            () => Is.EqualTo(mode == BmsLongNoteMode.LongNote ? 1 : 2));
+            () => Is.EqualTo(mode == BmsLongNoteMode.LongNote && useLazer != true ? 1 : 2));
+        AddStep("final health history matches engine", () =>
+        {
+            var recorded = practice.LastResult!.Statistics.EndingHealth!.Value;
+            var current = ((BmsHealthProcessor)player.GameplayState.HealthProcessor).CurrentHealth;
+            Assert.That(recorded.Value, Is.EqualTo(current.Value));
+            Assert.That(recorded.HasFailed, Is.EqualTo(current.HasFailed));
+            Assert.That(recorded.Layers, Is.EqualTo(current.Layers));
+        });
         AddAssert("practice imported no score", () => player.ImportCount == 0 && Realm.Run(realm => realm.All<ScoreInfo>().Count()) == scoreCountAtTestStart);
         AddStep("return from practice", () => practice.Exit());
     }

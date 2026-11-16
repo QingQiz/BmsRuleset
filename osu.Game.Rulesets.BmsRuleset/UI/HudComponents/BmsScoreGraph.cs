@@ -437,7 +437,7 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
                     {
                         if (personalBestProgression.Count == 0 || !ReferenceEquals(personalBestProgression[^1], state))
                             personalBestProgression.Add(state);
-                    }).Judgements;
+                    }, captureHealthHistory: false).Judgements;
             }
 
             personalBestJudgementProgress.SetProgression(CreateJudgementProgression(judgementEvents));

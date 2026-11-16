@@ -337,8 +337,18 @@ internal partial class BmsPracticePlayer : Player
 
         var duration = practiceEndTime - session.Settings.StartTime;
         progress.Text = BmsStrings.PracticeProgress(Math.Clamp(GameplayClockContainer.CurrentTime - session.Settings.StartTime, 0, duration), duration);
-        if (!completionPending)
-            recordGaugeState();
+        if (completionPending)
+            return;
+
+        // During an attempt, fixed gauge configuration makes unchanged health produce the same history projection.
+        if (attemptStarted && gaugeHistory.LastOrDefault() is { } last)
+        {
+            var health = ((BmsHealthProcessor)HealthProcessor).CurrentHealth;
+            if (last.Health.Value == health.Value && last.Health.HasFailed == health.HasFailed && last.Health.Layers.SequenceEqual(health.Layers))
+                return;
+        }
+
+        recordGaugeState();
     }
 
     private void updateVisualBreakTime()

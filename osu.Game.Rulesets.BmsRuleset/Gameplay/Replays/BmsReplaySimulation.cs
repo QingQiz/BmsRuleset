@@ -27,7 +27,7 @@ internal static class BmsReplaySimulation
     internal static (IReadOnlyList<BmsJudgementEvent> Judgements, IReadOnlyList<GameplayHealthHistoryEvent> Gauges) Run(
         BmsBeatmap beatmap, Replay replay, ScoreInfo source, CancellationToken cancellationToken = default,
         IReadOnlyList<BmsGaugeStateSnapshot>? courseGaugeStates = null, BmsGaugeProfileFamily? courseGaugeProfileFamily = null,
-        Action<ScoreState>? onScore = null)
+        Action<ScoreState>? onScore = null, bool captureHealthHistory = true)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var frames = replay.Frames.OfType<BmsReplayFrame>().OrderBy(frame => frame.Time).ToArray();
@@ -68,14 +68,14 @@ internal static class BmsReplaySimulation
 
         var gauges = new List<GameplayHealthHistoryEvent>();
         var columnCount = score.EngineChart.Chart.LaneCount;
-        var output = new SimulationOutput(score, health, recordGauge);
+        var output = new SimulationOutput(score, health, publishResult);
         var engine = new BmsJudgementEngine(
             score.EngineChart,
             Enumerable.Range(0, columnCount).Select(index => new BmsJudgementColumnDefinition(index, output)).ToArray(),
             compiled =>
             {
                 var configuration = health.CreateEngineHealth(compiled);
-                recordGauge(0);
+                publishResult(0);
                 return configuration;
             }, session =>
             {
@@ -93,10 +93,10 @@ internal static class BmsReplaySimulation
 
         return (score.JudgementEvents, gauges);
 
-        void recordGauge(double time)
+        void publishResult(double time)
         {
             onScore?.Invoke(score.EngineScore);
-            if (health.CaptureHistory(time) is { } snapshot)
+            if (captureHealthHistory && health.CaptureHistory(time) is { } snapshot)
                 gauges.Add(snapshot);
         }
     }

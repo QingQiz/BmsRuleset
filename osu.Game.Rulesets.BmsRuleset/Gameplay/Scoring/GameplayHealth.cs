@@ -27,7 +27,6 @@ internal class GameplayHealth(BindableDouble health)
     internal virtual HealthConfiguration CreateConfiguration(BmsEngineChart compiled)
     {
         initialState = compiled.Configuration.Health.InitialState;
-        Apply(initialState);
         return compiled.Configuration.Health;
     }
 

@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using NUnit.Framework;
+using RhythmEngine.Core;
 using RhythmEngine.Profiles.Bms;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
@@ -31,6 +32,39 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Replay;
 [TestFixture]
 public class BmsReplaySimulationTest
 {
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(2)]
+    public void SkippingHealthHistoryPreservesScoreNotificationsAndJudgements(int profile)
+    {
+        var beatmap = createBeatmap();
+        beatmap.HitObjects.AddRange([
+            new BmsLongNote { Beatmap = beatmap, Column = 1, StartTime = 1000, Duration = 1000 },
+            new BmsNote { Beatmap = beatmap, Column = 2, StartTime = 2250 },
+        ]);
+        var replay = createReplay(new BmsReplayFrame(1000, BmsAction.Key1), new BmsReplayFrame(1500),
+            new BmsReplayFrame(1600, BmsAction.Key1), new BmsReplayFrame(2000));
+        var source = new ScoreInfo
+        {
+            Mods = profile == 0 ? [] : [new BmsModManiaProfile { UseLazer = { Value = profile == 1 } }],
+        };
+        var recorded = new List<ScoreState>();
+        var unrecorded = new List<ScoreState>();
+        var withHistory = BmsReplaySimulation.Run(beatmap, replay, source, onScore: recorded.Add);
+        var withoutHistory = BmsReplaySimulation.Run(beatmap, replay, source, onScore: unrecorded.Add, captureHealthHistory: false);
+        Assert.Multiple(() =>
+        {
+            Assert.That(withHistory.Gauges, Is.Not.Empty);
+            Assert.That(withoutHistory.Gauges, Is.Empty);
+            Assert.That(withoutHistory.Judgements.Select(entry => (entry.Source, entry.Result, entry.SuppressPenalty)),
+                Is.EqualTo(withHistory.Judgements.Select(entry => (entry.Source, entry.Result, entry.SuppressPenalty))));
+            Assert.That(withoutHistory.Judgements.SelectMany(entry => entry.TimingObservations),
+                Is.EqualTo(withHistory.Judgements.SelectMany(entry => entry.TimingObservations)));
+            Assert.That(unrecorded.Select(state => (state.Score, state.Accuracy, state.Combo, state.MaximumCombo, state.JudgedOpportunities)),
+                Is.EqualTo(recorded.Select(state => (state.Score, state.Accuracy, state.Combo, state.MaximumCombo, state.JudgedOpportunities))));
+        });
+    }
+
     [Test]
     public void RebuildsInputTimingAndPassiveMisses()
     {
