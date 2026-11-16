@@ -206,11 +206,12 @@ internal sealed class BmsJudgementEngine
                     var kind = result.Part == NoteParts.HEAD ? BmsLongNoteEndpointKind.Head : BmsLongNoteEndpointKind.Tail;
                     var part = transition.After.Parts.Single(p => p.Part == result.Part);
                     var expected = kind == BmsLongNoteEndpointKind.Head ? hold.StartTime : hold.EndTime;
+                    var scoresHead = compiled.Chart.ScorePlan.OpportunitiesByPart.ContainsKey((result.NoteId, NoteParts.HEAD));
+                    // Separate scoring retains profile penalties; aggregated holds keep each endpoint's timing grade.
                     var endpoint = new BmsLongNoteEndpointResult(hold, kind,
                         part.Offset is { } offset ? expected + offset / 1000.0 : step.SimulationTime,
-                        step.GameplayRate, type, step.SimulationTime);
+                        step.GameplayRate, scoresHead ? type : compiled.Profile.HitResultFor(part.Result), step.SimulationTime);
 
-                    var scoresHead = compiled.Chart.ScorePlan.OpportunitiesByPart.ContainsKey((result.NoteId, NoteParts.HEAD));
                     if (kind == BmsLongNoteEndpointKind.Head)
                     {
                         if (scoresHead) output.ApplyMainResult(hold, type, [endpoint], step, result.SuppressPenalty);

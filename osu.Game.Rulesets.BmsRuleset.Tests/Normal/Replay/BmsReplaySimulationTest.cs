@@ -93,6 +93,41 @@ public class BmsReplaySimulationTest
         Assert.That(result.HitEvents.Select(entry => entry.TimeOffset), Is.All.EqualTo(0));
     }
 
+    [TestCase(BmsLongNoteMode.LongNote, 1)]
+    [TestCase(BmsLongNoteMode.ChargeNote, 2)]
+    [TestCase(BmsLongNoteMode.HellChargeNote, 2)]
+    public void LongNoteTimingKeepsEndpointGradesSeparateFromTheScoringResult(BmsLongNoteMode mode, int count)
+    {
+        var beatmap = createBeatmap(mode);
+        beatmap.HitObjects.Add(new BmsLongNote { Kind = mode.ToNoteKind(), Beatmap = beatmap, Column = 1, StartTime = 1000, Duration = 1000 });
+        var result = simulate(beatmap, createReplay(new BmsReplayFrame(1040, BmsAction.Key1), new BmsReplayFrame(1990)));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Judgements, Has.Count.EqualTo(count));
+            Assert.That(result.Judgements[0].Result, Is.EqualTo(HitResult.Great));
+            Assert.That(result.HitEvents.Select(entry => entry.Result), Is.EqualTo([HitResult.Great, HitResult.Perfect]));
+            Assert.That(result.HitEvents.Select(entry => entry.TimeOffset), Is.EqualTo([40d, -10d]));
+        });
+    }
+
+    [Test]
+    public void BrokenManiaHoldKeepsTheTailPenaltyInTimingObservations()
+    {
+        var beatmap = createBeatmap();
+        beatmap.HitObjects.Add(new BmsLongNote { Kind = beatmap.LockedLongNoteMode.ToNoteKind(), Beatmap = beatmap, Column = 1, StartTime = 1000, Duration = 2000 });
+        var replay = createReplay(new BmsReplayFrame(1000, BmsAction.Key1), new BmsReplayFrame(1500),
+            new BmsReplayFrame(1600, BmsAction.Key1), new BmsReplayFrame(3000));
+        var result = simulate(beatmap, replay, new ScoreInfo { Mods = [new BmsModManiaProfile()] });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Judgements.Select(entry => entry.Result), Is.EqualTo([HitResult.Perfect, HitResult.Meh]));
+            Assert.That(result.HitEvents.Select(entry => entry.Result), Is.EqualTo([HitResult.Perfect, HitResult.Meh]));
+            Assert.That(result.HitEvents.Select(entry => entry.TimeOffset), Is.EqualTo([0d, 0d]));
+        });
+    }
+
     [Test]
     public void HellChargeTicksFollowElapsedTimeAcrossCompaction()
     {
