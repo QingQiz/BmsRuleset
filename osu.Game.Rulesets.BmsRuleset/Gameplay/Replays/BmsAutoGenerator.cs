@@ -13,7 +13,6 @@ namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 
 public class BmsAutoGenerator : AutoGenerator<BmsReplayFrame>
 {
-    private readonly BmsBeatmap beatmap;
     private readonly BmsEngineChart compiled;
     private readonly bool scratchOnly;
 
@@ -25,7 +24,6 @@ public class BmsAutoGenerator : AutoGenerator<BmsReplayFrame>
     internal BmsAutoGenerator(BmsBeatmap beatmap, BmsEngineChart compiled, bool scratchOnly = false)
         : base(beatmap)
     {
-        this.beatmap = beatmap;
         this.compiled = compiled;
         this.scratchOnly = scratchOnly;
     }
@@ -53,7 +51,12 @@ public class BmsAutoGenerator : AutoGenerator<BmsReplayFrame>
     }
 
     internal IEnumerable<ActionPoint> GenerateActionPoints()
-        => compiled.Profile.GenerateAutoplayActions(beatmap, compiled)
-            .Where(point => !scratchOnly || (BmsKeyBindingConfiguration.ActionToColumn(point.Action, beatmap.LayoutVariant) is { } column
-                && BmsLayout.IsScratchColumn(column, beatmap.LayoutVariant)));
+    {
+        var beatmap = (BmsBeatmap)Beatmap;
+        foreach (var point in compiled.Profile.GenerateAutoplayActions(beatmap, compiled))
+        {
+            if (!scratchOnly || (BmsKeyBindingConfiguration.ActionToColumn(point.Action, beatmap.LayoutVariant) is { } column && BmsLayout.IsScratchColumn(column, beatmap.LayoutVariant)))
+                yield return point;
+        }
+    }
 }

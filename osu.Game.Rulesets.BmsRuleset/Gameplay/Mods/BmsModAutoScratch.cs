@@ -28,7 +28,6 @@ public partial class BmsModAutoScratch : Mod, IApplicableToDrawableRuleset<BmsHi
     private Action<BmsAction> release = null!;
     private double lastTime = double.NegativeInfinity;
     private double nextTime = double.PositiveInfinity;
-    private BmsPlayfield playfield = null!;
     private BmsInputManager input = null!;
 
     private bool usesRecordedInputs => input.ReplayInputHandler != null;
@@ -60,7 +59,7 @@ public partial class BmsModAutoScratch : Mod, IApplicableToDrawableRuleset<BmsHi
 
     public void ApplyToDrawableRuleset(DrawableRuleset<BmsHitObject> drawableRuleset)
     {
-        playfield = (BmsPlayfield)drawableRuleset.Playfield;
+        var playfield = (BmsPlayfield)drawableRuleset.Playfield;
         input = (BmsInputManager)((BmsDrawableRuleset)drawableRuleset).KeyBindingInputManager;
         PrepareActions(playfield.Beatmap, drawableRuleset.Dependencies.Get<BmsEngineChart>(),
             action => input.KeyBindingContainer.TriggerPressed(action), input.KeyBindingContainer.TriggerReleased);

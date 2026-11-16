@@ -71,10 +71,12 @@ public partial class BmsKeySoundCursorTest
         Column = 1,
     };
 
-    private static BmsKeySoundCursor createCursor(IReadOnlyList<BmsHitObject> notes, IReadOnlyList<BmsInvisibleNote> invisibleNotes = null, GameplayProfile profile = null)
+    private static BmsKeySoundCursor createCursor(IReadOnlyList<BmsHitObject> notes, IReadOnlyList<BmsInvisibleNote> invisibleNotes = null)
     {
-        var compiled = new BmsEngineChart(notes.ToArray(), notes.FirstOrDefault()?.Beatmap.LayoutVariant ?? BmsLayoutVariant.Bme7K,
-            notes.Select(note => note.Column).Distinct().DefaultIfEmpty(0).ToArray(), profile);
+        var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, Rank = 3, HitObjects = [.. notes] };
+        foreach (var note in notes)
+            note.Beatmap = beatmap;
+        var compiled = new BmsEngineChart(beatmap);
         return new BmsKeySoundCursor(notes, note => note.StartTime + compiled.TimingFor(note).HeadDeadline / 1000.0, invisibleNotes);
     }
 
@@ -115,7 +117,9 @@ public partial class BmsKeySoundCursorTest
     {
         var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, Rank = 2, ExRank = 1000 };
         var pending = new BmsNote { Beatmap = beatmap, Column = 1, StartTime = 1000 };
-        var cursor = createCursor([pending], profile: new BmsGameplayProfile(BmsJudgementModifiers.NoBad));
+        beatmap.HitObjects.Add(pending);
+        var compiled = new BmsEngineChart(beatmap, new BmsGameplayProfile(BmsJudgementModifiers.NoBad));
+        var cursor = new BmsKeySoundCursor(beatmap.HitObjects, note => note.StartTime + compiled.TimingFor(note).HeadDeadline / 1000.0);
         Assert.That(cursor.Next(4000, _ => false), Is.Null);
         Assert.That(cursor.Next(2500, _ => false), Is.SameAs(pending));
     }

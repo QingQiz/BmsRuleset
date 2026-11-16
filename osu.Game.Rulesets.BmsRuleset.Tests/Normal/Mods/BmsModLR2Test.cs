@@ -135,7 +135,7 @@ public class BmsModLr2Test
         Assert.That(second.HitWindows.WindowFor(HitResult.Perfect), Is.EqualTo(secondPerfect).Within(0.001));
 
         var output = new BmsRecordingJudgementOutput();
-        var engine = BmsEngineTestAccess.CreateEngine(beatmap.HitObjects.ToArray(), beatmap.LayoutVariant, first.Column, output, lr2_profile);
+        var engine = BmsEngineTestAccess.CreateEngine(beatmap, first.Column, output, lr2_profile);
         var offset = (firstPerfect + secondPerfect) / 2;
         engine.QueueInput(first.StartTime + offset, first.Column, true, false);
         engine.ProcessFrame(new BmsFrameContext(first.StartTime + offset, 1), 0);
@@ -298,7 +298,8 @@ public class BmsModLr2Test
         var beatmap = createBeatmap();
         var note = new BmsNote { Beatmap = beatmap, ExRank = 100, Column = 1, StartTime = 1000 };
         var output = new BmsRecordingJudgementOutput();
-        var column = BmsEngineTestAccess.CreateEngine([note], beatmap.LayoutVariant, 1, output, lr2_profile).GetColumn(1);
+        beatmap.HitObjects.AddRange([note]);
+        var column = BmsEngineTestAccess.CreateEngine(beatmap, 1, output, lr2_profile).GetColumn(1);
         Assert.That(column.HandleNotePress(new BmsPressContext(100, new BmsFrameContext(100, 1))).Kind, Is.EqualTo(PressOutcomeKind.EmptyPoor));
         var judged = new BmsJudgementCandidate(1000, 1000, 1, 0.75, false, IsJudged: true);
         Assert.That(BmsTestJudgementSelector.SelectPress(beatmap.LayoutVariant, 1, [judged], 1050, modifiers: BmsJudgementModifiers.Lr2oraja).Result, Is.EqualTo(HitResult.None));
@@ -346,7 +347,8 @@ public class BmsModLr2Test
         var profile = GameplayProfile.FromMods([new BmsModLr2(), noGreat ? new BmsModNoGreat() : new BmsModNoGood()]);
         var note = new BmsLongNote { Kind = beatmap.LockedLongNoteMode.ToNoteKind(), Beatmap = beatmap, ExRank = 100, Column = 1, StartTime = 1000, Duration = 500 };
         var output = new BmsRecordingJudgementOutput();
-        var engine = BmsEngineTestAccess.CreateEngine([note], beatmap.LayoutVariant, 1, output, profile);
+        beatmap.HitObjects.AddRange([note]);
+        var engine = BmsEngineTestAccess.CreateEngine(beatmap, 1, output, profile);
         engine.QueueInput(1010, 1, true, false);
         engine.ProcessFrame(new BmsFrameContext(1010, 1), 1010);
         engine.QueueInput(1400, 1, false, false);
@@ -360,7 +362,8 @@ public class BmsModLr2Test
         var beatmap = createBeatmap();
         var note = new BmsLongNote { Kind = beatmap.LockedLongNoteMode.ToNoteKind(), Beatmap = beatmap, ExRank = 100, Column = 1, StartTime = 1000, Duration = 10 };
         var output = new BmsRecordingJudgementOutput();
-        var engine = BmsEngineTestAccess.CreateEngine([note], beatmap.LayoutVariant, 1, output, lr2_profile);
+        beatmap.HitObjects.AddRange([note]);
+        var engine = BmsEngineTestAccess.CreateEngine(beatmap, 1, output, lr2_profile);
         engine.ProcessFrame(new BmsFrameContext(2000, 1), 2000);
         Assert.That(output.GetMainResult(note).Type, Is.EqualTo(HitResult.Meh));
         Assert.That(engine.GetColumn(note.Column).GetNote(note).Completed, Is.True);
@@ -625,7 +628,7 @@ public class BmsModLr2Test
         foreach (var item in mods.OfType<IApplicableToHealthProcessor>()) item.ApplyToHealthProcessor(health);
         var gauges = new List<BmsGaugeStateSnapshot[]>();
         var output = new BmsReplaySimulation.SimulationOutput(score, health, _ => gauges.Add(health.Gauge().CurrentGaugeStates.ToArray()));
-        var engine = BmsEngineTestAccess.CreateEngine(beatmap.HitObjects.ToArray(), beatmap.LayoutVariant, Enumerable.Range(1, 3)
+        var engine = BmsEngineTestAccess.CreateEngine(beatmap, Enumerable.Range(1, 3)
                 .Select(column => new BmsJudgementColumnDefinition(column, output)).ToArray(),
             health.CreateEngineHealth, lr2_profile);
         (double Time, int Column, bool Pressed)[] inputs = [(100, 1, true), (110, 1, false), (1017, 1, true), (1025, 1, false), (1500, 2, true), (1900, 2, false)];

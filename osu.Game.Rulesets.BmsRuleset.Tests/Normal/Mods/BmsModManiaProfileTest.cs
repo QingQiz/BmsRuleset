@@ -509,7 +509,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Mods
                 Assert.That(play.Score.Combo.Value, Is.EqualTo(scoringOpportunities));
                 Assert.That(play.Score.ScoringJudgementEventCount, Is.EqualTo(scoringOpportunities));
                 Assert.That(play.Health.CurrentHealth.Layers.IsEmpty, Is.EqualTo(mania));
-                Assert.That(play.Score.Outcome, Is.EqualTo(SessionOutcome.Cleared));
+                Assert.That(play.Health.Outcome, Is.EqualTo(SessionOutcome.Cleared));
                 Assert.That(play.Health.HasPassedAtEnd(), Is.True);
             }
         }
@@ -526,7 +526,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Mods
                 Assert.That(play.Score.ScoringJudgementEventCount, Is.EqualTo(1));
                 Assert.That(play.Score.TotalScore.Value, Is.Zero);
                 Assert.That(play.Score.Accuracy.Value, Is.Zero);
-                Assert.That(play.Score.Outcome, Is.EqualTo(outcome));
+                Assert.That(play.Health.Outcome, Is.EqualTo(outcome));
                 Assert.That(play.Health.HasPassedAtEnd(), Is.EqualTo(outcome == SessionOutcome.Cleared));
                 Assert.That(play.Score.Statistics.GetValueOrDefault(mania ? HitResult.Miss : HitResult.Meh), Is.EqualTo(1));
             }
@@ -566,7 +566,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Mods
                 Assert.That(play.Score.TotalScore.Value, Is.EqualTo(score));
                 Assert.That(play.Score.Accuracy.Value, Is.EqualTo(accuracy));
                 Assert.That(play.Health.CurrentHealth, Is.EqualTo(health));
-                Assert.That(play.Score.Outcome, Is.EqualTo(SessionOutcome.Cleared));
+                Assert.That(play.Health.Outcome, Is.EqualTo(SessionOutcome.Cleared));
             }
         }
 

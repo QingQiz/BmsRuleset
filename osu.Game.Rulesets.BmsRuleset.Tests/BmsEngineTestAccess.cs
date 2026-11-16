@@ -6,8 +6,8 @@ using System.Linq;
 using System.Reflection;
 using RhythmEngine.Core;
 using RhythmEngine.Profiles.Common;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
-using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
@@ -17,12 +17,12 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests;
 
 internal static class BmsEngineTestAccess
 {
-    internal static BmsJudgementEngine CreateEngine(BmsHitObject[] notes, BmsLayoutVariant layout,
+    internal static BmsJudgementEngine CreateEngine(BmsBeatmap beatmap,
                                                     BmsJudgementColumnDefinition[] definitions, Func<BmsEngineChart, HealthConfiguration>? healthFactory = null, GameplayProfile? profile = null)
-        => new(new BmsEngineChart(notes, layout, definitions.Select(definition => definition.Index).ToArray(), profile), definitions, healthFactory);
+        => new(new BmsEngineChart(beatmap, profile), definitions, healthFactory);
 
-    internal static BmsJudgementEngine CreateEngine(BmsHitObject[] notes, BmsLayoutVariant layout, int column, IBmsJudgementOutput output, GameplayProfile? profile = null)
-        => CreateEngine(notes, layout, [new BmsJudgementColumnDefinition(column, output)], profile: profile);
+    internal static BmsJudgementEngine CreateEngine(BmsBeatmap beatmap, int column, IBmsJudgementOutput output, GameplayProfile? profile = null)
+        => CreateEngine(beatmap, [new BmsJudgementColumnDefinition(column, output)], profile: profile);
 
     internal static JudgementSession Session(this BmsJudgementEngine engine)
         => (JudgementSession)typeof(BmsJudgementEngine).GetField("session", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(engine)!;
@@ -32,8 +32,8 @@ internal static class BmsEngineTestAccess
             .Single(f => f.FieldType == typeof(BmsJudgementEngine)).GetValue(column)!;
 
     internal static IEnumerable<BmsHitObject> Notes(this BmsJudgementView column)
-        => ((BmsHitObject[])typeof(BmsJudgementEngine).GetField("objects", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .GetValue(column.Engine())!).Where(n => n.Column == column.Index && n is BmsNote or BmsLongNote);
+        => ((BmsEngineChart)typeof(BmsJudgementEngine).GetField("compiled", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(column.Engine())!).Objects.Where(n => n.Column == column.Index && n is BmsNote or BmsLongNote);
 
     internal static IEnumerable<BmsHitObject> GetNoteCandidates(this BmsJudgementView column)
         => column.Notes().Where(n => !column.IsKeySoundFinished(n, 0));

@@ -58,7 +58,11 @@ internal sealed class BmsLongNoteTestContext
                                     BmsHitObject[]? notes = null, GameplayProfile? profile = null)
     {
         Note = note;
-        Column = BmsEngineTestAccess.CreateEngine(notes ?? [note], note.Beatmap.LayoutVariant, [new BmsJudgementColumnDefinition(note.Column, Output)],
+        var beatmap = (BmsBeatmap)note.Beatmap;
+        beatmap.HitObjects = [.. notes ?? [note]];
+        foreach (var source in beatmap.HitObjects)
+            source.Beatmap = beatmap;
+        Column = BmsEngineTestAccess.CreateEngine(beatmap, [new BmsJudgementColumnDefinition(note.Column, Output)],
             healthFactory, profile).GetColumn(note.Column);
 
         Output.ResultApplied = (_, _) => MainResults.Add((Output.GetMainResult(Note).Type, Output.GetEndpoints(Note).ToArray()));

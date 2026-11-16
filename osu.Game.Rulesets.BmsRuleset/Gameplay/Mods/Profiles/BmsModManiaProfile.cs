@@ -136,10 +136,10 @@ public partial class BmsModManiaProfile : Mod, IApplicableToGameplayProfile, IAp
 
     private sealed class ManiaGameplayProfile(float? overallDifficulty, float? drainRate, bool useLazer) : GameplayProfile
     {
-        private static float originalOd(IBeatmapInfo? beatmapInfo)
+        private static float originalOd(IBeatmapInfo beatmapInfo)
             => beatmapInfo is { Ruleset.OnlineID: 3 } ? beatmapInfo.Difficulty.OverallDifficulty : default_difficulty;
 
-        private static float originalHp(IBeatmapInfo? beatmapInfo)
+        private static float originalHp(IBeatmapInfo beatmapInfo)
             => beatmapInfo is { Ruleset.OnlineID: 3 } ? beatmapInfo.Difficulty.DrainRate : default_difficulty;
 
         internal override void AdjustDisplayDifficulty(IBeatmapInfo beatmapInfo, BeatmapDifficulty difficulty)
@@ -161,7 +161,7 @@ public partial class BmsModManiaProfile : Mod, IApplicableToGameplayProfile, IAp
         internal override IEnumerable<KeyValuePair<HitResult, int>> MaximumAuxiliaryResults(BmsEngineChart compiled)
             => useLazer ? [] : [new(HitResult.LargeTickHit, ManiaProfiles.GetStableMaximumCombo(compiled.Chart) - compiled.Chart.ScorePlan.Opportunities.Length)];
 
-        internal override (Chart Chart, SessionConfiguration Configuration) Compile(BmsHitObject[] objects, KeyChart source, IBeatmapInfo? beatmapInfo)
+        internal override (Chart Chart, SessionConfiguration Configuration) Compile(BmsHitObject[] objects, KeyChart source, IBeatmapInfo beatmapInfo)
         {
             var options = new ManiaOptions(overallDifficulty ?? originalOd(beatmapInfo), drainRate ?? originalHp(beatmapInfo));
             var profile = useLazer ? ManiaProfiles.CreateLazer(source, options) : ManiaProfiles.CreateStable(source, options);

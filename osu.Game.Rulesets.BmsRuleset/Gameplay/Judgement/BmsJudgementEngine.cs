@@ -15,13 +15,10 @@ internal readonly record struct BmsJudgementColumnDefinition(int Index, IBmsJudg
 /// <summary>Maps host input and engine output; it contains no timing or note-lifecycle decisions.</summary>
 internal sealed class BmsJudgementEngine
 {
-    private readonly BmsHitObject[] objects;
-    private readonly IReadOnlyDictionary<BmsHitObject, int> ids;
     private readonly Dictionary<int, BmsJudgementView> columns;
     private readonly Dictionary<int, IBmsJudgementOutput> outputs;
     private readonly List<InputEvent> pendingInputs = [];
     private readonly int[] pressed;
-    private readonly Chart chart;
     private readonly NoteSnapshot[] snapshots;
     private readonly ImmutableArray<NoteSnapshot> initialSnapshots;
     private readonly Dictionary<int, BmsLandmineState> mines = [];
@@ -41,13 +38,10 @@ internal sealed class BmsJudgementEngine
         if (definitions.Length == 0 || definitions.Any(d => d.Index < 0) || definitions.Select(d => d.Index).Distinct().Count() != definitions.Length)
             throw new ArgumentException(@"Each judgement column needs a unique non-negative index.", nameof(definitions));
 
-        objects = compiled.Objects;
-        ids = compiled.Ids;
-        chart = compiled.Chart;
-        pressed = new int[chart.LaneCount];
+        pressed = new int[compiled.Chart.LaneCount];
         initialSnapshots =
         [
-            .. chart.Notes.Select(n => new NoteSnapshot(n.Id, n.Lane, false,
+            .. compiled.Chart.Notes.Select(n => new NoteSnapshot(n.Id, n.Lane, false,
                 n.Rule.GetParts(new NoteContext(n, n.Rule.CreateState(n), 0, default))))
         ];
         snapshots = initialSnapshots.ToArray();
@@ -59,9 +53,9 @@ internal sealed class BmsJudgementEngine
 
     internal NoteTiming GetTiming(BmsHitObject note) => compiled.TimingFor(note);
 
-    internal double EarliestInputTime => objects.Select(note => note.StartTime + GetTiming(note).EarliestInputOffset / 1000.0).DefaultIfEmpty(0).Min();
+    internal double EarliestInputTime => compiled.Objects.Select(note => note.StartTime + GetTiming(note).EarliestInputOffset / 1000.0).DefaultIfEmpty(0).Min();
 
-    internal bool ScoresHead(BmsHitObject note) => chart.ScorePlan.OpportunitiesByPart.ContainsKey((ids[note], NoteParts.HEAD));
+    internal bool ScoresHead(BmsHitObject note) => compiled.Chart.ScorePlan.OpportunitiesByPart.ContainsKey((compiled.Ids[note], NoteParts.HEAD));
 
     internal bool HasPendingInputs => pendingInputs.Count > 0;
 
@@ -69,11 +63,11 @@ internal sealed class BmsJudgementEngine
 
     internal BmsJudgementView GetColumn(int index) => columns[index];
 
-    internal NoteSnapshot GetNote(BmsHitObject note) => snapshots[ids[note]];
+    internal NoteSnapshot GetNote(BmsHitObject note) => snapshots[compiled.Ids[note]];
 
     internal int GetPressedDirections(int column) => pressed[column];
 
-    internal BmsLandmineState GetLandmineState(BmsLandmine note) => mines.GetValueOrDefault(ids[note]);
+    internal BmsLandmineState GetLandmineState(BmsLandmine note) => mines.GetValueOrDefault(compiled.Ids[note]);
 
     internal void Reset()
     {
@@ -160,14 +154,14 @@ internal sealed class BmsJudgementEngine
     private JudgementSession createSession(BmsJudgementAlgorithm? algorithm)
     {
         var health = healthFactory?.Invoke(compiled) ?? compiled.Configuration.Health;
-        return new JudgementSession(chart, compiled.Profile.ConfigureSession(compiled, algorithm, health));
+        return new JudgementSession(compiled.Chart, compiled.Profile.ConfigureSession(compiled, algorithm, health));
     }
 
     private void publish(ReadOnlySpan<NoteTransition> transitions, BmsFrameContext frame, Func<double, BmsFrameContext>? contextAtTime)
     {
         foreach (var transition in transitions)
         {
-            var note = objects[transition.After.Id];
+            var note = compiled.Objects[transition.After.Id];
             var output = outputs[note.Column];
             // Microsecond rounding must not make the framework revert a result as being ahead of its clock.
             var eventTime = Math.Min(transition.Time / 1000.0, frame.SimulationTime);
@@ -216,7 +210,7 @@ internal sealed class BmsJudgementEngine
                         part.Offset is { } offset ? expected + offset / 1000.0 : step.SimulationTime,
                         step.GameplayRate, type, step.SimulationTime);
 
-                    var scoresHead = chart.ScorePlan.OpportunitiesByPart.ContainsKey((result.NoteId, NoteParts.HEAD));
+                    var scoresHead = compiled.Chart.ScorePlan.OpportunitiesByPart.ContainsKey((result.NoteId, NoteParts.HEAD));
                     if (kind == BmsLongNoteEndpointKind.Head)
                     {
                         if (scoresHead) output.ApplyMainResult(hold, type, [endpoint], step, result.SuppressPenalty);

@@ -94,7 +94,8 @@ public class BmsHellChargeTimeTest
         var output = new BmsRecordingJudgementOutput();
         var health = createHealth();
         output.BodyTick = frame => health.ApplyEngineTick(frame.EngineResult!);
-        var engine = BmsEngineTestAccess.CreateEngine([released, held], beatmap.LayoutVariant, [
+        beatmap.HitObjects.AddRange([released, held]);
+        var engine = BmsEngineTestAccess.CreateEngine(beatmap, [
                 new BmsJudgementColumnDefinition(1, output),
                 new BmsJudgementColumnDefinition(2, output)
             ],
@@ -134,7 +135,8 @@ public class BmsHellChargeTimeTest
         var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, Rank = 2, LockedLongNoteMode = BmsLongNoteMode.HellChargeNote };
         var note = new BmsLongNote { Kind = KeyNoteKind.SustainHold, Beatmap = beatmap, Column = 1, StartTime = 1000, Duration = 3000 };
         var output = new BmsRecordingJudgementOutput();
-        var engine = BmsEngineTestAccess.CreateEngine([note], beatmap.LayoutVariant, 1, output);
+        beatmap.HitObjects.AddRange([note]);
+        var engine = BmsEngineTestAccess.CreateEngine(beatmap, 1, output);
 
         engine.QueueInput(1000, 1, true, false);
         engine.ProcessFrame(new BmsFrameContext(1000, 1), 0);

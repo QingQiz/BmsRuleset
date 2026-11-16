@@ -42,8 +42,11 @@ internal static class BmsTestJudgementSelector
             note.Beatmap = beatmap;
             return note;
         }).ToArray();
+        beatmap.HitObjects.AddRange(objects);
         var output = new BmsRecordingJudgementOutput();
-        var engine = BmsEngineTestAccess.CreateEngine(objects, layout, column, output, new BmsGameplayProfile(modifiers));
+        var engine = BmsEngineTestAccess.CreateEngine(beatmap,
+            Enumerable.Range(0, BmsLayout.GetTotalColumns(layout)).Select(index => new BmsJudgementColumnDefinition(index, output)).ToArray(),
+            profile: new BmsGameplayProfile(modifiers));
 
         foreach (var candidate in ordered.Where(c => c.Column == column && (c.IsJudged || c.HasMistake)))
         {
@@ -56,14 +59,14 @@ internal static class BmsTestJudgementSelector
         var selection = new BmsJudgementSelection(null, HitResult.None, false);
         output.AfterResultApplied = (note, frame) =>
         {
-            if (Math.Abs(frame.SimulationTime - inputTime) < .0005)
+            if (note.Column == column && Math.Abs(frame.SimulationTime - inputTime) < .0005)
                 selection = new BmsJudgementSelection(ordered[Array.IndexOf(objects, note)], output.GetMainResult(note).Type, false);
         };
         output.NonConsumingJudgement = (expected, lane, result) =>
             selection = new BmsJudgementSelection(ordered.First(c => c.StartTime == expected && c.Column == lane), result, result == HitResult.Miss);
         output.StatePublished = (note, state, _) =>
         {
-            if (note.Kind == KeyNoteKind.Hold && engine.GetColumn(column).GetNote(note).Parts[0].Time / 1000.0 == inputTime && !state.TailJudged)
+            if (note.Column == column && note.Kind == KeyNoteKind.Hold && engine.GetColumn(column).GetNote(note).Parts[0].Time / 1000.0 == inputTime && !state.TailJudged)
                 selection = new BmsJudgementSelection(ordered[Array.IndexOf(objects, note)], state.HeadResult, false);
         };
         engine.QueueInput(inputTime, column, true, false);

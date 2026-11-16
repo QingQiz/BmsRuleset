@@ -32,7 +32,8 @@ public class BmsJudgementEngineTest
         var note = new BmsNote { Beatmap = beatmap, Column = 1, StartTime = inputTime };
         double? publishedTime = null;
         var output = new BmsRecordingJudgementOutput { ResultApplied = (_, frame) => publishedTime = frame.SimulationTime };
-        var engine = BmsEngineTestAccess.CreateEngine([note], beatmap.LayoutVariant, 1, output);
+        beatmap.HitObjects.AddRange([note]);
+        var engine = BmsEngineTestAccess.CreateEngine(beatmap, 1, output);
         engine.QueueInput(inputTime, 1, true, false);
         engine.ProcessFrame(new BmsFrameContext(inputTime, 1), 1,
             contextAtTime: historicalContext ? time => new BmsFrameContext(time, 1) : null);
@@ -47,7 +48,8 @@ public class BmsJudgementEngineTest
         var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, Rank = 2 };
         var note = new BmsNote { Beatmap = beatmap, Column = 1, StartTime = 1000 };
         var output = new BmsRecordingJudgementOutput();
-        var engine = BmsEngineTestAccess.CreateEngine([note], beatmap.LayoutVariant, 1, output, new BmsGameplayProfile(BmsJudgementModifiers.NoBad));
+        beatmap.HitObjects.AddRange([note]);
+        var engine = BmsEngineTestAccess.CreateEngine(beatmap, 1, output, new BmsGameplayProfile(BmsJudgementModifiers.NoBad));
 
         engine.QueueInput(1150, 1, true, false);
         engine.ProcessFrame(new BmsFrameContext(1150, 1), 150);
@@ -121,7 +123,8 @@ public class BmsJudgementEngineTest
             output.BodyTick = frame => events.Add($"body:{frame.EngineResult!.Event.Lane}");
         }
 
-        var engine = BmsEngineTestAccess.CreateEngine(objects, beatmap.LayoutVariant, Enumerable.Range(1, 3).Select(i =>
+        beatmap.HitObjects.AddRange(objects);
+        var engine = BmsEngineTestAccess.CreateEngine(beatmap, Enumerable.Range(1, 3).Select(i =>
             new BmsJudgementColumnDefinition(i, outputs[i - 1])).ToArray());
 
         engine.QueueInput(1000, 1, true, false);
@@ -145,7 +148,8 @@ public class BmsJudgementEngineTest
         var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, Rank = 2 };
         var mine = new BmsLandmine { Beatmap = beatmap, Column = 1, StartTime = 1000 };
         var output = new BmsRecordingJudgementOutput();
-        var engine = BmsEngineTestAccess.CreateEngine([mine], beatmap.LayoutVariant, 1, output);
+        beatmap.HitObjects.AddRange([mine]);
+        var engine = BmsEngineTestAccess.CreateEngine(beatmap, 1, output);
         var column = engine.GetColumn(1);
 
         if (held)
@@ -166,7 +170,8 @@ public class BmsJudgementEngineTest
         var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K };
         var mine = new BmsLandmine { Beatmap = beatmap, Column = 1, StartTime = 1000 };
         var output = new BmsRecordingJudgementOutput();
-        var engine = BmsEngineTestAccess.CreateEngine([mine], beatmap.LayoutVariant, 1, output);
+        beatmap.HitObjects.AddRange([mine]);
+        var engine = BmsEngineTestAccess.CreateEngine(beatmap, 1, output);
         var column = engine.GetColumn(1);
 
         if (held) engine.QueueInput(1000, 1, true, false);
@@ -192,7 +197,8 @@ public class BmsJudgementEngineTest
         var first = new BmsNote { Beatmap = beatmap, Column = 1, StartTime = 1000 };
         var second = new BmsNote { Beatmap = beatmap, Column = 1, StartTime = 1000 };
         var output = new BmsRecordingJudgementOutput();
-        var engine = BmsEngineTestAccess.CreateEngine([first, second], beatmap.LayoutVariant, 1, output);
+        beatmap.HitObjects.AddRange([first, second]);
+        var engine = BmsEngineTestAccess.CreateEngine(beatmap, 1, output);
 
         output.ResultApplied = (note, _) =>
         {
@@ -219,7 +225,8 @@ public class BmsJudgementEngineTest
         var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, Rank = 2, LockedLongNoteMode = mode };
         var note = new BmsLongNote { Kind = mode.ToNoteKind(), Beatmap = beatmap, Column = 1, StartTime = 1000, Duration = 1000 };
         var output = new BmsRecordingJudgementOutput();
-        var engine = BmsEngineTestAccess.CreateEngine([note], beatmap.LayoutVariant, 1, output);
+        beatmap.HitObjects.AddRange([note]);
+        var engine = BmsEngineTestAccess.CreateEngine(beatmap, 1, output);
         var column = engine.GetColumn(1);
 
         engine.QueueInput(1000, 1, true, false);
@@ -241,7 +248,8 @@ public class BmsJudgementEngineTest
         var note = new BmsLongNote { Kind = KeyNoteKind.SustainHold, Beatmap = beatmap, Column = 1, StartTime = 1000, Duration = 1000 };
         var mine = new BmsLandmine { Beatmap = beatmap, Column = 1, StartTime = 1000 };
         var output = new BmsRecordingJudgementOutput();
-        var engine = BmsEngineTestAccess.CreateEngine([note, mine], beatmap.LayoutVariant, 1, output);
+        beatmap.HitObjects.AddRange([note, mine]);
+        var engine = BmsEngineTestAccess.CreateEngine(beatmap, 1, output);
         var column = engine.GetColumn(1);
 
         engine.QueueInput(1000, 1, true, false);
@@ -261,7 +269,8 @@ public class BmsJudgementEngineTest
         var note = new BmsNote { Beatmap = beatmap, Column = 1, StartTime = 1000, SampleKey = 7 };
         var feedback = new List<string>();
         var output = new BmsRecordingJudgementOutput { Feedback = feedback.Add };
-        var engine = BmsEngineTestAccess.CreateEngine([note], beatmap.LayoutVariant, 1, output);
+        beatmap.HitObjects.AddRange([note]);
+        var engine = BmsEngineTestAccess.CreateEngine(beatmap, 1, output);
         engine.QueueInput(0, 1, true, false);
         engine.QueueInput(0, 1, false, false);
         engine.QueueInput(1000, 1, true, false);
@@ -279,7 +288,8 @@ public class BmsJudgementEngineTest
         var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, Rank = 2, LockedLongNoteMode = BmsLongNoteMode.HellChargeNote };
         var note = new BmsLongNote { Kind = KeyNoteKind.SustainHold, Beatmap = beatmap, Column = 1, StartTime = 1000, Duration = 1000 };
         var output = new BmsRecordingJudgementOutput();
-        var engine = BmsEngineTestAccess.CreateEngine([note], beatmap.LayoutVariant, 1, output);
+        beatmap.HitObjects.AddRange([note]);
+        var engine = BmsEngineTestAccess.CreateEngine(beatmap, 1, output);
         var view = engine.GetColumn(1);
         var observed = new List<(bool Head, bool Tail, bool Held)>();
         output.StatePublished = (_, _, _) =>
@@ -315,7 +325,8 @@ public class BmsJudgementEngineTest
         var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, Rank = 2, LockedLongNoteMode = mode };
         var note = new BmsLongNote { Kind = mode.ToNoteKind(), Beatmap = beatmap, Column = 1, StartTime = 1000, Duration = duration };
         var output = new BmsRecordingJudgementOutput();
-        var engine = BmsEngineTestAccess.CreateEngine([note], beatmap.LayoutVariant, 1, output);
+        beatmap.HitObjects.AddRange([note]);
+        var engine = BmsEngineTestAccess.CreateEngine(beatmap, 1, output);
         engine.QueueInput(1000, 1, true, false);
         engine.QueueInput(1000 + duration, 1, false, false);
         engine.ProcessFrame(new BmsFrameContext(2000, 1), 2000);

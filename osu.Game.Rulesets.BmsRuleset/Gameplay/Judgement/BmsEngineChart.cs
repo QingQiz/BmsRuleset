@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using System.Linq;
 using RhythmEngine.Core;
 using RhythmEngine.Profiles.Common;
-using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
@@ -28,27 +27,22 @@ internal sealed class BmsEngineChart
     internal double MaximumScore { get; }
 
     internal BmsEngineChart(BmsBeatmap beatmap, GameplayProfile? profile = null)
-        : this(beatmap.HitObjects.ToArray(), beatmap.LayoutVariant, Enumerable.Range(0, BmsLayout.GetTotalColumns(beatmap.LayoutVariant)).ToArray(), profile,
-            beatmap.PracticeEndTime is { } practiceEndTime ? Time.FromMilliseconds(practiceEndTime) : null, beatmap.BeatmapInfo)
     {
-    }
-
-    internal BmsEngineChart(BmsHitObject[] notes, BmsLayoutVariant layout, int[] columns, GameplayProfile? profile = null, long? endTime = null, IBeatmapInfo? beatmapInfo = null)
-    {
-        var scratch = layout switch
+        var columnCount = BmsLayout.GetTotalColumns(beatmap.LayoutVariant);
+        var scratch = beatmap.LayoutVariant switch
         {
             BmsLayoutVariant.Bms5K or BmsLayoutVariant.Bms5K2P or BmsLayoutVariant.Bms5KDouble => 5,
             BmsLayoutVariant.Bme7K or BmsLayoutVariant.Bme7K2P or BmsLayoutVariant.Bme7KDouble => 7,
             _ => -1,
         };
-        var notesByColumn = notes.Where(n => n is not BmsInvisibleNote).ToLookup(n => n.Column);
+        var notesByColumn = beatmap.HitObjects.Where(n => n is not BmsInvisibleNote).ToLookup(n => n.Column);
         // The host's chart traversal order is observable when simultaneous results clip a gauge.
-        Objects = columns.OrderBy(column => scratch < 0 || column > scratch ? column : column == 0 ? scratch : column - 1)
+        Objects = Enumerable.Range(0, columnCount).OrderBy(column => scratch < 0 || column > scratch ? column : column == 0 ? scratch : column - 1)
             .SelectMany(column => notesByColumn[column].OrderBy(n => n.StartTime)).ToArray();
         Ids = Objects.Select((note, id) => (note, id)).ToDictionary(pair => pair.note, pair => pair.id);
         Profile = profile ?? BmsGameplayProfile.INSTANCE;
-        (Chart, Configuration) = Profile.Compile(Objects, new KeyChart(columns.Max() + 1, Objects.Select(createKeyNote), endTime: endTime),
-            beatmapInfo ?? (notes.FirstOrDefault()?.Beatmap as IBeatmap)?.BeatmapInfo);
+        (Chart, Configuration) = Profile.Compile(Objects, new KeyChart(columnCount, Objects.Select(createKeyNote),
+            endTime: beatmap.PracticeEndTime is { } practiceEndTime ? Time.FromMilliseconds(practiceEndTime) : null), beatmap.BeatmapInfo);
         MaximumScore = Score.MaximumScore(Chart.ScorePlan);
     }
 

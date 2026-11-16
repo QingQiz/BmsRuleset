@@ -103,8 +103,6 @@ public sealed class BmsTimingDefinition(TimingWindows windows, long passiveDeadl
 {
     public TimingWindows Windows { get; } = windows;
 
-    public long EarliestHitOffset { get; } = windows.Entries.Where(window => window.Result != BmsResults.EMPTY_POOR).Min(window => window.Early);
-
     // Removing a hit result does not remove its passive timeout.
     public long PassiveDeadline { get; } = passiveDeadline;
 

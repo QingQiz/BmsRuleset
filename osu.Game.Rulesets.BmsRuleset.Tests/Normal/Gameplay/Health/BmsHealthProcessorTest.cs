@@ -675,9 +675,10 @@ public class BmsHealthProcessorTest
 
         processor.Gauge().RestoreGaugeStates([new BmsGaugeStateSnapshot(processor.Gauge().GaugeType, 0.8, false)]);
         var mine = (BmsLandmine)beatmap.HitObjects[0];
-        mine.Beatmap = beatmap;
+        foreach (var note in beatmap.HitObjects)
+            note.Beatmap = beatmap;
         var output = new BmsRecordingJudgementOutput();
-        var engine = BmsEngineTestAccess.CreateEngine([mine], beatmap.LayoutVariant, [new BmsJudgementColumnDefinition(mine.Column, output)],
+        var engine = BmsEngineTestAccess.CreateEngine(beatmap, [new(mine.Column, output), new(2, output)],
             processor.CreateEngineHealth);
         engine.ProcessFrame(new BmsFrameContext(1000, 1), 1000);
 

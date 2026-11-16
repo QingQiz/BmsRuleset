@@ -41,13 +41,10 @@ public partial class BmsScoreProcessor : ScoreProcessor
     internal ScoreState EngineScore { get; private set; } = new();
     private bool engineCompleted;
 
-    internal SessionOutcome Outcome { get; private set; }
-
     internal void ApplyEngineState(JudgementSession session)
     {
         ApplyEngineScore(session.Score);
         engineCompleted = session.Completed;
-        Outcome = session.Outcome;
     }
 
     [UnsafeAccessor(UnsafeAccessorKind.Method, Name = "updateScore")]
@@ -170,7 +167,6 @@ public partial class BmsScoreProcessor : ScoreProcessor
         base.Reset(storeResults);
         EngineScore = EngineChart.Score.InitialState;
         engineCompleted = false;
-        Outcome = SessionOutcome.InProgress;
         TotalScoreWithoutMods.Value = 0;
         judgementEvents.Clear();
         timingHitEventEntries.Clear();

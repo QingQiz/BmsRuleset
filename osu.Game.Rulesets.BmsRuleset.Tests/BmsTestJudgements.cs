@@ -31,10 +31,15 @@ internal static class BmsTestJudgements
     private static BmsEngineChart healthChart(BmsHealthProcessor processor, BmsHitObject eventSource)
     {
         var source = (IBeatmap?)processor.Beatmap ?? (IBeatmap)eventSource.Beatmap;
-        var notes = source.HitObjects.Count > 0 ? source.HitObjects.Cast<BmsHitObject>().ToArray() : [eventSource];
-        foreach (var note in notes)
-            note.Beatmap = (IBmsBeatmap)source;
-        return new BmsEngineChart(notes, ((IBmsBeatmap)source).LayoutVariant, notes.Select(note => note.Column).Distinct().ToArray(), GameplayProfile.FromMods(processor.Mods));
+        var beatmap = new BmsBeatmap
+        {
+            BeatmapInfo = source.BeatmapInfo,
+            HitObjects = source.HitObjects.Count > 0 ? source.HitObjects.Cast<BmsHitObject>().ToList() : [eventSource],
+        };
+        beatmap.CopyBmsDataFrom((IBmsBeatmap)source);
+        foreach (var note in beatmap.HitObjects)
+            note.Beatmap = beatmap;
+        return new BmsEngineChart(beatmap, GameplayProfile.FromMods(processor.Mods));
     }
 
     internal static HitResult HitAt(this BmsTimingDefinition timing, double milliseconds)
@@ -153,7 +158,15 @@ internal static class BmsTestJudgements
         return (note, judgement);
     }
 
-    private static Chart chartFor(BmsHitObject note) => new BmsEngineChart([note], note.Beatmap.LayoutVariant, [note.Column]).Chart;
+    private static Chart chartFor(BmsHitObject note)
+    {
+        var beatmap = new BmsBeatmap();
+        beatmap.CopyBmsDataFrom(note.Beatmap);
+        var clone = note.CloneForConversion();
+        clone.Beatmap = beatmap;
+        beatmap.HitObjects.Add(clone);
+        return new BmsEngineChart(beatmap).Chart;
+    }
 
     private static void reduceHealth(BmsHealthProcessor processor, PartId part, ResultId result)
     {
