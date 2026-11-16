@@ -37,12 +37,12 @@ internal abstract partial class GameplayProfile
 
     internal virtual IReadOnlyList<GameplayHealthHistoryEvent> ReconstructHealthHistory(ScoreInfo score, IBeatmap beatmap, IReadOnlyList<HitEvent> events) => [];
 
-    internal abstract (Chart Chart, SessionConfiguration Configuration) Compile(BmsHitObject[] objects, KeyChart source);
+    internal abstract (Chart Chart, SessionConfiguration Configuration) Compile(BmsHitObject[] objects, KeyChart source, IBeatmapInfo? beatmapInfo);
 
     internal virtual SessionConfiguration ConfigureSession(BmsEngineChart compiled, BmsJudgementAlgorithm? algorithm, HealthConfiguration health)
         => compiled.Configuration with { Health = health };
 
-    internal virtual void AdjustDisplayDifficulty(BeatmapDifficulty difficulty)
+    internal virtual void AdjustDisplayDifficulty(IBeatmapInfo beatmapInfo, BeatmapDifficulty difficulty)
     {
     }
 
@@ -114,6 +114,8 @@ internal abstract partial class GameplayProfile
     internal abstract int AccuracyValue(HitResult result);
 
     internal virtual int AccuracyJudgementCount(ScoreState score) => score.JudgedOpportunities;
+
+    internal virtual IEnumerable<KeyValuePair<HitResult, int>> MaximumAuxiliaryResults(BmsEngineChart compiled) => [];
 
     internal abstract ScoreRank RankFromScore(double accuracy, IReadOnlyDictionary<HitResult, int> results);
 

@@ -4,25 +4,57 @@ using RhythmEngine.Profiles.Common;
 
 namespace RhythmEngine.Profiles.Mania;
 
-internal sealed record StableManiaHoldState(NoteTimer? Timer, long? PressTime, long? ReleaseTime, long? TickTime, bool Held, bool Broken, bool Done) : NoteState
+internal sealed record StableManiaHoldState(NoteTimer? Timer, long? PressTime, long? ReleaseTime, long? TickTime, bool Held, bool Broken, ResultId? Result) : NoteState
 {
     public override NoteTimer? NextTimer => Timer;
 
-    public override bool Completed => Done;
+    public override bool Completed => Result != null;
 }
 
-internal sealed class StableManiaHoldRule(ImmutableArray<long> windows) : INoteRule
+internal sealed class StableManiaHoldRule(ImmutableArray<long> windows) : INoteRule, INoteTiming
 {
     private const long tick_interval = 100_000;
+
+    internal int MaximumTicks(ChartNote note)
+    {
+        // Early presses can start ticking at the head; a late release can include the final tick.
+        var earliestPress = (long)Math.Ceiling((note.StartTime - windows[^1]) / 1000.0) * 1000;
+        var firstTick = Math.Max(note.StartTime, earliestPress + tick_interval);
+        return firstTick > note.EndTime ? 0 : (int)((note.EndTime - firstTick) / tick_interval) + 1;
+    }
+
+    // Stable combines head and tail errors. These are the maximum endpoint extents for presentation.
+    public NoteTiming Timing { get; } = createTiming(windows);
+
+    private static NoteTiming createTiming(ImmutableArray<long> windows)
+    {
+        var head = new TimingWindows(new[] { ManiaResults.PERFECT, ManiaResults.GREAT, ManiaResults.GOOD, ManiaResults.OK, ManiaResults.MEH, ManiaResults.MISS }
+            .Select((result, index) =>
+            {
+                var extent = (long)(windows[index] * (index == 0 ? 1.2 : index == 1 ? 1.1 : 1));
+                return new TimingWindow(result, -extent, extent);
+            }));
+        var tail = new TimingWindows(head.Entries.Select(window => window with
+        {
+            Early = Math.Max(-windows[4], window.Early * 2),
+            Late = Math.Min(windows[4], window.Late * 2),
+        }));
+        return new NoteTiming(head, windows[3], TailDeadline: windows[4], TailWindows: tail);
+    }
 
     public ImmutableArray<NotePartState> GetParts(NoteContext context)
     {
         var hold = (StableManiaHoldState)context.State;
-        return [new NotePartState(NoteParts.HEAD, hold.PressTime != null || hold.Done), new(NoteParts.BODY, hold.Done, hold.Held && !hold.Done), new(NoteParts.TAIL, hold.Done)];
+        return
+        [
+            new NotePartState(NoteParts.HEAD, hold.PressTime != null || hold.Completed, Result: hold.Result),
+            new(NoteParts.BODY, hold.Completed, hold.Held && !hold.Completed),
+            new(NoteParts.TAIL, hold.Completed, Offset: hold.ReleaseTime - context.Note.EndTime, Result: hold.Result)
+        ];
     }
 
     public NoteState CreateState(ChartNote note) => new StableManiaHoldState(new NoteTimer(note.EndTime + windows[3], TimerOrder.BeforeInput),
-        null, null, null, false, false, false);
+        null, null, null, false, false, null);
 
     public InputCandidate? GetCandidate(NoteContext context, InputEvent input, int noteIndex)
     {
@@ -101,7 +133,7 @@ internal sealed class StableManiaHoldRule(ImmutableArray<long> windows) : INoteR
             }
         }
 
-        return new NoteUpdate(state with { Done = true, Timer = null, TickTime = null },
+        return new NoteUpdate(state with { Result = result, Timer = null, TickTime = null },
             [new NoteEmission(NoteParts.TAIL, result, note.EndTime, (state.Held ? clockTime(context.Time) : state.ReleaseTime) - note.EndTime)]);
     }
 

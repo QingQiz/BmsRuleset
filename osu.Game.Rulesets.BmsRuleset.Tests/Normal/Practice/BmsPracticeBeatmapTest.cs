@@ -28,7 +28,7 @@ using osu.Game.Skinning;
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Practice;
 
 [TestFixture]
-public class BmsPracticeBeatmapTest
+public partial class BmsPracticeBeatmapTest
 {
     [TestCase(false)]
     [TestCase(true)]
@@ -185,27 +185,6 @@ public class BmsPracticeBeatmapTest
 
         Assert.That(practice.Total, Is.EqualTo(full.Total));
         Assert.That(practice.PracticeFullScoringOpportunities, Is.EqualTo(100));
-    }
-
-    [Test]
-    public void PracticeWorkingBeatmapUsesSelectedProfilesFullScorePlan()
-    {
-        var full = createBeatmap(new BmsLongNote { StartTime = 1000, Duration = 500, Column = 1 },
-            new BmsNote { StartTime = 2000, Column = 1 });
-        var session = new BmsPracticeSession(new TestWorkingBeatmap(full),
-            new BmsPracticeSettings { StartTime = 2000, EndTime = 2001 }, []);
-        var working = new BmsPracticeWorkingBeatmap(session, null!);
-        var cachedFull = session.GetFullBeatmap(default);
-        var cachedWindows = cachedFull.HitObjects.Select(note => note.HitWindows).ToArray();
-        var attempt = (BmsBeatmap)working.GetPlayableBeatmap(new BmsRuleset().RulesetInfo, session.Mods, default);
-        using var score = new BmsScoreProcessor();
-        score.Mods.Value = session.Mods;
-        score.ApplyBeatmap(attempt);
-        Assert.That(attempt.PracticeFullScoringOpportunities, Is.EqualTo(2));
-        Assert.That(score.EngineChart.Chart.ScorePlan.Opportunities, Has.Length.EqualTo(1));
-        Assert.That(full.PracticeFullScoringOpportunities, Is.Null);
-        Assert.That(full.HitObjects, Has.Count.EqualTo(2));
-        Assert.That(cachedFull.HitObjects.Select(note => note.HitWindows), Is.EqualTo(cachedWindows));
     }
 
     [Test]

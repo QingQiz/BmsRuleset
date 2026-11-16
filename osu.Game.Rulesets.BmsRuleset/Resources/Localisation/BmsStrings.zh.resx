@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <root>
+  <data name="mania_overall_difficulty" xml:space="preserve"><value>判定难度（OD）</value></data>
+  <data name="mania_drain_rate" xml:space="preserve"><value>血量难度（HP）</value></data>
+  <data name="mania_difficulty_description" xml:space="preserve"><value>默认为 8，osu!mania 转谱则使用原谱数值；可手动调整覆盖。</value></data>
+  <data name="mania_use_lazer" xml:space="preserve"><value>使用 lazer 规则</value></data>
+  <data name="mania_use_lazer_description" xml:space="preserve"><value>开启时使用 lazer 判定、计分和血量，关闭时使用 stable 规则。</value></data>
   <data name="result_statistics_require_replay" xml:space="preserve"><value>观看回放后可查看详细统计。</value></data>
   <data name="result_statistics_unavailable" xml:space="preserve"><value>无法加载统计数据。</value></data>
   <data name="result_performance" xml:space="preserve"><value>成绩</value></data>
@@ -612,6 +617,12 @@
   <data name="difficulty_refresh_failed" xml:space="preserve">
     <value>BMS 难度更新结束，{0} 张谱面计算失败。</value>
   </data>
+  <data name="mod_mania_profile_name" xml:space="preserve">
+    <value>osu!mania 规则</value>
+  </data>
+  <data name="mod_mania_profile" xml:space="preserve">
+    <value>使用 osu!mania 判定、计分和血量。可在 Mod 设置中选择 lazer 或 stable 规则并调整 OD、HP。所有长按均需松键，地雷会被移除。</value>
+  </data>
   <data name="health" xml:space="preserve">
     <value>血量</value>
   </data>
@@ -642,6 +653,12 @@
   <data name="gauge_name_exhardclass" xml:space="preserve">
     <value>ExHard Class</value>
   </data>
+  <data name="result_score" xml:space="preserve">
+    <value>分数</value>
+  </data>
+  <data name="rank_letter_ss" xml:space="preserve">
+    <value>SS</value>
+  </data>
   <data name="rank_letter_s" xml:space="preserve">
     <value>S</value>
   </data>
@@ -660,8 +677,29 @@
   <data name="rank_letter_c" xml:space="preserve">
     <value>C</value>
   </data>
+  <data name="rank_letter_d" xml:space="preserve">
+    <value>D</value>
+  </data>
   <data name="rank_letter_f" xml:space="preserve">
     <value>F</value>
+  </data>
+  <data name="mania_judgement_perfect" xml:space="preserve">
+    <value>MAX</value>
+  </data>
+  <data name="mania_judgement_great" xml:space="preserve">
+    <value>300</value>
+  </data>
+  <data name="mania_judgement_good" xml:space="preserve">
+    <value>200</value>
+  </data>
+  <data name="mania_judgement_ok" xml:space="preserve">
+    <value>100</value>
+  </data>
+  <data name="mania_judgement_meh" xml:space="preserve">
+    <value>50</value>
+  </data>
+  <data name="mania_judgement_miss" xml:space="preserve">
+    <value>MISS</value>
   </data>
   <data name="score_graph_score" xml:space="preserve">
     <value>{0} {1:0000}</value>
@@ -680,6 +718,10 @@
   <data name="difficulty_attribute_lnmode_acronym" xml:space="preserve"><value>LM</value></data>
   <data name="difficulty_attribute_total" xml:space="preserve"><value>TOTAL</value></data>
   <data name="difficulty_attribute_total_acronym" xml:space="preserve"><value>TL</value></data>
+  <data name="difficulty_attribute_od" xml:space="preserve"><value>判定难度</value></data>
+  <data name="difficulty_attribute_od_acronym" xml:space="preserve"><value>OD</value></data>
+  <data name="difficulty_attribute_hp" xml:space="preserve"><value>血量难度</value></data>
+  <data name="difficulty_attribute_hp_acronym" xml:space="preserve"><value>HP</value></data>
   <data name="timing_metric_group_note" xml:space="preserve"><value>普通音符</value></data>
   <data name="timing_metric_group_tail" xml:space="preserve"><value>长键尾</value></data>
   <data name="timing_metric_group_scratch_tail" xml:space="preserve"><value>皿长键尾</value></data>

@@ -13,7 +13,6 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Scoring;
 [TestFixture]
 public class BmsExScoreTest
 {
-
     [TestCase(ScoreRank.C, 1000)]
     [TestCase(ScoreRank.B, 1200)]
     [TestCase(ScoreRank.A, 1400)]

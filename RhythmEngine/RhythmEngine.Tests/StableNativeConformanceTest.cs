@@ -39,7 +39,8 @@ public class StableNativeConformanceTest
         inputs.Add(new InputEvent(release, 0, false));
         session.AdvanceTo(release, inputs.ToArray());
         Assert.That(session.GetEventsSince(0).Last(e => e.Result.Value != "hold-tick").Result.Value, Is.EqualTo(row.GetProperty("result").GetString()));
-        Assert.That(session.Completed, Is.EqualTo(row.GetProperty("result").GetString() != "hold-break"));
+        Assert.That(session.GetNote(0).Completed, Is.EqualTo(row.GetProperty("result").GetString() != "hold-break"));
+        Assert.That(session.Completed, Is.EqualTo(release >= ms(2000) && session.GetNote(0).Completed));
     }
 
     [Test]

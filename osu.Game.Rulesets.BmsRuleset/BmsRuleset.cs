@@ -178,6 +178,7 @@ public partial class BmsRuleset : Ruleset
         ],
         ModType.Fun =>
         [
+            new BmsModManiaProfile(),
             new BmsModLr2(),
             new BmsModLongNote(),
             new BmsModChargeNote(),
@@ -204,7 +205,7 @@ public partial class BmsRuleset : Ruleset
         foreach (var mod in mods.OfType<IApplicableToDifficulty>())
             mod.ApplyToDifficulty(adjustedDifficulty);
 
-        GameplayProfile.FromMods(mods).AdjustDisplayDifficulty(adjustedDifficulty);
+        GameplayProfile.FromMods(mods).AdjustDisplayDifficulty(beatmapInfo, adjustedDifficulty);
         return adjustedDifficulty;
     }
 
@@ -236,5 +237,4 @@ public partial class BmsRuleset : Ruleset
         new BmsFilterCriteria(BmsRulesetRuntime.ConfigManager);
 
     public override Drawable CreateIcon() => new BmsRulesetIcon();
-
 }

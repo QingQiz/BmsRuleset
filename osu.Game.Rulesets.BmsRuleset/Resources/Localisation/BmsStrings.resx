@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <root>
+  <data name="mania_overall_difficulty" xml:space="preserve"><value>Overall difficulty (OD)</value></data>
+  <data name="mania_drain_rate" xml:space="preserve"><value>HP drain</value></data>
+  <data name="mania_difficulty_description" xml:space="preserve"><value>Defaults to 8, or the original value for osu!mania beatmaps. Adjust to override.</value></data>
+  <data name="mania_use_lazer" xml:space="preserve"><value>Use lazer rules</value></data>
+  <data name="mania_use_lazer_description" xml:space="preserve"><value>Enable for lazer judgement, scoring and health; disable for stable rules.</value></data>
   <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
   <resheader name="version"><value>2.0</value></resheader>
   <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
@@ -612,6 +617,12 @@ Click to open the BMS log for the complete list and error details.</value>
   <data name="difficulty_refresh_failed" xml:space="preserve">
     <value>BMS difficulty update finished with {0} failed charts.</value>
   </data>
+  <data name="mod_mania_profile_name" xml:space="preserve">
+    <value>osu!mania Profile</value>
+  </data>
+  <data name="mod_mania_profile" xml:space="preserve">
+    <value>Use osu!mania judgement, scoring and health. Choose lazer or stable rules and adjust OD and HP in the mod settings. All long notes require a release; mines are removed.</value>
+  </data>
   <data name="health" xml:space="preserve">
     <value>Health</value>
   </data>
@@ -642,6 +653,12 @@ Click to open the BMS log for the complete list and error details.</value>
   <data name="gauge_name_exhardclass" xml:space="preserve">
     <value>ExHard Class</value>
   </data>
+  <data name="result_score" xml:space="preserve">
+    <value>SCORE</value>
+  </data>
+  <data name="rank_letter_ss" xml:space="preserve">
+    <value>SS</value>
+  </data>
   <data name="rank_letter_s" xml:space="preserve">
     <value>S</value>
   </data>
@@ -660,8 +677,29 @@ Click to open the BMS log for the complete list and error details.</value>
   <data name="rank_letter_c" xml:space="preserve">
     <value>C</value>
   </data>
+  <data name="rank_letter_d" xml:space="preserve">
+    <value>D</value>
+  </data>
   <data name="rank_letter_f" xml:space="preserve">
     <value>F</value>
+  </data>
+  <data name="mania_judgement_perfect" xml:space="preserve">
+    <value>MAX</value>
+  </data>
+  <data name="mania_judgement_great" xml:space="preserve">
+    <value>300</value>
+  </data>
+  <data name="mania_judgement_good" xml:space="preserve">
+    <value>200</value>
+  </data>
+  <data name="mania_judgement_ok" xml:space="preserve">
+    <value>100</value>
+  </data>
+  <data name="mania_judgement_meh" xml:space="preserve">
+    <value>50</value>
+  </data>
+  <data name="mania_judgement_miss" xml:space="preserve">
+    <value>MISS</value>
   </data>
   <data name="score_graph_score" xml:space="preserve">
     <value>{0} {1:0000}</value>
@@ -680,6 +718,10 @@ Click to open the BMS log for the complete list and error details.</value>
   <data name="difficulty_attribute_lnmode_acronym" xml:space="preserve"><value>LM</value></data>
   <data name="difficulty_attribute_total" xml:space="preserve"><value>TOTAL</value></data>
   <data name="difficulty_attribute_total_acronym" xml:space="preserve"><value>TL</value></data>
+  <data name="difficulty_attribute_od" xml:space="preserve"><value>Overall difficulty</value></data>
+  <data name="difficulty_attribute_od_acronym" xml:space="preserve"><value>OD</value></data>
+  <data name="difficulty_attribute_hp" xml:space="preserve"><value>HP drain rate</value></data>
+  <data name="difficulty_attribute_hp_acronym" xml:space="preserve"><value>HP</value></data>
   <data name="timing_metric_group_note" xml:space="preserve"><value>Normal note</value></data>
   <data name="timing_metric_group_tail" xml:space="preserve"><value>LN tail</value></data>
   <data name="timing_metric_group_scratch_tail" xml:space="preserve"><value>Scratch LN tail</value></data>

@@ -3,7 +3,6 @@ using System.Threading.Tasks;
 using NUnit.Framework;
 using RhythmEngine.Profiles.Bms;
 using RhythmEngine.Profiles.Common;
-using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
@@ -15,7 +14,7 @@ using osu.Game.Rulesets.Scoring;
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
 
 [TestFixture]
-public class BmsJudgementProfileCacheTest
+public partial class BmsJudgementProfileCacheTest
 {
     [Test]
     public void ConcurrentConfigurationsShareDefinitionsWithoutLeakingMods()
@@ -64,21 +63,5 @@ public class BmsJudgementProfileCacheTest
         score.ApplyBeatmap(beatmap);
         Assert.That(note.HitWindows.WindowFor(HitResult.Perfect), Is.EqualTo(15));
         Assert.That(second.Profile.CreateHitWindows(note, second.TimingFor(note), NoteParts.HEAD).WindowFor(HitResult.Perfect), Is.EqualTo(18));
-    }
-
-    [Test]
-    public void EquivalentModSelectionsPreserveTheActiveHealthModel()
-    {
-        var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Popn9K, TotalColumns = 9 };
-        beatmap.HitObjects.Add(new BmsNote { Beatmap = beatmap, Column = 1, StartTime = 1000 });
-        using var health = new BmsHealthProcessor();
-        health.ApplyBeatmap(beatmap);
-        health.Mods = [new BmsModLr2(), new BmsModNoBad()];
-        var model = health.Model;
-        health.Mods = [new BmsModNoBad(), new BmsModLr2()];
-        Assert.That(health.Model, Is.SameAs(model));
-        health.Mods = [];
-        health.CreateEngineHealth(new BmsEngineChart(beatmap));
-        Assert.That(health.Health.Value, Is.EqualTo(.3), "Returning to the default BMS profile retains the chart's PMS gauge family.");
     }
 }

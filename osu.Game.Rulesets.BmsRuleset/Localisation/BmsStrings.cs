@@ -10,6 +10,20 @@ namespace osu.Game.Rulesets.BmsRuleset.Localisation;
 
 public static class BmsStrings
 {
+    public static LocalisableString ModManiaProfileName => get("mod_mania_profile_name");
+
+    public static LocalisableString ModManiaProfile => get("mod_mania_profile");
+
+    public static LocalisableString ManiaOverallDifficulty => get("mania_overall_difficulty");
+
+    public static LocalisableString ManiaDrainRate => get("mania_drain_rate");
+
+    public static LocalisableString ManiaDifficultyDescription => get("mania_difficulty_description");
+
+    public static LocalisableString ManiaUseLazer => get("mania_use_lazer");
+
+    public static LocalisableString ManiaUseLazerDescription => get("mania_use_lazer_description");
+
     public static LocalisableString PracticeMeasure(int measure) => get("practice_measure", measure);
 
     public static LocalisableString PracticeDensityWindow(double startMs, double endMs, double notesPerSecond)
@@ -247,7 +261,11 @@ public static class BmsStrings
 
     public static LocalisableString ResultComparisonDate(DateTimeOffset date) => get("result_comparison_date", date);
 
+    public static LocalisableString ResultScore => get("result_score");
+
     public static LocalisableString RankLetter(string letter) => get($"rank_letter_{letter}");
+
+    public static LocalisableString ManiaJudgement(Scoring.HitResult result) => get($"mania_judgement_{result.ToString().ToLowerInvariant()}");
 
     public static LocalisableString ResultNumber(double? value) => value.HasValue ? get("result_number", value.Value) : LeaderboardUnknown;
 

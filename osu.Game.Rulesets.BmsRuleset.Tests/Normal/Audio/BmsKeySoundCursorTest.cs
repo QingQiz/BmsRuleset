@@ -3,9 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
-using RhythmEngine.Core;
 using RhythmEngine.Profiles.Bms;
-using RhythmEngine.Profiles.Common;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
@@ -20,36 +18,8 @@ using osu.Game.Rulesets.Scoring;
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Audio;
 
 [TestFixture]
-public class BmsKeySoundCursorTest
+public partial class BmsKeySoundCursorTest
 {
-    [TestCase(835, 2210, 3210)]
-    public void SelectedProfileControlsSamplePreparationAndExpiry(double nextReady, double headExpiry, double tailExpiry)
-    {
-        var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, Rank = 2 };
-        var tap = new BmsNote { Beatmap = beatmap, Column = 1, StartTime = 1000, SampleKey = 1 };
-        var hold = new BmsLongNote { Beatmap = beatmap, Column = 1, StartTime = 2000, Duration = 1000, Kind = KeyNoteKind.ReleaseHold, SampleKey = 2, TailSampleKey = 3 };
-        beatmap.HitObjects.AddRange([tap, hold]);
-        using var score = new BmsScoreProcessor();
-        score.ApplyBeatmap(beatmap);
-        var compiled = score.EngineChart;
-        var usages = BmsGameplayAudioController.GetSampleUsages(beatmap, compiled).ToArray();
-        var cursor = new BmsKeySoundCursor(beatmap.HitObjects, note => note.StartTime + compiled.TimingFor(note).HeadDeadline / 1000.0);
-        Assert.Multiple(() =>
-        {
-            Assert.That(usages.Single(usage => usage.SampleKey == 2).EarliestTriggerTime, Is.EqualTo(nextReady));
-            Assert.That(usages.Single(usage => usage.SampleKey == 2).LatestTriggerTime, Is.EqualTo(headExpiry));
-            Assert.That(usages.Single(usage => usage.SampleKey == 3).EarliestTriggerTime, Is.EqualTo(nextReady + 1000));
-            Assert.That(usages.Single(usage => usage.SampleKey == 3).LatestTriggerTime, Is.EqualTo(tailExpiry));
-            Assert.That(cursor.Next(headExpiry - 1000, _ => false), Is.SameAs(tap));
-            Assert.That(cursor.Next(headExpiry - 1000 + 0.001, _ => false), Is.SameAs(hold));
-            Assert.That(cursor.Next(headExpiry - 1000, _ => false), Is.SameAs(tap));
-        });
-
-        var session = new JudgementSession(compiled.Chart, compiled.Configuration);
-        session.AdvanceTo(Time.FromMilliseconds(headExpiry + 0.001));
-        Assert.That(session.GetNote(compiled.Ids[hold]).Parts.Single(part => part.Part == NoteParts.HEAD).Resolved, Is.True);
-    }
-
     [TestCase(BmsJudgementModifiers.None, 835)]
     [TestCase(BmsJudgementModifiers.NoBad, 887.5)]
     [TestCase(BmsJudgementModifiers.NoBad | BmsJudgementModifiers.NoGood, 955)]

@@ -174,6 +174,10 @@ internal sealed class BmsJudgementEngine
             var step = contextAtTime?.Invoke(eventTime) ?? frame with { SimulationTime = eventTime };
             snapshots[transition.After.Id] = transition.After;
 
+            // Stable holds accept head and recovery presses without producing a judgement.
+            if (note is BmsLongNote && transition.Input is { Pressed: true } && transition.Judgements.IsEmpty)
+                output.PlaySample(note);
+
             foreach (var judgement in transition.Judgements)
             {
                 step = step with { EngineResult = judgement };
@@ -205,7 +209,6 @@ internal sealed class BmsJudgementEngine
                     output.ApplyBodyTick(step);
                 else if (note is BmsLongNote hold)
                 {
-
                     var kind = result.Part == NoteParts.HEAD ? BmsLongNoteEndpointKind.Head : BmsLongNoteEndpointKind.Tail;
                     var part = transition.After.Parts.Single(p => p.Part == result.Part);
                     var expected = kind == BmsLongNoteEndpointKind.Head ? hold.StartTime : hold.EndTime;
@@ -222,8 +225,11 @@ internal sealed class BmsJudgementEngine
                     }
                     else if (!scoresHead)
                     {
-                        var head = heads[result.NoteId];
-                        output.ApplyMainResult(hold, type, compiled.Profile.IncludeHeadOnly(part) ? [head] : [head, endpoint], step, result.SuppressPenalty);
+                        // Some profiles resolve the hold as a single tail judgement without emitting a head.
+                        var endpoints = heads.TryGetValue(result.NoteId, out var head)
+                            ? compiled.Profile.IncludeHeadOnly(part) ? new[] { head } : [head, endpoint]
+                            : [endpoint];
+                        output.ApplyMainResult(hold, type, endpoints, step, result.SuppressPenalty);
                     }
                     else output.ApplySyntheticEndpoint(endpoint, step, result.SuppressPenalty);
 

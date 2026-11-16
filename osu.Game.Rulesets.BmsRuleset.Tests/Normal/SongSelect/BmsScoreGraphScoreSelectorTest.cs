@@ -9,7 +9,7 @@ using osu.Game.Scoring;
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.SongSelect;
 
 [TestFixture]
-public class BmsScoreSelectorGraphTest
+public partial class BmsScoreSelectorGraphTest
 {
     [Test]
     public void TestSelectsHighestExScoreInsteadOfTotalScore()

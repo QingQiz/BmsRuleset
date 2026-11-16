@@ -85,7 +85,7 @@ internal sealed partial class BmsGameplayProfile : GameplayProfile
     // Historical BMS fast/slow totals include POOR's direction, although averages exclude it.
     internal override bool CountsForFastSlow(HitResult result) => result.IsHit();
 
-    internal override (Chart Chart, SessionConfiguration Configuration) Compile(BmsHitObject[] objects, KeyChart source)
+    internal override (Chart Chart, SessionConfiguration Configuration) Compile(BmsHitObject[] objects, KeyChart source, IBeatmapInfo? beatmapInfo)
     {
         var chart = new Chart(source.LaneCount, source.Notes.Select(note => new ChartNote(note.Id, note.Lane, note.StartTime, note.EndTime,
                 BmsEngineRules.ForBeatmap(objects[note.Id].Beatmap, modifiers).GetProfile(BmsEngineRules.RateFor(objects[note.Id], modifiers)).CreateRule(note))),

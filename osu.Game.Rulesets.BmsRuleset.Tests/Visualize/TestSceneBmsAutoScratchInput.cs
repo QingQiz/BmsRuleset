@@ -11,6 +11,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
+using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
@@ -149,14 +150,14 @@ public partial class TestSceneBmsAutoScratchInput : BmsPlayerTestScene
         new BmsReplayFrame(3219, BmsAction.Scratch), new BmsReplayFrame(3800, BmsAction.ScratchReverse), new BmsReplayFrame(3810), new BmsReplayFrame(60000),
     ];
 
-    private void load(BmsLongNoteMode longNoteMode, bool recorded = false, bool adjacent = false)
+    private void load(BmsLongNoteMode longNoteMode, bool recorded = false, bool adjacent = false, params Mod[] additionalMods)
     {
         AddStep("load AS player", () =>
         {
             mode = longNoteMode;
             recordedInputs = recorded;
             adjacentHold = adjacent;
-            LoadPlayer([new BmsModAutoScratch()]);
+            LoadPlayer([new BmsModAutoScratch(), .. additionalMods]);
         });
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.LoadedBeatmapSuccessfully && Player.Alpha == 1);
         AddStep("freeze time and observe production input", () =>

@@ -30,6 +30,7 @@ public static class BmsPracticeBeatmap
                 }
             }
         }
+
         return (start, Math.Max(start + 1, end));
     }
 
@@ -48,6 +49,7 @@ public static class BmsPracticeBeatmap
         var practice = (BmsBeatmap)fullBeatmap.Clone();
         practice.BeatmapInfo = fullBeatmap.BeatmapInfo.Clone();
         practice.Difficulty = fullBeatmap.Difficulty.Clone();
+        practice.BeatmapInfo.Difficulty = fullBeatmap.BeatmapInfo.Difficulty.Clone();
         practice.PracticeFullScoringOpportunities = new BmsEngineChart(fullBeatmap, GameplayProfile.FromMods(mods ?? [])).Chart.ScorePlan.Opportunities.Length;
         practice.PracticeEndTime = settings.EndTime;
         practice.HitObjects = fullBeatmap.HitObjects.Where(note => settings.Contains(note.StartTime, millisecondPrecision))

@@ -383,5 +383,4 @@ public partial class TestSceneBmsReplayRebuild : BmsPlayerTestScene
     {
         protected override bool CheckModsAllowFailure() => false;
     }
-
 }

@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using RhythmEngine.Core;
 using RhythmEngine.Profiles.Common;
+using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
@@ -28,11 +29,11 @@ internal sealed class BmsEngineChart
 
     internal BmsEngineChart(BmsBeatmap beatmap, GameplayProfile? profile = null)
         : this(beatmap.HitObjects.ToArray(), beatmap.LayoutVariant, Enumerable.Range(0, BmsLayout.GetTotalColumns(beatmap.LayoutVariant)).ToArray(), profile,
-            beatmap.PracticeEndTime is { } practiceEndTime ? Time.FromMilliseconds(practiceEndTime) : null)
+            beatmap.PracticeEndTime is { } practiceEndTime ? Time.FromMilliseconds(practiceEndTime) : null, beatmap.BeatmapInfo)
     {
     }
 
-    internal BmsEngineChart(BmsHitObject[] notes, BmsLayoutVariant layout, int[] columns, GameplayProfile? profile = null, long? endTime = null)
+    internal BmsEngineChart(BmsHitObject[] notes, BmsLayoutVariant layout, int[] columns, GameplayProfile? profile = null, long? endTime = null, IBeatmapInfo? beatmapInfo = null)
     {
         var scratch = layout switch
         {
@@ -46,7 +47,8 @@ internal sealed class BmsEngineChart
             .SelectMany(column => notesByColumn[column].OrderBy(n => n.StartTime)).ToArray();
         Ids = Objects.Select((note, id) => (note, id)).ToDictionary(pair => pair.note, pair => pair.id);
         Profile = profile ?? BmsGameplayProfile.INSTANCE;
-        (Chart, Configuration) = Profile.Compile(Objects, new KeyChart(columns.Max() + 1, Objects.Select(createKeyNote), endTime: endTime));
+        (Chart, Configuration) = Profile.Compile(Objects, new KeyChart(columns.Max() + 1, Objects.Select(createKeyNote), endTime: endTime),
+            beatmapInfo ?? (notes.FirstOrDefault()?.Beatmap as IBeatmap)?.BeatmapInfo);
         MaximumScore = Score.MaximumScore(Chart.ScorePlan);
     }
 
@@ -69,5 +71,4 @@ internal sealed class BmsEngineChart
                          && layout is not (BmsLayoutVariant.Keyboard24K or BmsLayoutVariant.Keyboard24KDouble),
             MineDamage: note is BmsLandmine mine ? mine.LandmineDamagePercent : 0);
     }
-
 }

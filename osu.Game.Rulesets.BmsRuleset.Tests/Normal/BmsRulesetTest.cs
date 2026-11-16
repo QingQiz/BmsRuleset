@@ -38,7 +38,7 @@ using osuTK.Graphics;
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal;
 
 [TestFixture]
-public class BmsRulesetTest
+public partial class BmsRulesetTest
 {
     [SetUp]
     public void SetUp()

@@ -15,6 +15,33 @@ public sealed record ManiaOptions(
 
 public static class ManiaProfiles
 {
+    public static AccuracyGrades Grades { get; } = new(.95, .9, .8, .7);
+
+    public static ScoreGrade GradeFor(double accuracy, IReadOnlyDictionary<ResultId, int> results)
+        => accuracy >= Grades.S && new[] { ManiaResults.GOOD, ManiaResults.OK, ManiaResults.MEH, ManiaResults.MISS }.All(result => results.GetValueOrDefault(result) == 0)
+            ? ScoreGrade.Perfect
+            : Grades.GradeFor(accuracy);
+
+    private static readonly ImmutableDictionary<ResultId, ResultValue> lazer_values = ProfileSupport.Values(
+        (ManiaResults.PERFECT, 305, 305, ComboChange.Increment), (ManiaResults.GREAT, 300, 300, ComboChange.Increment),
+        (ManiaResults.GOOD, 200, 200, ComboChange.Increment), (ManiaResults.OK, 100, 100, ComboChange.Increment),
+        (ManiaResults.MEH, 50, 50, ComboChange.Increment), (ManiaResults.MISS, 0, 0, ComboChange.Reset));
+
+    public static ResultValue GetLazerResultValue(ResultId result) => lazer_values[result];
+
+    private static readonly ImmutableDictionary<ResultId, ResultValue> stable_values = ProfileSupport.Values(
+        (ManiaResults.PERFECT, 320, 300, ComboChange.Increment), (ManiaResults.GREAT, 300, 300, ComboChange.Increment),
+        (ManiaResults.GOOD, 200, 200, ComboChange.Increment), (ManiaResults.OK, 100, 100, ComboChange.Increment),
+        (ManiaResults.MEH, 50, 50, ComboChange.Increment), (ManiaResults.MISS, 0, 0, ComboChange.Reset));
+
+    public static ResultValue GetStableResultValue(ResultId result) => stable_values[result];
+
+    public static int GetStableMaximumCombo(Chart chart)
+    {
+        var ticks = chart.Notes.Sum(note => note.Rule is StableManiaHoldRule hold ? hold.MaximumTicks(note) : 0);
+        return chart.ScorePlan.Opportunities.Length + ticks;
+    }
+
     public static CompiledProfile CreateLazer(KeyChart source, ManiaOptions? options = null) => compile(source, options ?? new ManiaOptions(), false);
 
     public static CompiledProfile CreateStable(KeyChart source, ManiaOptions? options = null) => compile(source, options ?? new ManiaOptions(), true);
@@ -52,7 +79,7 @@ public static class ManiaProfiles
                     : "Normal gameplay; mod-specific score multipliers and pre-v8 beatmap break drain are not inferred from difficulty values.",
             ]);
         return new CompiledProfile(chart, new SessionConfiguration(id, score, health, context =>
-            !stable && context.State.Held == context.State.PreviouslyHeld ? [] : ProfileSupport.Oldest(context),
+                !stable && context.State.Held == context.State.PreviouslyHeld ? [] : ProfileSupport.Oldest(context),
             context => context.Time >= source.EndTime && context.NotesRetired), descriptor);
     }
 
@@ -129,9 +156,6 @@ public static class ManiaProfiles
 
     private static ScoreConfiguration stableScore(ScorePlan plan)
     {
-        var values = ProfileSupport.Values((ManiaResults.PERFECT, 320, 300, ComboChange.Increment), (ManiaResults.GREAT, 300, 300, ComboChange.Increment),
-            (ManiaResults.GOOD, 200, 200, ComboChange.Increment), (ManiaResults.OK, 100, 100, ComboChange.Increment),
-            (ManiaResults.MEH, 50, 50, ComboChange.Increment), (ManiaResults.MISS, 0, 0, ComboChange.Reset));
         return new ScoreConfiguration(new ScoreState { Bonus = 100 }, (state, context) =>
         {
             var nativeCombo = state.Combo & ushort.MaxValue;
@@ -143,11 +167,16 @@ public static class ManiaProfiles
                 {
                     Combo = state.Combo + 1, MaximumCombo = Math.Max(state.MaximumCombo, state.Combo + 1),
                     Bonus = resetBonus ? 100 : state.Bonus,
+                    ResultCounts = state.ResultCounts.SetItem(ManiaResults.HOLD_TICK, state.ResultCounts.GetValueOrDefault(ManiaResults.HOLD_TICK) + 1),
                 };
             }
 
             if (context.Event.Result == ManiaResults.HOLD_BREAK)
-                return state with { Combo = 0, Bonus = resetBonus ? 100 : state.Bonus };
+                return state with
+                {
+                    Combo = 0, Bonus = resetBonus ? 100 : state.Bonus,
+                    ResultCounts = state.ResultCounts.SetItem(ManiaResults.HOLD_BREAK, state.ResultCounts.GetValueOrDefault(ManiaResults.HOLD_BREAK) + 1),
+                };
             if (context.Opportunity == null)
                 return state;
 
@@ -171,8 +200,8 @@ public static class ManiaProfiles
                 var id when id == ManiaResults.MEH => 4,
                 _ => 0,
             };
-            var value = values[result].Score;
-            var next = ProfileSupport.Accumulate(state, context, values);
+            var value = stable_values[result].Score;
+            var next = ProfileSupport.Accumulate(state, context, stable_values);
             var delta = 500000.0 / plan.Opportunities.Length * (value + bonusValue * Math.Sqrt(bonus)) / 320;
             var unrounded = state.Counters.GetValueOrDefault(ManiaCounters.SCORE_V1_UNROUNDED) + delta;
             // Stable displays truncated hit increments, then recomputes its rounded total when play finishes.
@@ -186,9 +215,6 @@ public static class ManiaProfiles
 
     private static ScoreConfiguration lazerScore(ScorePlan plan)
     {
-        var values = ProfileSupport.Values((ManiaResults.PERFECT, 305, 305, ComboChange.Increment), (ManiaResults.GREAT, 300, 300, ComboChange.Increment),
-            (ManiaResults.GOOD, 200, 200, ComboChange.Increment), (ManiaResults.OK, 100, 100, ComboChange.Increment),
-            (ManiaResults.MEH, 50, 50, ComboChange.Increment), (ManiaResults.MISS, 0, 0, ComboChange.Reset));
         var maximumCombo = Enumerable.Range(1, plan.Opportunities.Length).Sum(combo => 300 * comboFactor(combo));
         return new ScoreConfiguration(new ScoreState(), (state, context) =>
         {
@@ -198,8 +224,8 @@ public static class ManiaProfiles
             if (context.Opportunity == null)
                 return state;
 
-            var next = ProfileSupport.Accumulate(state, context, values);
-            var baseCombo = context.Event.Result == ManiaResults.PERFECT ? 300 : values[context.Event.Result].Score;
+            var next = ProfileSupport.Accumulate(state, context, lazer_values);
+            var baseCombo = context.Event.Result == ManiaResults.PERFECT ? 300 : lazer_values[context.Event.Result].Score;
             var comboPortion = state.Counters.GetValueOrDefault(ManiaCounters.COMBO_PORTION) + baseCombo * comboFactor(next.Combo);
             var progress = next.AccuracyMaximum / plan.MaximumAccuracy;
             return next with

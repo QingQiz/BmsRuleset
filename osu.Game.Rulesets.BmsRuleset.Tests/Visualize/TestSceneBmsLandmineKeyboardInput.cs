@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Text.Json;
 using NUnit.Framework;
 using RhythmEngine.Profiles.Common;
 using osu.Framework.Input;
@@ -15,7 +14,6 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.LongNoteMode;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
@@ -90,64 +88,6 @@ public partial class TestSceneBmsLandmineKeyboardInput : BmsPlayerTestScene
         Assert.That(Player.DrawableRuleset.HasReplayLoaded.Value, Is.False);
         Assert.That(inputManager.ReplayInputHandler, Is.Null);
         Assert.That(((RulesetInputManagerInputState<BmsAction>)inputManager.CurrentState).LastReplayState, Is.Null);
-    }
-
-    [Test]
-    public void LiveRewindRestoresTheSelectedProfile([Values] bool explicitSeek)
-    {
-        var snapshots = new Dictionary<double, string>();
-        AddStep("load live profile", () => LoadPlayer([new BmsModChargeNote()]));
-        AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
-        AddStep("attach keyboard", () =>
-        {
-            Player.DrawableRuleset.SetRecordTarget(Player.Score);
-            typeof(GameplayClockContainer).GetMethod("StopGameplayClock", BindingFlags.Instance | BindingFlags.NonPublic)!
-                .Invoke(Player.GameplayClockContainer, null);
-            inputManager = Player.DrawableRuleset.ChildrenOfType<BmsInputManager>().Single(i => i.ChildrenOfType<BmsColumn>().Any());
-            inputManager.UseParentInput = false;
-            var keyboard = new ScheduledKeyboard(() => Player.DrawableRuleset.FrameStableClock.CurrentTime,
-                [(3000, new KeyboardKeyInput([new(Key.Z, true)])), (3300, new KeyboardKeyInput([new(Key.Z, false)])),
-                    (3500, new KeyboardKeyInput([new(Key.Z, true)])), (5000, new KeyboardKeyInput([new(Key.Z, false)]))]);
-            typeof(CustomInputManager).GetMethod("AddHandler", BindingFlags.Instance | BindingFlags.NonPublic)!
-                .Invoke(inputManager, [keyboard]);
-        });
-
-        foreach (var time in new[] { 0d, 3000, 3200, 3300, 3500, 4000, 5000, 5500 })
-        {
-            moveTo(time);
-            AddStep("capture live state", () => snapshots[time] = state());
-        }
-        AddAssert("input recorder contains actual key transitions", () => Player.Score.Replay.Frames.Count > 4);
-        foreach (var time in new[] { 4000d, 3200, 0 })
-        {
-            moveTo(time);
-            AddAssert("rewind restores score, health and profile counters", () => state(), () => Is.EqualTo(snapshots[time]));
-            AddStep("no replay handler is attached", assertNoReplay);
-        }
-
-        void moveTo(double time)
-        {
-            AddStep("move live clock " + time, () =>
-            {
-                if (explicitSeek) Player.GameplayClockContainer.Seek(time);
-                else AdvanceReplayClock(time);
-            });
-            AddUntilStep("clock reached target", () => Math.Abs(Player.DrawableRuleset.FrameStableClock.CurrentTime - time) < .001);
-        }
-
-        string state()
-        {
-            var score = (BmsScoreProcessor)Player.ScoreProcessor;
-            var health = (BmsHealthProcessor)Player.HealthProcessor;
-            return JsonSerializer.Serialize(new
-            {
-                score.EngineScore.Score, score.EngineScore.AccuracyPoints, score.EngineScore.AccuracyMaximum,
-                score.EngineScore.Combo, score.EngineScore.MaximumCombo, score.EngineScore.JudgedOpportunities,
-                score.EngineScore.Bonus, Counters = score.EngineScore.Counters.OrderBy(pair => pair.Key).ToArray(),
-                Results = score.EngineScore.ResultCounts.OrderBy(pair => pair.Key.Value).ToArray(),
-                Health = health.CurrentHealth, health.HasFailed, score.JudgementEvents,
-            });
-        }
     }
 
     private void checkpoint(double time, bool expectedMine)

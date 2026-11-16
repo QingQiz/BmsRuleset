@@ -198,14 +198,14 @@ public class BmsBeatmapConversionTest
             Assert.That(converted.TotalColumns, Is.EqualTo(BmsLayout.BME7_KEY_COLUMNS));
             Assert.That(converted.LayoutVariant, Is.EqualTo(BmsLayoutVariant.Bme7K));
             Assert.That(converted.Difficulty.CircleSize, Is.EqualTo(BmsLayout.BME7_KEY_COLUMNS));
-            Assert.That(converted.BeatmapInfo.Difficulty.CircleSize, Is.EqualTo(BmsLayout.BME7_KEY_COLUMNS));
+            Assert.That(converted.BeatmapInfo.Difficulty.CircleSize, Is.EqualTo(7));
             Assert.That(converted.Rank, Is.EqualTo(2));
             Assert.That(converted.Total, Is.EqualTo(BmsGaugeCalculator.CalculateDefaultTotal(hitObjects.Count)).Within(0.000001));
             Assert.That(converted.Difficulty.OverallDifficulty, Is.EqualTo(2));
             Assert.That(converted.Difficulty.ApproachRate, Is.EqualTo(converted.Total).Within(0.000001));
             Assert.That(converted.LockedLongNoteMode, Is.EqualTo(BmsLongNoteMode.ChargeNote));
             Assert.That(converted.Difficulty.DrainRate, Is.EqualTo(2));
-            Assert.That(converted.BeatmapInfo.Difficulty.DrainRate, Is.EqualTo(2));
+            Assert.That(converted.BeatmapInfo.Difficulty.DrainRate, Is.EqualTo(5));
             Assert.That(converted.HitObjects.Take(7).Select(h => h.Column), Is.EqualTo(Enumerable.Range(1, 7)));
             Assert.That(converted.HitObjects, Has.None.Matches<BmsHitObject>(h => h.Column == 0));
 

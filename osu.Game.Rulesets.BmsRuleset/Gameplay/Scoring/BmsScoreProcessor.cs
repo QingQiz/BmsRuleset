@@ -155,6 +155,13 @@ public partial class BmsScoreProcessor : ScoreProcessor
         if (storeResults)
         {
             EngineScore = EngineScore with { Score = EngineChart.MaximumScore };
+            foreach (var (result, count) in profile.MaximumAuxiliaryResults(EngineChart))
+            {
+                ScoreResultCounts[result] = count;
+                if (result.AffectsCombo())
+                    HighestCombo.Value += count;
+            }
+
             var statistics = GetScoreProcessorStatistics();
             statistics.BaseScore = statistics.MaximumBaseScore = EngineChart.Chart.ScorePlan.MaximumAccuracy;
             SetScoreProcessorStatistics(statistics);

@@ -70,7 +70,9 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
             LockedLongNoteMode = converted.LockedLongNoteMode,
         };
         difficulty.WriteToOsuDifficulty(converted.Difficulty);
-        difficulty.WriteToOsuDifficulty(converted.BeatmapInfo.Difficulty);
+        // Foreign metadata remains the source of its original difficulty; runtime BMS encoding lives in Difficulty.
+        if (original.BeatmapInfo.Ruleset.OnlineID != 3)
+            difficulty.WriteToOsuDifficulty(converted.BeatmapInfo.Difficulty);
 
         foreach (var note in converted.HitObjects)
             note.Beatmap = converted;
@@ -127,7 +129,7 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
             return converted;
         }
 
-        if (Mania7KBeatmapConverter.CanConvert(original))
+        if (original is not IBmsBeatmap && Mania7KBeatmapConverter.CanConvert(original))
             Mania7KBeatmapConverter.Convert(original, converted, cancellationToken);
         else if (original is IBmsBeatmap bmsSource)
         {

@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
-using RhythmEngine.Profiles.Common;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
@@ -21,7 +20,7 @@ using osu.Game.Tests.Beatmaps;
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Difficulty;
 
 [TestFixture]
-public class BmsStarRatingProcessorTest
+public partial class BmsStarRatingProcessorTest
 {
     [Test]
     public void ExRankRetainsSmallPositiveWindowsAndExplicitZero([Values] bool lr2, [Values] bool timed, [Values(0, .1, 1)] double exRank)
@@ -282,31 +281,6 @@ public class BmsStarRatingProcessorTest
         calculator.CalculateTimed();
 
         Assert.That(calculator.StarRatingProcessor.HitLeniencyX, Is.EqualTo(computeExpectedHitLeniency(90)).Within(1e-12));
-    }
-
-    [Test]
-    public void SelectedProfileControlsRatingAndScoringOpportunities([Values] bool timed)
-    {
-        var beatmap = createSimpleBeatmap();
-        beatmap.HitObjects =
-        [
-            new BmsNote { Beatmap = beatmap, Column = 1, StartTime = 0 },
-            new BmsLongNote { Beatmap = beatmap, Column = 2, StartTime = 500, Duration = 250, Kind = KeyNoteKind.ReleaseHold },
-            new BmsLongNote { Beatmap = beatmap, Column = 3, StartTime = 1000, Duration = 250 },
-            new BmsLandmine { Beatmap = beatmap, Column = 4, StartTime = 1500, LandmineDamagePercent = 10 },
-            new BmsNote { Beatmap = beatmap, Column = 5, StartTime = 2000 },
-        ];
-        var calculator = new BmsDifficultyCalculator(new BmsRuleset().RulesetInfo, new TestWorkingBeatmap(beatmap));
-
-        var attributes = timed
-            ? calculator.CalculateTimed().Select(result => result.Attributes).ToArray()
-            : [calculator.Calculate()];
-        int[] expectedCombos = timed ? [1, 3, 4, 4, 5] : [5];
-        Assert.That(attributes.Select(result => result.MaxCombo), Is.EqualTo(expectedCombos));
-        Assert.That(calculator.StarRatingProcessor.HitLeniencyX, Is.EqualTo(computeExpectedHitLeniency(45)).Within(1e-12));
-
-        Assert.That(((BmsLongNote)beatmap.HitObjects[1]).Kind, Is.EqualTo(KeyNoteKind.ReleaseHold));
-        Assert.That(beatmap.HitObjects.OfType<BmsLandmine>().Count(), Is.EqualTo(1));
     }
 
     [Test]

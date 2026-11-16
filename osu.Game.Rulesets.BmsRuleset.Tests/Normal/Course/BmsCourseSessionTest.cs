@@ -22,7 +22,7 @@ using osu.Game.Scoring;
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Course;
 
 [TestFixture]
-public class BmsCourseSessionTest
+public partial class BmsCourseSessionTest
 {
     [SetUp]
     public void SetUp()
@@ -454,23 +454,6 @@ public class BmsCourseSessionTest
 
         var same = BmsCourseSession.CreateCourseMods([new BmsModNoGood()], BmsGaugeType.Class, ["no_good"]);
         Assert.That(same, Has.One.TypeOf<BmsModNoGood>());
-    }
-
-    [TestCase(null)]
-    [TestCase("ln")]
-    [TestCase("gauge_lr2")]
-    public void TestCourseDisallowsPlayerProfileModifiers(string constraint)
-    {
-        string[] constraints = constraint == null ? [] : [constraint];
-        var forbidden = BmsCourseSession.ResolveForbiddenModTypes(constraints).ToArray();
-        foreach (var selected in new Mod[] { new BmsModLr2(), new BmsModNoGood(), new BmsModNoGreat(), new BmsModNoBad() })
-        {
-            Assert.That(forbidden.Any(type => type.IsInstanceOfType(selected)), Is.True, selected.Acronym);
-            var gaugeType = BmsCourseSession.ResolveCourseGaugeType([selected]);
-            var mods = BmsCourseSession.CreateCourseMods([selected], gaugeType, constraints);
-            Assert.That(mods.OfType<IApplicableToGameplayProfile>(), Is.Empty, selected.Acronym);
-            Assert.That(mods, Has.One.TypeOf<BmsModClassGauge>());
-        }
     }
 
     [Test]

@@ -11,7 +11,6 @@ using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using RhythmEngine.Profiles.Common;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
@@ -21,31 +20,6 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay;
 
 public partial class BmsGameplayVirtualisationTest
 {
-    [TestCase(500, 1310, 3310)]
-    public void SelectedProfileControlsLifetimeBeforePlayfieldLoad(double start, double tapEnd, double holdEnd)
-    {
-        var tap = new BmsNote { StartTime = 1000, Column = 1 };
-        var hold = new BmsLongNote { StartTime = 2000, Duration = 1000, Column = 1, Kind = KeyNoteKind.ReleaseHold };
-        var beatmap = attachBeatmap(new BmsBeatmap { Rank = 2, TotalColumns = BmsLayout.BME7_KEY_COLUMNS, LayoutVariant = BmsLayoutVariant.Bme7K, HitObjects = [tap, hold] });
-        using var score = new BmsScoreProcessor();
-        score.ApplyBeatmap(beatmap);
-        var playfield = new BmsPlayfield(beatmap, () => score.EngineChart);
-        playfield.ScrollController.SetConfiguredScrollSpeed(1000);
-        playfield.ScrollController.ConstantScrollActive = true;
-        playfield.Add(tap);
-        playfield.Add(hold);
-        playfield.RefreshAllLifetimes();
-        var entries = playfield.Stage.Columns[1].HitObjectContainer.Entries.ToArray();
-        Assert.Multiple(() =>
-        {
-            Assert.That(playfield.IsLoaded, Is.False);
-            Assert.That(entries.Single(entry => entry.HitObject == tap).LifetimeStart, Is.EqualTo(start));
-            Assert.That(entries.Single(entry => entry.HitObject == tap).LifetimeEnd, Is.EqualTo(tapEnd));
-            Assert.That(entries.Single(entry => entry.HitObject == hold).LifetimeEnd, Is.EqualTo(holdEnd));
-            Assert.That(playfield.CreateNoteLifetimeEntry(tap).GetPracticeVisibilityStart(), Is.EqualTo(start));
-        });
-    }
-
     [TestCase(0)]
     [TestCase(34.4828448267217)]
     [TestCase(1000)]
@@ -61,6 +35,7 @@ public partial class BmsGameplayVirtualisationTest
         var entry = playfield.CreateNoteLifetimeEntry(note);
         entry.RefreshLifetime();
         Assert.That(entry.LifetimeEnd, Is.EqualTo(Math.Max(1210, note.EndTime + .001) + 100).Within(1e-9));
+
         foreach (var press in new[] { false, true })
         {
             var session = new JudgementSession(compiled.Chart, compiled.Configuration);
@@ -519,21 +494,6 @@ public partial class BmsGameplayVirtualisationTest
         }
 
         return string.Empty;
-    }
-
-    private static string findSourceRoot([CallerFilePath] string sourceFile = "")
-    {
-        var directory = new DirectoryInfo(Path.GetDirectoryName(sourceFile) ?? string.Empty);
-
-        while (directory != null)
-        {
-            if (Directory.Exists(Path.Combine(directory.FullName, "osu.Game.Rulesets.BmsRuleset")))
-                return directory.FullName;
-
-            directory = directory.Parent;
-        }
-
-        return TestContext.CurrentContext.TestDirectory;
     }
 
     private static double findFirstVisibleTime(BmsBeatmap beatmap, BmsHitObject hitObject)

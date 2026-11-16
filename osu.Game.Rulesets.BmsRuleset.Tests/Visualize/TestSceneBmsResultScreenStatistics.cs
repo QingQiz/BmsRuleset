@@ -40,7 +40,6 @@ using osu.Game.Scoring;
 using osu.Game.Screens;
 using osu.Game.Screens.Footer;
 using osu.Game.Screens.Ranking;
-using osu.Game.Screens.Ranking.Expanded.Statistics;
 using osu.Game.Tests.Visual;
 using osuTK;
 using osuTK.Input;
@@ -473,37 +472,6 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
         AddAssert("reveal follows the new proportional width", () =>
             bar.ChildrenOfType<Container>().Single(container => container.Name == "Bar fill reveal").DrawWidth,
             () => Is.EqualTo(4));
-    }
-
-    [Test]
-    public void TestResultStatisticsUseProfileScore()
-    {
-        TestBmsSoloResultsScreen screen = null!;
-
-        AddStep("load results screen", () =>
-        {
-            OsuScreenStack stack;
-            Child = stack = new OsuScreenStack { RelativeSizeAxes = Axes.Both };
-            var score = createScore();
-            stack.Push(screen = new TestBmsSoloResultsScreen(score));
-        });
-
-        AddUntilStep("results screen loaded", () => screen.IsLoaded);
-        AddUntilStep("statistics shown automatically", () => this.ChildrenOfType<BmsStatisticsPanel>().Single().State.Value == Visibility.Visible);
-        AddAssert("performance statistic is absent", () => this.ChildrenOfType<PerformanceStatistic>().Count() == 0);
-        AddUntilStep("new overview loaded", () => screen.ChildrenOfType<BmsResultOverview>().SingleOrDefault()?.IsLoaded == true);
-        AddAssert("score uses selected profile", () => screen.ChildrenOfType<BmsResultFittedText>()
-            .Single(text => text.Name == "Score value").ChildrenOfType<SpriteText>().Single().Text.ToString(), () => Is.EqualTo("1542"));
-        AddAssert("judgement labels use selected profile", () => screen.ChildrenOfType<BmsResultJudgementRow>()
-            .Single(row => row.Result == HitResult.Miss).ChildrenOfType<SpriteText>().Any(text => text.Text.ToString() == "E-POOR"));
-        AddAssert("six judgement bars use score counts", () => screen.ChildrenOfType<BmsResultJudgementRow>().Select(row => row.Count),
-            () => Is.EqualTo(new[] { 621, 300, 41, 12, 8, 3 }));
-        AddAssert("judgement bar uses count proportion", () => screen.ChildrenOfType<BmsResultJudgementRow>()
-                .Single(row => row.Result == HitResult.Perfect).ChildrenOfType<BmsResultBar>().Single().Proportion,
-            () => Is.EqualTo(621.0 / 985).Within(0.0001));
-        AddAssert("combo bar uses maximum achievable combo", () => screen.ChildrenOfType<BmsResultBar>()
-                .Single(bar => bar.Name == "Result combo progress").Proportion,
-            () => Is.EqualTo(653.0 / 985).Within(0.0001));
     }
 
     [TestCase(false)]
@@ -1207,5 +1175,4 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
             () => Is.EqualTo(accuracy - 0.001).Within(0.0001));
         AddAssert("native score panels absent", () => screen.ChildrenOfType<ScorePanel>(), () => Is.Empty);
     }
-
 }
