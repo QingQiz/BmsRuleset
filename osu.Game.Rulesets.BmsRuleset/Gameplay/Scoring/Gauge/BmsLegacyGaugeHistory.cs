@@ -19,7 +19,7 @@ internal static class BmsLegacyGaugeHistory
 {
     private const double max_landmine_damage_percent = (36 * 36 - 1) / 2d;
 
-    internal static IReadOnlyList<GameplayHealthHistoryEvent> Reconstruct(ScoreInfo score, IBeatmap beatmap, IReadOnlyList<HitEvent> events)
+    internal static IReadOnlyList<GameplayHealthHistoryEvent> Reconstruct(ScoreInfo score, IBeatmap beatmap, IReadOnlyList<HitEvent> events, BmsGameplayProfile profile)
     {
         if (events.Count == 0)
             return [];
@@ -30,7 +30,7 @@ internal static class BmsLegacyGaugeHistory
             : [explicitType ?? BmsGaugeType.Normal];
         var family = beatmap is BmsBeatmap bms ? BmsGaugeProfileFamilyProvider.FromLayout(bms.LayoutVariant) : BmsGaugeProfileFamily.SevenKeys;
         var noteCount = Math.Max(1, beatmap.HitObjects.Count(note => note is not BmsLandmine));
-        var calculators = types.Select(type => new BmsGaugeCalculator(BmsGaugeProfileFactory.Create(type, family),
+        var calculators = types.Select(type => new BmsGaugeCalculator(profile.CreateGaugeProfile(type, family),
             (beatmap as BmsBeatmap)?.Total, noteCount, family)).ToArray();
         var states = calculators.Select(calculator => new HealthState(calculator.Profile.InitialHealth, false)).ToArray();
         var history = new List<GameplayHealthHistoryEvent> { snapshot(0) };

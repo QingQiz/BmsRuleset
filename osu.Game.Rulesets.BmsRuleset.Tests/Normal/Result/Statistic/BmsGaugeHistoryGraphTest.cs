@@ -1,9 +1,11 @@
 using System.Linq;
+using System.Threading;
 using NUnit.Framework;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Profiles;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
@@ -57,6 +59,24 @@ public class BmsGaugeHistoryGraphTest
 
         Assert.That(finalGauge.IsFinalUsedGauge, Is.True);
         Assert.That(finalGauge.LineRadius, Is.GreaterThan(series.Where(s => !s.IsFinalUsedGauge).Max(s => s.LineRadius)));
+    }
+
+    [TestCase(false, HitResult.Miss, 0.9d)]
+    [TestCase(true, HitResult.Miss, 1d)]
+    [TestCase(true, HitResult.Ok, 0d)]
+    public void TestHistoryWithoutReplayUsesSelectedGaugeProfile(bool lr2, HitResult result, double expectedHealth)
+    {
+        var beatmap = createBeatmap();
+        var score = new ScoreInfo
+        {
+            Mods = lr2 ? [new BmsModLr2(), new BmsModHazardGauge()] : [new BmsModHazardGauge()],
+            HitEvents = [new HitEvent(0, 1, result, beatmap.HitObjects[0], null, null)],
+        };
+        var data = BmsResultStatisticsData.Load(score, beatmap, new osu.Game.Replays.Replay(), CancellationToken.None);
+        Assert.That(data, Is.Not.Null);
+        var gauge = data!.Gauges.Single();
+        Assert.That(gauge.Points.Last().Health, Is.EqualTo(expectedHealth).Within(1e-6));
+        Assert.That(gauge.FailurePoint.HasValue, Is.EqualTo(expectedHealth == 0));
     }
 
     [Test]

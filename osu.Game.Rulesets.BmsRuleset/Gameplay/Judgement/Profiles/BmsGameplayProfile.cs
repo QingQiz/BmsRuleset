@@ -60,7 +60,7 @@ internal sealed partial class BmsGameplayProfile : GameplayProfile
         };
 
     internal override IReadOnlyList<GameplayHealthHistoryEvent> ReconstructHealthHistory(ScoreInfo score, IBeatmap beatmap, IReadOnlyList<HitEvent> events)
-        => BmsLegacyGaugeHistory.Reconstruct(score, beatmap, events);
+        => BmsLegacyGaugeHistory.Reconstruct(score, beatmap, events, this);
 
     internal override GameplayEventKind EventKind(JudgementEvent result) => result switch
     {
