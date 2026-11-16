@@ -23,6 +23,7 @@ using osu.Game.Rulesets.Replays;
 using osu.Game.Screens.Play.HUD;
 using osu.Game.Screens.Play.HUD.JudgementCounter;
 using osu.Game.Skinning;
+using osu.Game.Scoring;
 using osu.Game.Tests.Visual;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
@@ -142,6 +143,37 @@ public partial class TestSceneBmsReplayRebuild : BmsPlayerTestScene
     }
 
     [Test]
+    public void ReplacementReplayRebuildsWithItsOwnHealthSeed()
+    {
+        AddStep("load seeded replay", () =>
+        {
+            layout = BmsLayoutVariant.Bme7K;
+            scratchReplay = false;
+            disableFailure = true;
+            LoadPlayer(mods(0.6));
+        });
+        AddUntilStep("player loaded", () => Player.IsLoaded && Player.LoadedBeatmapSuccessfully && Player.Alpha == 1);
+        seek(500);
+        AddAssert("original replay seed", () => Player.HealthProcessor.Health.Value, () => Is.EqualTo(0.6));
+        foreach (var seed in new[] { 0.25, 0.8 })
+        {
+            AddStep($"replace replay with seed {seed}", () => Player.DrawableRuleset.SetReplayScore(new Score
+            {
+                ScoreInfo = { Mods = mods(seed) },
+                Replay = { Frames = [new BmsReplayFrame(0), new BmsReplayFrame(5000)] },
+            }));
+            AddUntilStep("replacement applied at the current time", () => Player.HealthProcessor.Health.Value == seed);
+            AddAssert("no previous judgements survive", () => ((BmsScoreProcessor)Player.ScoreProcessor).JudgementEvents, () => Is.Empty);
+            seek(4000);
+            AddAssert("replacement replay loses health", () => Player.HealthProcessor.Health.Value, () => Is.LessThan(seed));
+            seek(500);
+            AddAssert("rewind restores replacement seed", () => Player.HealthProcessor.Health.Value, () => Is.EqualTo(seed));
+        }
+
+        Mod[] mods(double seed) => [new BmsModHardGauge { InitialHealth = { Value = seed } }];
+    }
+
+    [Test]
     public void ScratchReversalKeepsTheSameResultsAfterRebuild(
         [Values(BmsLongNoteMode.ChargeNote, BmsLongNoteMode.HellChargeNote)] BmsLongNoteMode mode,
         [Values] bool doubleTime)
@@ -169,7 +201,7 @@ public partial class TestSceneBmsReplayRebuild : BmsPlayerTestScene
         });
         verifyRebuilds([500, 600, 1000, 4100]);
         AddAssert("depleted gauge retains the failure override", () =>
-            ((BmsHealthProcessor)Player.HealthProcessor).HasEverFailed && !Player.HealthProcessor.HasFailed);
+            ((BmsHealthProcessor)Player.HealthProcessor).CurrentHealth.HasFailed && !Player.HealthProcessor.HasFailed);
     }
 
     [Test]
@@ -323,14 +355,15 @@ public partial class TestSceneBmsReplayRebuild : BmsPlayerTestScene
             Rank = score.Rank.Value,
             score.ScoringJudgementEventCount,
             score.JudgementEvents,
-            health.CurrentGaugeStates,
+            Health = health.CurrentHealth,
+            Display = health.DisplayProfile.Value,
             health.HasFailed,
-            health.HasEverFailed,
+            EngineFailed = health.CurrentHealth.HasFailed,
             Columns = Playfield.Stage.Columns.Cast<BmsColumn>().Select(column => new
             {
                 column.Judgements.PressedDirections,
                 Holds = Playfield.Beatmap.HitObjects.OfType<BmsLongNote>().Where(note => note.Column == column.Index)
-                    .Select(column.Judgements.GetLongNoteState).ToArray(),
+                    .Select(column.Judgements.GetNote).ToArray(),
             }).ToArray(),
         });
     }

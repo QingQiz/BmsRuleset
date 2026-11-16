@@ -4,20 +4,20 @@
 // Based on osu! revision 3c1c96f742e7aae2ff67a7361e058fe91ca3b955.
 // BMS owns these components so rank lettering does not depend on native UI patches.
 
-using System;
 using System.Linq;
+using System;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.Color4Extensions;
-using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.UserInterface;
+using osu.Framework.Graphics;
 using osu.Framework.Utils;
 using osu.Game.Audio;
 using osu.Game.Graphics;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
 using osu.Game.Screens.Ranking.Expanded.Accuracy;
@@ -51,6 +51,7 @@ internal partial class BmsAccuracyCircle : CompositeDrawable
     public static readonly Easing ACCURACY_TRANSFORM_EASING = Easing.OutPow10;
 
     private readonly ScoreInfo score;
+    private readonly GameplayProfile profile;
 
     [Resolved]
     private BmsResultsScreen? resultsScreen { get; set; }
@@ -82,13 +83,14 @@ internal partial class BmsAccuracyCircle : CompositeDrawable
     internal BmsAccuracyCircle(ScoreInfo score)
     {
         this.score = score;
+        profile = GameplayProfile.FromMods(score.Mods);
 
-        accuracyX = BmsExScore.AccuracyCutoffFromRank(ScoreRank.X);
-        accuracyS = BmsExScore.AccuracyCutoffFromRank(ScoreRank.S);
-        accuracyA = BmsExScore.AccuracyCutoffFromRank(ScoreRank.A);
-        accuracyB = BmsExScore.AccuracyCutoffFromRank(ScoreRank.B);
-        accuracyC = BmsExScore.AccuracyCutoffFromRank(ScoreRank.C);
-        accuracyD = BmsExScore.AccuracyCutoffFromRank(ScoreRank.D);
+        accuracyX = profile.AccuracyCutoffFromRank(ScoreRank.X);
+        accuracyS = profile.AccuracyCutoffFromRank(ScoreRank.S);
+        accuracyA = profile.AccuracyCutoffFromRank(ScoreRank.A);
+        accuracyB = profile.AccuracyCutoffFromRank(ScoreRank.B);
+        accuracyC = profile.AccuracyCutoffFromRank(ScoreRank.C);
+        accuracyD = profile.AccuracyCutoffFromRank(ScoreRank.D);
     }
 
     [BackgroundDependencyLoader]
@@ -136,16 +138,16 @@ internal partial class BmsAccuracyCircle : CompositeDrawable
                 Padding = new MarginPadding { Vertical = -15, Horizontal = -20 },
                 Children =
                 [
-                    new BmsRankBadge(accuracyD, Interpolation.Lerp(accuracyD, accuracyC, 0.5), getRank(ScoreRank.D)),
-                    new BmsRankBadge(accuracyC, Interpolation.Lerp(accuracyC, accuracyB, 0.5), getRank(ScoreRank.C)),
-                    new BmsRankBadge(accuracyB, Interpolation.Lerp(accuracyB, accuracyA, 0.5), getRank(ScoreRank.B)),
+                    new BmsRankBadge(accuracyD, Interpolation.Lerp(accuracyD, accuracyC, 0.5), getRank(ScoreRank.D), profile),
+                    new BmsRankBadge(accuracyC, Interpolation.Lerp(accuracyC, accuracyB, 0.5), getRank(ScoreRank.C), profile),
+                    new BmsRankBadge(accuracyB, Interpolation.Lerp(accuracyB, accuracyA, 0.5), getRank(ScoreRank.B), profile),
                     // The S and A badges are moved down slightly to prevent collision with the SS badge.
-                    new BmsRankBadge(accuracyA, Interpolation.Lerp(accuracyA, accuracyS, 0.25), getRank(ScoreRank.A)),
-                    new BmsRankBadge(accuracyS, Interpolation.Lerp(accuracyS, accuracyX - VIRTUAL_SS_PERCENTAGE, 0.25), getRank(ScoreRank.S)),
-                    new BmsRankBadge(accuracyX, accuracyX, getRank(ScoreRank.X)),
+                    new BmsRankBadge(accuracyA, Interpolation.Lerp(accuracyA, accuracyS, 0.25), getRank(ScoreRank.A), profile),
+                    new BmsRankBadge(accuracyS, Interpolation.Lerp(accuracyS, accuracyX - VIRTUAL_SS_PERCENTAGE, 0.25), getRank(ScoreRank.S), profile),
+                    new BmsRankBadge(accuracyX, accuracyX, getRank(ScoreRank.X), profile),
                 ],
             },
-            rankText = new BmsRankText(score.Rank)
+            rankText = new BmsRankText(score.Rank, profile)
         ];
 
         if (withFlair)
@@ -206,7 +208,7 @@ internal partial class BmsAccuracyCircle : CompositeDrawable
             }
 
             // The final gap between 99.999...% (S) and 100% (SS) is exaggerated by `virtual_ss_percentage`. We don't want to land there either.
-            if (score.Rank == ScoreRank.X || score.Rank == ScoreRank.XH)
+            if (score.Accuracy >= accuracyX)
                 targetAccuracy = 1;
             else
                 targetAccuracy = Math.Min(accuracyX - VIRTUAL_SS_PERCENTAGE - GRADE_SPACING_PERCENTAGE / 2, targetAccuracy);

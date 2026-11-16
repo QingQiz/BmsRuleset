@@ -30,7 +30,7 @@ public static class O2JamProfile
         if (!Enum.IsDefined(options.Difficulty))
             throw new ArgumentOutOfRangeException(nameof(options));
 
-        var chart = source.Compile(note => createRule(source, note, options));
+        var chart = source.Compile(note => createRule(source, note, options), note => scoringOpportunities(note));
         var maximumLife = 12000 * (2 + (int)options.Difficulty);
         var health = HealthRules.LatchedGauge(0, 1, 1, context => context.Event.Result switch
         {
@@ -60,18 +60,25 @@ public static class O2JamProfile
 
         var head = windowsAt(note.StartTime);
         if (note.Kind == KeyNoteKind.Tap)
-            return new TapRule(new TapConfiguration(head, head.Entries[^1].Late, O2JamResults.MISS, 200));
+            return new TapRule(new TapConfiguration(head, head.Entries[^1].Late, O2JamResults.MISS));
 
         if (note.Kind != KeyNoteKind.Hold)
             throw ProfileSupport.Unsupported("O2Jam", note.Kind);
 
         var tail = windowsAt(note.EndTime);
         return new HoldRule(new HoldConfiguration(head, tail, head.Entries[^1].Late, tail.Entries[^1].Late,
-            O2JamResults.MISS, O2JamResults.COOL, O2JamResults.MISS, 200, 200, HoldEndMode.Release, HoldDropMode.Resolve,
+            O2JamResults.MISS, O2JamResults.COOL, O2JamResults.MISS, HoldEndMode.Release, HoldDropMode.Resolve,
             evaluation => evaluation.Resolution == HoldResolution.MissedHead
                 ? null
                 : new NoteEmission(NoteParts.TAIL, evaluation.TailResult, evaluation.Note.EndTime, evaluation.TailOffset)));
     }
+
+    private static ImmutableArray<ScoringOpportunity> scoringOpportunities(KeyNote note) => note.Kind switch
+    {
+        KeyNoteKind.Tap => [new ScoringOpportunity(note.Id, NoteParts.TAP, 200)],
+        KeyNoteKind.Hold => [new ScoringOpportunity(note.Id, NoteParts.HEAD, 200), new ScoringOpportunity(note.Id, NoteParts.TAIL, 200)],
+        _ => [],
+    };
 
     private static ScoreConfiguration createScore()
     {

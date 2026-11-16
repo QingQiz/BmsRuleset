@@ -1,18 +1,18 @@
-using System.Linq;
 using NUnit.Framework;
+using System.Linq;
+using System;
 using osu.Framework.Timing;
-using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Practice;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.Mods;
-using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 using osu.Game.Screens.Play;
 
@@ -23,306 +23,217 @@ public partial class BmsScoreProcessorTest
     [Test]
     public void TestPracticeCompletionIncludesTrailingSilence()
     {
-        var full = createThreeNoteBeatmap();
-        var practice = BmsPracticeBeatmap.Create(full, new BmsPracticeSettings { StartTime = 0, EndTime = 2500 });
-        var manualClock = new ManualClock();
-        var framedClock = new FramedClock(manualClock);
-        var processor = new TestBmsScoreProcessor { Clock = framedClock };
-        processor.ApplyBeatmap(practice);
-
+        var practice = BmsPracticeBeatmap.Create(createThreeNoteBeatmap(), new BmsPracticeSettings { StartTime = 0, EndTime = 2500 });
+        using var play = new CompletionPlay(practice);
         foreach (var note in practice.HitObjects)
-            processor.ApplyTestResult(new BmsJudgementResult(note, note.CreateJudgement()) { Type = HitResult.Perfect });
-
-        manualClock.CurrentTime = 2499;
-        framedClock.ProcessFrame();
-        processor.UpdateCompletion();
-        Assert.That(processor.HasCompleted.Value, Is.False);
-
-        manualClock.CurrentTime = 2500;
-        framedClock.ProcessFrame();
-        processor.UpdateCompletion();
-        Assert.That(processor.HasCompleted.Value, Is.True);
+        {
+            play.Input(note.StartTime, note.Column, true);
+            play.Input(note.StartTime + 1, note.Column, false);
+        }
+        play.Advance(2499);
+        Assert.That(play.Processor.HasCompleted.Value, Is.False);
+        play.Advance(2500);
+        Assert.That(play.Processor.HasCompleted.Value, Is.True);
     }
 
     [Test]
     public void TestPracticeEndPreservesCompleteHoldAndSlowWindow(
-        [Values(BmsLongNoteMode.LongNote, BmsLongNoteMode.ChargeNote, BmsLongNoteMode.HellChargeNote)]
-        BmsLongNoteMode mode)
+        [Values(BmsLongNoteMode.LongNote, BmsLongNoteMode.ChargeNote, BmsLongNoteMode.HellChargeNote)] BmsLongNoteMode mode)
     {
-        var source = new BmsLongNote { StartTime = 1000, Duration = 1000, Column = 1 };
-        var full = new BmsBeatmap
-        {
-            LayoutVariant = BmsLayoutVariant.Bme7K,
-            TotalColumns = 8,
-            LockedLongNoteMode = mode,
-            HitObjects = { source },
-        };
-        source.Beatmap = full;
+        var source = new BmsLongNote { Kind = mode.ToNoteKind(), StartTime = 1000, Duration = 1000, Column = 1 };
+        var full = completionBeatmap(source);
+        full.LockedLongNoteMode = mode;
         var practice = BmsPracticeBeatmap.Create(full, new BmsPracticeSettings { StartTime = 0, EndTime = 1500 });
         var hold = (BmsLongNote)practice.HitObjects.Single();
-        var manualClock = new ManualClock { CurrentTime = 1500 };
-        var framedClock = new FramedClock(manualClock);
-        var processor = new TestBmsScoreProcessor { Clock = framedClock };
-        processor.ApplyBeatmap(practice);
-        if (mode != BmsLongNoteMode.LongNote)
-            processor.ApplyTestResult(createEndpointResult(hold, BmsLongNoteEndpointKind.Head, hold.StartTime));
-
-        processor.UpdateCompletion();
-        Assert.That(processor.HasCompleted.Value, Is.False);
-
-        manualClock.CurrentTime = hold.EndTime;
-        framedClock.ProcessFrame();
-        processor.ApplyTestResult(mode == BmsLongNoteMode.LongNote
-            ? createLongNoteResult(hold, hold.StartTime, hold.EndTime)
-            : createEndpointResult(hold, BmsLongNoteEndpointKind.Tail, hold.EndTime));
-        processor.UpdateCompletion();
-        Assert.That(processor.HasCompleted.Value, Is.False);
-
-        var lastJudgementTime = hold.EndTime + hold.HitWindows.WindowFor(HitResult.Ok);
-        manualClock.CurrentTime = lastJudgementTime - 1;
-        framedClock.ProcessFrame();
-        processor.UpdateCompletion();
-        Assert.That(processor.HasCompleted.Value, Is.False);
-
-        manualClock.CurrentTime = lastJudgementTime;
-        framedClock.ProcessFrame();
-        processor.UpdateCompletion();
-        Assert.That(processor.HasCompleted.Value, Is.True);
+        using var play = new CompletionPlay(practice);
+        play.Input(hold.StartTime, hold.Column, true);
+        play.Advance(1500);
+        Assert.That(play.Processor.HasCompleted.Value, Is.False);
+        play.Input(hold.EndTime, hold.Column, false);
+        Assert.That(play.Processor.HasCompleted.Value, Is.False);
+        var deadline = hold.EndTime + BmsEngineRules.GetTiming(hold, false).PassiveDeadline / 1000.0;
+        play.Advance(deadline - 1);
+        Assert.That(play.Processor.HasCompleted.Value, Is.False);
+        play.Advance(deadline);
+        Assert.That(play.Processor.HasCompleted.Value, Is.True);
     }
 
     [Test]
     public void TestCompletionWaitsForFinalGaugeDamage([Values] bool autoGauge, [Values(1280, 1281, 2000)] double completionTime)
     {
-        var beatmap = new BmsBeatmap
-        {
-            LayoutVariant = BmsLayoutVariant.Bme7K,
-            TotalColumns = 8,
-            HitObjects = { new BmsHitObject { StartTime = 1000, Column = 1 } },
-        };
-        beatmap.HitObjects[0].Beatmap = beatmap;
-        var manualClock = new ManualClock { CurrentTime = completionTime };
-        var framedClock = new FramedClock(manualClock);
-        var scoreProcessor = new TestBmsScoreProcessor { Clock = framedClock };
-        var healthProcessor = new BmsHealthProcessor();
-        Mod[] mods = autoGauge ? [new BmsModAutoGauge()] : [];
-        scoreProcessor.Mods.Value = mods;
-        scoreProcessor.ApplyBeatmap(beatmap);
-        healthProcessor.ApplyBeatmap(beatmap);
-
-        foreach (var mod in mods.OfType<IApplicableToHealthProcessor>())
-            mod.ApplyToHealthProcessor(healthProcessor);
-
-        healthProcessor.RestoreGaugeStates(healthProcessor.CurrentGaugeStates.Select(state =>
-            new BmsGaugeStateSnapshot(state.GaugeType, state.GaugeType > BmsGaugeType.Normal ? 0 : 0.83,
-                state.GaugeType > BmsGaugeType.Normal)).ToArray());
-
-        var score = new Score { ScoreInfo = { Mods = mods, Passed = true } };
-        var gameplayState = new GameplayState(beatmap, new BmsRuleset(), mods, score, scoreProcessor, healthProcessor);
-        using var completion = new BmsGameplayCompletionController(scoreProcessor, healthProcessor, gameplayState, null, null);
-
-        // A frame may check completion before the final drawable processes its passive POOR.
-        framedClock.ProcessFrame();
-        scoreProcessor.UpdateCompletion();
-        var completedBeforeDamage = scoreProcessor.HasCompleted.Value;
-
-        manualClock.CurrentTime = completionTime + 1;
-        framedClock.ProcessFrame();
-        var note = beatmap.HitObjects.Single();
-        var result = new BmsJudgementResult(note, note.CreateJudgement()) { Type = HitResult.Meh };
-        healthProcessor.ApplyTestResult(result);
-        scoreProcessor.ApplyTestResult(result);
-        scoreProcessor.UpdateCompletion();
-
+        using var play = new CompletionPlay(completionBeatmap(new BmsNote { StartTime = 1000, Column = 1 }), autoGauge, .83);
+        play.SetClock(completionTime);
+        play.Processor.UpdateCompletion();
+        Assert.That(play.Processor.HasCompleted.Value, Is.False);
+        play.Advance(completionTime + 1);
         Assert.Multiple(() =>
         {
-            Assert.That(completedBeforeDamage, Is.False);
-            Assert.That(scoreProcessor.HasCompleted.Value, Is.True);
-            Assert.That(healthProcessor.Health.Value, Is.LessThan(0.8));
-            Assert.That(score.ScoreInfo.Passed, Is.EqualTo(autoGauge));
-            Assert.That(healthProcessor.WorstGaugeType, Is.EqualTo(autoGauge ? BmsGaugeType.AssistEasy : BmsGaugeType.Normal));
-            Assert.That(score.ScoreInfo.Rank == ScoreRank.F, Is.EqualTo(!autoGauge));
-            Assert.That(score.ScoreInfo.Mods.OfType<BmsModAssistEasyGauge>().Any(), Is.EqualTo(autoGauge));
-            Assert.That(healthProcessor.CurrentGaugeStates.Single(state => state.GaugeType == BmsGaugeType.Normal).Health,
-                Is.EqualTo(0.77).Within(1e-12));
+            Assert.That(play.Processor.HasCompleted.Value, Is.True);
+            Assert.That(play.Health.Health.Value, Is.LessThan(.8));
+            Assert.That(play.Score.ScoreInfo.Passed, Is.EqualTo(autoGauge));
+            Assert.That(play.Health.Gauge().WorstGaugeType, Is.EqualTo(autoGauge ? BmsGaugeType.AssistEasy : BmsGaugeType.Normal));
+            Assert.That(play.Score.ScoreInfo.Rank == ScoreRank.F, Is.EqualTo(!autoGauge));
+            Assert.That(play.Score.ScoreInfo.Mods.OfType<BmsModAssistEasyGauge>().Any(), Is.EqualTo(autoGauge));
+            Assert.That(play.Health.Gauge().CurrentGaugeStates.Single(state => state.GaugeType == BmsGaugeType.Normal).Health, Is.EqualTo(.77).Within(1e-12));
         });
     }
 
     [Test]
     public void TestCompletionWaitsForChargeTail([Values(BmsLongNoteMode.ChargeNote, BmsLongNoteMode.HellChargeNote)] BmsLongNoteMode mode)
     {
-        var (processor, source) = createLongNoteProcessor(mode);
-        processor.Clock = new FramedClock(new ManualClock { CurrentTime = 10000 });
-        processor.ApplyTestResult(createEndpointResult(source, BmsLongNoteEndpointKind.Head, 1000));
-        processor.UpdateCompletion();
-        Assert.That(processor.HasCompleted.Value, Is.False);
-
-        processor.ApplyTestResult(createEndpointResult(source, BmsLongNoteEndpointKind.Tail, 1600));
-        processor.UpdateCompletion();
-        Assert.That(processor.HasCompleted.Value, Is.True);
+        using var play = new CompletionPlay(completionBeatmap(new BmsLongNote { StartTime = 1000, Column = 1, Duration = 600, Kind = mode.ToNoteKind() }));
+        play.Input(1000, 1, true);
+        Assert.That(play.Processor.HasCompleted.Value, Is.False);
+        play.Input(1600, 1, false);
+        play.Advance(2000);
+        Assert.That(play.Processor.HasCompleted.Value, Is.True);
     }
 
     [Test]
     public void TestCompletionIgnoresEmptyPoorAndLandmineCounts([Values] bool detonateMine)
     {
-        var note = new BmsHitObject { StartTime = 1000, Column = 1 };
-        var mine = new BmsLandmine { StartTime = 500, Column = 2 };
-        var beatmap = new BmsBeatmap { HitObjects = { mine, note } };
-        mine.Beatmap = beatmap;
-        note.Beatmap = beatmap;
-        var processor = new TestBmsScoreProcessor { Clock = new FramedClock(new ManualClock { CurrentTime = 10000 }) };
-        processor.ApplyBeatmap(beatmap);
-
-        processor.ApplyTestEmptyPoor(600);
-        Assert.That(processor.ScoringJudgementEventCount, Is.Zero);
-
+        using var play = new CompletionPlay(completionBeatmap(new BmsLandmine { StartTime = 500, Column = 2 }, new BmsNote { StartTime = 1000, Column = 1 }));
         if (detonateMine)
-            processor.ApplyTestResult(new BmsJudgementResult(mine, mine.CreateJudgement()) { Type = HitResult.Meh });
-
-        Assert.That(processor.ScoringJudgementEventCount, Is.Zero);
-        processor.UpdateCompletion();
-        Assert.That(processor.HasCompleted.Value, Is.False);
-
-        processor.ApplyTestResult(new BmsJudgementResult(note, note.CreateJudgement()) { Type = HitResult.Perfect });
-        Assert.That(processor.ScoringJudgementEventCount, Is.EqualTo(1));
-        processor.UpdateCompletion();
-        Assert.That(processor.HasCompleted.Value, Is.True);
+            play.Input(500, 2, true);
+        play.Input(600, 1, true);
+        Assert.That(play.Processor.ScoringJudgementEventCount, Is.Zero);
+        Assert.That(play.Processor.HasCompleted.Value, Is.False);
+        play.Input(700, 1, false);
+        play.Input(1000, 1, true);
+        play.Advance(1500);
+        Assert.That(play.Processor.ScoringJudgementEventCount, Is.EqualTo(1));
+        Assert.That(play.Processor.HasCompleted.Value, Is.True);
     }
 
     [Test]
     public void TestCompletionWithFinalLandmine([Values] bool autoGauge, [Values] bool detonateMine, [Values] bool includeNote)
     {
         var mine = new BmsLandmine { StartTime = 3000, Column = 2, LandmineDamagePercent = 10 };
-        var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, TotalColumns = 8 };
-        mine.Beatmap = beatmap;
-        if (includeNote)
-            beatmap.HitObjects.Add(new BmsHitObject { Beatmap = beatmap, StartTime = 1000, Column = 1 });
-        beatmap.HitObjects.Add(mine);
-
-        var manualClock = new ManualClock();
-        var framedClock = new FramedClock(manualClock);
-        var scoreProcessor = new TestBmsScoreProcessor { Clock = framedClock };
-        var healthProcessor = new BmsHealthProcessor();
-        Mod[] mods = autoGauge ? [new BmsModAutoGauge()] : [];
-        scoreProcessor.Mods.Value = mods;
-        scoreProcessor.ApplyBeatmap(beatmap);
-        healthProcessor.ApplyBeatmap(beatmap);
-        foreach (var mod in mods.OfType<IApplicableToHealthProcessor>())
-            mod.ApplyToHealthProcessor(healthProcessor);
-
-        if (includeNote)
-        {
-            var note = beatmap.HitObjects[0];
-            var result = new BmsJudgementResult(note, note.CreateJudgement()) { Type = HitResult.Perfect };
-            healthProcessor.ApplyTestResult(result);
-            scoreProcessor.ApplyTestResult(result);
-        }
-
-        healthProcessor.RestoreGaugeStates(healthProcessor.CurrentGaugeStates.Select(state =>
-            new BmsGaugeStateSnapshot(state.GaugeType, state.GaugeType > BmsGaugeType.Normal ? 0 : 0.83,
-                state.GaugeType > BmsGaugeType.Normal)).ToArray());
-
-        var score = new Score { ScoreInfo = { Mods = mods, Passed = true } };
-        var gameplayState = new GameplayState(beatmap, new BmsRuleset(), mods, score, scoreProcessor, healthProcessor);
-        using var completion = new BmsGameplayCompletionController(scoreProcessor, healthProcessor, gameplayState, null, null);
-
-        manualClock.CurrentTime = mine.StartTime - 1;
-        framedClock.ProcessFrame();
-        scoreProcessor.UpdateCompletion();
-        Assert.That(scoreProcessor.HasCompleted.Value, Is.False);
-
-        manualClock.CurrentTime = mine.StartTime;
-        framedClock.ProcessFrame();
-        scoreProcessor.UpdateCompletion();
-        Assert.That(scoreProcessor.HasCompleted.Value, Is.False);
-
+        var beatmap = includeNote ? completionBeatmap(new BmsNote { StartTime = 1000, Column = 1 }, mine) : completionBeatmap(mine);
+        using var play = new CompletionPlay(beatmap, autoGauge, includeNote ? .89 : .83);
+        play.Advance(2999);
+        Assert.That(play.Processor.HasCompleted.Value, Is.False);
         if (detonateMine)
-        {
-            var result = new BmsJudgementResult(mine, mine.CreateJudgement()) { Type = HitResult.Meh };
-            healthProcessor.ApplyTestResult(result);
-            scoreProcessor.ApplyTestResult(result);
-        }
-
-        manualClock.CurrentTime = mine.StartTime + BmsEngineRules.GetTiming(mine, false).SlowWindowFor(HitResult.Ok) - 1;
-        framedClock.ProcessFrame();
-        scoreProcessor.UpdateCompletion();
-        Assert.That(scoreProcessor.HasCompleted.Value, Is.False);
-
-        manualClock.CurrentTime++;
-        framedClock.ProcessFrame();
-        scoreProcessor.UpdateCompletion();
-
+            play.Input(3000, 2, true);
+        else
+            play.Advance(3000);
+        Assert.That(play.Processor.HasCompleted.Value, Is.False);
+        var deadline = mine.StartTime + BmsEngineRules.GetTiming(mine, false).PassiveDeadline / 1000.0;
+        play.Advance(deadline - 1);
+        Assert.That(play.Processor.HasCompleted.Value, Is.False);
+        play.Advance(deadline);
         Assert.Multiple(() =>
         {
-            Assert.That(scoreProcessor.ScoringJudgementEventCount, Is.EqualTo(includeNote ? 1 : 0));
-            Assert.That(scoreProcessor.HasCompleted.Value, Is.True);
-            Assert.That(healthProcessor.Health.Value, Is.EqualTo(detonateMine ? 0.73 : 0.83).Within(1e-12));
-            Assert.That(score.ScoreInfo.Passed, Is.EqualTo(!detonateMine || autoGauge));
-            Assert.That(healthProcessor.WorstGaugeType, Is.EqualTo(detonateMine && autoGauge ? BmsGaugeType.AssistEasy : BmsGaugeType.Normal));
-            Assert.That(score.ScoreInfo.Mods.OfType<BmsModAssistEasyGauge>().Any(), Is.EqualTo(detonateMine && autoGauge));
+            Assert.That(play.Processor.ScoringJudgementEventCount, Is.EqualTo(includeNote ? 1 : 0));
+            Assert.That(play.Processor.HasCompleted.Value, Is.True);
+            Assert.That(play.Health.Health.Value, Is.EqualTo(detonateMine ? .73 : .83).Within(1e-12));
+            Assert.That(play.Score.ScoreInfo.Passed, Is.EqualTo(!detonateMine || autoGauge));
+            Assert.That(play.Health.Gauge().WorstGaugeType, Is.EqualTo(detonateMine && autoGauge ? BmsGaugeType.AssistEasy : BmsGaugeType.Normal));
         });
     }
 
     [Test]
     public void TestCompletionWithNoScoringNotes([Values] bool includeMine)
     {
-        var beatmap = new BmsBeatmap();
-        if (includeMine)
-            beatmap.HitObjects.Add(new BmsLandmine { Beatmap = beatmap, StartTime = 1000, Column = 1 });
-
-        var processor = new TestBmsScoreProcessor { Clock = new FramedClock(new ManualClock { CurrentTime = 10000 }) };
-        processor.ApplyBeatmap(beatmap);
-        processor.UpdateCompletion();
-        Assert.That(processor.HasCompleted.Value, Is.True);
-    }
-
-    [Test]
-    public void TestCompletionClearsWhenFinalJudgementReverted()
-    {
-        var (processor, source) = createLongNoteProcessor();
-        processor.Clock = new FramedClock(new ManualClock { CurrentTime = 10000 });
-        var result = createLongNoteResult(source, 1000, 1500);
-        processor.ApplyTestResult(result);
-        processor.UpdateCompletion();
-        Assert.That(processor.HasCompleted.Value, Is.True);
-
-        processor.RevertResult(result);
-        processor.UpdateCompletion();
-        Assert.That(processor.HasCompleted.Value, Is.False);
-
-        processor.ApplyTestResult(createLongNoteResult(source, 1000, 1500));
-        processor.UpdateCompletion();
-        Assert.That(processor.HasCompleted.Value, Is.True);
+        using var play = new CompletionPlay(includeMine ? completionBeatmap(new BmsLandmine { StartTime = 1000, Column = 1 }) : completionBeatmap());
+        play.Advance(10000);
+        Assert.That(play.Processor.HasCompleted.Value, Is.True);
     }
 
     [Test]
     public void TestRewindDoesNotFinaliseScore()
     {
-        var beatmap = new BmsBeatmap { HitObjects = { new BmsHitObject { StartTime = 1000, Column = 1 } } };
-        beatmap.HitObjects[0].Beatmap = beatmap;
-        var manualClock = new ManualClock { CurrentTime = 10000 };
-        var framedClock = new FramedClock(manualClock);
-        var scoreProcessor = new TestBmsScoreProcessor { Clock = framedClock };
-        var healthProcessor = new BmsHealthProcessor();
-        scoreProcessor.ApplyBeatmap(beatmap);
-        healthProcessor.ApplyBeatmap(beatmap);
-        healthProcessor.RestoreGaugeStates([new(BmsGaugeType.Normal, 1, false)]);
-        var gameplayState = new GameplayState(beatmap, new BmsRuleset(), scoreProcessor: scoreProcessor, healthProcessor: healthProcessor);
-        using var completion = new BmsGameplayCompletionController(scoreProcessor, healthProcessor, gameplayState, null, null);
-
-        var note = beatmap.HitObjects.Single();
-        scoreProcessor.ApplyTestResult(new BmsJudgementResult(note, note.CreateJudgement()) { Type = HitResult.Perfect });
-        scoreProcessor.UpdateCompletion();
-        Assert.That(scoreProcessor.HasCompleted.Value, Is.True);
-
-        healthProcessor.RestoreGaugeStates([new(BmsGaugeType.Normal, 0.2, false)]);
-        manualClock.CurrentTime = 0;
-        framedClock.ProcessFrame();
-        scoreProcessor.UpdateCompletion();
-
+        using var play = new CompletionPlay(completionBeatmap(new BmsNote { StartTime = 1000, Column = 1 }));
+        play.Input(1000, 1, true);
+        play.Advance(2000);
+        Assert.That(play.Processor.HasCompleted.Value, Is.True);
+        play.Engine.Reset();
+        play.Processor.ResetReplayState();
+        play.Health.ResetReplayState();
+        play.Advance(0);
         Assert.Multiple(() =>
         {
-            Assert.That(scoreProcessor.HasCompleted.Value, Is.False);
-            Assert.That(scoreProcessor.Rank.Value, Is.Not.EqualTo(ScoreRank.F));
+            Assert.That(play.Processor.HasCompleted.Value, Is.False);
+            Assert.That(play.Processor.Rank.Value, Is.Not.EqualTo(ScoreRank.F));
         });
+        play.Input(1000, 1, true);
+        play.Advance(2000);
+        Assert.That(play.Processor.HasCompleted.Value, Is.True);
+    }
+
+    private static BmsBeatmap completionBeatmap(params BmsHitObject[] notes)
+    {
+        var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, TotalColumns = 8 };
+        beatmap.HitObjects.AddRange(notes);
+        foreach (var note in notes)
+            note.Beatmap = beatmap;
+        return beatmap;
+    }
+
+    private sealed class CompletionPlay : IDisposable
+    {
+        internal TestBmsScoreProcessor Processor { get; } = new();
+        internal BmsHealthProcessor Health { get; } = new();
+        internal Score Score { get; }
+        internal BmsJudgementEngine Engine { get; }
+        private readonly ManualClock clock = new();
+        private readonly FramedClock framedClock;
+        private readonly BmsGameplayCompletionController completion;
+
+        internal CompletionPlay(BmsBeatmap beatmap, bool autoGauge = false, double? initialHealth = null, Mod[] selectedMods = null)
+        {
+            framedClock = new FramedClock(clock);
+            Processor.Clock = Health.Clock = framedClock;
+            Mod[] mods = selectedMods ?? (autoGauge ? [new BmsModAutoGauge()] : []);
+            Processor.Mods.Value = mods;
+            Health.Mods = mods;
+            Processor.ApplyBeatmap(beatmap);
+            Health.ApplyBeatmap(beatmap);
+            foreach (var mod in mods.OfType<IApplicableToHealthProcessor>())
+                mod.ApplyToHealthProcessor(Health);
+            if (initialHealth is { } initial)
+            {
+                var types = autoGauge ? BmsModAutoGauge.AUTO_GAUGE_CHAIN : [BmsGaugeType.Normal];
+                Health.Gauge().SetGaugeTypes(types, replaceExisting: true, initialStates: types.Select(type =>
+                    new BmsGaugeStateSnapshot(type, type > BmsGaugeType.Normal ? 0 : initial, type > BmsGaugeType.Normal)).ToArray());
+            }
+            Score = new Score { ScoreInfo = { Mods = mods, Passed = true } };
+            var gameplay = new GameplayState(beatmap, new BmsRuleset(), mods, Score, Processor, Health);
+            completion = new BmsGameplayCompletionController(Processor, Health, gameplay, null, null);
+            var output = new BmsReplaySimulation.SimulationOutput(Processor, Health, _ => { });
+            Engine = new BmsJudgementEngine(Processor.EngineChart,
+                Enumerable.Range(0, Processor.EngineChart.Chart.LaneCount).Select(column => new BmsJudgementColumnDefinition(column, output)).ToArray(), Health.CreateEngineHealth,
+                session =>
+                {
+                    Processor.ApplyEngineState(session);
+                    Health.ApplyEngineState(session);
+                });
+        }
+
+        internal void SetClock(double time)
+        {
+            clock.CurrentTime = time;
+            framedClock.ProcessFrame();
+        }
+
+        internal void Input(double time, int column, bool pressed)
+        {
+            Engine.QueueInput(time, column, pressed, false);
+            Advance(time);
+        }
+
+        internal void Advance(double time)
+        {
+            SetClock(time);
+            Engine.ProcessFrame(new BmsFrameContext(time, 1), 0);
+            Processor.UpdateCompletion();
+        }
+
+        public void Dispose()
+        {
+            completion.Dispose();
+            Processor.Dispose();
+            Health.Dispose();
+        }
     }
 }

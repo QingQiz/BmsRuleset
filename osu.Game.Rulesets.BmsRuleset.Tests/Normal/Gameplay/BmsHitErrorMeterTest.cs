@@ -1,4 +1,7 @@
+using System.Linq;
+using System.Collections.Generic;
 using NUnit.Framework;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using RhythmEngine.Profiles.Bms;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
@@ -16,7 +19,7 @@ public class BmsHitErrorMeterTest
     [Test]
     public void TestAsymmetricWindowsUseSymmetricDomain()
     {
-        var domain = BmsHitErrorMeter.CreateDomain(BmsLayoutVariant.Bme7K, 0.75);
+        var domain = BmsHitErrorMeter.CreateDomain(createWindows(0.75, BmsJudgementModifiers.None, 0, 1));
 
         Assert.Multiple(() =>
         {
@@ -29,36 +32,6 @@ public class BmsHitErrorMeterTest
             var scratchWindows = BmsEngineRules.GetTiming(BmsLayoutVariant.Bme7K, 0, 0.75, tail: false);
             Assert.That(domain.RelativePosition(-scratchWindows.FastWindowFor(HitResult.Ok)), Is.GreaterThan(0));
             Assert.That(domain.RelativePosition(scratchWindows.SlowWindowFor(HitResult.Ok)), Is.LessThan(1));
-        });
-    }
-
-    [Test]
-    public void TestLongNoteUsesBothEndpointOffsets()
-    {
-        var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K };
-        var longNote = new BmsLongNote
-        {
-            Beatmap = beatmap,
-            StartTime = 1000,
-            Duration = 500,
-            Column = 1,
-        };
-        var result = new BmsLongNoteJudgementResult(longNote, longNote.CreateJudgement(),
-        [
-            new BmsLongNoteEndpointResult(longNote, BmsLongNoteEndpointKind.Head, 988, 1, HitResult.Perfect),
-            new BmsLongNoteEndpointResult(longNote, BmsLongNoteEndpointKind.Tail, 1519, 1, HitResult.Great),
-        ])
-        {
-            Type = HitResult.Great,
-        };
-
-        var observations = BmsHitErrorMeter.GetTimingObservations(result);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(observations, Has.Count.EqualTo(2));
-            Assert.That(observations[0], Is.EqualTo(new BmsHitErrorTimingObservation(-12, HitResult.Perfect)));
-            Assert.That(observations[1], Is.EqualTo(new BmsHitErrorTimingObservation(19, HitResult.Great)));
         });
     }
 
@@ -82,22 +55,21 @@ public class BmsHitErrorMeterTest
             2 => BmsJudgementModifiers.NoGreat,
             _ => BmsJudgementModifiers.None,
         });
-        var windows = BmsEngineRules.GetTiming(BmsLayoutVariant.Bme7K, 1, 0.75, false, modifiers);
+        var windows = createWindows(0.75, modifiers, 1);
 
-        var (fastEdge, slowEdge) = BmsHitErrorMeter.GetPoorDisplayOffsets(windows, showEmptyPoor);
-        var fastPoor = new BmsHitErrorTimingObservation(-281, HitResult.Meh);
-        var slowPoor = new BmsHitErrorTimingObservation(281, HitResult.Meh);
+        var (fastEdge, slowEdge) = BmsHitErrorMeter.GetUntimedDisplayOffsets(windows, showEmptyPoor);
+        var kind = BmsGameplayProfile.INSTANCE.TimingKindFor(HitResult.Meh);
 
         Assert.Multiple(() =>
         {
             Assert.That(fastEdge, Is.EqualTo(expectedFast));
             Assert.That(slowEdge, Is.EqualTo(expectedSlow));
-            Assert.That(BmsHitErrorMeter.GetDisplayOffset(fastPoor, fastEdge, slowEdge, showPoor: false), Is.Null);
-            Assert.That(BmsHitErrorMeter.GetDisplayOffset(slowPoor, fastEdge, slowEdge, showPoor: false), Is.Null);
-            Assert.That(BmsHitErrorMeter.GetDisplayOffset(fastPoor, fastEdge, slowEdge, showPoor: true), Is.EqualTo(expectedFast));
-            Assert.That(BmsHitErrorMeter.GetDisplayOffset(slowPoor, fastEdge, slowEdge, showPoor: true), Is.EqualTo(expectedSlow));
+            Assert.That(BmsHitErrorMeter.GetDisplayOffset(-281, kind, fastEdge, slowEdge, showUntimed: false, showEmptyInput: true), Is.Null);
+            Assert.That(BmsHitErrorMeter.GetDisplayOffset(281, kind, fastEdge, slowEdge, showUntimed: false, showEmptyInput: true), Is.Null);
+            Assert.That(BmsHitErrorMeter.GetDisplayOffset(-281, kind, fastEdge, slowEdge, showUntimed: true, showEmptyInput: true), Is.EqualTo(expectedFast));
+            Assert.That(BmsHitErrorMeter.GetDisplayOffset(281, kind, fastEdge, slowEdge, showUntimed: true, showEmptyInput: true), Is.EqualTo(expectedSlow));
             Assert.That(BmsHitErrorMeter.GetDisplayOffset(
-                new BmsHitErrorTimingObservation(-12, HitResult.Perfect), fastEdge, slowEdge, showPoor: false), Is.EqualTo(-12));
+                -12, BmsGameplayProfile.INSTANCE.TimingKindFor(HitResult.Perfect), fastEdge, slowEdge, showUntimed: false, showEmptyInput: true), Is.EqualTo(-12));
         });
     }
 
@@ -112,9 +84,9 @@ public class BmsHitErrorMeterTest
             2 => BmsJudgementModifiers.NoGreat,
             _ => BmsJudgementModifiers.None,
         });
-        var windows = BmsEngineRules.GetTiming(BmsLayoutVariant.Bme7K, 1, 1.25, false, modifiers);
+        var windows = createWindows(1.25, modifiers, 1);
 
-        var (fastEdge, slowEdge) = BmsHitErrorMeter.GetPoorDisplayOffsets(windows, showEmptyPoor: true);
+        var (fastEdge, slowEdge) = BmsHitErrorMeter.GetUntimedDisplayOffsets(windows, showEmptyInput: true);
 
         Assert.That(fastEdge, Is.EqualTo(-500));
         Assert.That(slowEdge, Is.EqualTo(expectedSlow));
@@ -128,6 +100,13 @@ public class BmsHitErrorMeterTest
     [TestCase(HitResult.Miss, false)]
     public void TestPoorAndEmptyPoorDoNotAffectMovingAverage(HitResult result, bool expected)
     {
-        Assert.That(BmsHitErrorMeter.AffectsMovingAverage(result), Is.EqualTo(expected));
+        Assert.That(BmsGameplayProfile.INSTANCE.TimingKindFor(result) == ResultTimingKind.Timed, Is.EqualTo(expected));
     }
+    private static IReadOnlyList<BmsHitErrorWindow> createWindows(double rate, BmsJudgementModifiers modifiers, params int[] columns)
+    {
+        var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, ExRank = rate / 0.75 * 100 };
+        beatmap.HitObjects.AddRange(columns.Select(column => new BmsNote { Beatmap = beatmap, Column = column, StartTime = 1000 }));
+        return BmsHitErrorMeter.CreateWindows(new BmsEngineChart(beatmap, new BmsGameplayProfile(modifiers)));
+    }
+
 }

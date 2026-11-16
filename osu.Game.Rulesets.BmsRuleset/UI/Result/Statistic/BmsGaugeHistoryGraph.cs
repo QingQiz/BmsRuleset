@@ -1,25 +1,24 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
+using System;
 using osu.Framework.Allocation;
-using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Lines;
 using osu.Framework.Graphics.Shapes;
+using osu.Framework.Graphics;
 using osu.Framework.Layout;
+using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
-using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
-using osu.Game.Rulesets.BmsRuleset.Beatmaps;
-using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Gauge;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
-using osu.Game.Rulesets.Mods;
+using osu.Game.Graphics;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
+using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
-using osuTK;
 using osuTK.Graphics;
+using osuTK;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
 
@@ -31,7 +30,6 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable, IBmsResult
     private const float secondary_line_alpha = 0.35f;
     private const float final_line_depth = -1;
     internal const float FAILURE_MARKER_SIZE = 13;
-    private const double max_landmine_damage_percent = (36 * 36 - 1) / 2d;
 
     private readonly ScoreInfo? score;
     private readonly IBeatmap? playableBeatmap;
@@ -102,30 +100,17 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable, IBmsResult
         => CreateSeries(score, playableBeatmap, score.HitEvents, []);
 
     internal static IReadOnlyList<GaugeSeries> CreateSeries(ScoreInfo score, IBeatmap playableBeatmap,
-                                                            IReadOnlyList<HitEvent> hitEvents, IReadOnlyList<BmsGaugeHistoryEvent> gaugeHistory,
+                                                            IReadOnlyList<HitEvent> hitEvents, IReadOnlyList<GameplayHealthHistoryEvent> gaugeHistory,
                                                             double minimumDuration = 0)
     {
-        var profileFamily = playableBeatmap is BmsBeatmap bmsBeatmap
-            ? BmsGaugeProfileFamilyProvider.FromLayout(bmsBeatmap.LayoutVariant)
-            : BmsGaugeProfileFamily.SevenKeys;
-
-        if (gaugeHistory.Count > 0)
-            return createSeries(score, gaugeHistory, Math.Max(minimumDuration, graphDuration(playableBeatmap, gaugeHistory.Max(e => e.Time))), profileFamily);
-
-        if (hitEvents.Count == 0)
+        if (gaugeHistory.Count == 0)
+            gaugeHistory = GameplayProfile.FromMods(score.Mods).ReconstructHealthHistory(score, playableBeatmap, hitEvents);
+        if (gaugeHistory.Count == 0)
             return [];
 
-        var noteCount = playableBeatmap.HitObjects.Count(h => h is not BmsLandmine);
-        if (noteCount == 0)
-            noteCount = 1;
-
-        var total = (playableBeatmap as BmsBeatmap)?.Total;
-        var duration = Math.Max(minimumDuration, graphDuration(playableBeatmap, hitEvents.Max(e => e.HitObject.GetEndTime())));
-
-        var gaugeTypes = gaugeTypesFor(score.Mods).ToArray();
-        var finalGaugeType = finalGaugeTypeFor(score.Mods, gaugeTypes);
-
-        return gaugeTypes.Select(type => createSeries(type, hitEvents, total, noteCount, duration, type == finalGaugeType, profileFamily)).ToArray();
+        var duration = Math.Max(minimumDuration, graphDuration(playableBeatmap, gaugeHistory.Max(entry => entry.Time)));
+        return Enumerable.Range(0, gaugeHistory[0].Layers.Length)
+            .Select(index => createSeries(gaugeHistory, index, duration)).ToArray();
     }
 
     internal static IReadOnlyList<GaugeSeries> CreateCourseSeries(
@@ -197,24 +182,6 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable, IBmsResult
         return boundaries;
     }
 
-    private static IReadOnlyList<GaugeSeries> createSeries(
-        ScoreInfo score,
-        IReadOnlyList<BmsGaugeHistoryEvent> gaugeHistory,
-        double duration,
-        BmsGaugeProfileFamily profileFamily)
-    {
-        var ordered = gaugeHistory as BmsGaugeHistoryEvent[] ?? gaugeHistory.ToArray();
-
-        var gaugeTypes = ordered
-            .SelectMany(e => e.States.Select(s => s.GaugeType))
-            .Distinct()
-            .OrderByDescending(type => (int)type)
-            .ToArray();
-
-        var finalGaugeType = finalGaugeTypeFor(score.Mods, gaugeTypes) ?? ordered[^1].ActiveGaugeType;
-        return gaugeTypes.Select(type => createSeries(type, ordered, duration, type == finalGaugeType, profileFamily)).ToArray();
-    }
-
     private static double graphDuration(IBeatmap playableBeatmap, double lastEventTime)
     {
         var beatmapEndTime = playableBeatmap.HitObjects
@@ -229,53 +196,31 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable, IBmsResult
     private static float monotonicGraphTime(double eventTime, double duration, float previousTime)
         => Math.Max(previousTime, (float)Math.Clamp(eventTime / duration, 0, 1));
 
-    private static GaugeSeries createSeries(
-        BmsGaugeType type,
-        IReadOnlyList<BmsGaugeHistoryEvent> history,
-        double duration,
-        bool isFinalUsedGauge,
-        BmsGaugeProfileFamily profileFamily)
+    private static GaugeSeries createSeries(IReadOnlyList<GameplayHealthHistoryEvent> history, int index, double duration)
     {
-        var profile = BmsGaugeProfileFactory.Create(type, profileFamily);
-        var initialState = history.FirstOrDefault(e => e.Time <= 0)?.States.FirstOrDefault(state => state.GaugeType == type);
-        var health = initialState?.Health ?? profile.InitialHealth;
+        var first = history[0].Layers[index];
         GaugePoint? failurePoint = null;
-        var points = new List<GaugePoint>
+        var points = new List<GaugePoint>();
+        if (history[0].Time > 0)
+            points.Add(new GaugePoint(0, (float)first.Value));
+        float previousTime = 0;
+        foreach (var entry in history)
         {
-            new(0, normaliseHealth(profile, health)),
-        };
-
-        foreach (var gaugeEvent in history)
-        {
-            var time = monotonicGraphTime(gaugeEvent.Time, duration, points[^1].Time);
-            var state = gaugeEvent.States.FirstOrDefault(s => s.GaugeType == type);
-
-            if (state != null)
-            {
-                health = state.Health;
-
-                if (failurePoint == null && (state.Failed || health <= 0))
-                    failurePoint = new GaugePoint(time, normaliseHealth(profile, health));
-            }
-
-            points.Add(new GaugePoint(time, normaliseHealth(profile, health)));
+            var layer = entry.Layers[index];
+            var point = new GaugePoint(monotonicGraphTime(entry.Time, duration, previousTime), (float)layer.Value);
+            previousTime = point.Time;
+            if (failurePoint == null && layer.Failed)
+                failurePoint = point;
+            points.Add(point);
         }
-
         if (points[^1].Time < 1)
             points.Add(new GaugePoint(1, points[^1].Health));
-
-        if (failurePoint == null && profile.ClearThreshold > 0 && health < profile.ClearThreshold)
+        var final = history[^1];
+        if (failurePoint == null && !final.Layers[index].Cleared)
             failurePoint = points[^1];
-
-        return new GaugeSeries(
-            formatGaugeName(type),
-            colourFor(type),
-            points,
-            failurePoint,
-            isFinalUsedGauge,
-            isFinalUsedGauge ? final_line_radius : secondary_line_radius,
-            isFinalUsedGauge ? 1 : secondary_line_alpha,
-            [points]);
+        var selected = final.SelectedLayer == index;
+        return new GaugeSeries(first.Name, first.Colour, points, failurePoint, selected,
+            selected ? final_line_radius : secondary_line_radius, selected ? 1 : secondary_line_alpha, [points]);
     }
 
     private Drawable createGraph(IReadOnlyList<GaugeSeries> series)
@@ -293,8 +238,9 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable, IBmsResult
             Children =
             [
                 plotBackground,
-                createHorizontalLine(0.2f, "80%"),
-                createHorizontalLine(0.5f, "50%"),
+                createHorizontalLine(0.25f, BmsStrings.ResultPercentage(0.75)),
+                createHorizontalLine(0.5f, BmsStrings.ResultPercentage(0.5)),
+                createHorizontalLine(0.75f, BmsStrings.ResultPercentage(0.25)),
             ],
         };
 
@@ -424,7 +370,7 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable, IBmsResult
         ],
     };
 
-    private Drawable createHorizontalLine(float y, string label) => new Container
+    private Drawable createHorizontalLine(float y, LocalisableString label) => new Container
     {
         RelativeSizeAxes = Axes.X,
         Height = 1,
@@ -452,127 +398,8 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable, IBmsResult
         ],
     };
 
-    private static GaugeSeries createSeries(
-        BmsGaugeType type,
-        IReadOnlyList<HitEvent> hitEvents,
-        double? total,
-        int noteCount,
-        double duration,
-        bool isFinalUsedGauge,
-        BmsGaugeProfileFamily profileFamily)
-    {
-        var profile = BmsGaugeProfileFactory.Create(type, profileFamily);
-        var calculator = new BmsGaugeCalculator(profile, total, noteCount, profileFamily);
-        var health = profile.InitialHealth;
-        var failed = false;
-        GaugePoint? failurePoint = null;
-        var points = new List<GaugePoint>
-        {
-            new(0, normaliseHealth(profile, health)),
-        };
-
-        foreach (var hitEvent in hitEvents)
-        {
-            var time = monotonicGraphTime(hitEvent.HitObject.GetEndTime(), duration, points[^1].Time);
-
-            if (!failed)
-            {
-                health = applyHitEvent(hitEvent, calculator, health);
-
-                if (health <= 0)
-                {
-                    failed = true;
-                    failurePoint = new GaugePoint(time, normaliseHealth(profile, health));
-                }
-            }
-
-            points.Add(new GaugePoint(time, normaliseHealth(profile, health)));
-        }
-
-        if (points[^1].Time < 1)
-            points.Add(new GaugePoint(1, points[^1].Health));
-
-        if (failurePoint == null && profile.ClearThreshold > 0 && health < profile.ClearThreshold)
-            failurePoint = points[^1];
-
-        return new GaugeSeries(
-            formatGaugeName(type),
-            colourFor(type),
-            points,
-            failurePoint,
-            isFinalUsedGauge,
-            isFinalUsedGauge ? final_line_radius : secondary_line_radius,
-            isFinalUsedGauge ? 1 : secondary_line_alpha,
-            [points]);
-    }
-
-    private static double applyHitEvent(HitEvent hitEvent, BmsGaugeCalculator calculator, double health)
-    {
-        if (hitEvent.HitObject is BmsLandmine mine)
-        {
-            if (hitEvent.Result != HitResult.Meh)
-                return health;
-
-            return mine.LandmineDamagePercent >= max_landmine_damage_percent
-                ? 0
-                : Math.Max(0, health - mine.LandmineDamagePercent / 100);
-        }
-
-        return calculator.ApplyDelta(health, calculator.GetDeltaFor(hitEvent.Result, health));
-    }
-
-    private static IEnumerable<BmsGaugeType> gaugeTypesFor(IReadOnlyList<Mod> mods)
-    {
-        if (mods.OfType<BmsModAutoGauge>().Any())
-        {
-            var resolvedGaugeType = mods.OfType<BmsModGauge>().FirstOrDefault()?.GaugeType;
-            if (resolvedGaugeType is BmsGaugeType.Class or BmsGaugeType.ExClass or BmsGaugeType.ExHardClass)
-                return BmsModAutoGauge.COURSE_AUTO_GAUGE_CHAIN;
-
-            return BmsModAutoGauge.AUTO_GAUGE_CHAIN;
-        }
-
-        return
-        [
-            mods.OfType<BmsModGauge>().FirstOrDefault()?.GaugeType ?? BmsGaugeType.Normal,
-        ];
-    }
-
-    private static BmsGaugeType? finalGaugeTypeFor(IReadOnlyList<Mod> mods, IReadOnlyList<BmsGaugeType> displayedGaugeTypes)
-    {
-        var explicitGaugeType = mods.OfType<BmsModGauge>().FirstOrDefault()?.GaugeType;
-        if (explicitGaugeType != null)
-            return explicitGaugeType;
-
-        return displayedGaugeTypes.Count == 1 ? displayedGaugeTypes[0] : null;
-    }
-
-    private static float normaliseHealth(BmsGaugeProfile profile, double health) =>
-        (float)Math.Clamp(health / profile.MaxHealth, 0, 1);
-
-    private static string formatGaugeName(BmsGaugeType gaugeType) => gaugeType switch
-    {
-        BmsGaugeType.AssistEasy => "Assist Easy",
-        BmsGaugeType.Easy => "Easy",
-        BmsGaugeType.Normal => "Normal",
-        BmsGaugeType.Hard => "Hard",
-        BmsGaugeType.ExHard => "ExHard",
-        BmsGaugeType.Hazard => "Hazard",
-        BmsGaugeType.Class => "Class",
-        BmsGaugeType.ExClass => "ExClass",
-        BmsGaugeType.ExHardClass => "ExHard Class",
-        _ => gaugeType.ToString(),
-    };
-
-    private static Color4 colourFor(BmsGaugeType type) => type switch
-    {
-        BmsGaugeType.AssistEasy => new Color4(75, 210, 235, 255),
-        BmsGaugeType.Easy => new Color4(75, 150, 255, 255),
-        _ => BmsGaugeProfileFactory.Create(type).Display.FillColour,
-    };
-
     internal sealed record GaugeSeries(
-        string Name,
+        LocalisableString Name,
         Color4 Colour,
         IReadOnlyList<GaugePoint> Points,
         GaugePoint? FailurePoint,

@@ -68,7 +68,8 @@ public class HostLifecycleTest
             Assert.That(actual.Event, Is.EqualTo(expected.Event));
             Assert.That(actual.Health, Is.EqualTo(expected.Health));
             Assert.That(actual.Score.Counters, Is.EquivalentTo(expected.Score.Counters));
-            Assert.That(actual.Score with { Counters = expected.Score.Counters }, Is.EqualTo(expected.Score));
+            Assert.That(actual.Score.ResultCounts, Is.EquivalentTo(expected.Score.ResultCounts));
+            Assert.That(actual.Score with { Counters = expected.Score.Counters, ResultCounts = expected.Score.ResultCounts }, Is.EqualTo(expected.Score));
         }
 
         var audioCount = host.Audio.Count;
@@ -131,11 +132,11 @@ public class HostLifecycleTest
     [Test]
     public void ResolvedPartAndInputRetirementAreSeparate()
     {
-        var rule = new TapRule(new TapConfiguration(new TimingWindows([new(new ResultId("hit"), -50, 50)]), 50, new ResultId("miss"), 1)
+        var rule = new TapRule(new TapConfiguration(new TimingWindows([new(new ResultId("hit"), -50, 50)]), 50, new ResultId("miss"))
         {
             ResolvedWindows = new TimingWindows([new(new ResultId("repeat"), -100, 100)]),
         });
-        var session = new GameplaySession(new Chart(1, [new ChartNote(10, 0, 1_000, 1_000, rule)]), unscoredConfiguration());
+        var session = new GameplaySession(new Chart(1, [new ChartNote(10, 0, 1_000, 1_000, rule)], []), unscoredConfiguration());
         var hit = session.AdvanceTo(1_000, [new(1_000, 0, true)]);
         Assert.That(hit.Transitions.Single().After.Parts.Single().Resolved, Is.True);
         Assert.That(hit.Completed, Is.False);
@@ -186,8 +187,8 @@ public class HostLifecycleTest
         var precise = new ResultId("precise");
         var late = new ResultId("late");
         var windows = new TimingWindows([new(new ResultId("precise"), -40, 60), new(new ResultId("late"), -100, 100)]);
-        var rule = new TapRule(new TapConfiguration(windows, 100, new ResultId("absent"), 3));
-        var chart = new Chart(1, [new ChartNote(4, 0, 1_000, 1_000, rule)]);
+        var rule = new TapRule(new TapConfiguration(windows, 100, new ResultId("absent")));
+        var chart = new Chart(1, [new ChartNote(4, 0, 1_000, 1_000, rule)], [new ScoringOpportunity(4, NoteParts.TAP, 3)]);
         var configuration = new SessionConfiguration("independent-asymmetric", new ScoreConfiguration(new ScoreState(), (state, context) =>
             {
                 var value = context.Event.Result == precise ? 3 : context.Event.Result == late ? 1 : 0;
@@ -214,7 +215,7 @@ public class HostLifecycleTest
     public void SustainedBodyContinuesAfterItsTailDecisionAndStopsAtItsTimer()
     {
         var windows = new TimingWindows([new(new ResultId("hit"), -100, 100)]);
-        var rule = new HoldRule(new HoldConfiguration(windows, windows, 100, 100, new ResultId("miss"), new ResultId("hit"), new ResultId("drop"), 1, 1,
+        var rule = new HoldRule(new HoldConfiguration(windows, windows, 100, 100, new ResultId("miss"), new ResultId("hit"), new ResultId("drop"),
             HoldEndMode.Release, HoldDropMode.Resolve, e => new NoteEmission(new PartId("tail"), e.TailResult, e.Note.EndTime))
         {
             Balance = new HoldBalance(200, new ResultId("gain"), new ResultId("loss"), []),
@@ -222,7 +223,7 @@ public class HostLifecycleTest
         var configuration = new SessionConfiguration("sustained-body", new ScoreConfiguration(new ScoreState(), (state, _) => state, _ => 0),
             HealthRules.LatchedGauge(0, 10, 5, c => c.Event.Result.Value == "gain" ? 1 : c.Event.Result.Value == "loss" ? -1 : 0, _ => false, _ => true),
             context => context.Candidates);
-        IGameplaySession session = new GameplaySession(new Chart(1, [new ChartNote(10, 0, 1_000, 2_000, rule)]), configuration);
+        IGameplaySession session = new GameplaySession(new Chart(1, [new ChartNote(10, 0, 1_000, 2_000, rule)], []), configuration);
         var host = new RecordingHost();
         host.Present(session.Current);
         host.Present(session.AdvanceTo(2_001, [new(1_000, 0, true), new(1_100, 0, false), new(1_500, 0, true)]));
@@ -255,11 +256,11 @@ public class HostLifecycleTest
     [Test]
     public void SameTimeExpiryAndInputKeepOrderAndLaneIdentity()
     {
-        var rule = new TapRule(new TapConfiguration(new TimingWindows([new(new ResultId("perfect"), -1, 1)]), 1, new ResultId("miss"), 305));
+        var rule = new TapRule(new TapConfiguration(new TimingWindows([new(new ResultId("perfect"), -1, 1)]), 1, new ResultId("miss")));
         var chart = new Chart(2, [
             new ChartNote(7, 0, 1_000, 1_000, rule), new ChartNote(3, 0, 1_000, 1_000, rule),
             new ChartNote(9, 1, 1_002, 1_002, rule)
-        ]);
+        ], []);
         IGameplaySession session = new GameplaySession(chart, unscoredConfiguration());
         var host = new RecordingHost();
         host.Present(session.Current);

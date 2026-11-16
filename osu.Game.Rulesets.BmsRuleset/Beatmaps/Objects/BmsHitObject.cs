@@ -1,10 +1,10 @@
 using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects;
+using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 
@@ -28,11 +28,8 @@ public class BmsHitObject : HitObject
             yield return new BmsSampleEvent(StartTime, additional, SampleVolume);
     }
 
-    public double JudgementRate { get; set; } = double.NaN;
-
-    public double EffectiveJudgementRate => double.IsNaN(JudgementRate)
-        ? BmsEngineRules.ForBeatmap(Beatmap).ResolveRate(Beatmap.Rank, Beatmap.ExRank)
-        : JudgementRate;
+    /// <summary>Per-note EXRANK percentage from the chart; null uses the chart's header difficulty.</summary>
+    public double? ExRank { get; set; }
 
     /// <summary>
     ///     Precomputed scroll position at <see cref="HitObject.StartTime"/>.
@@ -74,9 +71,10 @@ public class BmsHitObject : HitObject
         return clone;
     }
 
-    public override Judgement CreateJudgement() => new BmsJudgement(this);
+    public override Judgement CreateJudgement() => new BmsJudgement();
 
-    protected override BmsHitWindows CreateHitWindows() => new(this);
+    // Conversion precedes profile selection. Compilation publishes the selected framework windows.
+    protected override HitWindows CreateHitWindows() => HitWindows.Empty;
 
     protected virtual void CopyTo(BmsHitObject target)
     {
@@ -85,7 +83,7 @@ public class BmsHitObject : HitObject
         target.SampleKey = SampleKey;
         target.SampleVolume = SampleVolume;
         target.AdditionalSampleKeys = AdditionalSampleKeys;
-        target.JudgementRate = JudgementRate;
+        target.ExRank = ExRank;
         target.ScrollPositionAtStartTime = ScrollPositionAtStartTime;
         target.Beatmap = Beatmap;
     }

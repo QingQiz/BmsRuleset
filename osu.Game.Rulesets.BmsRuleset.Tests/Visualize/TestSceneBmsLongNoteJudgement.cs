@@ -1,5 +1,5 @@
 #nullable enable
-
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -826,7 +826,7 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
 
             foreach (var result in HealthEvents.OrderBy(e => e.Offset))
             {
-                var delta = calculator.GetDeltaFor(result.Result, health) * result.Scale;
+                var delta = calculator.GetDeltaFor(BmsGameplayProfile.ResultIdFor(result.Result), health) * result.Scale;
                 health = calculator.ApplyDelta(health, delta);
             }
 

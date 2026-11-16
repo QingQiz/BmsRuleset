@@ -12,8 +12,6 @@ internal sealed class EtternaNoteRule(INoteRule inner, int row) : INoteRule
 
     public ImmutableArray<NotePartState> GetParts(NoteContext context) => inner.GetParts(context);
 
-    public IEnumerable<ScoringOpportunity> GetScoringOpportunities(ChartNote note) => inner.GetScoringOpportunities(note);
-
     public InputCandidate? GetCandidate(NoteContext context, InputEvent input, int noteIndex)
     {
         var unresolved = context.State is TapState { Resolved: false } or HoldState { HeadResult: null } or MineState { Done: false };

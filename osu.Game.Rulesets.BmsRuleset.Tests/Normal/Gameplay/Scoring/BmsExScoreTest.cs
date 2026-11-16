@@ -1,7 +1,7 @@
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using System.Collections.Generic;
 using NUnit.Framework;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 using osu.Game.Rulesets.Objects;
@@ -14,21 +14,14 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Scoring;
 public class BmsExScoreTest
 {
 
-    [TestCase(0, 1800, ScoreRank.C, 1000)]
-    [TestCase(1000, 1800, ScoreRank.B, 1200)]
-    [TestCase(1200, 1800, ScoreRank.A, 1400)]
-    [TestCase(1400, 1800, ScoreRank.S, 1600)]
-    [TestCase(1600, 1800, ScoreRank.X, 1800)]
-    [TestCase(1800, 1800, ScoreRank.X, 1800)]
-    public void TestNextTarget(int personalBest, int maximum, ScoreRank expectedRank, int expectedScore)
+    [TestCase(ScoreRank.C, 1000)]
+    [TestCase(ScoreRank.B, 1200)]
+    [TestCase(ScoreRank.A, 1400)]
+    [TestCase(ScoreRank.S, 1600)]
+    [TestCase(ScoreRank.X, 1800)]
+    public void TestScoreRankThreshold(ScoreRank rank, int expectedScore)
     {
-        var targetRank = BmsExScore.NextRank(BmsExScore.RankFromScore(personalBest, maximum));
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(targetRank, Is.EqualTo(expectedRank));
-            Assert.That(BmsExScore.MinimumScoreForRank(targetRank, maximum), Is.EqualTo(expectedScore));
-        });
+        Assert.That(BmsGameplayProfile.INSTANCE.ScoreForRank(rank, 1800), Is.EqualTo(expectedScore));
     }
 
     [TestCase(1600, 0, 1000, 0)]
@@ -55,7 +48,7 @@ public class BmsExScoreTest
             [HitResult.Good] = 20,
         };
 
-        Assert.That(BmsExScore.Calculate(statistics), Is.EqualTo(23));
+        Assert.That(BmsGameplayProfile.INSTANCE.StoredScore(new ScoreInfo { Statistics = statistics }), Is.EqualTo(23));
     }
 
     [Test]
@@ -86,8 +79,7 @@ public class BmsExScoreTest
 
         Assert.Multiple(() =>
         {
-            Assert.That(BmsExScore.CountScoringEvents(events), Is.EqualTo(3));
-            Assert.That(BmsExScore.CreateProgression(events), Is.EqualTo([0, 1, 3, 4]));
+            Assert.That(BmsTestExScore.CreateProgression(events), Is.EqualTo([0, 1, 3, 4]));
         });
     }
 
@@ -108,19 +100,20 @@ public class BmsExScoreTest
     {
         var score = new ScoreInfo { Accuracy = 0.75 };
 
-        Assert.That(BmsExScore.Calculate(score, 2000), Is.EqualTo(1500));
+        Assert.That(BmsGameplayProfile.INSTANCE.StoredScore(score, 2000), Is.EqualTo(1500));
+        Assert.That(BmsGameplayProfile.INSTANCE.StoredScore(score), Is.Null);
     }
 
     [Test]
     public void TestPersistedProgressionClampsToAvailableEvents()
     {
-        Assert.That(BmsScoreGraph.ScoreAtProgress(6, [0, 2, 3], 5, 5), Is.EqualTo(3));
+        Assert.That(BmsScoreGraph.ScoreAtProgress(6, BmsTestExScore.States([0, 2, 3]), 5, 5), Is.EqualTo(3));
     }
 
     [Test]
     public void TestPersistedProgressionTakesPriorityOverLinearEstimate()
     {
-        Assert.That(BmsScoreGraph.ScoreAtProgress(6, [0, 2, 2, 3], 2, 3), Is.EqualTo(2));
+        Assert.That(BmsScoreGraph.ScoreAtProgress(6, BmsTestExScore.States([0, 2, 2, 3]), 2, 3), Is.EqualTo(2));
     }
 
     [Test]
@@ -176,7 +169,7 @@ public class BmsExScoreTest
         [
             createEvent(new BmsJudgementSource(200, 0, BmsJudgementSourceKind.Note), HitResult.Great),
             createEvent(new BmsJudgementSource(100, 0, BmsJudgementSourceKind.Note), HitResult.Perfect),
-            createEvent(new BmsJudgementSource(150, 0, BmsJudgementSourceKind.EmptyPoor), HitResult.Miss),
+            createEvent(new BmsJudgementSource(150, 0, BmsJudgementSourceKind.EmptyInput), HitResult.Miss),
             createEvent(new BmsJudgementSource(100, 0, BmsJudgementSourceKind.LongNote, 200), HitResult.Good),
             createEvent(new BmsJudgementSource(400, 0, BmsJudgementSourceKind.Note), HitResult.Ok, 350),
         ];

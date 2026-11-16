@@ -1,20 +1,20 @@
 using System;
 using System.Runtime.CompilerServices;
+using RhythmEngine.Core;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
-using osu.Game.Rulesets.Judgements;
+using JudgementResult = osu.Game.Rulesets.Judgements.JudgementResult;
 using osu.Game.Rulesets.Objects;
-using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 
 internal sealed class BmsHitObjectLifetimeEntry(
     HitObject hitObject,
     BmsGameplayScrollController scrollController,
-    Func<double> getVisualOffset)
+    Func<double> getVisualOffset,
+    NoteTiming? timing)
     : HitObjectLifetimeEntry(hitObject)
 {
     /// <summary>
@@ -71,7 +71,7 @@ internal sealed class BmsHitObjectLifetimeEntry(
     /// </summary>
     private const double default_past_lifetime = 0;
 
-    private const double passive_poor_lifetime_margin = 100;
+    private const double judgement_lifetime_margin = 100;
 
     /// <summary>
     ///     Mines only need a single frame to check whether the column is pressed; after that they
@@ -98,8 +98,7 @@ internal sealed class BmsHitObjectLifetimeEntry(
 
     /// <summary>
     ///     Re-compute and apply this entry's lifetime from current scroll state.
-    ///     Called once on <c>Add</c> (during loading) and again whenever the user
-    ///     adjusts the scroll speed in-game.
+    ///     The container refreshes entries when loading completes and when scroll settings change.
     /// </summary>
     public void RefreshLifetime(double? currentTime = null)
     {
@@ -127,7 +126,7 @@ internal sealed class BmsHitObjectLifetimeEntry(
         unjudgedLifetimeEnd = hitObject switch
         {
             BmsInvisibleNote => hitObject.StartTime + 1,
-            BmsLandmine => hitObject.StartTime + MINE_PAST_LIFETIME,
+            BmsLandmine => hitObject.StartTime + timing!.Value.HeadDeadline / 1000.0 + MINE_PAST_LIFETIME,
             _ => hitObject.GetEndTime() + Math.Max(pastLifetime, slowWindow + lifetime_margin),
         };
         LifetimeEnd = unjudgedLifetimeEnd;
@@ -218,8 +217,7 @@ internal sealed class BmsHitObjectLifetimeEntry(
 
     private double computeFutureLifetime(BmsHitObject hitObject)
     {
-        // E-POOR is timed against the next note without consuming it, so the candidate must exist
-        // throughout the earlier miss row as well as the hittable BAD window.
+        // Non-consuming inputs also need the upcoming note to remain available for display.
         var floor = Math.Max(getFastInputWindow(hitObject), minimum_future_lifetime);
         var timingMap = getTimingMap();
 
@@ -234,15 +232,13 @@ internal sealed class BmsHitObjectLifetimeEntry(
     }
 
     /// <summary>
-    ///     The furthest fast-side input window for this object's head judgement. This includes the
-    ///     non-consuming E-POOR row so it can still be associated with the upcoming note.
+    ///     Includes non-consuming input windows, which can precede the resolving head window.
     /// </summary>
-    private static double getFastInputWindow(BmsHitObject hitObject)
+    private double getFastInputWindow(BmsHitObject hitObject)
     {
         if (hitObject is BmsLandmine or BmsInvisibleNote) return 0;
 
-        var table = BmsEngineRules.GetTiming(hitObject, tail: false);
-        return Math.Max(table.FastWindowFor(HitResult.Ok), table.FastWindowFor(HitResult.Miss));
+        return -timing!.Value.EarliestInputOffset / 1000.0;
     }
 
     private bool useConstantScrollFallback(BmsTimingMap? timingMap) => scrollController.ConstantScrollActive || timingMap == null;
@@ -369,22 +365,16 @@ internal sealed class BmsHitObjectLifetimeEntry(
     private static double computePastLifetime() => default_past_lifetime + lifetime_margin;
 
     /// <summary>
-    ///     The BAD (slow) hit-window for this object. The entry must stay alive beyond this boundary
-    ///     so its final drawable update can apply the passive result before lifetime removal begins.
+    ///     Keep the final passive judgement and any post-resolution input observable before removal.
     /// </summary>
-    private static double getSlowWindow(BmsHitObject hitObject)
+    private double getSlowWindow(BmsHitObject hitObject)
     {
         if (hitObject is BmsInvisibleNote or BmsLandmine)
             return 0;
 
-        if (hitObject is BmsLongNote)
-        {
-            var tailTable = BmsEngineRules.GetTiming(hitObject, tail: true);
-            return tailTable.PassiveDeadline / 1000.0 + passive_poor_lifetime_margin;
-        }
-
-        var table = BmsEngineRules.GetTiming(hitObject, tail: false);
-        return table.PassiveDeadline / 1000.0 + passive_poor_lifetime_margin;
+        var windows = timing!.Value;
+        var head = Math.Max(windows.HeadDeadline, windows.ResolvedHeadDeadline) / 1000.0;
+        return Math.Max(head - (hitObject.GetEndTime() - hitObject.StartTime), windows.TailDeadline / 1000.0) + judgement_lifetime_margin;
     }
 
     #endregion

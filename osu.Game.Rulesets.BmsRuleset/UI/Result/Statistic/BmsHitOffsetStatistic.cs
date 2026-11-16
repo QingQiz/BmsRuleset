@@ -14,6 +14,8 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
+using osu.Game.Scoring;
 using osu.Game.Rulesets.Scoring;
 using osuTK;
 using osuTK.Graphics;
@@ -31,9 +33,9 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable, IBmsResul
     private const float minimum_bar_height = 0.02f;
     private const float label_width = 96;
 
-    private readonly IReadOnlyList<HitEvent>? hitEvents;
+    private readonly ScoreInfo? score;
     private readonly IBeatmap? playableBeatmap;
-    private HitOffsetStatistics statistics = null!;
+    private HitOffsetStatistics? statistics;
 
     private FillFlowContainer content = null!;
     private bool expanded;
@@ -47,12 +49,12 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable, IBmsResul
         this.statistics = statistics;
     }
 
-    public BmsHitOffsetStatistic(IReadOnlyList<HitEvent> hitEvents, IBeatmap playableBeatmap)
+    public BmsHitOffsetStatistic(ScoreInfo score, IBeatmap playableBeatmap)
     {
         RelativeSizeAxes = Axes.X;
         AutoSizeAxes = Axes.Y;
 
-        this.hitEvents = hitEvents;
+        this.score = score;
         this.playableBeatmap = playableBeatmap;
     }
 
@@ -61,7 +63,7 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable, IBmsResul
     [BackgroundDependencyLoader]
     private void load()
     {
-        statistics ??= CreateStatistics(playableBeatmap!, hitEvents!);
+        statistics ??= CreateStatistics(GameplayProfile.FromMods(score!.Mods), playableBeatmap!, score.HitEvents);
 
         InternalChild = content = new FillFlowContainer
         {
@@ -81,27 +83,24 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable, IBmsResul
             rebuild();
     }
 
-    internal static HitOffsetStatistics CreateStatistics(IBeatmap playableBeatmap, IReadOnlyList<HitEvent> hitEvents)
+    internal static HitOffsetStatistics CreateStatistics(GameplayProfile profile, IBeatmap playableBeatmap, IReadOnlyList<HitEvent> hitEvents)
     {
-        var displayedHitEvents = hitEvents.Where(e =>
-            e.HitObject is not BmsLandmine
-            && e.Result.IsBasic()
-            && (e.HitObject is BmsHitObject || e.Result == HitResult.Miss)).ToArray();
-        var bmsHitEvents = displayedHitEvents.Where(e => e.HitObject is BmsHitObject).ToArray();
+        var observations = hitEvents.Where(profile.IsTimingEvent).Select(hit => new HitOffsetObservation(hit, profile.TimingKindFor(hit.Result))).ToArray();
+        var noteObservations = observations.Where(observation => observation.Hit.HitObject is BmsHitObject).ToArray();
 
         var variant = playableBeatmap is BmsBeatmap bms ? bms.LayoutVariant : BmsLayoutVariant.Bms5K;
         var totalColumns = playableBeatmap is BmsBeatmap { TotalColumns: > 0 } bmsWithColumns
             ? bmsWithColumns.TotalColumns
-            : Math.Max(BmsLayout.GetTotalColumns(variant), bmsHitEvents.Select(e => ((BmsHitObject)e.HitObject).Column + 1).DefaultIfEmpty(0).Max());
+            : Math.Max(BmsLayout.GetTotalColumns(variant), noteObservations.Select(observation => ((BmsHitObject)observation.Hit.HitObject).Column + 1).DefaultIfEmpty(0).Max());
 
-        var hitsByColumn = bmsHitEvents.ToLookup(e => ((BmsHitObject)e.HitObject).Column);
+        var hitsByColumn = noteObservations.ToLookup(observation => ((BmsHitObject)observation.Hit.HitObject).Column);
         var keyIndex = 0;
 
         var keyGroups = Enumerable.Range(0, totalColumns)
-            .Select(column => new KeyHitOffsetStatistics(labelFor(column, variant, ref keyIndex), createSummary(hitsByColumn[column].Select(e => (e.TimeOffset, e.Result)))))
+            .Select(column => new KeyHitOffsetStatistics(labelFor(column, variant, ref keyIndex), createSummary(hitsByColumn[column])))
             .ToArray();
 
-        return new HitOffsetStatistics(createSummary(displayedHitEvents.Select(e => (e.TimeOffset, e.Result))), keyGroups);
+        return new HitOffsetStatistics(createSummary(observations), keyGroups, observations);
     }
 
     private static LocalisableString labelFor(int column, BmsLayoutVariant variant, ref int keyIndex)
@@ -112,29 +111,30 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable, IBmsResul
         return BmsStrings.Key(++keyIndex);
     }
 
-    internal static HitOffsetStatistics CombineStatistics(IReadOnlyList<(HitOffsetStatistics Statistics, IReadOnlyList<HitEvent> HitEvents)> attempts)
+    internal static HitOffsetStatistics CombineStatistics(IReadOnlyList<HitOffsetStatistics> attempts)
     {
-        var hits = attempts.SelectMany(attempt => attempt.HitEvents).Where(e =>
-            e.HitObject is not BmsLandmine && e.Result.IsBasic()
-            && (e.HitObject is BmsHitObject || e.Result == HitResult.Miss)).ToArray();
-        var keyCount = attempts.Select(attempt => attempt.Statistics.Keys.Count).DefaultIfEmpty().Max();
-        var hitsByColumn = hits.Where(e => e.HitObject is BmsHitObject).ToLookup(e => ((BmsHitObject)e.HitObject).Column);
+        // Keep each stage's interpretation and original offsets when choosing new histogram bins.
+        var observations = attempts.SelectMany(attempt => attempt.Observations).ToArray();
+        var keyCount = attempts.Select(attempt => attempt.Keys.Count).DefaultIfEmpty().Max();
+        var hitsByColumn = observations.Where(observation => observation.Hit.HitObject is BmsHitObject)
+            .ToLookup(observation => ((BmsHitObject)observation.Hit.HitObject).Column);
         return new HitOffsetStatistics(
-            createSummary(hits.Select(e => (e.TimeOffset, e.Result))),
+            createSummary(observations),
             Enumerable.Range(0, keyCount).Select(column => new KeyHitOffsetStatistics(
-                attempts.First(attempt => attempt.Statistics.Keys.Count > column).Statistics.Keys[column].Label,
-                createSummary(hitsByColumn[column].Select(e => (e.TimeOffset, e.Result))))).ToArray());
+                attempts.First(attempt => attempt.Keys.Count > column).Keys[column].Label,
+                createSummary(hitsByColumn[column]))).ToArray(), observations);
     }
 
     private void rebuild()
     {
         content.Clear();
+        var current = statistics!;
 
-        content.Add(overallRow = createRow(BmsStrings.Overall, statistics.Overall, summaryHeight));
+        content.Add(overallRow = createRow(BmsStrings.Overall, current.Overall, summaryHeight));
 
         if (expanded)
         {
-            foreach (var key in statistics.Keys)
+            foreach (var key in current.Keys)
                 content.Add(createRow(key.Label, key.Summary, key_graph_height));
         }
     }
@@ -190,7 +190,7 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable, IBmsResul
             },
             new OsuSpriteText
             {
-                Text = $"{summary.AverageOffset:+0.0;-0.0;0.0} ms",
+                Text = BmsStrings.MeanOffsetMilliseconds(summary.AverageOffset),
                 Colour = summary.AverageOffset < 0 ? BmsResultColours.FAST : BmsResultColours.SLOW,
                 Font = OsuFont.GetFont(size: 12, weight: FontWeight.SemiBold),
             },
@@ -211,10 +211,10 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable, IBmsResul
         ],
     };
 
-    private static HitOffsetSummary createSummary(IEnumerable<(double offset, HitResult result)> hits)
+    private static HitOffsetSummary createSummary(IEnumerable<HitOffsetObservation> hits)
     {
         var hitList = hits.ToList();
-        var timedValues = hitList.Where(h => h.result is not (HitResult.Meh or HitResult.Miss)).Select(h => h.offset).ToArray();
+        var timedValues = hitList.Where(h => h.Kind == ResultTimingKind.Timed).Select(h => h.Hit.TimeOffset).ToArray();
         var averageOffset = timedValues.Length == 0 ? 0 : timedValues.Average();
         var standardDeviation = timedValues.Length == 0
             ? 0
@@ -223,13 +223,14 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable, IBmsResul
         var binSize = Math.Max(1, Math.Ceiling(timedValues.Select(Math.Abs).DefaultIfEmpty(0).Max() / bins_per_side));
         var roundUp = true;
 
-        foreach (var (offset, result) in hitList)
+        foreach (var observation in hitList)
         {
-            if (result is HitResult.Meh or HitResult.Miss)
+            var (offset, result) = (observation.Hit.TimeOffset, observation.Hit.Result);
+            if (observation.Kind != ResultTimingKind.Timed)
             {
                 if (!binsByResult.TryGetValue(result, out var untimedBins))
                     binsByResult[result] = untimedBins = new int[bin_count];
-                untimedBins[result == HitResult.Miss || offset < 0 ? 0 : bin_count - 1]++;
+                untimedBins[observation.Kind == ResultTimingKind.EmptyInput || offset < 0 ? 0 : bin_count - 1]++;
                 continue;
             }
 
@@ -261,7 +262,9 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable, IBmsResul
     }
 
 
-    internal sealed record HitOffsetStatistics(HitOffsetSummary Overall, IReadOnlyList<KeyHitOffsetStatistics> Keys);
+    internal readonly record struct HitOffsetObservation(HitEvent Hit, ResultTimingKind Kind);
+
+    internal sealed record HitOffsetStatistics(HitOffsetSummary Overall, IReadOnlyList<KeyHitOffsetStatistics> Keys, IReadOnlyList<HitOffsetObservation> Observations);
 
     internal sealed record KeyHitOffsetStatistics(LocalisableString Label, HitOffsetSummary Summary);
 
@@ -440,7 +443,7 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable, IBmsResul
                     RelativePositionAxes = Axes.Y,
                     Y = -(1 - minimum_bar_height) * cumulativeBelow / maxTotal,
                     Height = height,
-                    Colour = binIndex == centre_bin_index && i == 0 && result is not (HitResult.Meh or HitResult.Miss)
+                    Colour = binIndex == centre_bin_index && i == 0
                         ? Color4.White
                         : BmsHitResultColours.ForHitResult(result),
                 });

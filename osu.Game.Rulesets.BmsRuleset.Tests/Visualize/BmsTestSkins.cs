@@ -1,9 +1,8 @@
 #nullable enable
-using System;
 using System.Collections.Generic;
 using System.Linq;
+using System;
 using osu.Framework.Allocation;
-using osu.Game.Extensions;
 using osu.Game.IO;
 using osu.Game.Replays;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
@@ -89,7 +88,7 @@ public static partial class BmsTestSkins
                 Replay = new Replay { Frames = frames },
                 ScoreInfo = new ScoreInfo
                 {
-                    Mods = replayMods?.Select(mod => mod.DeepClone()).ToArray() ?? [],
+                    Mods = (replayMods ?? GameplayState.Mods).Select(mod => mod.DeepClone()).ToArray(),
                 },
             });
         }

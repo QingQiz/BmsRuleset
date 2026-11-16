@@ -4,47 +4,6 @@ using RhythmEngine.Profiles.Common;
 
 namespace RhythmEngine.Profiles.Bms;
 
-public enum BmsJudgementMode
-{
-    FiveKey,
-    SevenKey,
-    Pms,
-    Keyboard,
-}
-
-[Flags]
-public enum BmsJudgementModifiers
-{
-    None = 0,
-    Lr2oraja = 1,
-    NoBad = 2,
-    NoGood = 4,
-    NoGreat = 8,
-}
-
-/// <summary>A timing definition shared by execution, previews and framework adapters. All times are microseconds.</summary>
-public sealed class BmsTimingDefinition(TimingWindows windows, long passiveDeadline, long? longNoteHeadDeadline = null)
-{
-    public TimingWindows Windows { get; } = windows;
-
-    public long EarliestHitOffset { get; } = windows.Entries.Where(window => window.Result != BmsResults.EMPTY_POOR).Min(window => window.Early);
-
-    // Removing a hit result does not remove its passive timeout.
-    public long PassiveDeadline { get; } = passiveDeadline;
-
-    public long? LongNoteHeadDeadline { get; } = longNoteHeadDeadline;
-
-    public TimingWindow? WindowFor(ResultId result)
-    {
-        foreach (var window in Windows.Entries)
-        {
-            if (window.Result == result) return window;
-        }
-
-        return null;
-    }
-}
-
 /// <summary>Immutable BMS policy, independent of any host mod instances or active game.</summary>
 public sealed class BmsJudgementRules
 {

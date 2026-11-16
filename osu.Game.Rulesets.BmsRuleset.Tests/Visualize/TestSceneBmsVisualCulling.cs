@@ -42,7 +42,7 @@ public partial class TestSceneBmsVisualCulling : BmsPlayerTestScene
             HitObjects =
             [
                 longNote
-                    ? new BmsLongNote { StartTime = 5000, Duration = 2000, Column = 1 }
+                    ? new BmsLongNote { Kind = mode.ToNoteKind(), StartTime = 5000, Duration = 2000, Column = 1 }
                     : new BmsNote { StartTime = 5000, Column = 1 },
                 new BmsNote { StartTime = 30000, Column = 2 },
             ],

@@ -24,11 +24,6 @@ internal sealed class StableManiaHoldRule(ImmutableArray<long> windows) : INoteR
     public NoteState CreateState(ChartNote note) => new StableManiaHoldState(new NoteTimer(note.EndTime + windows[3], TimerOrder.BeforeInput),
         null, null, null, false, false, false);
 
-    public IEnumerable<ScoringOpportunity> GetScoringOpportunities(ChartNote note)
-    {
-        yield return new ScoringOpportunity(note.Id, NoteParts.TAIL, 300);
-    }
-
     public InputCandidate? GetCandidate(NoteContext context, InputEvent input, int noteIndex)
     {
         var time = clockTime(context.Time);

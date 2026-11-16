@@ -4,8 +4,10 @@ using RhythmEngine.Profiles.Common;
 
 namespace RhythmEngine.Profiles.Patterns;
 
-public sealed class HoldRule : INoteRule
+public sealed class HoldRule : INoteRule, INoteTiming
 {
+    public NoteTiming Timing { get; }
+
     public ImmutableArray<NotePartState> GetParts(NoteContext context)
     {
         var hold = (HoldState)context.State;
@@ -32,20 +34,15 @@ public sealed class HoldRule : INoteRule
             throw new ArgumentOutOfRangeException(nameof(configuration));
 
         Configuration = configuration;
+        Timing = new NoteTiming(configuration.HeadWindows, configuration.HeadDeadline, configuration.NonResolvingHeadResults,
+            configuration.EndMode == HoldEndMode.Release ? configuration.TailDeadline : configuration.AutomaticEndOffset,
+            configuration.ResolvedHeadWindows?.Entries.Max(window => window.Late) ?? 0, configuration.TailWindows);
     }
 
     public NoteState CreateState(ChartNote note)
     {
         var state = new HoldState(null, false, null, null, false, false, 0, null, 0, note.StartTime);
         return schedule(note, state, long.MinValue, false);
-    }
-
-    public IEnumerable<ScoringOpportunity> GetScoringOpportunities(ChartNote note)
-    {
-        if (Configuration.HeadAccuracy > 0)
-            yield return new ScoringOpportunity(note.Id, NoteParts.HEAD, Configuration.HeadAccuracy);
-        if (Configuration.TailAccuracy > 0)
-            yield return new ScoringOpportunity(note.Id, NoteParts.TAIL, Configuration.TailAccuracy);
     }
 
     public InputCandidate? GetCandidate(NoteContext context, InputEvent input, int noteIndex)
@@ -264,7 +261,7 @@ public sealed class HoldRule : INoteRule
         {
             emissions.Add(emission with
             {
-                SuppressPenalty = reason == HoldResolution.MissedHead && Configuration.HeadAccuracy == 0
+                SuppressPenalty = reason == HoldResolution.MissedHead && Configuration.SuppressMissedHeadPenalty
                                                                       && state.Mistake && Configuration.SuppressRepeatedMistakes
             });
         }

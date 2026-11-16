@@ -1,7 +1,5 @@
 using System.Collections.Generic;
 using System.Linq;
-using RhythmEngine.Profiles.Bms;
-using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
@@ -10,8 +8,6 @@ namespace osu.Game.Rulesets.BmsRuleset.Beatmaps;
 
 public interface IBmsBeatmap
 {
-    BmsJudgementModifiers JudgementModifiers { get; set; }
-
     int TotalColumns { get; set; }
 
     BmsLayoutVariant LayoutVariant { get; set; }
@@ -54,10 +50,6 @@ public interface IBmsBeatmap
 
 internal static class BmsBeatmapExtensions
 {
-    internal static int CountScoringNotes(this IBeatmap beatmap) => beatmap.HitObjects
-        .Where(note => note is not BmsLandmine and not BmsInvisibleNote)
-        .Sum(note => note is BmsLongNote { EffectiveMode: BmsLongNoteMode.ChargeNote or BmsLongNoteMode.HellChargeNote } ? 2 : 1);
-
     public static void CopyFrom(this IBmsBeatmap target, BmsParseResult parseResult)
     {
         target.TimingMap = parseResult.TimingMap;

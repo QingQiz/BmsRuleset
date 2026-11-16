@@ -1,16 +1,18 @@
 using System.IO;
 using System.Linq;
 using NUnit.Framework;
+using RhythmEngine.Profiles.Bms;
+using RhythmEngine.Profiles.Common;
 using osu.Game.Beatmaps;
 using osu.Game.Models;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Profiles;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.LongNoteMode;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Practice;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 
@@ -27,13 +29,9 @@ public class BmsonLongNoteModeTest
     {
         var beatmap = convert(mixedChart(chartMode));
         var holds = beatmap.HitObjects.OfType<BmsLongNote>().ToArray();
-        Assert.That(holds.Select(note => note.Mode), Is.EqualTo(new[]
+        Assert.That(holds.Select(note => note.Kind), Is.EqualTo(new[]
         {
-            BmsLongNoteMode.LongNote, BmsLongNoteMode.ChargeNote, BmsLongNoteMode.HellChargeNote, BmsLongNoteMode.Undefined,
-        }));
-        Assert.That(holds.Select(note => note.EffectiveMode), Is.EqualTo(new[]
-        {
-            BmsLongNoteMode.LongNote, BmsLongNoteMode.ChargeNote, BmsLongNoteMode.HellChargeNote, expectedDefault,
+            KeyNoteKind.Hold, KeyNoteKind.ReleaseHold, KeyNoteKind.SustainHold, expectedDefault.ToNoteKind(),
         }));
     }
 
@@ -49,11 +47,11 @@ public class BmsonLongNoteModeTest
         Assert.That(result.Gauges.Any(gauge => gauge.Time > 1000 && gauge.Time < 1500), Is.True);
 
         var practice = BmsPracticeBeatmap.Create(beatmap, new BmsPracticeSettings { StartTime = 1000, EndTime = 2500 });
-        Assert.That(practice.HitObjects.OfType<BmsLongNote>().Select(note => note.EffectiveMode),
-            Is.EqualTo(beatmap.HitObjects.OfType<BmsLongNote>().Select(note => note.EffectiveMode)));
+        Assert.That(practice.HitObjects.OfType<BmsLongNote>().Select(note => note.Kind),
+            Is.EqualTo(beatmap.HitObjects.OfType<BmsLongNote>().Select(note => note.Kind)));
         new BmsModHellChargeNote().ApplyToBeatmap(practice);
-        Assert.That(beatmap.HitObjects.OfType<BmsLongNote>().First().EffectiveMode, Is.EqualTo(BmsLongNoteMode.LongNote));
-        Assert.That(decoded.HitObjects.OfType<BmsLongNote>().First().Mode, Is.EqualTo(BmsLongNoteMode.LongNote));
+        Assert.That(beatmap.HitObjects.OfType<BmsLongNote>().First().Kind, Is.EqualTo(KeyNoteKind.Hold));
+        Assert.That(decoded.HitObjects.OfType<BmsLongNote>().First().Kind, Is.EqualTo(KeyNoteKind.Hold));
     }
 
     [TestCase(BmsLongNoteMode.LongNote)]
@@ -69,8 +67,7 @@ public class BmsonLongNoteModeTest
             _ => new BmsModHellChargeNote(),
         };
         mod.ApplyToBeatmap(beatmap);
-        Assert.That(beatmap.HitObjects.OfType<BmsLongNote>().Select(note => note.Mode), Is.All.EqualTo(BmsLongNoteMode.Undefined));
-        Assert.That(beatmap.HitObjects.OfType<BmsLongNote>().Select(note => note.EffectiveMode), Is.All.EqualTo(target));
+        Assert.That(beatmap.HitObjects.OfType<BmsLongNote>().Select(note => note.Kind), Is.All.EqualTo(target.ToNoteKind()));
     }
 
     [Test]
@@ -78,7 +75,7 @@ public class BmsonLongNoteModeTest
     {
         var beatmap = convert(mixedChart(3));
         new BmsModLr2().ApplyToBeatmap(beatmap);
-        Assert.That(beatmap.HitObjects.OfType<BmsLongNote>().Select(note => note.EffectiveMode), Is.All.EqualTo(BmsLongNoteMode.LongNote));
+        Assert.That(beatmap.HitObjects.OfType<BmsLongNote>().Select(note => note.Kind), Is.All.EqualTo(KeyNoteKind.Hold));
     }
 
     [Test]
@@ -88,7 +85,7 @@ public class BmsonLongNoteModeTest
             [{"name":"a.wav","notes":[{"x":1,"y":480,"l":240,"t":3},{"x":1,"y":960}]}]
             """));
         new BmsModInvert().ApplyToBeatmap(beatmap);
-        Assert.That(beatmap.HitObjects.OfType<BmsLongNote>().Single().EffectiveMode, Is.EqualTo(BmsLongNoteMode.HellChargeNote));
+        Assert.That(beatmap.HitObjects.OfType<BmsLongNote>().Single().Kind, Is.EqualTo(KeyNoteKind.SustainHold));
     }
 
     [Test]
@@ -100,7 +97,7 @@ public class BmsonLongNoteModeTest
             """, info: """, "ln_type":2 """));
         Assert.That(beatmap.HitObjects, Has.Count.EqualTo(2));
         Assert.That(beatmap.HitObjects.All(note => note.AdditionalSampleKeys.Count == 1), Is.True);
-        Assert.That(beatmap.HitObjects.OfType<BmsLongNote>().Single().EffectiveMode, Is.EqualTo(BmsLongNoteMode.ChargeNote));
+        Assert.That(beatmap.HitObjects.OfType<BmsLongNote>().Single().Kind, Is.EqualTo(KeyNoteKind.ReleaseHold));
     }
 
     [Test]

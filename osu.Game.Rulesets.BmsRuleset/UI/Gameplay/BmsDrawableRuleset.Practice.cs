@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using osu.Framework.Bindables;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Practice.Audio;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.UI;
 
@@ -10,8 +11,8 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 
 public partial class BmsDrawableRuleset
 {
-    private static BmsGameplayAudioController createGameplayAudioController(BmsBeatmap beatmap, IReadOnlyList<Mod> mods)
-        => new(beatmap, mods, beatmap.PracticeEndTime.HasValue ? new BmsPracticeSamplePlayback(beatmap, mods) : null);
+    private static BmsGameplayAudioController createGameplayAudioController(BmsBeatmap beatmap, IReadOnlyList<Mod> mods, BmsEngineChart compiled)
+        => new(beatmap, mods, compiled, beatmap.PracticeEndTime.HasValue ? new BmsPracticeSamplePlayback(beatmap, mods, compiled) : null);
 
     internal bool UpdatePracticePreparation()
     {

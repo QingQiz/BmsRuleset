@@ -1,8 +1,8 @@
-#nullable enable
-using System;
 using System.Collections.Generic;
+#nullable enable
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Graphics.Rendering;
@@ -16,9 +16,9 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
-using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Replays;
@@ -104,7 +104,7 @@ public abstract partial class BmsPlayerTestScene : PlayerTestScene, IStorageReso
     protected override Ruleset CreatePlayerRuleset() => new BmsRuleset();
 
     // Timeline assertions exercise the result simulation; live gameplay only exposes current gauge states.
-    protected IReadOnlyList<BmsGaugeHistoryEvent> SimulateGaugeHistory()
+    private protected IReadOnlyList<GameplayHealthHistoryEvent> SimulateGaugeHistory()
     {
         var replay = Player.DrawableRuleset.ReplayScore?.Replay ?? Player.Score.Replay;
         return BmsReplaySimulation.Run(Playfield.Beatmap, replay, Player.Score.ScoreInfo).Gauges

@@ -8,6 +8,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Tests.Performance;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
@@ -26,7 +27,7 @@ public partial class BmsGameplayVirtualisationTest
     public void MineTemplatePreservesHitObjectSearchAndRemoval(int templateIndex)
     {
         var beatmap = attachBeatmap(new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, TotalColumns = 8 });
-        var playfield = new BmsPlayfield(beatmap);
+        var playfield = createPlayfield(beatmap);
         var column = (BmsColumn)playfield.Stage.Columns[1];
         var container = (BmsColumnHitObjectContainer)column.HitObjectContainer;
         var compare = typeof(BmsColumnHitObjectContainer).GetMethod("Compare", BindingFlags.Instance | BindingFlags.NonPublic)!
@@ -34,7 +35,7 @@ public partial class BmsGameplayVirtualisationTest
         var children = (IReadOnlyList<Drawable>)typeof(CompositeDrawable).GetProperty("InternalChildren", BindingFlags.Instance | BindingFlags.NonPublic)!
             .GetValue(container)!;
         for (var i = 0; i < 128; i++)
-            container.Add(new BmsHitObjectLifetimeEntry(new BmsLandmine { StartTime = 5000 + i, Column = 1 }, playfield.ScrollController, () => 0));
+            container.Add(createMarkerEntry(new BmsLandmine { StartTime = 5000 + i, Column = 1 }, playfield.ScrollController, () => 0));
 
         var drawables = new List<OrderingDrawable>();
         for (var i = 0; i < 8; i++)
@@ -85,7 +86,8 @@ public partial class BmsGameplayVirtualisationTest
         });
         var controller = new BmsGameplayScrollController(map);
         var container = new BmsColumnHitObjectContainer(controller, () => 124.8f) { RelativeSizeAxes = Axes.None, Height = 768 };
-        var entry = new BmsHitObjectLifetimeEntry(marker, controller, () => 0);
+        var entry = new BmsHitObjectLifetimeEntry(marker, controller, () => 0,
+            invisible ? null : new BmsEngineChart(beatmap).TimingFor(marker));
         container.Add(entry);
         container.RefreshAllEntries();
 
@@ -111,7 +113,7 @@ public partial class BmsGameplayVirtualisationTest
         var entries = Enumerable.Range(0, 200).Reverse().Select(i =>
         {
             var mine = new BmsLandmine { StartTime = 100000 + i, ScrollPositionAtStartTime = i * 1000 };
-            var entry = new BmsHitObjectLifetimeEntry(mine, controller, () => 0);
+            var entry = createMarkerEntry(mine, controller, () => 0);
             container.Add(entry);
             return entry;
         }).ToArray();
@@ -152,7 +154,7 @@ public partial class BmsGameplayVirtualisationTest
         var container = new BmsColumnHitObjectContainer(controller, () => 124.8f);
         var offset = 0d;
         var mine = new BmsLandmine { StartTime = 10000 };
-        var entry = new BmsHitObjectLifetimeEntry(mine, controller, () => offset);
+        var entry = createMarkerEntry(mine, controller, () => offset);
         container.Add(entry);
         container.RefreshAllEntries();
         controller.Update(0);
@@ -182,7 +184,7 @@ public partial class BmsGameplayVirtualisationTest
             TimingMap = map,
             HitObjects = [note],
         });
-        var entry = new BmsHitObjectLifetimeEntry(beatmap.HitObjects[0], new BmsGameplayScrollController(map), () => 0);
+        var entry = new BmsHitObjectLifetimeEntry(note, new BmsGameplayScrollController(map), () => 0, new BmsEngineChart(beatmap).TimingFor(note));
         using var probe = new ScopedMethodProbe(typeof(BmsTimingMap).GetMethod(nameof(BmsTimingMap.GetScrollPositionAtTime)),
             typeof(BmsGameplayVirtualisationTest).GetMethod(nameof(countVisibilityQuery), BindingFlags.Static | BindingFlags.NonPublic));
         visibilityQueries = 0;
@@ -190,6 +192,12 @@ public partial class BmsGameplayVirtualisationTest
 
         Assert.That(entry.LifetimeStart, Is.EqualTo(time - BmsDrawableRuleset.ComputeScrollTime(8)).Within(1));
         Assert.That(visibilityQueries, Is.LessThan(100), "Visibility search should depend on the visible interval, not song length.");
+    }
+
+    private static BmsHitObjectLifetimeEntry createMarkerEntry(BmsLandmine mine, BmsGameplayScrollController scroll, Func<double> visualOffset)
+    {
+        var beatmap = attachBeatmap(new BmsBeatmap { HitObjects = [mine] });
+        return new BmsHitObjectLifetimeEntry(mine, scroll, visualOffset, new BmsEngineChart(beatmap).TimingFor(mine));
     }
 
     private static void countVisibilityQuery() => visibilityQueries++;

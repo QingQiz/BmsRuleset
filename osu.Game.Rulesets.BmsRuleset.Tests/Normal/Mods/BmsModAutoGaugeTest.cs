@@ -1,5 +1,6 @@
 using System.Linq;
 using NUnit.Framework;
+using RhythmEngine.Profiles.Bms;
 using osu.Game.Configuration;
 using osu.Game.IO.Serialization;
 using osu.Game.Online.API;
@@ -41,7 +42,7 @@ public class BmsModAutoGaugeTest
 
         hp.ApplyTestResult(new BmsJudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
             { Type = HitResult.Ok });
-        hp.HasPassedAtEnd();
+        hp.EvaluateTestClear();
 
         return (autoGauge, hp);
     }
@@ -59,7 +60,7 @@ public class BmsModAutoGaugeTest
     public void TestAutoGaugeAppendsResolvedGaugeModOnApplyToScore()
     {
         var (autoGauge, hp) = createAutoGaugeResolvedToExHard();
-        Assert.That(hp.WorstGaugeType, Is.EqualTo(BmsGaugeType.ExHard));
+        Assert.That(hp.Gauge().WorstGaugeType, Is.EqualTo(BmsGaugeType.ExHard));
 
         var score = new ScoreInfo { Mods = [autoGauge] };
 
@@ -118,7 +119,7 @@ public class BmsModAutoGaugeTest
 
         hp.ApplyTestResult(new BmsJudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
             { Type = HitResult.Ok });
-        hp.HasPassedAtEnd();
+        hp.EvaluateTestClear();
 
         autoGauge.ApplyToScore(score);
 
@@ -140,19 +141,19 @@ public class BmsModAutoGaugeTest
     {
         var hp = new BmsHealthProcessor();
         hp.ApplyBeatmap(new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K });
-        hp.ConfigureGaugeContext(true, BmsGaugeProfileFamily.FiveKeys);
+        hp.Gauge().ConfigureGaugeContext(true, BmsGaugeProfileFamily.FiveKeys);
 
         new BmsModAutoGauge().ApplyToHealthProcessor(hp);
 
         Assert.Multiple(() =>
         {
-            Assert.That(hp.CurrentGaugeStates.Select(state => state.GaugeType), Is.EqualTo(
+            Assert.That(hp.Gauge().CurrentGaugeStates.Select(state => state.GaugeType), Is.EqualTo(
             [
                 BmsGaugeType.ExHardClass,
                 BmsGaugeType.ExClass,
                 BmsGaugeType.Class,
             ]));
-            Assert.That(hp.GaugeProfile.PerfectGain, Is.EqualTo(0.0001).Within(0.000001));
+            Assert.That(hp.Gauge().GaugeProfile.PerfectGain, Is.EqualTo(0.0001).Within(0.000001));
         });
     }
 
@@ -161,11 +162,11 @@ public class BmsModAutoGaugeTest
     {
         var hp = new BmsHealthProcessor();
         hp.ApplyBeatmap(new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K });
-        hp.ConfigureGaugeContext(true, BmsGaugeProfileFamily.FiveKeys);
+        hp.Gauge().ConfigureGaugeContext(true, BmsGaugeProfileFamily.FiveKeys);
 
         new BmsModClassGauge().ApplyToHealthProcessor(hp);
 
-        Assert.That(hp.GaugeProfile.PerfectGain, Is.EqualTo(0.0001).Within(0.000001));
+        Assert.That(hp.Gauge().GaugeProfile.PerfectGain, Is.EqualTo(0.0001).Within(0.000001));
     }
 
     [Test]
@@ -187,9 +188,9 @@ public class BmsModAutoGaugeTest
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(health.IsCourseGaugeMode, Is.True);
-            Assert.That(health.ConfiguredProfileFamily, Is.EqualTo(BmsGaugeProfileFamily.Lr2));
-            Assert.That(health.CurrentGaugeStates, Is.EqualTo(new[]
+            Assert.That(health.Gauge().IsCourseGaugeMode, Is.True);
+            Assert.That(health.Gauge().ConfiguredProfileFamily, Is.EqualTo(BmsGaugeProfileFamily.Lr2));
+            Assert.That(health.Gauge().CurrentGaugeStates, Is.EqualTo(new[]
             {
                 new BmsGaugeStateSnapshot(BmsGaugeType.ExClass, 0.42, false),
                 new BmsGaugeStateSnapshot(BmsGaugeType.Class, 0.81, false),
@@ -220,9 +221,9 @@ public class BmsModAutoGaugeTest
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(health.IsCourseGaugeMode, Is.True);
-            Assert.That(health.ConfiguredProfileFamily, Is.EqualTo(BmsGaugeProfileFamily.FiveKeys));
-            Assert.That(health.CurrentGaugeStates.Single(), Is.EqualTo(new BmsGaugeStateSnapshot(type, 0.42, false)));
+            Assert.That(health.Gauge().IsCourseGaugeMode, Is.True);
+            Assert.That(health.Gauge().ConfiguredProfileFamily, Is.EqualTo(BmsGaugeProfileFamily.FiveKeys));
+            Assert.That(health.Gauge().CurrentGaugeStates.Single(), Is.EqualTo(new BmsGaugeStateSnapshot(type, 0.42, false)));
         }
 
         foreach (var control in restored.CreateSettingsControls())

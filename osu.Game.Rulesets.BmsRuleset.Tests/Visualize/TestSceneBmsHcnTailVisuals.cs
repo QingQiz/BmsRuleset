@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
+using RhythmEngine.Profiles.Common;
 using osu.Framework.Graphics;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
@@ -39,7 +40,7 @@ public partial class TestSceneBmsHcnTailVisuals : BmsPlayerTestScene
             Rank = 2,
             Total = 12,
             LockedLongNoteMode = BmsLongNoteMode.HellChargeNote,
-            HitObjects = [new BmsLongNote { StartTime = 3000, Duration = 1000, Column = column }],
+            HitObjects = [new BmsLongNote { Kind = KeyNoteKind.SustainHold, StartTime = 3000, Duration = 1000, Column = column }],
         };
         if (mineAtTail)
             beatmap.HitObjects.Add(new BmsLandmine { StartTime = 4000, Column = column, LandmineDamagePercent = 10 });

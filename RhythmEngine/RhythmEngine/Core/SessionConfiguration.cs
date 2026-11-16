@@ -29,9 +29,13 @@ public sealed record ScoreState
 
     public int MaximumCombo { get; init; }
 
+    public int JudgedOpportunities { get; init; }
+
     public double Bonus { get; init; }
 
     public ImmutableDictionary<string, double> Counters { get; init; } = ImmutableDictionary<string, double>.Empty;
+
+    public ImmutableDictionary<ResultId, int> ResultCounts { get; init; } = ImmutableDictionary<ResultId, int>.Empty;
 
     public double Accuracy => AccuracyMaximum == 0 ? 1 : AccuracyPoints / AccuracyMaximum;
 }
@@ -80,4 +84,7 @@ public sealed record SessionConfiguration(
     string ProfileId,
     ScoreConfiguration Score,
     HealthConfiguration Health,
-    Func<InputArbitrationContext, ImmutableArray<InputCandidate>> SelectCandidates);
+    Func<InputArbitrationContext, ImmutableArray<InputCandidate>> SelectCandidates,
+    Func<SessionCompletionContext, bool>? IsComplete = null);
+
+public readonly record struct SessionCompletionContext(long? Time, bool NotesRetired, ScoreState Score, ScorePlan Plan);

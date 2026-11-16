@@ -55,7 +55,7 @@ public partial class TestSceneBmsLeaderboardRank : OsuManualInputManagerTestScen
         AddAssert("username unchanged", () => row.ChildrenOfType<TruncatingSpriteText>()
             .Single(text => text.Name == "Leaderboard username").Text.ToString(), () => Is.EqualTo(username));
         AddAssert("EXSCORE uses judgements", () => row.ChildrenOfType<OsuSpriteText>()
-            .Single(text => text.Name == "Leaderboard EXSCORE").Text.ToString(), () => Is.EqualTo("205"));
+            .Single(text => text.Name == "Leaderboard score").Text.ToString(), () => Is.EqualTo("205"));
         AddUntilStep("username fits before mods", () => row.ChildrenOfType<TruncatingSpriteText>()
             .Single(text => text.Name == "Leaderboard username").ScreenSpaceDrawQuad.AABBFloat.Right
             <= row.ChildrenOfType<ModIcon>().Min(icon => icon.ScreenSpaceDrawQuad.AABBFloat.Left));
@@ -134,16 +134,16 @@ public partial class TestSceneBmsLeaderboardRank : OsuManualInputManagerTestScen
         AddAssert("score callback invoked", () => presented);
         AddAssert("course owns deletion without replay file actions", () =>
         {
-            var items = ((IHasContextMenu)row).ContextMenuItems.Select(item => item.Text.ToString()).ToArray();
+            var items = ((IHasContextMenu)row).ContextMenuItems!.Select(item => item.Text.ToString()).ToArray();
             return items.Contains(BmsStrings.LeaderboardDelete.ToString()) == course
                    && !items.Contains(BmsStrings.LeaderboardExport.ToString())
                    && !items.Contains(BmsStrings.LeaderboardWatchReplay.ToString());
         });
-        AddStep("copy mods", () => ((IHasContextMenu)row).ContextMenuItems.First().Action.Value());
+        AddStep("copy mods", () => ((IHasContextMenu)row).ContextMenuItems!.First().Action.Value());
         AddAssert("system mods excluded and settings detached", () => row.SelectedMods.Value.Count == 1
             && row.SelectedMods.Value[0] is BmsModMirror && !ReferenceEquals(row.SelectedMods.Value[0], row.Score.Mods[0]));
         AddStep("attach replay file", () => row.Score.Files.Add(new RealmNamedFileUsage(new RealmFile { Hash = "test" }, "replay.osr")));
-        AddAssert("file actions remain exclusive to single scores", () => ((IHasContextMenu)row).ContextMenuItems
+        AddAssert("file actions remain exclusive to single scores", () => ((IHasContextMenu)row).ContextMenuItems!
             .Any(item => item.Text.ToString() == BmsStrings.LeaderboardExport.ToString()), () => Is.EqualTo(!course));
         AddStep("leave score", () => InputManager.MoveMouseTo(new Vector2(-100)));
         AddUntilStep("tooltip hides", () => !tooltip.IsPresent);

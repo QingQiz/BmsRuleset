@@ -1,6 +1,6 @@
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Course;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
@@ -59,8 +59,12 @@ internal partial class BmsCourseAggregateStatistics : BmsStatisticsPanel
                 return statistics ?? BmsResultStatisticsData.Create(new ScoreInfo(), beatmap);
             }, cancellationToken).ConfigureAwait(false);
 
-            if (statistics?.EndingGaugeStates.Count > 0)
-                gaugeStates = statistics.EndingGaugeStates.Where(state => !state.Failed).ToArray();
+            if (statistics?.EndingHealth is { } endingHealth)
+                gaugeStates = gaugeStates.Select((state, index) => state with
+                {
+                    Health = endingHealth.Layers[index].Value,
+                    Failed = endingHealth.Layers[index].HasFailed,
+                }).Where(state => !state.Failed).ToArray();
         }
 
         cancellationToken.ThrowIfCancellationRequested();

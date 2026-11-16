@@ -13,6 +13,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
@@ -32,7 +33,7 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable, IBmsResult
     private static readonly Color4 scratch_colour = colours.Yellow;
     private readonly ScoreInfo? score;
     private readonly IBeatmap? playableBeatmap;
-    private TimelineData data = null!;
+    private TimelineData? data;
     private readonly List<Drawable> plots = [];
     private readonly List<Drawable> legends = [];
 
@@ -69,6 +70,7 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable, IBmsResult
 
     private void rebuild()
     {
+        var current = data!;
         var height = plots.FirstOrDefault()?.Height ?? subplot_height;
         plots.Clear();
         legends.Clear();
@@ -80,9 +82,9 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable, IBmsResult
             Spacing = new Vector2(0, 8),
             Children =
             [
-                createSubplot(BmsStrings.Notes, data.Notes, data.StageBoundaries),
-                createSubplot(BmsStrings.Judgement, data.Judgements, data.StageBoundaries),
-                createSubplot(BmsStrings.FastSlow, data.FastSlow, data.StageBoundaries),
+                createSubplot(BmsStrings.Notes, current.Notes, current.StageBoundaries),
+                createSubplot(BmsStrings.Judgement, current.Judgements, current.StageBoundaries),
+                createSubplot(BmsStrings.FastSlow, current.FastSlow, current.StageBoundaries),
             ],
         };
         foreach (var plot in plots)
@@ -90,9 +92,9 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable, IBmsResult
     }
 
     internal static TimelineData CreateData(ScoreInfo score, IBeatmap playableBeatmap)
-        => CreateData(playableBeatmap, score.HitEvents, score.HitEvents);
+        => CreateData(GameplayProfile.FromMods(score.Mods), playableBeatmap, score.HitEvents, score.HitEvents);
 
-    internal static TimelineData CreateData(IBeatmap playableBeatmap, IReadOnlyList<HitEvent> timingEvents, IReadOnlyList<HitEvent> scoringEvents,
+    internal static TimelineData CreateData(GameplayProfile profile, IBeatmap playableBeatmap, IReadOnlyList<HitEvent> timingEvents, IReadOnlyList<HitEvent> scoringEvents,
         double minimumDuration = 0)
     {
         var variant = playableBeatmap is BmsBeatmap bms ? bms.LayoutVariant : BmsLayoutVariant.Bms5K;
@@ -102,8 +104,8 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable, IBmsResult
         var duration = Math.Max(Math.Max(1, minimumDuration), Math.Max(beatmapMax, hitEventsMax));
 
         var notes = createNotesSubplot(playableBeatmap, variant, duration);
-        var judgements = createJudgementSubplot(scoringEvents, duration);
-        var fastSlow = createFastSlowSubplot(timingEvents, duration);
+        var judgements = createJudgementSubplot(profile, scoringEvents, duration);
+        var fastSlow = createFastSlowSubplot(profile, timingEvents, duration);
         return new TimelineData(notes, judgements, fastSlow, [], duration);
     }
 
@@ -178,49 +180,27 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable, IBmsResult
         ], uniformBucketWeights(duration));
     }
 
-    private static SubplotData createJudgementSubplot(IReadOnlyList<HitEvent> hitEvents, double duration)
+    private static SubplotData createJudgementSubplot(GameplayProfile profile, IReadOnlyList<HitEvent> hitEvents, double duration)
     {
-        var perfect = new int[bucket_count];
-        var great = new int[bucket_count];
-        var good = new int[bucket_count];
-        var ok = new int[bucket_count];
-        var meh = new int[bucket_count];
-
-        foreach (var e in hitEvents.Where(isBmsHit))
+        var categories = BmsRuleset.STATIC_VALID_HIT_RESULTS
+            .Where(result => profile.TimingKindFor(result) != ResultTimingKind.EmptyInput)
+            .OrderByDescending(result => result.GetIndexForOrderedDisplay())
+            .ToDictionary(result => result, result => new CategoryData(profile.JudgementLabel(result), BmsHitResultColours.ForHitResult(result), new int[bucket_count]));
+        foreach (var hit in hitEvents.Where(profile.IsTimingEvent))
         {
-            var b = bucketFor(e.HitObject.GetEndTime(), duration);
-
-            switch (e.Result)
-            {
-                case HitResult.Perfect: perfect[b]++; break;
-
-                case HitResult.Great: great[b]++; break;
-
-                case HitResult.Good: good[b]++; break;
-
-                case HitResult.Ok: ok[b]++; break;
-
-                case HitResult.Meh: meh[b]++; break;
-                    // Miss (E-Poor) excluded — IsHit() filters it out.
-            }
+            if (categories.TryGetValue(hit.Result, out var category))
+                category.Buckets[bucketFor(hit.HitObject.GetEndTime(), duration)]++;
         }
 
-        return new SubplotData(
-        [
-            new CategoryData(BmsStrings.Poor, BmsHitResultColours.ForHitResult(HitResult.Meh), meh),
-            new CategoryData(BmsStrings.Bad, BmsHitResultColours.ForHitResult(HitResult.Ok), ok),
-            new CategoryData(BmsStrings.Good, BmsHitResultColours.ForHitResult(HitResult.Good), good),
-            new CategoryData(BmsStrings.Great, BmsHitResultColours.ForHitResult(HitResult.Great), great),
-            new CategoryData(BmsStrings.Perfect, BmsHitResultColours.ForHitResult(HitResult.Perfect), perfect),
-        ], uniformBucketWeights(duration));
+        return new SubplotData(categories.Values.ToArray(), uniformBucketWeights(duration));
     }
 
-    private static SubplotData createFastSlowSubplot(IReadOnlyList<HitEvent> hitEvents, double duration)
+    private static SubplotData createFastSlowSubplot(GameplayProfile profile, IReadOnlyList<HitEvent> hitEvents, double duration)
     {
         var fast = new int[bucket_count];
         var slow = new int[bucket_count];
 
-        foreach (var e in hitEvents.Where(isBmsHit))
+        foreach (var e in hitEvents.Where(hit => profile.IsTimingEvent(hit) && profile.CountsForFastSlow(hit.Result)))
         {
             var b = bucketFor(e.HitObject.GetEndTime(), duration);
 
@@ -237,8 +217,6 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable, IBmsResult
 
     private static float[] uniformBucketWeights(double duration) =>
         Enumerable.Repeat((float)(duration / bucket_count), bucket_count).ToArray();
-
-    private static bool isBmsHit(HitEvent e) => e.HitObject is BmsHitObject and not BmsLandmine && e.Result.IsBasic() && e.Result.IsHit();
 
     private static int bucketFor(double time, double duration) => Math.Clamp((int)Math.Floor(time / duration * bucket_count), 0, bucket_count - 1);
 

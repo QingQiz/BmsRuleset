@@ -64,6 +64,7 @@
   <data name="visual_offset" xml:space="preserve"><value>Visual offset</value></data>
   <data name="bms_visual_offset" xml:space="preserve"><value>BMS Visual offset</value></data>
   <data name="long_note_tail_visual_offset" xml:space="preserve"><value>LN tail visual offset</value></data>
+  <data name="mean_offset_milliseconds" xml:space="preserve"><value>{0:+0.0;-0.0;0.0} ms</value></data>
   <data name="offset_milliseconds" xml:space="preserve"><value>{0:N0} ms</value></data>
   <data name="visual_offset_earlier" xml:space="preserve"><value>{0:N0} ms - notes appear earlier; suited to players who receive more Slow judgements</value></data>
   <data name="visual_offset_later" xml:space="preserve"><value>{0:N0} ms - notes appear later; suited to players who receive more Fast judgements</value></data>
@@ -125,10 +126,10 @@
   <data name="scratch" xml:space="preserve"><value>Scratch</value></data>
   <data name="fast" xml:space="preserve"><value>fast</value></data>
   <data name="slow" xml:space="preserve"><value>slow</value></data>
-  <data name="hit_error_meter_show_empty_poor" xml:space="preserve"><value>Show E-POOR</value></data>
-  <data name="hit_error_meter_show_empty_poor_description" xml:space="preserve"><value>Shows E-POOR judgements and their grey timing regions.</value></data>
-  <data name="hit_error_meter_show_poor" xml:space="preserve"><value>Show POOR</value></data>
-  <data name="hit_error_meter_show_poor_description" xml:space="preserve"><value>Shows Fast and Slow POOR judgements at the outer edges of the displayed judgement regions.</value></data>
+  <data name="hit_error_meter_show_empty_poor" xml:space="preserve"><value>Show empty inputs</value></data>
+  <data name="hit_error_meter_show_empty_poor_description" xml:space="preserve"><value>Shows empty-input judgements and their timing regions.</value></data>
+  <data name="hit_error_meter_show_poor" xml:space="preserve"><value>Show misses</value></data>
+  <data name="hit_error_meter_show_poor_description" xml:space="preserve"><value>Shows untimed misses at the outer edges of the displayed judgement regions.</value></data>
   <data name="hit_error_meter_fade_duration" xml:space="preserve"><value>Judgement fade duration</value></data>
   <data name="hit_error_meter_fade_duration_description" xml:space="preserve"><value>Seconds taken for judgement lines to fade out.</value></data>
   <data name="hit_error_meter_line_thickness" xml:space="preserve"><value>Judgement line thickness</value></data>
@@ -137,8 +138,8 @@
   <data name="hit_error_meter_background_opacity_description" xml:space="preserve"><value>Adjusts the opacity of the hit error meter's black background.</value></data>
   <data name="hit_error_meter_colour_bar_height" xml:space="preserve"><value>Colour bar height</value></data>
   <data name="hit_error_meter_colour_bar_height_description" xml:space="preserve"><value>Adjusts the height of the coloured judgement area. Set to 0 to hide it.</value></data>
-  <data name="judgement_display_show_empty_poor" xml:space="preserve"><value>Show E-POOR</value></data>
-  <data name="judgement_display_show_empty_poor_description" xml:space="preserve"><value>Shows empty POOR judgements in the judgement HUD.</value></data>
+  <data name="judgement_display_show_empty_poor" xml:space="preserve"><value>Show empty inputs</value></data>
+  <data name="judgement_display_show_empty_poor_description" xml:space="preserve"><value>Shows empty-input judgements in the judgement HUD.</value></data>
   <data name="key" xml:space="preserve"><value>Key {0}</value></data>
   <data name="notes" xml:space="preserve"><value>Notes</value></data>
   <data name="judgement" xml:space="preserve"><value>Judgement</value></data>
@@ -302,8 +303,7 @@
   <data name="score_graph_personal_best" xml:space="preserve"><value>Personal best</value></data>
   <data name="score_graph_personal_best_short" xml:space="preserve"><value>Best</value></data>
   <data name="score_graph_target" xml:space="preserve"><value>Target {0}</value></data>
-  <data name="score_graph_ex_score" xml:space="preserve"><value>{0:D4}</value></data>
-  <data name="score_graph_difference" xml:space="preserve"><value>{0:+0000;-0000;+0000}</value></data>
+<data name="score_graph_difference" xml:space="preserve"><value>{0:+0000;-0000;+0000}</value></data>
   <data name="score_graph_current_colour" xml:space="preserve"><value>Current score colour</value></data>
   <data name="score_graph_current_colour_description" xml:space="preserve"><value>Colour of the current EX score column.</value></data>
   <data name="score_graph_personal_best_colour" xml:space="preserve"><value>Personal best colour</value></data>
@@ -504,7 +504,7 @@
     <value>Practice results</value>
   </data>
   <data name="practice_completed_attempts" xml:space="preserve"><value>{0} completed attempts</value></data>
-  <data name="practice_attempt_metrics" xml:space="preserve"><value>EX {0} · Combo {1} · Gauge {2:0}%</value></data>
+  <data name="practice_attempt_metrics" xml:space="preserve"><value>{0} {1} · COMBO {2:N0} · HP {3:0.0}%</value></data>
   <data name="practice_input_time" xml:space="preserve">
     <value>{0:0.000}</value>
   </data>
@@ -612,4 +612,85 @@ Click to open the BMS log for the complete list and error details.</value>
   <data name="difficulty_refresh_failed" xml:space="preserve">
     <value>BMS difficulty update finished with {0} failed charts.</value>
   </data>
+  <data name="health" xml:space="preserve">
+    <value>Health</value>
+  </data>
+  <data name="gauge_name_assisteasy" xml:space="preserve">
+    <value>Assist Easy</value>
+  </data>
+  <data name="gauge_name_easy" xml:space="preserve">
+    <value>Easy</value>
+  </data>
+  <data name="gauge_name_normal" xml:space="preserve">
+    <value>Normal</value>
+  </data>
+  <data name="gauge_name_hard" xml:space="preserve">
+    <value>Hard</value>
+  </data>
+  <data name="gauge_name_exhard" xml:space="preserve">
+    <value>ExHard</value>
+  </data>
+  <data name="gauge_name_hazard" xml:space="preserve">
+    <value>Hazard</value>
+  </data>
+  <data name="gauge_name_class" xml:space="preserve">
+    <value>Class</value>
+  </data>
+  <data name="gauge_name_exclass" xml:space="preserve">
+    <value>ExClass</value>
+  </data>
+  <data name="gauge_name_exhardclass" xml:space="preserve">
+    <value>ExHard Class</value>
+  </data>
+  <data name="rank_letter_s" xml:space="preserve">
+    <value>S</value>
+  </data>
+  <data name="rank_letter_aaa" xml:space="preserve">
+    <value>AAA</value>
+  </data>
+  <data name="rank_letter_aa" xml:space="preserve">
+    <value>AA</value>
+  </data>
+  <data name="rank_letter_a" xml:space="preserve">
+    <value>A</value>
+  </data>
+  <data name="rank_letter_b" xml:space="preserve">
+    <value>B</value>
+  </data>
+  <data name="rank_letter_c" xml:space="preserve">
+    <value>C</value>
+  </data>
+  <data name="rank_letter_f" xml:space="preserve">
+    <value>F</value>
+  </data>
+  <data name="score_graph_score" xml:space="preserve">
+    <value>{0} {1:0000}</value>
+  </data>
+  <data name="score_graph_rank" xml:space="preserve">
+    <value>{0} {1:0000}</value>
+  </data>
+  <data name="score_graph_maximum_target" xml:space="preserve">
+    <value>TARGET MAX</value>
+  </data>
+  <data name="difficulty_attribute_exrank" xml:space="preserve"><value>EXRANK</value></data>
+  <data name="difficulty_attribute_exrank_acronym" xml:space="preserve"><value>EX</value></data>
+  <data name="difficulty_attribute_rank" xml:space="preserve"><value>RANK</value></data>
+  <data name="difficulty_attribute_rank_acronym" xml:space="preserve"><value>RK</value></data>
+  <data name="difficulty_attribute_lnmode" xml:space="preserve"><value>LNMODE</value></data>
+  <data name="difficulty_attribute_lnmode_acronym" xml:space="preserve"><value>LM</value></data>
+  <data name="difficulty_attribute_total" xml:space="preserve"><value>TOTAL</value></data>
+  <data name="difficulty_attribute_total_acronym" xml:space="preserve"><value>TL</value></data>
+  <data name="timing_metric_group_note" xml:space="preserve"><value>Normal note</value></data>
+  <data name="timing_metric_group_tail" xml:space="preserve"><value>LN tail</value></data>
+  <data name="timing_metric_group_scratch_tail" xml:space="preserve"><value>Scratch LN tail</value></data>
+  <data name="timing_metric_label" xml:space="preserve"><value>{0} {1}</value></data>
+  <data name="empty_input_fast_zone" xml:space="preserve"><value>E-POOR fast zone</value></data>
+  <data name="timing_window" xml:space="preserve"><value>{0:0.##} to {1:+0.##;-0.##;0} ms</value></data>
+  <data name="gauge_best_judgements" xml:space="preserve"><value>PGREAT/GREAT</value></data>
+  <data name="gauge_delta" xml:space="preserve"><value>{0:+0.###;-0.###;0}%</value></data>
+  <data name="total_value" xml:space="preserve"><value>#TOTAL {0:0.###}</value></data>
+  <data name="default_total_value" xml:space="preserve"><value>default TOTAL {0:0.###}</value></data>
+  <data name="long_note_mode_longnote" xml:space="preserve"><value>LN</value></data>
+  <data name="long_note_mode_chargenote" xml:space="preserve"><value>CN</value></data>
+  <data name="long_note_mode_hellchargenote" xml:space="preserve"><value>HCN</value></data>
 </root>

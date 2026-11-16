@@ -1,18 +1,15 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
-using RhythmEngine.Profiles.Bms;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
-using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using osu.Game.Rulesets.Difficulty;
 using osu.Game.Rulesets.Difficulty.Preprocessing;
 using osu.Game.Rulesets.Difficulty.Skills;
 using osu.Game.Rulesets.Mods;
-using osu.Game.Rulesets.Scoring;
 using osu.Game.Utils;
 
 namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Difficulty;
@@ -20,7 +17,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Difficulty;
 public class BmsDifficultyCalculator(IRulesetInfo ruleset, IWorkingBeatmap beatmap) : DifficultyCalculator(ruleset, beatmap)
 {
     // Increment when model, conversion or mod changes affect calculated star ratings.
-    public const int DIFFICULTY_VERSION = 1;
+    public const int DIFFICULTY_VERSION = 2;
 
     public override int Version => DIFFICULTY_VERSION;
 
@@ -28,24 +25,19 @@ public class BmsDifficultyCalculator(IRulesetInfo ruleset, IWorkingBeatmap beatm
 
     internal CancellationToken CalculationCancellationToken { get; set; }
 
+    private Dictionary<BmsHitObject, int> scoringOpportunities = [];
+    private double hitLeniency;
+
     protected override DifficultyAttributes CreateDifficultyAttributes(IBeatmap beatmap, Mod[] mods, Skill[] skills)
     {
-        // Result constraints such as NE must not remove the rating model's base GREAT tolerance.
-        var modifiers = BmsEngineRules.ModifiersFor(mods) & BmsJudgementModifiers.Lr2oraja;
         CalculationCancellationToken.ThrowIfCancellationRequested();
         var clockRate = ModUtils.CalculateRateWithMods(mods);
-        var bmsBeatmap = beatmap as BmsBeatmap;
-        var storedDifficulty = bmsBeatmap == null ? BmsDifficultyInfo.FromOsuDifficulty(beatmap.Difficulty) : default;
-
-        // When called from CalculateTimed, beatmap is a ProgressiveCalculationBeatmap wrapper
-        // (not a BmsBeatmap), so the cast above returns null. In that case, derive TotalColumns
-        // and judgement difficulty from the difficulty metadata written by the converter.
-        var totalColumns = bmsBeatmap?.TotalColumns ?? storedDifficulty.KeyCount;
-        var rank = bmsBeatmap?.Rank ?? storedDifficulty.Rank;
+        // The base calculator retains the full playable chart when passing a progressive wrapper.
+        var bmsBeatmap = (BmsBeatmap)Beatmap;
 
         var noteTimings = beatmap.HitObjects
             .OfType<BmsHitObject>()
-            .Where(h => h is not BmsLandmine)
+            .Where(scoringOpportunities.ContainsKey)
             .Select(h => new BmsNoteTiming(h.Column, h.StartTime, h is BmsLongNote ln ? ln.EndTime : h.StartTime))
             .ToList();
 
@@ -53,24 +45,29 @@ public class BmsDifficultyCalculator(IRulesetInfo ruleset, IWorkingBeatmap beatm
 
         if (noteTimings.Count > 0)
         {
-            var layout = bmsBeatmap?.LayoutVariant ?? BmsLayout.VariantFromTotalColumns(totalColumns);
-            var exRank = bmsBeatmap != null ? bmsBeatmap.ExRank : storedDifficulty.ExRank;
-            var judgementRate = BmsEngineRules.ForLayout(layout, modifiers).ResolveRate(rank, exRank);
-            var column = BmsLayout.IsScratchColumn(0, layout) ? 1 : 0;
-            var greatWindow = BmsEngineRules.GetTiming(layout, column, judgementRate, false, modifiers).FrameworkWindowFor(HitResult.Great);
-            var result = StarRatingProcessor.Compute(noteTimings, totalColumns, rank, clockRate, layout,
-                cancellationToken: CalculationCancellationToken, hitLeniency: BmsHitLeniency.FromGreatWindow(greatWindow));
+            var result = StarRatingProcessor.Compute(noteTimings, bmsBeatmap.TotalColumns, bmsBeatmap.Rank, clockRate, bmsBeatmap.LayoutVariant,
+                cancellationToken: CalculationCancellationToken, hitLeniency: hitLeniency);
             sr = result.StarRating;
         }
 
         return new DifficultyAttributes(mods, sr)
         {
-            MaxCombo = beatmap.HitObjects.Count,
+            MaxCombo = beatmap.HitObjects.OfType<BmsHitObject>().Sum(note => scoringOpportunities.GetValueOrDefault(note)),
         };
     }
 
     // Required by the base class; BMS computes attributes without Skills or their object wrappers.
     protected override IEnumerable<DifficultyHitObject> CreateDifficultyHitObjects(IBeatmap beatmap, Mod[] mods) => [];
 
-    protected override Skill[] CreateSkills(IBeatmap beatmap, Mod[] mods) => [];
+    protected override Skill[] CreateSkills(IBeatmap beatmap, Mod[] mods)
+    {
+        CalculationCancellationToken.ThrowIfCancellationRequested();
+        var bmsBeatmap = (BmsBeatmap)beatmap;
+        var profile = GameplayProfile.FromMods(mods);
+        var compiled = new BmsEngineChart(bmsBeatmap, profile);
+        scoringOpportunities = compiled.Chart.ScorePlan.Opportunities.GroupBy(opportunity => compiled.Objects[opportunity.NoteId])
+            .ToDictionary(group => group.Key, group => group.Count());
+        hitLeniency = scoringOpportunities.Count == 0 ? 0 : BmsHitLeniency.FromGreatWindow(profile.RatingWindowFor(bmsBeatmap, compiled));
+        return [];
+    }
 }

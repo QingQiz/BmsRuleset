@@ -122,7 +122,7 @@ public static class EtternaProfile
             if (!rules.TryGetValue(note.Kind, out var rule))
                 rules.Add(note.Kind, rule = createRule(note.Kind, windows));
             return new EtternaNoteRule(rule, timeline.RowAt(note.StartTime));
-        });
+        }, note => scoringOpportunities(note));
     }
 
     private static INoteRule createRule(KeyNoteKind kind, TimingWindows windows)
@@ -134,14 +134,14 @@ public static class EtternaProfile
         }
 
         if (kind is KeyNoteKind.Tap or KeyNoteKind.Lift)
-            return new TapRule(new TapConfiguration(windows, Time.FromMilliseconds(180), EtternaResults.MISS, 2, kind == KeyNoteKind.Lift));
+            return new TapRule(new TapConfiguration(windows, Time.FromMilliseconds(180), EtternaResults.MISS, kind == KeyNoteKind.Lift));
 
         if (kind is not (KeyNoteKind.Hold or KeyNoteKind.Roll))
             throw ProfileSupport.Unsupported("Etterna", kind);
 
         var tail = ProfileSupport.Symmetric((EtternaResults.HELD, 0));
         return new HoldRule(new HoldConfiguration(windows, tail, Time.FromMilliseconds(180), 0,
-            EtternaResults.MISS, EtternaResults.HELD, EtternaResults.LET_GO, 2, 0, HoldEndMode.Automatic, HoldDropMode.Grace,
+            EtternaResults.MISS, EtternaResults.HELD, EtternaResults.LET_GO, HoldEndMode.Automatic, HoldDropMode.Grace,
             evaluation => new NoteEmission(NoteParts.TAIL, evaluation.HeadResult == EtternaResults.MISS ? EtternaResults.MISSED_HOLD : evaluation.TailResult, evaluation.Note.EndTime))
         {
             Grace = Time.FromMilliseconds(kind == KeyNoteKind.Roll ? 500 : 250),
@@ -150,6 +150,13 @@ public static class EtternaProfile
             ObserveActiveInput = true,
         });
     }
+
+    private static ImmutableArray<ScoringOpportunity> scoringOpportunities(KeyNote note) => note.Kind switch
+    {
+        KeyNoteKind.Tap or KeyNoteKind.Lift => [new ScoringOpportunity(note.Id, NoteParts.TAP, 2)],
+        KeyNoteKind.Hold or KeyNoteKind.Roll => [new ScoringOpportunity(note.Id, NoteParts.HEAD, 2)],
+        _ => [],
+    };
 
     private static ScoreConfiguration createScore(double scale)
     {

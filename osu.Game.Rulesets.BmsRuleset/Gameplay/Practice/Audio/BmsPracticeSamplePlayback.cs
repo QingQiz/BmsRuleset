@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.IO.ResourceStore;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
@@ -11,7 +12,7 @@ using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Practice.Audio;
 
-internal partial class BmsPracticeSamplePlayback(BmsBeatmap beatmap, IReadOnlyList<Mod> mods)
+internal partial class BmsPracticeSamplePlayback(BmsBeatmap beatmap, IReadOnlyList<Mod> mods, BmsEngineChart compiled)
     : BmsSamplePlayback(beatmap.SampleDefinitions, BmsGameplayAudioController.ResolveBeatmapSource(beatmap),
         BmsGameplayAudioController.GetPlaybackRate(mods))
 {
@@ -29,7 +30,7 @@ internal partial class BmsPracticeSamplePlayback(BmsBeatmap beatmap, IReadOnlyLi
         => preparation = Task.Run(async () =>
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var usages = BmsGameplayAudioController.GetSampleUsages(beatmap).ToArray();
+            var usages = BmsGameplayAudioController.GetSampleUsages(beatmap, compiled).ToArray();
             var plan = new BmsPracticeAudioPreparation(usages);
             using var store = new BmsAudioResourceStore(BmsGameplayAudioController.ResolveBeatmapSource(beatmap), cancellationToken);
             var resources = beatmap.SampleDefinitions.Where(pair => !string.IsNullOrEmpty(pair.Value.Path))

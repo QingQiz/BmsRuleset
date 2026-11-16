@@ -88,7 +88,7 @@ public partial class TestSceneBmsCourseSelect
             beatmap.HitObjects =
             [
                 new BmsNote { StartTime = 1000, Column = 1, Beatmap = beatmap },
-                new BmsLongNote { StartTime = 1499, Duration = 200, Column = 1, Beatmap = beatmap },
+                new BmsLongNote { StartTime = 1499, Duration = 200, Column = 1, Kind = beatmap.LockedLongNoteMode.ToNoteKind(), Beatmap = beatmap },
                 new BmsNote { StartTime = 3000, Column = 1, Beatmap = beatmap },
             ];
             var source = new TestWorkingBeatmap(beatmap, audioManager: Audio);
@@ -145,7 +145,7 @@ public partial class TestSceneBmsCourseSelect
             beatmap.HitObjects =
             [
                 new BmsNote { StartTime = 1100, Column = 1, Beatmap = beatmap },
-                new BmsLongNote { StartTime = 1400, Duration = 300, Column = 2, Beatmap = beatmap },
+                new BmsLongNote { StartTime = 1400, Duration = 300, Column = 2, Kind = beatmap.LockedLongNoteMode.ToNoteKind(), Beatmap = beatmap },
                 new BmsNote { StartTime = 3000, Column = 1, Beatmap = beatmap },
             ];
             var source = new TestWorkingBeatmap(beatmap, audioManager: Audio);
@@ -187,13 +187,13 @@ public partial class TestSceneBmsCourseSelect
             var attemptIndex = index;
             AddStep($"click round {index + 1}", () => clickAttempt(attemptIndex));
             AddUntilStep($"round {index + 1} score and full statistics loaded", () =>
-                results.SelectedScore.Value == session.AttemptResults[attemptIndex].Score
+                ReferenceEquals(results.SelectedScore.Value, session.AttemptResults[attemptIndex].Score)
                 && ReferenceEquals(displayedHits, session.AttemptResults[attemptIndex].Statistics.HitEvents));
             AddAssert($"round {index + 1} is highlighted and fits", () =>
                 results.ChildrenOfType<BmsPracticeAttemptCard>().Single(card => card.IsSelected).Name
                 == $"Practice attempt {session.AttemptResults[attemptIndex].Attempt} result"
                 && results.ChildrenOfType<BmsPracticeOverviewHeader>().Single() == header
-                && results.ChildrenOfType<BmsResultOverview>().Single().Score == session.AttemptResults[attemptIndex].Score
+                && ReferenceEquals(results.ChildrenOfType<BmsResultOverview>().Single().Score, session.AttemptResults[attemptIndex].Score)
                 && TestSceneBmsResultScreenStatistics.ChartsFitViewport(results));
             if (index == 0)
                 AddStep("Escape returns to the aggregate", () => InputManager.Key(Key.Escape));
@@ -201,14 +201,14 @@ public partial class TestSceneBmsCourseSelect
                 AddStep("summary heading returns to the aggregate", () => results.ChildrenOfType<OsuClickableContainer>()
                     .Single(container => container.Name == "Practice aggregate selector").TriggerClick());
             AddUntilStep("aggregate restored without leaving the screen", () => Stack.CurrentScreen == results
-                && results.SelectedScore.Value == aggregate && results.ChildrenOfType<BmsPracticeAttemptCard>().All(card => !card.IsSelected));
+                && ReferenceEquals(results.SelectedScore.Value, aggregate) && results.ChildrenOfType<BmsPracticeAttemptCard>().All(card => !card.IsSelected));
         }
         AddStep("select the second round again", () => clickAttempt(1));
-        AddUntilStep("second round selected again", () => results.SelectedScore.Value == session.AttemptResults[1].Score);
+        AddUntilStep("second round selected again", () => ReferenceEquals(results.SelectedScore.Value, session.AttemptResults[1].Score));
         AddStep("click selected round to return to aggregate", () => clickAttempt(1));
-        AddUntilStep("selected card toggles back to aggregate", () => results.SelectedScore.Value == aggregate);
+        AddUntilStep("selected card toggles back to aggregate", () => ReferenceEquals(results.SelectedScore.Value, aggregate));
         AddStep("select a round before starting next practice", () => clickAttempt(0));
-        AddUntilStep("first round selected before restart", () => results.SelectedScore.Value == session.AttemptResults[0].Score);
+        AddUntilStep("first round selected before restart", () => ReferenceEquals(results.SelectedScore.Value, session.AttemptResults[0].Score));
         AddStep("Enter starts another practice from round details", () => InputManager.Key(Key.Enter));
         AddUntilStep("next practice reloads and waits at its opening count-in", () => practice.Players.Count == 4
             && Stack.CurrentScreen == practice.Players[3] && practice.Countdown.IsReady);

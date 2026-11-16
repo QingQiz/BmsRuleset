@@ -4,13 +4,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
-using osu.Framework.Graphics;
-using osu.Framework.Testing;
 using osu.Framework.Timing;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Tests.Performance;
-using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
@@ -22,7 +18,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 public partial class TestSceneBmsDrawableTraversal
 {
     private static BmsColumn? observedPulseColumn;
-    private static readonly List<double> holdPulseTimes = [];
+    private static readonly List<double> hold_pulse_times = [];
     private static double pulseSimulationTime;
 
     [TestCase(BmsTestSkins.SkinKind.Argon, BmsLongNoteMode.LongNote)]
@@ -77,13 +73,12 @@ public partial class TestSceneBmsDrawableTraversal
                 ReleaseColumn(column, 6980);
                 Assert.That(column.Judgements.GetLongNoteState(note).TailJudged, Is.True);
                 runTimeline("judged tail", [6980, 6981, 7000, 7001, 7100]);
-
             }
             finally
             {
                 observedLongNote = null;
                 observedPulseColumn = null;
-                holdPulseTimes.Clear();
+                hold_pulse_times.Clear();
                 Playfield.Clock = previousClock;
                 Playfield.ProcessCustomClock = previousProcessClock;
             }
@@ -98,15 +93,15 @@ public partial class TestSceneBmsDrawableTraversal
             {
                 var referenceLastTime = double.NaN;
                 var referenceLastPulse = (double)lastPulse.GetValue(drawable)!;
-                var mapping = BmsLongNotePresentation.SelectMapping(mode);
+                BmsLongNotePresentationMapping mapping = column.Judgements.Profile.LongNotePresentation;
                 var expectedPulses = new List<double>();
                 var dueReads = 0;
                 var unguardedReads = 0;
-                var state = column.Judgements.GetLongNoteState(note);
+                var state = column.Judgements.GetNote(note);
                 var results = Player.Results.Count;
                 var health = Player.HealthProcessor.Health.Value;
                 presentationReads = 0;
-                holdPulseTimes.Clear();
+                hold_pulse_times.Clear();
                 foreach (var time in times)
                 {
                     advance(time);
@@ -116,7 +111,7 @@ public partial class TestSceneBmsDrawableTraversal
                         if (time >= note.StartTime && time <= note.EndTime)
                         {
                             unguardedReads++;
-                            var current = mapping(note, state, new BmsLongNotePresentationContext(time, column.Judgements.PressedDirections > 0));
+                            var current = mapping(note, state, new BmsLongNotePresentationContext(time, column.Judgements.PressedDirections > 0, column.Judgements.GetTiming(note)));
                             if (time - referenceLastPulse >= BmsLegacySkinTransformer.HIT_EXPLOSION_FADE_IN_DURATION)
                                 dueReads++;
                             // This is the original decision order, evaluated independently of the drawable.
@@ -129,13 +124,13 @@ public partial class TestSceneBmsDrawableTraversal
                     }
                     pulseSimulationTime = time;
                     container.UpdateSubTree();
-                    Assert.That(holdPulseTimes, Is.EqualTo(expectedPulses), $"{phase} at {time}");
+                    Assert.That(hold_pulse_times, Is.EqualTo(expectedPulses), $"{phase} at {time}");
                     Assert.That(lastPulse.GetValue(drawable), Is.EqualTo(referenceLastPulse), $"{phase} at {time}");
                 }
-                Assert.That(column.Judgements.GetLongNoteState(note), Is.EqualTo(state), phase);
+                Assert.That(column.Judgements.GetNote(note), Is.EqualTo(state), phase);
                 Assert.That(Player.Results.Count, Is.EqualTo(results), phase);
                 Assert.That(Player.HealthProcessor.Health.Value, Is.EqualTo(health), phase);
-                TestContext.WriteLine($"HOLD_PULSES skin={skin} mode={mode} phase={phase} calls={times.Length} reads={presentationReads} originalReads={unguardedReads} dueReads={dueReads} pulses={holdPulseTimes.Count}");
+                TestContext.WriteLine($"HOLD_PULSES skin={skin} mode={mode} phase={phase} calls={times.Length} reads={presentationReads} originalReads={unguardedReads} dueReads={dueReads} pulses={hold_pulse_times.Count}");
             }
         });
     }
@@ -143,6 +138,6 @@ public partial class TestSceneBmsDrawableTraversal
     private static void countHoldPulse(BmsColumn __instance, BmsHitLightStyle style)
     {
         if (ReferenceEquals(__instance, observedPulseColumn) && style == BmsHitLightStyle.Hold)
-            holdPulseTimes.Add(pulseSimulationTime);
+            hold_pulse_times.Add(pulseSimulationTime);
     }
 }

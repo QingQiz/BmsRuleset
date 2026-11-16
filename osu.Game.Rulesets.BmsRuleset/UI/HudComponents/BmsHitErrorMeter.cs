@@ -4,7 +4,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using RhythmEngine.Profiles.Bms;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -12,10 +11,9 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.Configuration;
 using osu.Game.Overlays.Settings;
-using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
-using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
@@ -75,9 +73,10 @@ public partial class BmsHitErrorMeter : HitErrorMeter
     private const float bar_height = 3;
 
     private BmsHitErrorMeterDomain domain;
-    private BmsTimingDefinition headWindows = null!;
-    private double fastPoorDisplayOffset;
-    private double slowPoorDisplayOffset;
+    private GameplayProfile? profile;
+    private IReadOnlyList<BmsHitErrorWindow> windows = [];
+    private double fastUntimedDisplayOffset;
+    private double slowUntimedDisplayOffset;
     private double floatingAverage;
     private bool averageUpdatePending;
     private BmsScoreProcessor? scoreProcessor;
@@ -85,7 +84,7 @@ public partial class BmsHitErrorMeter : HitErrorMeter
 
     private Triangle arrow = null!;
     private Box background = null!;
-    private Box emptyPoorColourBar = null!;
+    private readonly List<Box> emptyInputColourBars = [];
     private Container windowColourBar = null!;
 
     internal JudgementsLayer Judgements { get; private set; } = null!;
@@ -98,19 +97,13 @@ public partial class BmsHitErrorMeter : HitErrorMeter
     [BackgroundDependencyLoader(true)]
     private void load(DrawableRuleset? drawableRuleset, ScoreProcessor? scoreProcessor)
     {
-        var beatmap = (drawableRuleset as BmsDrawableRuleset)?.Beatmap as BmsBeatmap;
         this.scoreProcessor = scoreProcessor as BmsScoreProcessor;
         gameplayEvents = (drawableRuleset as BmsDrawableRuleset)?.GameplayEvents;
         if (gameplayEvents != null) gameplayEvents.ReplaySeeked += resetReplayDisplay;
-        var layout = beatmap?.LayoutVariant ?? BmsLayoutVariant.Bme7K;
-        var judgementRate = beatmap?.HitObjects.FirstOrDefault(h => h is not BmsLandmine)?.EffectiveJudgementRate
-                            ?? BmsEngineRules.RateForRank(layout, beatmap?.Rank ?? 2);
-        var modifiers = beatmap?.JudgementModifiers ?? BmsJudgementModifiers.None;
-        domain = CreateDomain(layout, judgementRate, modifiers);
-
-        headWindows = beatmap?.HitObjects.FirstOrDefault(h => h is not BmsLandmine) is { } firstNote
-            ? BmsEngineRules.GetTiming(layout, 1, firstNote.EffectiveJudgementRate, false, modifiers)
-            : BmsEngineRules.GetTiming(layout, 1, beatmap?.Rank ?? 2, tail: false, modifiers: modifiers);
+        var engineChart = this.scoreProcessor?.EngineChart;
+        profile = engineChart?.Profile;
+        windows = engineChart == null ? [] : CreateWindows(engineChart);
+        domain = CreateDomain(windows);
 
         // Use legacy's time-to-width scale by default while respecting dimensions saved in user skins.
         if (Width == 0)
@@ -157,7 +150,7 @@ public partial class BmsHitErrorMeter : HitErrorMeter
             },
         ];
 
-        createColourBar(windowColourBar, headWindows);
+        createColourBar(windowColourBar);
     }
 
     protected override void LoadComplete()
@@ -169,10 +162,11 @@ public partial class BmsHitErrorMeter : HitErrorMeter
 
         ShowEmptyPoor.BindValueChanged(visible =>
         {
-            emptyPoorColourBar.Alpha = visible.NewValue ? 1 : 0;
-            (fastPoorDisplayOffset, slowPoorDisplayOffset) = GetPoorDisplayOffsets(headWindows, visible.NewValue);
+            foreach (var bar in emptyInputColourBars)
+                bar.Alpha = visible.NewValue ? 1 : 0;
+            (fastUntimedDisplayOffset, slowUntimedDisplayOffset) = GetUntimedDisplayOffsets(windows, visible.NewValue);
 
-            Judgements.UpdatePoorPositions(domain.RelativePosition(fastPoorDisplayOffset), domain.RelativePosition(slowPoorDisplayOffset));
+            Judgements.UpdateBoundaryPositions(domain.RelativePosition(fastUntimedDisplayOffset), domain.RelativePosition(slowUntimedDisplayOffset));
         }, true);
         BackgroundOpacity.BindValueChanged(opacity => background.Alpha = opacity.NewValue, true);
         ColourBarHeight.BindValueChanged(height =>
@@ -189,39 +183,24 @@ public partial class BmsHitErrorMeter : HitErrorMeter
         Clear();
     }
 
-    private void createColourBar(Container target, BmsTimingDefinition windows)
+    private void createColourBar(Container target)
     {
-        HitResult[] results = [HitResult.Ok, HitResult.Good, HitResult.Great, HitResult.Perfect];
-
-        // Layer valid hit windows over the full E-POOR interval so removing BAD exposes only
-        // offsets inside E-POOR, including its finite slow-side limit.
-        var emptyPoorStart = domain.RelativePosition(-windows.FastWindowFor(HitResult.Miss));
-        var emptyPoorEnd = domain.RelativePosition(windows.SlowWindowFor(HitResult.Miss));
-
-        target.Add(emptyPoorColourBar = new Box
+        foreach (var window in windows.OrderByDescending(window => window.SlowOffset - window.FastOffset))
         {
-            Name = "empty poor window",
-            RelativePositionAxes = Axes.X,
-            RelativeSizeAxes = Axes.Both,
-            X = emptyPoorStart,
-            Width = Math.Max(0, emptyPoorEnd - emptyPoorStart),
-            Colour = BmsHitResultColours.ForHitResult(HitResult.Miss),
-        });
-
-        foreach (var result in results)
-        {
-            var start = domain.RelativePosition(-windows.FastWindowFor(result));
-            var end = domain.RelativePosition(windows.SlowWindowFor(result));
-
-            target.Add(new Box
+            var start = domain.RelativePosition(window.FastOffset);
+            var end = domain.RelativePosition(window.SlowOffset);
+            var bar = new Box
             {
-                Name = $"{result} window",
+                Name = $"{window.Result} window",
                 RelativePositionAxes = Axes.X,
                 RelativeSizeAxes = Axes.Both,
                 X = start,
                 Width = Math.Max(0, end - start),
-                Colour = BmsHitResultColours.ForHitResult(result),
-            });
+                Colour = BmsHitResultColours.ForHitResult(window.Result),
+            };
+            target.Add(bar);
+            if (window.Kind == ResultTimingKind.EmptyInput)
+                emptyInputColourBars.Add(bar);
         }
     }
 
@@ -233,42 +212,40 @@ public partial class BmsHitErrorMeter : HitErrorMeter
         if (judgement is BmsJudgementResult { SuppressPenalty: true })
             return;
 
-        // Keep the allocation-free path here because this method runs for every scored object;
-        // GetTimingObservations remains a convenient materialised view for callers and tests.
         if (judgement is BmsLongNoteJudgementResult longNoteResult)
         {
             foreach (var endpoint in longNoteResult.EndpointResults)
-                processObservation(new BmsHitErrorTimingObservation(endpoint.TimeOffset, endpoint.Result));
+                processObservation(endpoint.TimeOffset, endpoint.Result);
 
             return;
         }
 
-        processObservation(new BmsHitErrorTimingObservation(judgement.TimeOffset, judgement.Type));
+        processObservation(judgement.TimeOffset, judgement.Type);
     }
 
-    private void processObservation(BmsHitErrorTimingObservation observation)
+    private void processObservation(double offset, HitResult result)
     {
-        var displayOffset = GetDisplayOffset(observation, fastPoorDisplayOffset, slowPoorDisplayOffset, ShowPoor.Value);
+        if (profile == null)
+            return;
 
+        var kind = profile.TimingKindFor(result);
+        var displayOffset = GetDisplayOffset(offset, kind, fastUntimedDisplayOffset,
+            slowUntimedDisplayOffset, ShowPoor.Value, ShowEmptyPoor.Value);
         if (displayOffset == null)
             return;
 
-        addJudgement(displayOffset.Value, observation.Result, AffectsMovingAverage(observation.Result),
-            observation.Result == HitResult.Meh ? observation.TimeOffset < 0 : null);
+        addJudgement(displayOffset.Value, result, kind == ResultTimingKind.Timed,
+            kind == ResultTimingKind.Untimed ? offset < 0 : null);
     }
 
     private void onNonConsumingJudgementRegistered(BmsTimingObservation observation)
-        => Schedule(() =>
-        {
-            if (observation.Result != HitResult.Miss || ShowEmptyPoor.Value)
-                addJudgement(observation.TimeOffset, observation.Result, AffectsMovingAverage(observation.Result));
-        });
+        => Schedule(() => processObservation(observation.TimeOffset, observation.Result));
 
-    private void addJudgement(double timeOffset, HitResult result, bool affectMovingAverage, bool? poorIsFast = null)
+    private void addJudgement(double timeOffset, HitResult result, bool affectMovingAverage, bool? boundaryIsFast = null)
     {
         var relativePosition = domain.RelativePosition(timeOffset);
 
-        Judgements.AddJudgement(relativePosition, BmsHitResultColours.ForHitResult(result), poorIsFast);
+        Judgements.AddJudgement(relativePosition, BmsHitResultColours.ForHitResult(result), boundaryIsFast);
 
         if (affectMovingAverage)
         {
@@ -290,66 +267,37 @@ public partial class BmsHitErrorMeter : HitErrorMeter
         }
     }
 
-    internal static IReadOnlyList<BmsHitErrorTimingObservation> GetTimingObservations(JudgementResult judgement)
+    internal static double? GetDisplayOffset(double offset, ResultTimingKind kind, double fastBoundary, double slowBoundary,
+        bool showUntimed, bool showEmptyInput) => kind switch
     {
-        if (judgement is BmsJudgementResult { SuppressPenalty: true })
-            return [];
+        ResultTimingKind.Timed => offset,
+        ResultTimingKind.Untimed => showUntimed ? offset < 0 ? fastBoundary : slowBoundary : null,
+        ResultTimingKind.EmptyInput => showEmptyInput ? offset : null,
+        _ => throw new ArgumentOutOfRangeException(nameof(kind)),
+    };
 
-        if (judgement is BmsLongNoteJudgementResult longNoteResult)
-        {
-            return longNoteResult.EndpointResults
-                .Select(endpoint => new BmsHitErrorTimingObservation(endpoint.TimeOffset, endpoint.Result))
-                .ToArray();
-        }
-
-        return [new BmsHitErrorTimingObservation(judgement.TimeOffset, judgement.Type)];
+    internal static (double FastOffset, double SlowOffset) GetUntimedDisplayOffsets(IReadOnlyList<BmsHitErrorWindow> windows, bool showEmptyInput)
+    {
+        var visible = windows.Where(window => showEmptyInput || window.Kind != ResultTimingKind.EmptyInput).ToArray();
+        return (visible.Select(window => window.FastOffset).DefaultIfEmpty(0).Min(),
+            visible.Select(window => window.SlowOffset).DefaultIfEmpty(0).Max());
     }
 
-    internal static double? GetDisplayOffset(
-        BmsHitErrorTimingObservation observation,
-        double fastPoorDisplayOffset,
-        double slowPoorDisplayOffset,
-        bool showPoor)
+    internal static IReadOnlyList<BmsHitErrorWindow> CreateWindows(BmsEngineChart chart)
+        => chart.Objects.Where(note => note is not BmsLandmine)
+            .Select(chart.TimingFor)
+            .Distinct()
+            .SelectMany(timing => timing.TailWindows is { } tail ? new[] { timing.HeadWindows, tail } : [timing.HeadWindows])
+            .SelectMany(table => table.Entries)
+            .GroupBy(window => chart.Profile.HitResultFor(window.Result))
+            .Select(group => new BmsHitErrorWindow(group.Key, chart.Profile.TimingKindFor(group.Key),
+                group.Min(window => window.Early) / 1000.0, group.Max(window => window.Late) / 1000.0))
+            .ToArray();
+
+    internal static BmsHitErrorMeterDomain CreateDomain(IReadOnlyList<BmsHitErrorWindow> windows)
     {
-        // POOR has no finite miss-side edge, so retain its timing direction at the displayed colour bar boundary.
-        if (observation.Result == HitResult.Meh)
-            return showPoor
-                ? observation.TimeOffset < 0 ? fastPoorDisplayOffset : slowPoorDisplayOffset
-                : null;
-
-        return observation.Result.IsHit() ? observation.TimeOffset : null;
-    }
-
-    internal static bool AffectsMovingAverage(HitResult result) => result.IsHit() && result != HitResult.Meh;
-
-    internal static (double FastOffset, double SlowOffset) GetPoorDisplayOffsets(BmsTimingDefinition windows, bool showEmptyPoor)
-    {
-        var fastOffset = 0d;
-        var slowOffset = 0d;
-
-        foreach (var window in windows.Windows.Entries)
-        {
-            if (!showEmptyPoor && window.Result == BmsResults.EMPTY_POOR) continue;
-
-            fastOffset = Math.Min(fastOffset, window.Early / 1000.0);
-            slowOffset = Math.Max(slowOffset, window.Late / 1000.0);
-        }
-
-        return (fastOffset, slowOffset);
-    }
-
-    internal static BmsHitErrorMeterDomain CreateDomain(BmsLayoutVariant layout, double judgementRate, BmsJudgementModifiers modifiers = BmsJudgementModifiers.None)
-    {
-        int[] columns = BmsLayout.IsScratchColumn(0, layout) ? [0, 1] : [1];
-        var tables = columns.SelectMany(column => new[]
-        {
-            BmsEngineRules.GetTiming(layout, column, judgementRate, tail: false, modifiers: modifiers),
-            BmsEngineRules.GetTiming(layout, column, judgementRate, tail: true, modifiers: modifiers),
-        });
-
-        var fastExtent = tables.Max(table => Math.Max(table.FastWindowFor(HitResult.Ok), table.FastWindowFor(HitResult.Miss)));
-        var slowExtent = tables.Max(table => Math.Max(table.PassiveDeadline / 1000.0, table.SlowWindowFor(HitResult.Miss)));
-        var extent = Math.Max(1, Math.Max(fastExtent, slowExtent));
+        // A standalone skin preview has no compiled chart or judgement regions.
+        var extent = Math.Max(1, windows.Select(window => Math.Max(-window.FastOffset, window.SlowOffset)).DefaultIfEmpty(150).Max());
         return new BmsHitErrorMeterDomain(-extent, extent);
     }
 
@@ -372,7 +320,7 @@ public partial class BmsHitErrorMeter : HitErrorMeter
     }
 }
 
-internal readonly record struct BmsHitErrorTimingObservation(double TimeOffset, HitResult Result);
+internal readonly record struct BmsHitErrorWindow(HitResult Result, ResultTimingKind Kind, double FastOffset, double SlowOffset);
 
 internal readonly record struct BmsHitErrorMeterDomain(double FastOffset, double SlowOffset)
 {

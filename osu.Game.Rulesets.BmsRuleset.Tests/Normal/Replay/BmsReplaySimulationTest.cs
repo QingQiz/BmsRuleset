@@ -1,6 +1,7 @@
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
+#nullable enable
 using System;
 using System.Collections.Generic;
-#nullable enable
 using System.Linq;
 using System.Text.Json;
 using System.Threading;
@@ -13,6 +14,7 @@ using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Profiles;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
@@ -40,7 +42,7 @@ public class BmsReplaySimulationTest
         Assert.That(result.Judgements.Count(entry => entry.Result == HitResult.Perfect), Is.EqualTo(1));
         Assert.That(result.Judgements.Count(entry => entry.Result == HitResult.Meh), Is.EqualTo(1));
         Assert.That(result.HitEvents[0].TimeOffset, Is.EqualTo(10));
-        Assert.That(result.Gauges, Has.Count.EqualTo(2));
+        Assert.That(result.Gauges, Has.Count.EqualTo(3));
     }
 
     [TestCase(BmsLongNoteMode.LongNote, 1)]
@@ -49,7 +51,7 @@ public class BmsReplaySimulationTest
     public void RebuildsLongNoteEndpoints(BmsLongNoteMode mode, int count)
     {
         var beatmap = createBeatmap(mode);
-        beatmap.HitObjects.Add(new BmsLongNote { Beatmap = beatmap, Column = 1, StartTime = 1000, Duration = 1000 });
+        beatmap.HitObjects.Add(new BmsLongNote { Kind = beatmap.LockedLongNoteMode.ToNoteKind(), Beatmap = beatmap, Column = 1, StartTime = 1000, Duration = 1000 });
         var result = simulate(beatmap, createReplay(new BmsReplayFrame(1000, BmsAction.Key1), new BmsReplayFrame(2000)));
 
         Assert.That(result.Judgements.Count(entry => entry.Result == HitResult.Perfect), Is.EqualTo(count));
@@ -61,7 +63,7 @@ public class BmsReplaySimulationTest
     public void HellChargeTicksFollowElapsedTimeAcrossCompaction()
     {
         var beatmap = createBeatmap(BmsLongNoteMode.HellChargeNote);
-        beatmap.HitObjects.Add(new BmsLongNote { Beatmap = beatmap, Column = 1, StartTime = 1000, Duration = 1000 });
+        beatmap.HitObjects.Add(new BmsLongNote { Kind = beatmap.LockedLongNoteMode.ToNoteKind(), Beatmap = beatmap, Column = 1, StartTime = 1000, Duration = 1000 });
         var replay = createReplay(new BmsReplayFrame(1000, BmsAction.Key1), new BmsReplayFrame(1250, BmsAction.Key1),
             new BmsReplayFrame(1500, BmsAction.Key1), new BmsReplayFrame(1750, BmsAction.Key1), new BmsReplayFrame(2000));
         var compact = BmsTestReplayArchive.RoundTrip(new Score { Replay = replay });
@@ -70,10 +72,10 @@ public class BmsReplaySimulationTest
         var gauges = original.Gauges;
         var restoredGauges = restored.Gauges;
         Assert.That(restoredGauges.Select(entry => entry.Time), Is.EqualTo(gauges.Select(entry => entry.Time)));
-        Assert.That(restoredGauges.SelectMany(entry => entry.States), Is.EqualTo(gauges.SelectMany(entry => entry.States)));
+        Assert.That(restoredGauges.SelectMany(entry => entry.Health.Layers), Is.EqualTo(gauges.SelectMany(entry => entry.Health.Layers)));
         Assert.That(gauges.Select(entry => entry.Time), Is.EqualTo(new[]
         {
-            1000d, 1200.001, 1400.001, 1600.001, 1800.001, 2000,
+            0d, 1000, 1200.001, 1400.001, 1600.001, 1800.001, 2000,
         }));
     }
 
@@ -81,7 +83,7 @@ public class BmsReplaySimulationTest
     public void HellChargeGaugeDoesNotDependOnUnchangedReplayFrames()
     {
         var beatmap = createBeatmap(BmsLongNoteMode.HellChargeNote);
-        beatmap.HitObjects.Add(new BmsLongNote { Beatmap = beatmap, Column = 1, StartTime = 1000, Duration = 2000 });
+        beatmap.HitObjects.Add(new BmsLongNote { Kind = beatmap.LockedLongNoteMode.ToNoteKind(), Beatmap = beatmap, Column = 1, StartTime = 1000, Duration = 2000 });
         var inputs = new[]
         {
             new BmsReplayFrame(1000, BmsAction.Key1), new BmsReplayFrame(1100),
@@ -102,10 +104,10 @@ public class BmsReplaySimulationTest
         var denseResult = simulate(beatmap, createReplay(dense.ToArray()));
 
         Assert.That(sparseResult.Gauges.Select(entry => entry.Time), Is.EqualTo(denseResult.Gauges.Select(entry => entry.Time)));
-        Assert.That(sparseResult.Gauges.SelectMany(entry => entry.States), Is.EqualTo(denseResult.Gauges.SelectMany(entry => entry.States)));
+        Assert.That(sparseResult.Gauges.SelectMany(entry => entry.Health.Layers), Is.EqualTo(denseResult.Gauges.SelectMany(entry => entry.Health.Layers)));
         Assert.That(sparseResult.Gauges.Select(entry => entry.Time), Is.EqualTo(new[]
         {
-            1000d, 1100, 1600.001, 1800.001, 2000.001,
+            0d, 1000, 1100, 1600.001, 1800.001, 2000.001,
             2200.001, 2400.001, 2600.001, 2800.001,
         }));
     }
@@ -114,7 +116,7 @@ public class BmsReplaySimulationTest
     public void PassiveMissesUseTheirDeadlineWithoutRecordedUpdates()
     {
         var beatmap = createBeatmap(BmsLongNoteMode.HellChargeNote);
-        beatmap.HitObjects.Add(new BmsLongNote { Beatmap = beatmap, Column = 1, StartTime = 1000, Duration = 1000 });
+        beatmap.HitObjects.Add(new BmsLongNote { Kind = beatmap.LockedLongNoteMode.ToNoteKind(), Beatmap = beatmap, Column = 1, StartTime = 1000, Duration = 1000 });
         beatmap.HitObjects.Add(new BmsNote { Beatmap = beatmap, Column = 2, StartTime = 1000 });
         var result = simulate(beatmap, createReplay(new BmsReplayFrame(0), new BmsReplayFrame(1000), new BmsReplayFrame(1500)));
         var deadline = 1000.001 + BmsEngineRules.GetTiming(beatmap.LayoutVariant, 1, beatmap.Rank, false).SlowWindowFor(HitResult.Ok);
@@ -159,8 +161,8 @@ public class BmsReplaySimulationTest
     public void JudgementsAndGaugeOrderingDoNotDependOnIdleFrames(BmsLongNoteMode mode)
     {
         var beatmap = createBeatmap(mode);
-        beatmap.HitObjects.Add(new BmsLongNote { Beatmap = beatmap, Column = 1, StartTime = 1000, Duration = 2000 });
-        beatmap.HitObjects.Add(new BmsLongNote { Beatmap = beatmap, Column = 2, StartTime = 1050, Duration = 1800 });
+        beatmap.HitObjects.Add(new BmsLongNote { Kind = beatmap.LockedLongNoteMode.ToNoteKind(), Beatmap = beatmap, Column = 1, StartTime = 1000, Duration = 2000 });
+        beatmap.HitObjects.Add(new BmsLongNote { Kind = beatmap.LockedLongNoteMode.ToNoteKind(), Beatmap = beatmap, Column = 2, StartTime = 1050, Duration = 1800 });
         beatmap.HitObjects.Add(new BmsNote { Beatmap = beatmap, Column = 3, StartTime = 1600 });
         beatmap.HitObjects.Add(new BmsLandmine { Beatmap = beatmap, Column = 1, StartTime = 1500, LandmineDamagePercent = 20 });
         var inputs = new[]
@@ -184,8 +186,8 @@ public class BmsReplaySimulationTest
         Assert.That(sampled.Judgements.Select(entry => (entry.Source, entry.Result, entry.SuppressPenalty)),
             Is.EqualTo(sparse.Judgements.Select(entry => (entry.Source, entry.Result, entry.SuppressPenalty))));
         Assert.That(sampled.Judgements.SelectMany(entry => entry.TimingObservations), Is.EqualTo(sparse.Judgements.SelectMany(entry => entry.TimingObservations)));
-        Assert.That(sampled.Gauges.Select(entry => (entry.Time, entry.ActiveGaugeType)), Is.EqualTo(sparse.Gauges.Select(entry => (entry.Time, entry.ActiveGaugeType))));
-        Assert.That(sampled.Gauges.SelectMany(entry => entry.States), Is.EqualTo(sparse.Gauges.SelectMany(entry => entry.States)));
+        Assert.That(sampled.Gauges.Select(entry => (entry.Time, entry.SelectedLayer)), Is.EqualTo(sparse.Gauges.Select(entry => (entry.Time, entry.SelectedLayer))));
+        Assert.That(sampled.Gauges.SelectMany(entry => entry.Health.Layers), Is.EqualTo(sparse.Gauges.SelectMany(entry => entry.Health.Layers)));
     }
 
     [Test]
@@ -257,7 +259,7 @@ public class BmsReplaySimulationTest
     public void AutomaticLongNoteTailPrecedesALaterRelease()
     {
         var beatmap = createBeatmap();
-        beatmap.HitObjects.Add(new BmsLongNote { Beatmap = beatmap, Column = 1, StartTime = 1000, Duration = 1000 });
+        beatmap.HitObjects.Add(new BmsLongNote { Kind = beatmap.LockedLongNoteMode.ToNoteKind(), Beatmap = beatmap, Column = 1, StartTime = 1000, Duration = 1000 });
         var result = simulate(beatmap, createReplay(new BmsReplayFrame(990, BmsAction.Key1), new BmsReplayFrame(2000.1)));
         Assert.That(result.HitEvents.Select(entry => entry.TimeOffset), Is.All.EqualTo(-10));
     }
@@ -266,7 +268,7 @@ public class BmsReplaySimulationTest
     public void PauseMetadataDoesNotAlterInputJudgements()
     {
         var beatmap = createBeatmap();
-        beatmap.HitObjects.Add(new BmsLongNote { Beatmap = beatmap, Column = 1, StartTime = 1000, Duration = 1000 });
+        beatmap.HitObjects.Add(new BmsLongNote { Kind = beatmap.LockedLongNoteMode.ToNoteKind(), Beatmap = beatmap, Column = 1, StartTime = 1000, Duration = 1000 });
         var replay = createReplay(new BmsReplayFrame(1000, BmsAction.Key1), new BmsReplayFrame(2000));
         var source = new ScoreInfo();
         source.Pauses.Add(1200);
@@ -295,8 +297,8 @@ public class BmsReplaySimulationTest
         };
         var result = simulate(beatmap, createReplay(new BmsReplayFrame(1000, BmsAction.Key1)), source);
         var gauges = result.Gauges;
-        Assert.That(gauges[0].States.Single().Health, Is.EqualTo(0.4));
-        Assert.That(gauges[^1].States.Single().Health, Is.GreaterThan(0.4));
+        Assert.That(gauges[0].Health.Layers.Single().Value, Is.EqualTo(0.4));
+        Assert.That(gauges[^1].Health.Layers.Single().Value, Is.GreaterThan(0.4));
     }
 
     [TestCase(BmsJudgementAlgorithm.Combo, 1000, HitResult.Good)]
@@ -336,12 +338,12 @@ public class BmsReplaySimulationTest
             ],
         };
         var result = simulate(beatmap, createReplay(new BmsReplayFrame(1000, BmsAction.Key1)), source);
-        Assert.That(result.Gauges[0].States, Is.EqualTo(new[]
+        Assert.That(result.Gauges[0].Health.Layers, Is.EqualTo(BmsTestHealth.ToState(new[]
         {
             new BmsGaugeStateSnapshot(BmsGaugeType.ExClass, 0.4, false),
             new BmsGaugeStateSnapshot(BmsGaugeType.Class, 0.8, false),
-        }));
-        Assert.That(result.Gauges[^1].States, Has.Count.EqualTo(2));
+        }).Layers));
+        Assert.That(result.Gauges[^1].Health.Layers, Has.Length.EqualTo(2));
     }
 
     [Test]
@@ -362,7 +364,7 @@ public class BmsReplaySimulationTest
     public void AbortedHoldSettlesAtTheTerminalTimeWithoutPauseMetadata(BmsLongNoteMode mode, int column, HitResult tailResult)
     {
         var beatmap = createBeatmap(mode);
-        beatmap.HitObjects.Add(new BmsLongNote { Beatmap = beatmap, Column = column, StartTime = 3000, Duration = 1000 });
+        beatmap.HitObjects.Add(new BmsLongNote { Kind = beatmap.LockedLongNoteMode.ToNoteKind(), Beatmap = beatmap, Column = column, StartTime = 3000, Duration = 1000 });
         var action = column == 0 ? BmsAction.Scratch : BmsAction.Key1;
         var result = simulate(beatmap, createReplay(new BmsReplayFrame(3000, action), new BmsReplayFrame(3500.375, action)), new ScoreInfo());
         var tail = result.Judgements.SelectMany(entry => entry.TimingObservations).Single(entry => entry.Kind == BmsTimingObservationKind.LongNoteTail);
@@ -377,15 +379,15 @@ public class BmsReplaySimulationTest
     {
         var beatmap = createBeatmap(BmsLongNoteMode.HellChargeNote);
         beatmap.Total = 1000;
-        beatmap.HitObjects.Add(new BmsLongNote { Beatmap = beatmap, Column = 0, StartTime = 1000, Duration = 3000 });
-        beatmap.HitObjects.Add(new BmsLongNote { Beatmap = beatmap, Column = 1, StartTime = 1000, Duration = 3000 });
+        beatmap.HitObjects.Add(new BmsLongNote { Kind = beatmap.LockedLongNoteMode.ToNoteKind(), Beatmap = beatmap, Column = 0, StartTime = 1000, Duration = 3000 });
+        beatmap.HitObjects.Add(new BmsLongNote { Kind = beatmap.LockedLongNoteMode.ToNoteKind(), Beatmap = beatmap, Column = 1, StartTime = 1000, Duration = 3000 });
         var source = new ScoreInfo { Mods = [new BmsModHardGauge { InitialHealth = { Value = .0459 } }] };
         var result = simulate(beatmap, createReplay(new BmsReplayFrame(1000, BmsAction.Scratch, BmsAction.Key1),
             new BmsReplayFrame(1100, BmsAction.Key1), new BmsReplayFrame(1401, BmsAction.Key1)), source);
-        var beforeStop = result.Gauges.Where(entry => entry.Time < 1401).Last().States.Single();
+        var beforeStop = result.Gauges.Where(entry => entry.Time < 1401).Last().Health.Layers.Single();
 
-        Assert.That(beforeStop.Failed, Is.False);
-        Assert.That(beforeStop.Health, Is.EqualTo(.0001).Within(1e-12));
+        Assert.That(beforeStop.HasFailed, Is.False);
+        Assert.That(beforeStop.Value, Is.EqualTo(.0001).Within(1e-12));
     }
 
     [Test]
@@ -401,10 +403,9 @@ public class BmsReplaySimulationTest
     }
 
     [Test]
-    public void UsesTheScoresRateAndConvertedJudgementConfiguration()
+    public void UsesTheScoresRateAndSelectedJudgementConfiguration()
     {
         var beatmap = createBeatmap();
-        beatmap.JudgementModifiers = BmsJudgementModifiers.NoGood;
         beatmap.HitObjects.Add(new BmsNote { Beatmap = beatmap, Column = 1, StartTime = 1000 });
         var result = simulate(beatmap, createReplay(new BmsReplayFrame(1080, BmsAction.Key1)),
             new ScoreInfo { Passed = true, Ruleset = new BmsRuleset().RulesetInfo, Mods = [new BmsModDoubleTime(), new BmsModNoGood()] });
@@ -430,7 +431,7 @@ public class BmsReplaySimulationTest
         LockedLongNoteMode = mode,
     };
 
-    private static (IReadOnlyList<BmsJudgementEvent> Judgements, IReadOnlyList<BmsGaugeHistoryEvent> Gauges, List<HitEvent> HitEvents)
+    private static (IReadOnlyList<BmsJudgementEvent> Judgements, IReadOnlyList<GameplayHealthHistoryEvent> Gauges, List<HitEvent> HitEvents)
         simulate(BmsBeatmap beatmap, ReplayData replay, ScoreInfo? source = null)
     {
         foreach (var note in beatmap.HitObjects)

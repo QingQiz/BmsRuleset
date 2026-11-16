@@ -11,7 +11,6 @@ using osu.Game.Graphics.UserInterface;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
-using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
@@ -26,7 +25,7 @@ public partial class BmsGameplayVirtualisationTest
     [Test]
     public void TestStageHudControllerDisposalAfterStageDisposal()
     {
-        var playfield = new BmsPlayfield(attachBeatmap(new BmsBeatmap
+        var playfield = createPlayfield(attachBeatmap(new BmsBeatmap
         {
             TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
             LayoutVariant = BmsLayoutVariant.Bme7K,
@@ -44,15 +43,13 @@ public partial class BmsGameplayVirtualisationTest
     public void TestStageHudBoundsControlStageTransform()
     {
         var root = new Container { Size = new Vector2(1000, 600) };
-        var playfield = new BmsPlayfield(attachBeatmap(new BmsBeatmap
+        var playfield = createPlayfield(attachBeatmap(new BmsBeatmap
         {
             TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
             LayoutVariant = BmsLayoutVariant.Bme7K,
-        }))
-        {
-            RelativeSizeAxes = Axes.None,
-            Size = new Vector2(1000, 600),
-        };
+        }));
+        playfield.RelativeSizeAxes = Axes.None;
+        playfield.Size = new Vector2(1000, 600);
         playfield.Stage.RelativeSizeAxes = Axes.None;
         setAutoSizeAxes(playfield.Stage, Axes.None);
         playfield.Stage.Size = new Vector2(100, 600);
@@ -91,7 +88,7 @@ public partial class BmsGameplayVirtualisationTest
     [Test]
     public void TestStageHudCanScaleWidthRelativeToOriginalStage()
     {
-        var playfield = new BmsPlayfield(attachBeatmap(new BmsBeatmap
+        var playfield = createPlayfield(attachBeatmap(new BmsBeatmap
         {
             TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
             LayoutVariant = BmsLayoutVariant.Bme7K,
@@ -125,7 +122,7 @@ public partial class BmsGameplayVirtualisationTest
     [Test]
     public void TestProportionalStageHudBoundsFollowCurrentStageWidth()
     {
-        var playfield = new BmsPlayfield(attachBeatmap(new BmsBeatmap
+        var playfield = createPlayfield(attachBeatmap(new BmsBeatmap
         {
             TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
             LayoutVariant = BmsLayoutVariant.Bme7K,
@@ -149,7 +146,7 @@ public partial class BmsGameplayVirtualisationTest
     [Test]
     public void TestWidthScalingCheckboxCapturesCurrentStageWidth()
     {
-        var playfield = new BmsPlayfield(attachBeatmap(new BmsBeatmap
+        var playfield = createPlayfield(attachBeatmap(new BmsBeatmap
         {
             TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
             LayoutVariant = BmsLayoutVariant.Bme7K,
@@ -175,15 +172,13 @@ public partial class BmsGameplayVirtualisationTest
     public void TestDiagonalStageHudResizePreservesAspectRatio()
     {
         var root = new Container { Size = new Vector2(1000, 600) };
-        var playfield = new BmsPlayfield(attachBeatmap(new BmsBeatmap
+        var playfield = createPlayfield(attachBeatmap(new BmsBeatmap
         {
             TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
             LayoutVariant = BmsLayoutVariant.Bme7K,
-        }))
-        {
-            RelativeSizeAxes = Axes.None,
-            Size = new Vector2(1000, 600),
-        };
+        }));
+        playfield.RelativeSizeAxes = Axes.None;
+        playfield.Size = new Vector2(1000, 600);
         playfield.Stage.RelativeSizeAxes = Axes.None;
         setAutoSizeAxes(playfield.Stage, Axes.None);
         playfield.Stage.Size = new Vector2(100, 600);
@@ -213,15 +208,13 @@ public partial class BmsGameplayVirtualisationTest
     public void TestHorizontalResizeAfterDiagonalResizePreservesNoteHeightScale()
     {
         var root = new Container { Size = new Vector2(1000, 600) };
-        var playfield = new BmsPlayfield(attachBeatmap(new BmsBeatmap
+        var playfield = createPlayfield(attachBeatmap(new BmsBeatmap
         {
             TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
             LayoutVariant = BmsLayoutVariant.Bme7K,
-        }))
-        {
-            RelativeSizeAxes = Axes.None,
-            Size = new Vector2(1000, 600),
-        };
+        }));
+        playfield.RelativeSizeAxes = Axes.None;
+        playfield.Size = new Vector2(1000, 600);
         playfield.Stage.RelativeSizeAxes = Axes.None;
         setAutoSizeAxes(playfield.Stage, Axes.None);
         playfield.Stage.Size = new Vector2(100, 600);
@@ -257,15 +250,13 @@ public partial class BmsGameplayVirtualisationTest
     public void TestStageHudNoteHeightScalePreservesBounds()
     {
         var root = new Container { Size = new Vector2(1000, 600) };
-        var playfield = new BmsPlayfield(attachBeatmap(new BmsBeatmap
+        var playfield = createPlayfield(attachBeatmap(new BmsBeatmap
         {
             TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
             LayoutVariant = BmsLayoutVariant.Bme7K,
-        }))
-        {
-            RelativeSizeAxes = Axes.None,
-            Size = new Vector2(1000, 600),
-        };
+        }));
+        playfield.RelativeSizeAxes = Axes.None;
+        playfield.Size = new Vector2(1000, 600);
         playfield.Stage.RelativeSizeAxes = Axes.None;
         setAutoSizeAxes(playfield.Stage, Axes.None);
         playfield.Stage.Size = new Vector2(100, 600);
@@ -313,15 +304,13 @@ public partial class BmsGameplayVirtualisationTest
     public void TestRepeatedMixedResizesKeepStageInsideHudBounds()
     {
         var root = new Container { Size = new Vector2(1000, 600) };
-        var playfield = new BmsPlayfield(attachBeatmap(new BmsBeatmap
+        var playfield = createPlayfield(attachBeatmap(new BmsBeatmap
         {
             TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
             LayoutVariant = BmsLayoutVariant.Bme7K,
-        }))
-        {
-            RelativeSizeAxes = Axes.None,
-            Size = new Vector2(1000, 600),
-        };
+        }));
+        playfield.RelativeSizeAxes = Axes.None;
+        playfield.Size = new Vector2(1000, 600);
         playfield.Stage.RelativeSizeAxes = Axes.None;
         setAutoSizeAxes(playfield.Stage, Axes.None);
         playfield.Stage.Size = new Vector2(100, 600);
@@ -357,15 +346,13 @@ public partial class BmsGameplayVirtualisationTest
     {
         var root = new Container { Size = new Vector2(1000, 600) };
         var hudCanvas = new Container { Size = new Vector2(800, 600) };
-        var playfield = new BmsPlayfield(attachBeatmap(new BmsBeatmap
+        var playfield = createPlayfield(attachBeatmap(new BmsBeatmap
         {
             TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
             LayoutVariant = BmsLayoutVariant.Bme7K,
-        }))
-        {
-            RelativeSizeAxes = Axes.None,
-            Size = new Vector2(1000, 600),
-        };
+        }));
+        playfield.RelativeSizeAxes = Axes.None;
+        playfield.Size = new Vector2(1000, 600);
         playfield.Stage.RelativeSizeAxes = Axes.None;
         setAutoSizeAxes(playfield.Stage, Axes.None);
         playfield.Stage.Size = new Vector2(100, 600);
@@ -411,15 +398,13 @@ public partial class BmsGameplayVirtualisationTest
     public void TestVerticalOnlyStageHudResizeCropsViewport()
     {
         var root = new Container { Size = new Vector2(1000, 600) };
-        var playfield = new BmsPlayfield(attachBeatmap(new BmsBeatmap
+        var playfield = createPlayfield(attachBeatmap(new BmsBeatmap
         {
             TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
             LayoutVariant = BmsLayoutVariant.Bme7K,
-        }))
-        {
-            RelativeSizeAxes = Axes.None,
-            Size = new Vector2(1000, 600),
-        };
+        }));
+        playfield.RelativeSizeAxes = Axes.None;
+        playfield.Size = new Vector2(1000, 600);
         playfield.Stage.RelativeSizeAxes = Axes.None;
         setAutoSizeAxes(playfield.Stage, Axes.None);
         playfield.Stage.Size = new Vector2(100, 600);
@@ -467,15 +452,13 @@ public partial class BmsGameplayVirtualisationTest
     public void TestStageHudIgnoresInvalidBounds()
     {
         var root = new Container { Size = new Vector2(1000, 600) };
-        var playfield = new BmsPlayfield(attachBeatmap(new BmsBeatmap
+        var playfield = createPlayfield(attachBeatmap(new BmsBeatmap
         {
             TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
             LayoutVariant = BmsLayoutVariant.Bme7K,
-        }))
-        {
-            RelativeSizeAxes = Axes.None,
-            Size = new Vector2(1000, 600),
-        };
+        }));
+        playfield.RelativeSizeAxes = Axes.None;
+        playfield.Size = new Vector2(1000, 600);
         playfield.Stage.RelativeSizeAxes = Axes.None;
         setAutoSizeAxes(playfield.Stage, Axes.None);
         playfield.Stage.Size = Vector2.Zero;
@@ -653,7 +636,7 @@ public partial class BmsGameplayVirtualisationTest
         });
     }
 
-    private static BmsStageHudController createController() => new(new BmsPlayfield(attachBeatmap(new BmsBeatmap
+    private static BmsStageHudController createController() => new(createPlayfield(attachBeatmap(new BmsBeatmap
     {
         TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
         LayoutVariant = BmsLayoutVariant.Bme7K,

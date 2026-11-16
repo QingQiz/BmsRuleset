@@ -7,8 +7,8 @@ using System.Runtime.CompilerServices;
 using NUnit.Framework;
 using osu.Game.IO;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
-using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 
@@ -171,7 +171,7 @@ public class BmsMeasureLineIndexTest
 
     private sealed class Pair : IDisposable
     {
-        private readonly BmsPlayfield playfield = new(new BmsBeatmap { TotalColumns = BmsLayout.BME7_KEY_COLUMNS, LayoutVariant = BmsLayoutVariant.Bme7K });
+        private readonly BmsPlayfield playfield;
         private readonly Dictionary<BmsMeasureLine, int> actualIds = [];
         private readonly Dictionary<BmsMeasureLine, int> referenceIds = [];
         private readonly HashSet<int> expectedIndices = [];
@@ -181,6 +181,9 @@ public class BmsMeasureLineIndexTest
 
         internal Pair(BmsTimingMap map)
         {
+            var beatmap = new BmsBeatmap { TotalColumns = BmsLayout.BME7_KEY_COLUMNS, LayoutVariant = BmsLayoutVariant.Bme7K };
+            var compiled = new BmsEngineChart(beatmap);
+            playfield = new BmsPlayfield(beatmap, () => compiled);
             // This unloaded fixture has no dependency loader to supply the skin source
             // that the playfield's disposal path expects.
             typeof(BmsPlayfield).GetProperty("parentSkin", instance)!.SetValue(playfield,

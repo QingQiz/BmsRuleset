@@ -240,7 +240,7 @@ public partial class BmsLegacySkinTransformer : LegacySkinTransformer, IBmsGamep
 
             var image = GetManiaConfig<string>(lookup)?.Value ?? filename;
             var animation = this.GetAnimation(image, true, true, frameLength: 1000 / 20d);
-            return animation == null ? null : new LegacyBmsJudgementPiece(result, animation);
+            return animation == null ? null : new BmsJudgementPiece(result is HitResult.Meh or HitResult.Miss, animation);
         }
 
         return null;

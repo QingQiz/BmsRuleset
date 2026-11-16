@@ -8,6 +8,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using NUnit.Framework;
+using RhythmEngine.Profiles.Common;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.Replays;
@@ -52,7 +53,7 @@ public partial class TestSceneBmsReplaySeekPerformance : BmsPlayerTestScene
             var time = nextTimes[column];
             var hold = profile == "hcn" && i % 11 == 0;
             beatmap.HitObjects.Add(hold
-                ? new BmsLongNote { StartTime = time, Duration = 400, Column = column }
+                ? new BmsLongNote { Kind = KeyNoteKind.SustainHold, StartTime = time, Duration = 400, Column = column }
                 : new BmsNote { StartTime = time, Column = column });
             if (hold && i % 33 == 0)
                 beatmap.HitObjects.Add(new BmsLandmine { StartTime = time + 201, Column = column, LandmineDamagePercent = .1 });
@@ -208,7 +209,7 @@ public partial class TestSceneBmsReplaySeekPerformance : BmsPlayerTestScene
             Combo = score.Combo.Value, HighestCombo = score.HighestCombo.Value, Score = score.TotalScore.Value,
             UnmodifiedScore = score.TotalScoreWithoutMods.Value, Accuracy = score.Accuracy.Value, Rank = score.Rank.Value,
             score.ScoringJudgementEventCount, score.JudgementEvents,
-            health.CurrentGaugeStates, health.HasFailed, health.HasEverFailed,
+            health.Gauge().CurrentGaugeStates, health.HasFailed, EngineFailed = health.CurrentHealth.HasFailed,
             Columns = Playfield.Stage.Columns.Cast<BmsColumn>().Select(column => new
             {
                 column.Judgements.PressedDirections,

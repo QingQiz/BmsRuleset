@@ -8,6 +8,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.LongNoteMode;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
@@ -73,11 +74,9 @@ public partial class TestSceneBmsReplayRewind : BmsPlayerTestScene
                 BmsLongNoteMode.HellChargeNote => new BmsModHellChargeNote(),
                 _ => new BmsModLongNote(),
             };
-            LoadPlayer([modeMod]);
+            LoadPlayer([modeMod, new BmsModAutoGauge()]);
         });
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.LoadedBeatmapSuccessfully && Player.Alpha == 1);
-        AddStep("track all gauge layers", () =>
-            ((BmsHealthProcessor)Player.HealthProcessor).SetGaugeTypes([BmsGaugeType.Hard, BmsGaugeType.Normal], replaceExisting: true));
 
         double[] checkpoints = [0, 1550, 1685, 1800, 2200, 4500];
         foreach (var time in checkpoints)
@@ -121,7 +120,7 @@ public partial class TestSceneBmsReplayRewind : BmsPlayerTestScene
         var health = (BmsHealthProcessor)Player.HealthProcessor;
         return new Snapshot(score.Statistics.OrderBy(p => p.Key).Where(p => p.Value != 0).ToArray(), score.Combo.Value,
             score.HighestCombo.Value, score.ScoringJudgementEventCount, score.JudgementEvents.SelectMany(e => e.TimingObservations).ToArray(),
-            health.CurrentGaugeStates.ToArray(), health.HasFailed, health.HasEverFailed);
+            health.Gauge().CurrentGaugeStates.ToArray(), health.HasFailed, health.CurrentHealth.HasFailed);
     }
 
     private void assertSnapshot(string label, Func<Snapshot> expected)

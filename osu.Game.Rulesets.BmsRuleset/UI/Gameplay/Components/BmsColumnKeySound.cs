@@ -20,10 +20,10 @@ internal sealed partial class BmsColumnKeySound : CompositeDrawable
     private readonly Func<BmsHitObject, bool> isFinished;
 
     internal BmsColumnKeySound(IReadOnlyList<BmsHitObject> hitObjects, BmsJudgementView judgements,
-                              IReadOnlyList<BmsInvisibleNote>? invisibleNotes = null)
+                               IReadOnlyList<BmsInvisibleNote>? invisibleNotes = null)
     {
         Judgements = judgements;
-        cursor = new BmsKeySoundCursor(hitObjects, invisibleNotes);
+        cursor = new BmsKeySoundCursor(hitObjects, note => note.StartTime + Judgements.GetTiming(note).HeadDeadline / 1000.0, invisibleNotes);
         isFinished = hasNoteFinished;
     }
 

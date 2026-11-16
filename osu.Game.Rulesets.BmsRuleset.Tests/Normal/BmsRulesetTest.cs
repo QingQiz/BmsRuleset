@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
+using RhythmEngine.Profiles.Bms;
 using osu.Framework.Allocation;
 using osu.Framework.Audio.Track;
 using osu.Framework.Bindables;
@@ -316,7 +317,7 @@ public class BmsRulesetTest
 
         mod.ApplyToHealthProcessor(processor);
 
-        Assert.That(processor.GaugeType, Is.EqualTo(BmsGaugeType.ExHard));
+        Assert.That(processor.Gauge().GaugeType, Is.EqualTo(BmsGaugeType.ExHard));
     }
 
     [Test]

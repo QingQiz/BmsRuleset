@@ -1,27 +1,46 @@
 #nullable enable
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using System.Collections.Immutable;
 using System.Linq;
 using RhythmEngine.Core;
 using RhythmEngine.Profiles.Bms;
 using RhythmEngine.Profiles.Common;
+using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.Scoring;
-using JudgementResult = osu.Game.Rulesets.Judgements.JudgementResult;
 using EngineResult = RhythmEngine.Core.JudgementResult;
+using JudgementResult = osu.Game.Rulesets.Judgements.JudgementResult;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests;
 
 /// <summary>Supplies authoritative reducer output to isolated framework processor tests.</summary>
 internal static class BmsTestJudgements
 {
+    internal static BmsNote CreateEndpoint(BmsLongNote source, double time) => new()
+    {
+        StartTime = time,
+        Column = source.Column,
+        Beatmap = source.Beatmap,
+        HitWindows = source.HitWindows,
+    };
+
+    private static BmsEngineChart healthChart(BmsHealthProcessor processor, BmsHitObject eventSource)
+    {
+        var source = (IBeatmap?)processor.Beatmap ?? (IBeatmap)eventSource.Beatmap;
+        var notes = source.HitObjects.Count > 0 ? source.HitObjects.Cast<BmsHitObject>().ToArray() : [eventSource];
+        foreach (var note in notes)
+            note.Beatmap = (IBmsBeatmap)source;
+        return new BmsEngineChart(notes, ((IBmsBeatmap)source).LayoutVariant, notes.Select(note => note.Column).Distinct().ToArray(), GameplayProfile.FromMods(processor.Mods));
+    }
+
     internal static HitResult HitAt(this BmsTimingDefinition timing, double milliseconds)
     {
         var result = timing.Windows.ResultFor(Time.FromMilliseconds(milliseconds));
-        return result == BmsResults.EMPTY_POOR ? HitResult.None : BmsEngineChart.HitResultFor(result);
+        return result == BmsResults.EMPTY_POOR ? HitResult.None : BmsGameplayProfile.INSTANCE.HitResultFor(result);
     }
 
     internal static bool EmptyPoorAt(this BmsTimingDefinition timing, double milliseconds)
@@ -41,7 +60,10 @@ internal static class BmsTestJudgements
     {
         var bms = (BmsJudgementResult)result;
         var (note, judgement) = describe(bms);
-        var health = processor.CreateEngineHealth([note]);
+        var compiled = healthChart(processor, note);
+        var health = processor.CreateEngineHealth(compiled);
+        if (note is BmsLandmine)
+            judgement = judgement with { NoteId = compiled.Ids[note] };
         var score = bms.EngineResult?.Score ?? new ScoreState();
         bms.EngineResult = new EngineResult(judgement, score,
             health.Reduce(new HealthContext(judgement, health.InitialState, score, chartFor(note).ScorePlan)));
@@ -51,11 +73,11 @@ internal static class BmsTestJudgements
     internal static void ApplyTestNonConsumingJudgement(this BmsScoreProcessor processor, HitResult result, double time, double expected, int column)
     {
         var note = new BmsNote { StartTime = expected, Column = column, Beatmap = (BmsBeatmap)processor.Beatmap.Value! };
-        var judgement = new JudgementEvent(0, 0, column, NoteParts.EMPTY, BmsEngineChart.ResultId(result),
+        var judgement = new JudgementEvent(0, 0, column, NoteParts.EMPTY, BmsGameplayProfile.ResultIdFor(result),
             Time.FromMilliseconds(time), Time.FromMilliseconds(expected), Time.FromMilliseconds(time - expected));
-        var configuration = BmsProfiles.CreateScore(BmsEngineRules.ForBeatmap(note.Beatmap).EmptyPoorBreaksCombo);
+        var configuration = processor.EngineChart.Score;
         var state = configuration.Reduce(scoreState(processor), new ScoreContext(judgement, null, chartFor(note).ScorePlan));
-        processor.RegisterNonConsumingJudgement(result, time, expected, column, state);
+        processor.RegisterNonConsumingJudgement(result, time, expected, column, new EngineResult(judgement, state, new HealthState()));
     }
 
     internal static void ApplyTestEmptyPoor(this BmsScoreProcessor processor, double time = 0)
@@ -68,7 +90,7 @@ internal static class BmsTestJudgements
         => processor.ApplyTestNonConsumingJudgement(HitResult.Miss);
 
     internal static void ApplyTestNonConsumingJudgement(this BmsHealthProcessor processor, HitResult result)
-        => reduceHealth(processor, NoteParts.EMPTY, BmsEngineChart.ResultId(result));
+        => reduceHealth(processor, NoteParts.EMPTY, BmsGameplayProfile.ResultIdFor(result));
 
     internal static void ApplyTestBodyTick(this BmsHealthProcessor processor, bool holding)
         => reduceHealth(processor, NoteParts.BODY, holding ? BmsResults.SUSTAIN_GAIN : BmsResults.SUSTAIN_LOSS);
@@ -77,7 +99,7 @@ internal static class BmsTestJudgements
         this BmsScoreProcessor processor,
         BmsLongNoteEndpointResult endpoint, bool suppressPenalty = false)
     {
-        var source = endpoint.Source.CreateSyntheticEndpoint(endpoint.ExpectedTime);
+        var source = BmsTestJudgements.CreateEndpoint(endpoint.Source, endpoint.ExpectedTime);
         var result = new BmsLongNoteJudgementResult(source, source.CreateJudgement(), [endpoint])
         {
             Type = endpoint.Result,
@@ -91,7 +113,7 @@ internal static class BmsTestJudgements
     {
         var (note, judgement) = describe(result);
         var chart = chartFor(note);
-        var configuration = BmsProfiles.CreateScore(BmsEngineRules.ForBeatmap(note.Beatmap).EmptyPoorBreaksCombo);
+        var configuration = processor.EngineChart.Score;
         var opportunity = chart.ScorePlan.Opportunities.SingleOrDefault(o => o.Part == judgement.Part);
         var state = configuration.Reduce(scoreState(processor), new ScoreContext(judgement, opportunity, chart.ScorePlan));
         return new EngineResult(judgement, state, default);
@@ -100,15 +122,15 @@ internal static class BmsTestJudgements
     private static ScoreState scoreState(BmsScoreProcessor processor)
     {
         var statistics = processor.GetScoreProcessorStatistics();
-        var mines = statistics.AccuracyJudgementCount - (int)(statistics.MaximumBaseScore / 2);
+        var mines = statistics.AccuracyJudgementCount - processor.ScoringJudgementEventCount;
         var counters = processor.Statistics.Where(p => p.Key is HitResult.Perfect or HitResult.Great or HitResult.Good or HitResult.Ok or HitResult.Meh or HitResult.Miss)
-            .ToImmutableDictionary(p => BmsEngineChart.ResultId(p.Key).Value, p => (double)p.Value);
-        counters = counters.SetItem(BmsResults.POOR.Value, counters.GetValueOrDefault(BmsResults.POOR.Value) - mines)
-            .SetItem(BmsResults.MINE_HIT.Value, mines);
+            .ToImmutableDictionary(p => BmsGameplayProfile.ResultIdFor(p.Key), p => p.Value);
+        counters = counters.SetItem(BmsResults.POOR, counters.GetValueOrDefault(BmsResults.POOR) - mines)
+            .SetItem(BmsResults.MINE_HIT, mines);
         return new ScoreState
         {
             Score = statistics.BaseScore, AccuracyPoints = statistics.BaseScore, AccuracyMaximum = statistics.MaximumBaseScore,
-            Combo = processor.Combo.Value, MaximumCombo = processor.HighestCombo.Value, Counters = counters,
+            Combo = processor.Combo.Value, MaximumCombo = processor.HighestCombo.Value, ResultCounts = counters, JudgedOpportunities = processor.ScoringJudgementEventCount,
         };
     }
 
@@ -123,7 +145,7 @@ internal static class BmsTestJudgements
         // ReSharper disable once NullCoalescingConditionIsAlwaysNotNullAccordingToAPIContract
         note.Beatmap ??= new BmsBeatmap { TotalColumns = note.Column + 1, HitObjects = { note } };
         var judgement = new JudgementEvent(0, 0, note.Column, part,
-            note is BmsLandmine ? BmsResults.MINE_HIT : BmsEngineChart.ResultId(result.Type),
+            note is BmsLandmine ? BmsResults.MINE_HIT : BmsGameplayProfile.ResultIdFor(result.Type),
             Time.FromMilliseconds(result.EventTime), Time.FromMilliseconds(note.StartTime), Time.FromMilliseconds(result.TimeOffset))
         {
             SuppressPenalty = result.SuppressPenalty,
@@ -131,16 +153,17 @@ internal static class BmsTestJudgements
         return (note, judgement);
     }
 
-    private static Chart chartFor(BmsHitObject note) => BmsEngineChart.Compile([note], note.Column + 1);
+    private static Chart chartFor(BmsHitObject note) => new BmsEngineChart([note], note.Beatmap.LayoutVariant, [note.Column]).Chart;
 
     private static void reduceHealth(BmsHealthProcessor processor, PartId part, ResultId result)
     {
         var beatmap = new BmsBeatmap { TotalColumns = 1, LockedLongNoteMode = BmsLongNoteMode.HellChargeNote };
-        BmsHitObject note = part == NoteParts.BODY ? new BmsLongNote { Duration = 1000 } : new BmsNote();
+        BmsHitObject note = part == NoteParts.BODY ? new BmsLongNote { Kind = KeyNoteKind.SustainHold, Duration = 1000 } : new BmsNote();
         note.Beatmap = beatmap;
         beatmap.HitObjects.Add(note);
-        var health = processor.CreateEngineHealth([note]);
+        var compiled = healthChart(processor, note);
+        var health = processor.CreateEngineHealth(compiled);
         var judgement = new JudgementEvent(0, 0, 0, part == NoteParts.EMPTY && result != BmsResults.EMPTY_POOR ? NoteParts.TAP : part, result, 200001, 0, null);
-        processor.ApplyEngineTick(health.Reduce(new HealthContext(judgement, health.InitialState, new ScoreState(), chartFor(note).ScorePlan)));
+        processor.ApplyEngineTick(new EngineResult(judgement, new ScoreState(), health.Reduce(new HealthContext(judgement, health.InitialState, new ScoreState(), chartFor(note).ScorePlan))));
     }
 }

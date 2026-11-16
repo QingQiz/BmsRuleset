@@ -63,8 +63,6 @@ public interface INoteRule
     /// </summary>
     ImmutableArray<NotePartState> GetParts(NoteContext context);
 
-    IEnumerable<ScoringOpportunity> GetScoringOpportunities(ChartNote note);
-
     InputCandidate? GetCandidate(NoteContext context, InputEvent input, int noteIndex);
 
     NoteUpdate ApplyInput(NoteContext context, InputEvent input);

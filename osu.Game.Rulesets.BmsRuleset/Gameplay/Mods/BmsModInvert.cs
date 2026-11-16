@@ -70,13 +70,13 @@ public class BmsModInvert : Mod, IApplicableAfterBeatmapConversion, IHasSeed
                     Beatmap = bmsBeatmap,
                     StartTime = source.StartTime,
                     Duration = duration,
-                    Mode = source is BmsLongNote hold ? hold.Mode : BmsLongNoteMode.Undefined,
+                    Kind = source is BmsLongNote hold ? hold.Kind : bmsBeatmap.LockedLongNoteMode.ToNoteKind(),
                     Column = source.Column,
                     SampleKey = source.SampleKey,
                     SampleVolume = source.SampleVolume,
                     AdditionalSampleKeys = source.AdditionalSampleKeys,
                     Samples = source.Samples.ToList(),
-                    JudgementRate = source.JudgementRate,
+                    ExRank = source.ExRank,
                     ScrollPositionAtStartTime = source.ScrollPositionAtStartTime,
                     ScrollPositionAtEndTime = bmsBeatmap.TimingMap?.GetScrollPositionAtTime(source.StartTime + duration) ?? 0,
                 });
@@ -92,7 +92,7 @@ public class BmsModInvert : Mod, IApplicableAfterBeatmapConversion, IHasSeed
                 SampleVolume = last.SampleVolume,
                 AdditionalSampleKeys = last.AdditionalSampleKeys,
                 Samples = last.Samples.ToList(),
-                JudgementRate = last.JudgementRate,
+                ExRank = last.ExRank,
                 ScrollPositionAtStartTime = last.ScrollPositionAtStartTime,
             });
         }

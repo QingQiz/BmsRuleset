@@ -5,83 +5,6 @@ using RhythmEngine.Profiles.Patterns;
 
 namespace RhythmEngine.Profiles.Bms;
 
-/// <summary>BMS RANK timing difficulty, ordered from strictest to most lenient; each client profile supplies its own window tables.</summary>
-public enum BmsRank
-{
-    /// <summary>The strictest rank, using the profile's narrowest timing windows.</summary>
-    VeryHard,
-
-    /// <summary>A strict rank with narrower timing windows than Normal.</summary>
-    Hard,
-
-    /// <summary>The standard rank and the default in BmsOptions.</summary>
-    Normal,
-
-    /// <summary>A lenient rank with wider timing windows than Normal.</summary>
-    Easy,
-
-    /// <summary>The most lenient rank; supported by beatoraja, but rejected by both LR2 profiles.</summary>
-    VeryEasy,
-}
-
-/// <summary>Selects BMS initial health, judgement deltas, failure conditions and the final clear requirement.</summary>
-/// <remarks>Health uses a 0..100 scale. Recovery gauges check final health; other gauges fail at zero. Delta tables depend on the client profile.</remarks>
-public enum BmsGauge
-{
-    /// <summary>An assisted recovery gauge starting at 20, with a floor of 2 and a final clear threshold of 60.</summary>
-    AssistEasy,
-
-    /// <summary>A lenient recovery gauge starting at 20, with a floor of 2 and a clear threshold of 80; deltas are more forgiving than Normal.</summary>
-    Easy,
-
-    /// <summary>The standard recovery gauge, starting at 20 with a floor of 2 and a final clear threshold of 80.</summary>
-    Normal,
-
-    /// <summary>A survival gauge starting at 100 and failing at zero, with reduced damage at low health; recovery depends on the client and chart.</summary>
-    Hard,
-
-    /// <summary>A stricter survival gauge starting at 100, with larger penalties and no Hard-style damage reduction at low health.</summary>
-    ExHard,
-
-    /// <summary>A BAD or POOR removes 100 health and fails the gauge; empty POOR uses a separate damage value.</summary>
-    Hazard,
-
-    /// <summary>A grade/course survival gauge starting at 100, with its own deltas and reduced damage at low health; fails at zero.</summary>
-    Grade,
-
-    /// <summary>A harder grade gauge with stricter deltas than Grade; low-health damage reduction depends on the client profile.</summary>
-    GradeHard,
-
-    /// <summary>A grade gauge with still larger penalties, no low-health damage reduction and failure at zero.</summary>
-    GradeExHard,
-}
-
-/// <summary>Selects a target when one input can judge multiple notes, without changing their individual timing windows.</summary>
-/// <remarks>Active hold interactions take priority. Playable targets precede empty POOR targets, and shared-input candidates are dispatched separately.</remarks>
-public enum BmsSelection
-{
-    /// <summary>Resolved by profile creation: beatoraja uses Combo, while the LR2 compatibility profile uses Oldest.</summary>
-    Default,
-
-    /// <summary>Scans in time order, replacing a candidate past its late GOOD boundary when a later candidate has reached its early GOOD boundary.</summary>
-    Combo,
-
-    /// <summary>Selects the smallest absolute timing error; ties retain the earlier note, then the lower chart index.</summary>
-    Nearest,
-
-    /// <summary>Keeps the earliest playable candidate, breaking time ties by chart index, without skipping ahead for a better judgement.</summary>
-    Oldest,
-
-    /// <summary>Scans like Combo but uses GREAT boundaries to decide whether a later note should receive the input.</summary>
-    Score,
-}
-
-public sealed record BmsOptions(
-    BmsRank Rank = BmsRank.Normal,
-    BmsGauge Gauge = BmsGauge.Normal,
-    double Total = 260,
-    BmsSelection Selection = BmsSelection.Default);
-
 public static partial class BmsProfiles
 {
     private const int empty_poor_priority = 2;
@@ -143,7 +66,7 @@ public static partial class BmsProfiles
             if (!rules.TryGetValue(key, out var rule))
                 rules.Add(key, rule = createRule(note, rank, lr2));
             return rule;
-        });
+        }, note => CreateScoringOpportunities(note.Id, note.Kind));
     }
 
     private static InputCandidate? selectCandidate(ImmutableArray<InputCandidate> candidates, BmsSelection selection, Chart chart)
@@ -230,7 +153,7 @@ public static partial class BmsProfiles
 
         if (note.Kind == KeyNoteKind.Tap)
         {
-            return new TapRule(new TapConfiguration(windows, headDeadline, BmsResults.POOR, 2,
+            return new TapRule(new TapConfiguration(windows, headDeadline, BmsResults.POOR,
                 NonResolvingResults: nonResolving, ResolvedWindows: ghosts, CandidatePriority: candidatePriority,
                 ShareInput: options.ShareLateBad ? (result, offset) => result == BmsResults.BAD && offset > 0 : null,
                 SuppressRepeatedMistakes: options.NonConsumingBad, RecoveringResults: recovery_results, PassiveOrder: options.PassiveOrder));
@@ -242,7 +165,7 @@ public static partial class BmsProfiles
         ArgumentNullException.ThrowIfNull(tailWindows);
         var aggregate = note.Kind == KeyNoteKind.Hold;
         var config = new HoldConfiguration(windows, tailWindows, headDeadline, options.TailDeadline ?? tailWindows.Entries[^1].Late,
-            BmsResults.POOR, BmsResults.PGREAT, aggregate ? BmsResults.BAD : BmsResults.POOR, aggregate ? 0 : 2, 2,
+            BmsResults.POOR, BmsResults.PGREAT, aggregate ? BmsResults.BAD : BmsResults.POOR,
             aggregate ? HoldEndMode.ReleaseOrAutomatic : HoldEndMode.Release, HoldDropMode.Resolve,
             evaluation =>
             {
@@ -272,6 +195,7 @@ public static partial class BmsProfiles
             ReleaseGrace = options.ReleaseGrace,
             DeferredReleaseResults = bad_results,
             SuppressRepeatedMistakes = options.NonConsumingBad,
+            SuppressMissedHeadPenalty = aggregate,
             RecoveringHeadResults = recovery_results,
             AutomaticEndOffset = 1,
             AutomaticTailUsesHeadOffset = aggregate,
@@ -282,6 +206,16 @@ public static partial class BmsProfiles
         };
         return new HoldRule(config);
     }
+
+    public static ImmutableArray<ScoringOpportunity> CreateScoringOpportunities(int noteId, KeyNoteKind kind) => kind switch
+    {
+        KeyNoteKind.Mine => [],
+        KeyNoteKind.Tap => [new ScoringOpportunity(noteId, NoteParts.TAP, 2)],
+        KeyNoteKind.Hold => [new ScoringOpportunity(noteId, NoteParts.TAIL, 2)],
+        KeyNoteKind.ReleaseHold or KeyNoteKind.SustainHold =>
+            [new ScoringOpportunity(noteId, NoteParts.HEAD, 2), new ScoringOpportunity(noteId, NoteParts.TAIL, 2)],
+        _ => throw ProfileSupport.Unsupported("BMS scoring", kind),
+    };
 
     private static int candidatePriority(ResultId result) => result == BmsResults.EMPTY_POOR ? empty_poor_priority : 1;
 
@@ -313,19 +247,10 @@ public static partial class BmsProfiles
     {
         var count = plan.Opportunities.Length;
         var recovery = count == 0 ? 0 : options.Total / count;
-        var normal = options.Gauge is BmsGauge.Normal or BmsGauge.Easy or BmsGauge.AssistEasy;
-        var deltas = options.Gauge switch
-        {
-            BmsGauge.AssistEasy => lr2 ? [1.2, 1.2, 0.6, -3.2, -4.8, -1.6] : new[] { 1.0, 1, 0.5, -1.5, -3, -0.5 },
-            BmsGauge.Easy => lr2 ? [1.2, 1.2, 0.6, -3.2, -4.8, -1.6] : [1.0, 1, 0.5, -1.5, -4.5, -1],
-            BmsGauge.Normal => lr2 ? [1.0, 1, 0.5, -4, -6, -2] : [1.0, 1, 0.5, -3, -6, -2],
-            BmsGauge.Hard => lr2 ? [0.1, 0.1, 0.05, -6, -10, -2] : [0.15, 0.12, 0.03, -5, -10, -5],
-            BmsGauge.ExHard => lr2 ? [0.1, 0.1, 0.05, -12, -20, -2] : [0.15, 0.06, 0, -8, -16, -8],
-            BmsGauge.Hazard => [0.15, 0.06, 0, -100, -100, -10],
-            BmsGauge.Grade => lr2 ? [0.1, 0.1, 0.05, -2, -3, -2] : [0.15, 0.12, 0.06, -1.5, -3, -1.5],
-            BmsGauge.GradeHard => lr2 ? [0.1, 0.1, 0.05, -6, -10, -2] : [0.15, 0.12, 0.03, -3, -6, -3],
-            _ => lr2 ? [0.1, 0.1, 0.05, -12, -20, -2] : [0.15, 0.06, 0, -5, -10, -5],
-        };
+        var profile = BmsGaugeProfiles.Create(options.Gauge, lr2 ? BmsGaugeProfileFamily.Lr2 : BmsGaugeProfileFamily.SevenKeys);
+        var normal = profile.Algorithm == BmsGaugeAlgorithm.Total;
+        var deltas = new[] { profile.PerfectGain, profile.GreatGain, profile.GoodGain, profile.BadDelta, profile.PoorDelta, profile.EmptyPoorDelta }
+            .Select(value => normal && value > 0 ? value : value * 100).ToArray();
 
         if (!lr2)
         {
@@ -350,9 +275,8 @@ public static partial class BmsProfiles
         }
 
         var mineDamage = source.Notes.Where(n => n.Kind == KeyNoteKind.Mine).ToImmutableDictionary(n => n.Id, n => n.MineDamage);
-        var scoringParts = plan.Opportunities.Select(o => (o.NoteId, o.Part)).ToImmutableHashSet();
-        var damageMultiplier = lr2 && options.Gauge is BmsGauge.Hard or BmsGauge.ExHard ? lr2DamageMultiplier(options.Total, count) : 1;
-        return HealthRules.LatchedGauge(normal ? 2 : 0, 100, normal ? 20 : 100, context =>
+        var damageMultiplier = lr2 && options.Gauge is BmsGauge.Hard or BmsGauge.ExHard ? BmsGaugeCalculator.CalculateDamageScale(options.Total, count) : 1;
+        return HealthRules.LatchedGauge(profile.MinHealth * 100, profile.MaxHealth * 100, profile.InitialHealth * 100, context =>
         {
             if (context.Health.HasFailed)
                 return 0;
@@ -367,7 +291,7 @@ public static partial class BmsProfiles
             }
 
             if (result == BmsResults.MINE_AVOIDED || (context.Event.Part != NoteParts.EMPTY && context.Event.Part != NoteParts.BODY
-                                                                                            && !scoringParts.Contains((context.Event.NoteId, context.Event.Part))))
+                                                                                            && !plan.OpportunitiesByPart.ContainsKey((context.Event.NoteId, context.Event.Part))))
                 return 0;
 
             var index = result switch
@@ -390,39 +314,21 @@ public static partial class BmsProfiles
             if (lr2 && delta > 0)
                 delta *= normal ? recovery : 1;
 
-            if (delta < 0 && (options.Gauge is BmsGauge.Hard or BmsGauge.Grade || (lr2 && options.Gauge == BmsGauge.GradeHard)))
+            if (delta < 0)
             {
-                var health = context.Health.Value;
-                var guts = lr2 ? health < 30 ? 0.6 : 1
-                    : options.Gauge == BmsGauge.Hard ? health < 10 ? 0.4 : health < 20 ? 0.5 : health < 30 ? 0.6 : health < 40 ? 0.7 : health < 50 ? 0.8 : 1
-                    : health < 5 ? 0.4
-                    : health < 10 ? 0.5
-                    : health < 15 ? 0.6
-                    : health < 20 ? 0.7
-                    : health < 25 ? 0.8 : 1;
-                delta = lr2 ? delta * guts : (float)delta * (float)guts;
+                foreach (var rule in profile.GutsRules)
+                {
+                    if (context.Health.Value >= rule.HealthThreshold * 100)
+                        continue;
+
+                    delta = lr2 ? delta * rule.DamageMultiplier : (float)delta * (float)rule.DamageMultiplier;
+                    break;
+                }
             }
 
             return lr2
                 ? context.Event.Part == NoteParts.BODY ? delta * 0.5 : delta
                 : (float)context.Health.Value + (float)delta - context.Health.Value;
-        }, value => !normal && value <= 0, value => normal ? value >= (options.Gauge == BmsGauge.AssistEasy ? 60 : 80) : value > 0);
-    }
-
-    private static double lr2DamageMultiplier(double total, int noteCount)
-    {
-        double[] thresholds = [240, 230, 210, 200, 180, 160, 150, 130, 120, 0];
-        double[] multipliers = [1, 1.11, 1.25, 1.5, 1.666, 2, 2.5, 3.333, 5, 10];
-        var index = Array.FindIndex(thresholds, threshold => total >= threshold);
-        var density = 1.0;
-        var coefficient = 0.002;
-
-        for (var notes = 1000; notes > noteCount || notes > 1; notes /= 2)
-        {
-            density += coefficient * (notes - Math.Max(noteCount, notes / 2));
-            coefficient *= 2;
-        }
-
-        return Math.Max(multipliers[index], density);
+        }, value => !normal && value <= 0, value => value >= profile.ClearThreshold * 100 && value > 0);
     }
 }

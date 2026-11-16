@@ -1,27 +1,27 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
+using System;
+using Realms;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
-using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics;
 using osu.Framework.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
-using osu.Game.Online.API;
 using osu.Game.Online.API.Requests.Responses;
-using osu.Game.Online.Leaderboards;
+using osu.Game.Online.API;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using osu.Game.Rulesets.BmsRuleset.UI.Ranking;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Lamp;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
 using osuTK;
-using Realms;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Components;
 
@@ -59,7 +59,7 @@ internal partial class BmsPanelLocalRankDisplay : CompositeDrawable
     private int scoreQueryGeneration;
     private ScheduledDelegate? scoreQueryOperation;
 
-    private readonly UpdateableRank updateable;
+    private readonly BmsUpdateableRank updateable;
     private readonly BmsLampDisplay lampDisplay;
 
     internal void AttachLamp(Container host)
@@ -221,7 +221,7 @@ internal partial class BmsPanelLocalRankDisplay : CompositeDrawable
             }
 
             var selection = task.Result;
-            updateable.Rank = selection.Rank;
+            updateable.SetRank(selection.Rank, GameplayProfile.FromMods(mods ?? []));
             updateable.Alpha = selection.Rank.HasValue ? 1 : 0;
             lampDisplay.Lamp = selection.Lamp ?? BmsLamp.NoPlay;
             lampDisplay.Alpha = selection.Lamp.HasValue ? 1 : 0;

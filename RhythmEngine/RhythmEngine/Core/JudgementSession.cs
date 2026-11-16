@@ -25,9 +25,13 @@ public sealed class JudgementSession
 
     public double MaximumScore { get; }
 
-    public bool Completed => remainingNotes == 0;
+    public bool Completed => completedAt(CurrentTime);
 
-    public SessionOutcome Outcome => configuration.Health.EvaluateOutcome(new SessionOutcomeContext(Completed, Health, Score, chart.ScorePlan));
+    public SessionOutcome Outcome => outcomeAt(CurrentTime);
+
+    private bool completedAt(long? time) => configuration.IsComplete?.Invoke(new SessionCompletionContext(time, remainingNotes == 0, Score, chart.ScorePlan)) ?? remainingNotes == 0;
+
+    private SessionOutcome outcomeAt(long? time) => configuration.Health.EvaluateOutcome(new SessionOutcomeContext(completedAt(time), Health, Score, chart.ScorePlan));
 
     public bool Cleared => Outcome == SessionOutcome.Cleared;
 
@@ -288,7 +292,7 @@ public sealed class JudgementSession
         }
 
         transitions.Add(new NoteTransition(TransitionCount++, time, input, before, snapshot(context with { State = update.State }),
-            judgements.MoveToImmutable(), Outcome));
+            judgements.MoveToImmutable(), outcomeAt(time)));
     }
 
     private NoteSnapshot snapshot(int index)

@@ -1,14 +1,13 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using osu.Game.Rulesets.BmsRuleset.Beatmaps;
+using System;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
 using osu.Game.Rulesets.Objects;
-using osu.Game.Rulesets.Scoring;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using osu.Game.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Practice;
@@ -20,23 +19,21 @@ internal sealed record BmsPracticeAttemptResult(
     int Slow,
     BmsResultStatisticsData Statistics)
 {
-    internal int ExScore => BmsExScore.Calculate(Score.Statistics);
-
-    internal double Health => Statistics.EndingGaugeStates.FirstOrDefault(state => !state.Failed)?.Health
-                              ?? Statistics.EndingGaugeStates.LastOrDefault()?.Health ?? 0;
+    internal double Health => Statistics.EndingHealth?.Value ?? 0;
 
     internal static BmsPracticeAttemptResult Create(int attempt, ScoreInfo score,
-        IReadOnlyList<BmsGaugeHistoryEvent> gaugeHistory, BmsBeatmap beatmap, BmsPracticeSettings settings,
+        IReadOnlyList<GameplayHealthHistoryEvent> gaugeHistory, BmsBeatmap beatmap, BmsPracticeSettings settings,
         IReadOnlyList<BmsJudgementEvent> judgements)
     {
-        var timedHits = score.HitEvents.Where(hit => hit.Result is HitResult.Perfect or HitResult.Great or HitResult.Good).ToArray();
+        var profile = GameplayProfile.FromMods(score.Mods);
+        var timedHits = score.HitEvents.Where(hit => profile.IsTimingEvent(hit) && profile.CountsForFastSlow(hit.Result)).ToArray();
         return new BmsPracticeAttemptResult(attempt, score.DeepClone(),
             timedHits.Count(hit => hit.TimeOffset < 0), timedHits.Count(hit => hit.TimeOffset > 0),
             createStatistics(score, beatmap, settings, judgements, gaugeHistory));
     }
 
     private static BmsResultStatisticsData createStatistics(ScoreInfo score, BmsBeatmap beatmap, BmsPracticeSettings settings,
-        IReadOnlyList<BmsJudgementEvent> judgements, IReadOnlyList<BmsGaugeHistoryEvent> gaugeHistory)
+        IReadOnlyList<BmsJudgementEvent> judgements, IReadOnlyList<GameplayHealthHistoryEvent> gaugeHistory)
     {
         // Statistics use a separate zero-based view so late-song intervals fill the existing result plots.
         var view = new BmsBeatmap { LayoutVariant = beatmap.LayoutVariant, TotalColumns = beatmap.TotalColumns, Total = beatmap.Total };

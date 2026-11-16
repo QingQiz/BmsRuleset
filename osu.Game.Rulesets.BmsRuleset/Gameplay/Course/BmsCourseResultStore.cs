@@ -117,9 +117,8 @@ internal sealed class BmsCourseResultStore
         }
 
         Changed?.Invoke(courseId);
-        return;
 
-        static BmsLamp lampFor(BmsGaugeType? gaugeType) => gaugeType switch
+        static BmsLamp lampFor(BmsGaugeType gaugeType) => gaugeType switch
         {
             BmsGaugeType.ExHardClass => BmsLamp.ExHardClear,
             BmsGaugeType.ExClass => BmsLamp.HardClear,

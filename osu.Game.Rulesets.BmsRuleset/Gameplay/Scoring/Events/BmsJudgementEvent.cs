@@ -29,8 +29,8 @@ public enum BmsJudgementSourceKind
     Note,
     LongNote,
     Landmine,
-    EmptyPoor,
-    NonConsumingBad,
+    EmptyInput,
+    NonConsumingHit,
 }
 
 public readonly record struct BmsJudgementSource(
@@ -56,7 +56,7 @@ public readonly record struct BmsJudgementSource(
                 BmsLandmine => BmsJudgementSourceKind.Landmine,
                 BmsLongNote => BmsJudgementSourceKind.LongNote,
                 BmsHitObject => BmsJudgementSourceKind.Note,
-                _ => BmsJudgementSourceKind.EmptyPoor,
+                _ => BmsJudgementSourceKind.EmptyInput,
             },
             hitObject is BmsLongNote longNote ? longNote.Duration : 0,
             hitObject is BmsLandmine landmine ? landmine.LandmineDamagePercent : 0);

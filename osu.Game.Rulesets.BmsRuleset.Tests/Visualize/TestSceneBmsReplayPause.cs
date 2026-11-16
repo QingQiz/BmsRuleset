@@ -4,10 +4,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
 using NUnit.Framework;
+using RhythmEngine.Profiles.Bms;
 using osu.Framework.Testing;
 using osu.Framework.Timing;
 using osu.Game.Beatmaps;
-using osu.Game.Extensions;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
@@ -49,7 +49,7 @@ public partial class TestSceneBmsReplayPause : BmsPlayerTestScene
             LockedLongNoteMode = mode,
             HitObjects =
             [
-                new BmsLongNote { StartTime = 3000, Duration = 1000, Column = 1 },
+                new BmsLongNote { Kind = mode.ToNoteKind(), StartTime = 3000, Duration = 1000, Column = 1 },
                 new BmsNote { StartTime = 5000, Column = 2 },
                 new BmsNote { StartTime = 30000, Column = 3 },
             ],
@@ -61,10 +61,16 @@ public partial class TestSceneBmsReplayPause : BmsPlayerTestScene
     }
 
     [Test]
-    public void PlaybackAndSimulationAgreeAfterRecordedPause(
-        [Values(BmsLongNoteMode.LongNote, BmsLongNoteMode.ChargeNote, BmsLongNoteMode.HellChargeNote)] BmsLongNoteMode noteMode)
+    public void PlaybackAndSimulationAgreeAfterRecordedPause([Values(BmsLongNoteMode.LongNote, BmsLongNoteMode.ChargeNote, BmsLongNoteMode.HellChargeNote)] BmsLongNoteMode noteMode)
     {
-        AddStep("load paused replay", () => { mode = noteMode; sameTimeMine = false; recordOnly = false; courseReplay = null; LoadPlayer(); });
+        AddStep("load paused replay", () =>
+        {
+            mode = noteMode;
+            sameTimeMine = false;
+            recordOnly = false;
+            courseReplay = null;
+            LoadPlayer();
+        });
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.LoadedBeatmapSuccessfully && Player.Alpha == 1);
         AddStep("seek through pause", () =>
         {
@@ -79,16 +85,27 @@ public partial class TestSceneBmsReplayPause : BmsPlayerTestScene
             var replay = new osu.Game.Replays.Replay { Frames = [.. inputs()] };
             var expected = BmsReplaySimulation.Run(Playfield.Beatmap, replay, source);
             Assert.That(JsonSerializer.Serialize(((BmsScoreProcessor)Player.ScoreProcessor).JudgementEvents), Is.EqualTo(JsonSerializer.Serialize(expected.Judgements)));
-            Assert.That(((BmsHealthProcessor)Player.HealthProcessor).CurrentGaugeStates, Is.EqualTo(expected.Gauges[^1].States));
+            Assert.That(((BmsHealthProcessor)Player.HealthProcessor).CurrentHealth.Layers, Is.EqualTo(expected.Gauges[^1].Health.Layers));
         });
     }
 
     [Test]
     public void SameTimestampReleaseAvoidsMineInRealPlayback()
     {
-        AddStep("load same-time mine replay", () => { mode = BmsLongNoteMode.LongNote; sameTimeMine = true; recordOnly = false; courseReplay = null; LoadPlayer(); });
+        AddStep("load same-time mine replay", () =>
+        {
+            mode = BmsLongNoteMode.LongNote;
+            sameTimeMine = true;
+            recordOnly = false;
+            courseReplay = null;
+            LoadPlayer();
+        });
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.LoadedBeatmapSuccessfully && Player.Alpha == 1);
-        AddStep("seek past simultaneous operations", () => { Player.GameplayClockContainer.Stop(); Player.GameplayClockContainer.Seek(5500); });
+        AddStep("seek past simultaneous operations", () =>
+        {
+            Player.GameplayClockContainer.Stop();
+            Player.GameplayClockContainer.Seek(5500);
+        });
         AddUntilStep("clock caught up", () => Math.Abs(Player.DrawableRuleset.FrameStableClock.CurrentTime - 5500) < .001);
         AddStep("compare final state mine decision", () =>
         {
@@ -117,7 +134,11 @@ public partial class TestSceneBmsReplayPause : BmsPlayerTestScene
             LoadPlayer();
         });
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.LoadedBeatmapSuccessfully && Player.Alpha == 1);
-        AddStep("seek to attempt end", () => { Player.GameplayClockContainer.Stop(); Player.GameplayClockContainer.Seek(3500.375); });
+        AddStep("seek to attempt end", () =>
+        {
+            Player.GameplayClockContainer.Stop();
+            Player.GameplayClockContainer.Seek(3500.375);
+        });
         AddUntilStep("clock reached terminal frame", () => Math.Abs(Player.DrawableRuleset.FrameStableClock.CurrentTime - 3500.375) < .001);
         AddStep("compare terminal tail and gauge", () =>
         {
@@ -125,7 +146,7 @@ public partial class TestSceneBmsReplayPause : BmsPlayerTestScene
             var events = ((BmsScoreProcessor)Player.ScoreProcessor).JudgementEvents;
             Assert.That(events.SelectMany(item => item.TimingObservations).Count(item => item.Kind == BmsTimingObservationKind.LongNoteTail), Is.EqualTo(1));
             Assert.That(JsonSerializer.Serialize(events), Is.EqualTo(JsonSerializer.Serialize(expected.Judgements)));
-            Assert.That(((BmsHealthProcessor)Player.HealthProcessor).CurrentGaugeStates, Is.EqualTo(expected.Gauges[^1].States));
+            Assert.That(((BmsHealthProcessor)Player.HealthProcessor).CurrentHealth.Layers, Is.EqualTo(expected.Gauges[^1].Health.Layers));
         });
     }
 
@@ -144,23 +165,25 @@ public partial class TestSceneBmsReplayPause : BmsPlayerTestScene
                 ScoreInfo = new ScoreInfo
                 {
                     Ruleset = new BmsRuleset().RulesetInfo,
-                    Mods = autoGauge ?
-                    [
-                        new BmsModAutoGauge
-                        {
-                            ClassHealth = { Value = 0.4 },
-                            ExClassHealth = { Value = 0.3 },
-                            GaugeProfileFamily = { Value = BmsGaugeProfileFamily.Lr2 },
-                        },
-                        new BmsModClassGauge(),
-                    ] :
-                    [
-                        new BmsModClassGauge
-                        {
-                            GaugeProfileFamily = { Value = BmsGaugeProfileFamily.Lr2 },
-                            InitialHealth = { Value = 0.4 },
-                        },
-                    ],
+                    Mods = autoGauge
+                        ?
+                        [
+                            new BmsModAutoGauge
+                            {
+                                ClassHealth = { Value = 0.4 },
+                                ExClassHealth = { Value = 0.3 },
+                                GaugeProfileFamily = { Value = BmsGaugeProfileFamily.Lr2 },
+                            },
+                            new BmsModClassGauge(),
+                        ]
+                        :
+                        [
+                            new BmsModClassGauge
+                            {
+                                GaugeProfileFamily = { Value = BmsGaugeProfileFamily.Lr2 },
+                                InitialHealth = { Value = 0.4 },
+                            },
+                        ],
                 },
             };
             courseReplay = BmsTestReplayArchive.RoundTrip(score.DeepClone());
@@ -172,13 +195,15 @@ public partial class TestSceneBmsReplayPause : BmsPlayerTestScene
             var health = (BmsHealthProcessor)Player.HealthProcessor;
             Assert.Multiple(() =>
             {
-                Assert.That(health.IsCourseGaugeMode, Is.True);
-                Assert.That(health.ConfiguredProfileFamily, Is.EqualTo(BmsGaugeProfileFamily.Lr2));
-                Assert.That(health.CurrentGaugeStates, Is.EqualTo(autoGauge ? new[]
-                {
-                    new BmsGaugeStateSnapshot(BmsGaugeType.ExClass, 0.3, false),
-                    new BmsGaugeStateSnapshot(BmsGaugeType.Class, 0.4, false),
-                } : [new BmsGaugeStateSnapshot(BmsGaugeType.Class, 0.4, false)]));
+                Assert.That(health.Gauge().IsCourseGaugeMode, Is.True);
+                Assert.That(health.Gauge().ConfiguredProfileFamily, Is.EqualTo(BmsGaugeProfileFamily.Lr2));
+                Assert.That(health.Gauge().CurrentGaugeStates, Is.EqualTo(autoGauge
+                    ? new[]
+                    {
+                        new BmsGaugeStateSnapshot(BmsGaugeType.ExClass, 0.3, false),
+                        new BmsGaugeStateSnapshot(BmsGaugeType.Class, 0.4, false),
+                    }
+                    : [new BmsGaugeStateSnapshot(BmsGaugeType.Class, 0.4, false)]));
             });
             Player.GameplayClockContainer.Stop();
             Player.GameplayClockContainer.Seek(5500);
@@ -188,7 +213,7 @@ public partial class TestSceneBmsReplayPause : BmsPlayerTestScene
         {
             var expected = BmsReplaySimulation.Run(Playfield.Beatmap, courseReplay!.Replay, courseReplay.ScoreInfo);
             Assert.That(JsonSerializer.Serialize(((BmsScoreProcessor)Player.ScoreProcessor).JudgementEvents), Is.EqualTo(JsonSerializer.Serialize(expected.Judgements)));
-            Assert.That(((BmsHealthProcessor)Player.HealthProcessor).CurrentGaugeStates, Is.EqualTo(expected.Gauges[^1].States));
+            Assert.That(((BmsHealthProcessor)Player.HealthProcessor).CurrentHealth.Layers, Is.EqualTo(expected.Gauges[^1].Health.Layers));
         });
         AddStep("seek back to dan opening", () => Player.GameplayClockContainer.Seek(0));
         AddUntilStep("rewind completed", () => Math.Abs(Player.DrawableRuleset.FrameStableClock.CurrentTime) < .001);
@@ -198,8 +223,8 @@ public partial class TestSceneBmsReplayPause : BmsPlayerTestScene
             Assert.Multiple(() =>
             {
                 Assert.That(health.Health.Value, Is.EqualTo(autoGauge ? 0.3 : 0.4));
-                Assert.That(health.CurrentGaugeStates.Select(state => state.Health), Is.EqualTo(autoGauge ? new[] { 0.3, 0.4 } : [0.4]));
-                Assert.That(health.CurrentGaugeStates.All(state => !state.Failed), Is.True);
+                Assert.That(health.Gauge().CurrentGaugeStates.Select(state => state.Health), Is.EqualTo(autoGauge ? new[] { 0.3, 0.4 } : [0.4]));
+                Assert.That(health.Gauge().CurrentGaugeStates.All(state => !state.Failed), Is.True);
             });
             Player.GameplayClockContainer.Seek(5500);
         });
@@ -207,14 +232,21 @@ public partial class TestSceneBmsReplayPause : BmsPlayerTestScene
         AddStep("replaying produces the same gauge states", () =>
         {
             var expected = BmsReplaySimulation.Run(Playfield.Beatmap, courseReplay!.Replay, courseReplay.ScoreInfo);
-            Assert.That(((BmsHealthProcessor)Player.HealthProcessor).CurrentGaugeStates, Is.EqualTo(expected.Gauges[^1].States));
+            Assert.That(((BmsHealthProcessor)Player.HealthProcessor).CurrentHealth.Layers, Is.EqualTo(expected.Gauges[^1].Health.Layers));
         });
     }
 
     [Test]
     public void LiveRecorderKeepsOnlyOperationsAndOneTerminalFrame()
     {
-        AddStep("load recording scene", () => { mode = BmsLongNoteMode.LongNote; sameTimeMine = false; recordOnly = true; courseReplay = null; LoadPlayer(); });
+        AddStep("load recording scene", () =>
+        {
+            mode = BmsLongNoteMode.LongNote;
+            sameTimeMine = false;
+            recordOnly = true;
+            courseReplay = null;
+            LoadPlayer();
+        });
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.LoadedBeatmapSuccessfully && Player.Alpha == 1);
         AddStep("attach live recorder", () => Player.DrawableRuleset.SetRecordTarget(Player.Score));
         AddUntilStep("recorder loaded", () => ((BmsInputManager)((global::osu.Game.Rulesets.BmsRuleset.UI.Gameplay.BmsDrawableRuleset)Player.DrawableRuleset).KeyBindingInputManager).Recorder?.IsLoaded == true);

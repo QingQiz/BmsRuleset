@@ -2,11 +2,14 @@ using System.Linq;
 using System.Threading.Tasks;
 using NUnit.Framework;
 using RhythmEngine.Profiles.Bms;
+using RhythmEngine.Profiles.Common;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
-using osu.Game.Rulesets.Mods;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Profiles;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
@@ -36,29 +39,46 @@ public class BmsJudgementProfileCacheTest
     }
 
     [Test]
-    public void ConversionOwnsModSelectionAndKeepsSourceAndOtherAttemptsIsolated()
+    public void SelectedProfilesKeepSharedChartAndOtherAttemptsIsolated()
     {
         var decoded = new BmsDecodedBeatmap { RawLines = ["#BPM 120", "#RANK 2", "#00018:01"] };
         decoded.CopyFrom(BmsChartParser.Parse(decoded.RawLines));
-        var firstConverter = new BmsBeatmapConverter(decoded, new BmsRuleset());
-        ((IApplicableToBeatmapConverter)new BmsModNoBad()).ApplyToBeatmapConverter(firstConverter);
-        var secondConverter = new BmsBeatmapConverter(decoded, new BmsRuleset());
-        ((IApplicableToBeatmapConverter)new BmsModLr2()).ApplyToBeatmapConverter(secondConverter);
-        var first = (BmsBeatmap)firstConverter.Convert();
-        var second = (BmsBeatmap)secondConverter.Convert();
-        var original = (BmsBeatmap)new BmsBeatmapConverter(decoded, new BmsRuleset()).Convert();
+        var beatmap = (BmsBeatmap)new BmsBeatmapConverter(decoded, new BmsRuleset()).Convert();
+        var note = beatmap.HitObjects[0];
+        note.ApplyDefaults(beatmap.ControlPointInfo, beatmap.Difficulty);
+        var sourceWindows = note.HitWindows;
+        var first = new BmsEngineChart(beatmap, GameplayProfile.FromMods([new BmsModNoBad()]));
+        var second = new BmsEngineChart(beatmap, GameplayProfile.FromMods([new BmsModLr2()]));
+        var original = new BmsEngineChart(beatmap);
+        Assert.That(first.TimingFor(note).HeadWindows.Entries.Any(window => window.Result == BmsResults.BAD), Is.False);
+        Assert.That(second.Profile.CreateHitWindows(note, second.TimingFor(note), NoteParts.HEAD).WindowFor(HitResult.Perfect), Is.EqualTo(18));
+        Assert.That(original.Profile.CreateHitWindows(note, original.TimingFor(note), NoteParts.HEAD).WindowFor(HitResult.Perfect), Is.EqualTo(15));
+        Assert.That(note.HitWindows, Is.SameAs(sourceWindows));
+        Assert.That(note.CloneForConversion().Beatmap, Is.SameAs(beatmap));
 
-        foreach (var beatmap in new[] { first, second, original })
-        {
-            foreach (var note in beatmap.HitObjects)
-                note.ApplyDefaults(beatmap.ControlPointInfo, beatmap.Difficulty);
-        }
+        using var score = new BmsScoreProcessor();
+        score.Mods.Value = [new BmsModLr2()];
+        score.ApplyBeatmap(beatmap);
+        Assert.That(note.HitWindows.WindowFor(HitResult.Perfect), Is.EqualTo(18));
+        score.Mods.Value = [];
+        score.ApplyBeatmap(beatmap);
+        Assert.That(note.HitWindows.WindowFor(HitResult.Perfect), Is.EqualTo(15));
+        Assert.That(second.Profile.CreateHitWindows(note, second.TimingFor(note), NoteParts.HEAD).WindowFor(HitResult.Perfect), Is.EqualTo(18));
+    }
 
-        Assert.That(first.HitObjects[0].HitWindows.WindowFor(HitResult.Ok), Is.EqualTo(210));
-        Assert.That(BmsEngineRules.GetTiming(first.HitObjects[0], false).WindowFor(BmsResults.BAD), Is.Null);
-        Assert.That(second.HitObjects[0].HitWindows.WindowFor(HitResult.Perfect), Is.EqualTo(18));
-        Assert.That(original.HitObjects[0].HitWindows.WindowFor(HitResult.Perfect), Is.EqualTo(15));
-        Assert.That(decoded.JudgementModifiers, Is.EqualTo(BmsJudgementModifiers.None));
-        Assert.That(first.HitObjects[0].CloneForConversion().Beatmap, Is.SameAs(first));
+    [Test]
+    public void EquivalentModSelectionsPreserveTheActiveHealthModel()
+    {
+        var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Popn9K, TotalColumns = 9 };
+        beatmap.HitObjects.Add(new BmsNote { Beatmap = beatmap, Column = 1, StartTime = 1000 });
+        using var health = new BmsHealthProcessor();
+        health.ApplyBeatmap(beatmap);
+        health.Mods = [new BmsModLr2(), new BmsModNoBad()];
+        var model = health.Model;
+        health.Mods = [new BmsModNoBad(), new BmsModLr2()];
+        Assert.That(health.Model, Is.SameAs(model));
+        health.Mods = [];
+        health.CreateEngineHealth(new BmsEngineChart(beatmap));
+        Assert.That(health.Health.Value, Is.EqualTo(.3), "Returning to the default BMS profile retains the chart's PMS gauge family.");
     }
 }

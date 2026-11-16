@@ -64,7 +64,7 @@ public partial class TestSceneBmsAutoGaugeScoreAttribution : BmsPlayerTestScene
 
         AddAssert("active gauge resolved to ExHard", () =>
             Player.GameplayState.HealthProcessor is BmsHealthProcessor hp
-            && hp.WorstGaugeType == BmsGaugeType.ExHard);
+            && hp.Gauge().WorstGaugeType == BmsGaugeType.ExHard);
 
         AddAssert("score mods contain resolved gauge only", () =>
             Player.Score.ScoreInfo.Mods.Any(m => m is BmsModAutoGauge)

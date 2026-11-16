@@ -85,7 +85,7 @@ public static class BmsStrings
 
     public static LocalisableString PracticeCompletedAttempts(int attempts) => get("practice_completed_attempts", attempts);
 
-    public static LocalisableString PracticeAttemptMetrics(int ex, int combo, double health) => get("practice_attempt_metrics", ex, combo, health * 100);
+    public static LocalisableString PracticeAttemptMetrics(LocalisableString scoreLabel, double? score, int combo, double health) => get("practice_attempt_metrics", scoreLabel, ResultNumber(score), combo, health * 100);
 
     public static LocalisableString PracticeInputTime(double milliseconds) => get("practice_input_time", milliseconds / 1000);
 
@@ -201,6 +201,10 @@ public static class BmsStrings
 
     public static LocalisableString ShowInvisibleNotesHint => get("show_invisible_notes_hint");
 
+    public static LocalisableString Health => get("health");
+
+    public static LocalisableString GaugeName(string type) => get($"gauge_name_{type}");
+
     public static LocalisableString GaugeHistory => get("gauge_history");
 
     public static LocalisableString Timeline => get("timeline");
@@ -237,15 +241,17 @@ public static class BmsStrings
 
     public static LocalisableString ResultComparisonDifference => get("result_comparison_difference");
 
-    public static LocalisableString ResultComparisonDifferenceValue(int value) => get("result_comparison_difference_value", value);
+    public static LocalisableString ResultComparisonDifferenceValue(double value) => get("result_comparison_difference_value", value);
 
     public static LocalisableString ResultComparisonPercentageDifference(double value) => get("result_comparison_percentage_difference", value * 100);
 
     public static LocalisableString ResultComparisonDate(DateTimeOffset date) => get("result_comparison_date", date);
 
-    public static LocalisableString ResultNumber(int value) => get("result_number", value);
+    public static LocalisableString RankLetter(string letter) => get($"rank_letter_{letter}");
 
-    public static LocalisableString ResultMaximum(int value) => get("result_maximum", value);
+    public static LocalisableString ResultNumber(double? value) => value.HasValue ? get("result_number", value.Value) : LeaderboardUnknown;
+
+    public static LocalisableString ResultMaximum(double value) => get("result_maximum", value);
 
     public static LocalisableString ResultPercentage(double value) => get("result_percentage", value);
 
@@ -257,13 +263,13 @@ public static class BmsStrings
 
     public static LocalisableString LeaderboardUnknown => get("leaderboard_unknown");
 
-    public static LocalisableString LeaderboardGrade(string grade) => get("leaderboard_grade", grade);
+    public static LocalisableString LeaderboardGrade(LocalisableString grade) => get("leaderboard_grade", grade);
 
     public static LocalisableString LeaderboardClearStatus => get("leaderboard_clear_status");
 
     public static LocalisableString LeaderboardLamp(UI.SongSelect.Lamp.BmsLamp lamp) => get($"leaderboard_lamp_{lamp.ToString().ToLowerInvariant()}");
 
-    public static LocalisableString LeaderboardFraction(int value, int maximum) => get("leaderboard_fraction", value, maximum);
+    public static LocalisableString LeaderboardFraction(double? value, double maximum) => value.HasValue ? get("leaderboard_fraction", value.Value, maximum) : LeaderboardUnknown;
 
     public static LocalisableString LeaderboardDate(DateTimeOffset date, bool use24HourTime) => get(use24HourTime ? "leaderboard_date_24" : "leaderboard_date_12", date);
 
@@ -355,6 +361,8 @@ public static class BmsStrings
     public static LocalisableString BmsVisualOffset => get("bms_visual_offset");
 
     public static LocalisableString LongNoteTailVisualOffset => get("long_note_tail_visual_offset");
+
+    public static LocalisableString MeanOffsetMilliseconds(double value) => get("mean_offset_milliseconds", value);
 
     public static LocalisableString OffsetMilliseconds(double value) => get("offset_milliseconds", value);
 
@@ -472,11 +480,15 @@ public static class BmsStrings
 
     public static LocalisableString ScoreGraphPersonalBestShort => get("score_graph_personal_best_short");
 
-    public static LocalisableString ScoreGraphTarget(string rank) => get("score_graph_target", rank);
+    public static LocalisableString ScoreGraphTarget(LocalisableString rank) => get("score_graph_target", rank);
 
-    public static LocalisableString ScoreGraphExScore(int score) => get("score_graph_ex_score", score);
+    public static LocalisableString ScoreGraphScore(LocalisableString label, double score) => get("score_graph_score", label, score);
 
-    public static LocalisableString ScoreGraphDifference(int difference) => get("score_graph_difference", difference);
+    public static LocalisableString ScoreGraphRank(LocalisableString rank, double score) => get("score_graph_rank", rank, score);
+
+    public static LocalisableString ScoreGraphMaximumTarget => get("score_graph_maximum_target");
+
+    public static LocalisableString ScoreGraphDifference(double difference) => get("score_graph_difference", difference);
 
     public static LocalisableString ScoreGraphCurrentColour => get("score_graph_current_colour");
 
@@ -798,17 +810,37 @@ public static class BmsStrings
 
     public static LocalisableString RefreshingProgress(int processed, int total) => get("refreshing_progress", processed, total);
 
+    public static LocalisableString DifficultyAttributeLabel(string attribute) => get($"difficulty_attribute_{attribute}");
+
+    public static LocalisableString DifficultyAttributeAcronym(string attribute) => get($"difficulty_attribute_{attribute}_acronym");
+
+    public static LocalisableString TimingMetricGroup(string group) => get($"timing_metric_group_{group}");
+
+    public static LocalisableString TimingMetricLabel(LocalisableString group, LocalisableString judgement) => get("timing_metric_label", group, judgement);
+
+    public static LocalisableString EmptyInputFastZone => get("empty_input_fast_zone");
+
+    public static LocalisableString TimingWindow(double early, double late) => get("timing_window", early, late);
+
+    public static LocalisableString GaugeBestJudgements => get("gauge_best_judgements");
+
+    public static LocalisableString GaugeDelta(double delta) => get("gauge_delta", delta * 100);
+
+    public static LocalisableString TotalValue(double total, bool isDefault) => get(isDefault ? "default_total_value" : "total_value", total);
+
+    public static LocalisableString LongNoteModeLabel(string mode) => get($"long_note_mode_{mode}");
+
     public static LocalisableString ExRankDescription(double exRank) => get("exrank_description", exRank);
 
     public static LocalisableString RankDescription(int rank) => get("rank_description", rank);
 
-    public static LocalisableString LockedLongNoteMode(string mode) => get("locked_long_note_mode", mode);
+    public static LocalisableString LockedLongNoteMode(LocalisableString mode) => get("locked_long_note_mode", mode);
 
     public static LocalisableString LockedMode => get("locked_mode");
 
-    public static LocalisableString GaugeSummary(string gauge, int objects, string total) => get("gauge_summary", gauge, objects, total);
+    public static LocalisableString GaugeSummary(LocalisableString gauge, int objects, LocalisableString total) => get("gauge_summary", gauge, objects, total);
 
-    public static LocalisableString GaugeSummaryWithGuts(string gauge, int objects, string total) => get("gauge_summary_with_guts", gauge, objects, total);
+    public static LocalisableString GaugeSummaryWithGuts(LocalisableString gauge, int objects, LocalisableString total) => get("gauge_summary_with_guts", gauge, objects, total);
 
     public static LocalisableString ActionScratch => get("action_scratch");
 

@@ -1,5 +1,6 @@
 using System.Linq;
 using NUnit.Framework;
+using RhythmEngine.Profiles.Bms;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
@@ -45,11 +46,11 @@ public class BmsReplayRebuildTest
     public void GaugeResetPreservesTheOriginalSeed([Values] bool course, [Values] bool explicitSeed)
     {
         using var processor = new BmsHealthProcessor();
-        processor.ConfigureGaugeContext(course, BmsGaugeProfileFamily.Lr2);
-        processor.SetGaugeTypes([BmsGaugeType.Hard], profileFamilyOverride: BmsGaugeProfileFamily.Lr2,
+        processor.Gauge().ConfigureGaugeContext(course, BmsGaugeProfileFamily.Lr2);
+        processor.Gauge().SetGaugeTypes([BmsGaugeType.Hard], profileFamilyOverride: BmsGaugeProfileFamily.Lr2,
             initialStates: explicitSeed ? [new BmsGaugeStateSnapshot(BmsGaugeType.Hard, 0.43, false)] : null);
         if (!explicitSeed)
-            processor.Health.Value = 0.43;
+            processor.Gauge().RestoreGaugeStates([new BmsGaugeStateSnapshot(BmsGaugeType.Hard, 0.43, false)]);
 
         for (var attempt = 0; attempt < 3; attempt++)
         {
@@ -59,9 +60,9 @@ public class BmsReplayRebuildTest
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(processor.Health.Value, Is.EqualTo(0.43));
-                Assert.That(processor.CurrentGaugeStates.Single().Health, Is.EqualTo(0.43));
+                Assert.That(processor.Gauge().CurrentGaugeStates.Single().Health, Is.EqualTo(0.43));
                 Assert.That(processor.HasFailed, Is.False);
-                Assert.That(processor.HasEverFailed, Is.False);
+                Assert.That(processor.CurrentHealth.HasFailed, Is.False);
             }
         }
     }
@@ -72,7 +73,7 @@ public class BmsReplayRebuildTest
         using var score = new BmsScoreProcessor();
         score.ApplyBeatmap(new BmsBeatmap { TotalColumns = 8 });
         using var health = new BmsHealthProcessor();
-        health.SetGaugeType(BmsGaugeType.Hazard);
+        health.Gauge().SetGaugeType(BmsGaugeType.Hazard);
         var failures = 0;
         var judgements = 0;
         var nonConsuming = 0;
@@ -93,7 +94,7 @@ public class BmsReplayRebuildTest
             score.ApplyTestResult(result);
             score.ApplyTestEmptyPoor(1001);
             Assert.That(health.HasFailed, Is.EqualTo(allowFailure));
-            Assert.That(health.HasEverFailed, Is.True);
+            Assert.That(health.CurrentHealth.HasFailed, Is.True);
         }
 
         Assert.That(failures + judgements + nonConsuming, Is.Zero);

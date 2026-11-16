@@ -5,15 +5,16 @@
 // BMS owns these components so rank lettering does not depend on native UI patches.
 
 using osu.Framework.Allocation;
-using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
-using osu.Game.Graphics;
+using osu.Framework.Graphics;
 using osu.Game.Graphics.Sprites;
+using osu.Game.Graphics;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using osu.Game.Rulesets.BmsRuleset.UI.Ranking;
 using osu.Game.Scoring;
-using osuTK;
 using osuTK.Graphics;
+using osuTK;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
 
@@ -21,12 +22,15 @@ internal partial class BmsRankText : CompositeDrawable
 {
     private readonly ScoreRank rank;
 
+    private readonly GameplayProfile profile;
+
     private BufferedContainer flash = null!;
     private BufferedContainer superFlash = null!;
     private GlowingSpriteText rankText = null!;
 
-    internal BmsRankText(ScoreRank rank)
+    internal BmsRankText(ScoreRank rank, GameplayProfile profile)
     {
+        this.profile = profile;
         this.rank = rank;
 
         Anchor = Anchor.Centre;
@@ -46,8 +50,8 @@ internal partial class BmsRankText : CompositeDrawable
                 Anchor = Anchor.Centre,
                 Origin = Anchor.Centre,
                 GlowColour = OsuColour.ForRank(rank),
-                Spacing = new Vector2(BmsRankDisplay.GetLargeLetterSpacing(rank), 0),
-                Text = BmsRankDisplay.GetRankLetter(rank),
+                Spacing = new Vector2(BmsRankDisplay.GetLargeLetterSpacing(profile.RankLabel(rank)), 0),
+                Text = profile.RankLabel(rank),
                 Font = OsuFont.Numeric.With(size: 76),
                 UseFullGlyphHeight = false
             },
@@ -86,8 +90,8 @@ internal partial class BmsRankText : CompositeDrawable
                     {
                         Anchor = Anchor.Centre,
                         Origin = Anchor.Centre,
-                        Spacing = new Vector2(BmsRankDisplay.GetLargeLetterSpacing(rank), 0),
-                        Text = BmsRankDisplay.GetRankLetter(rank),
+                        Spacing = new Vector2(BmsRankDisplay.GetLargeLetterSpacing(profile.RankLabel(rank)), 0),
+                        Text = profile.RankLabel(rank),
                         Font = OsuFont.Numeric.With(size: 76),
                         UseFullGlyphHeight = false,
                         Shadow = false

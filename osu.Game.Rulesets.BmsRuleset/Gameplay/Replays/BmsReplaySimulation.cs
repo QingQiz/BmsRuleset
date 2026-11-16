@@ -24,9 +24,10 @@ namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 
 internal static class BmsReplaySimulation
 {
-    internal static (IReadOnlyList<BmsJudgementEvent> Judgements, IReadOnlyList<BmsGaugeHistoryEvent> Gauges) Run(
+    internal static (IReadOnlyList<BmsJudgementEvent> Judgements, IReadOnlyList<GameplayHealthHistoryEvent> Gauges) Run(
         BmsBeatmap beatmap, Replay replay, ScoreInfo source, CancellationToken cancellationToken = default,
-        IReadOnlyList<BmsGaugeStateSnapshot>? courseGaugeStates = null, BmsGaugeProfileFamily? courseGaugeProfileFamily = null)
+        IReadOnlyList<BmsGaugeStateSnapshot>? courseGaugeStates = null, BmsGaugeProfileFamily? courseGaugeProfileFamily = null,
+        Action<ScoreState>? onScore = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var frames = replay.Frames.OfType<BmsReplayFrame>().OrderBy(frame => frame.Time).ToArray();
@@ -51,10 +52,10 @@ internal static class BmsReplaySimulation
             mod.ApplyToScoreProcessor(score);
         health.ApplyBeatmap(beatmap);
 
-        if (courseGaugeStates != null)
+        if (courseGaugeStates != null && health.Model is BmsGaugeController courseGauge)
         {
-            health.ConfigureGaugeContext(true, courseGaugeProfileFamily);
-            health.SetGaugeTypes(courseGaugeStates.Select(state => state.GaugeType), replaceExisting: true,
+            courseGauge.ConfigureGaugeContext(true, courseGaugeProfileFamily);
+            courseGauge.SetGaugeTypes(courseGaugeStates.Select(state => state.GaugeType), replaceExisting: true,
                 profileFamilyOverride: courseGaugeProfileFamily, initialStates: courseGaugeStates);
         }
         else if (mods.OfType<BmsModAutoGauge>().FirstOrDefault() is { } autoGauge)
@@ -65,21 +66,23 @@ internal static class BmsReplaySimulation
                 mod.ApplyToHealthProcessor(health);
         }
 
-        var gauges = new List<BmsGaugeHistoryEvent>();
-        if (courseGaugeStates?.Count > 0 || (courseGaugeStates == null &&
-                                             (mods.OfType<BmsModAutoGauge>().FirstOrDefault() is { } seededAutoGauge
-                                                 ? seededAutoGauge.ClassHealth.Value.HasValue || seededAutoGauge.ExClassHealth.Value.HasValue || seededAutoGauge.ExHardClassHealth.Value.HasValue
-                                                 : mods.OfType<BmsModGauge>().Any(mod => mod.InitialHealth.Value.HasValue))))
-            recordGauge(0);
-
-        var objects = beatmap.HitObjects.Where(note => note is BmsNote or BmsLongNote or BmsLandmine).ToArray();
-        var columnCount = Math.Max(beatmap.TotalColumns, objects.Select(note => note.Column + 1).DefaultIfEmpty(1).Max());
+        var gauges = new List<GameplayHealthHistoryEvent>();
+        var columnCount = score.EngineChart.Chart.LaneCount;
         var output = new SimulationOutput(score, health, recordGauge);
         var engine = new BmsJudgementEngine(
-            objects, beatmap.LayoutVariant,
+            score.EngineChart,
             Enumerable.Range(0, columnCount).Select(index => new BmsJudgementColumnDefinition(index, output)).ToArray(),
-            notes => (BmsProfiles.CreateScore(BmsEngineRules.ForBeatmap(beatmap).EmptyPoorBreaksCombo),
-                health.CreateEngineHealth(notes))
+            compiled =>
+            {
+                var configuration = health.CreateEngineHealth(compiled);
+                recordGauge(0);
+                return configuration;
+            }, session =>
+            {
+                score.ApplyEngineState(session);
+                health.ApplyEngineState(session);
+                onScore?.Invoke(session.Score);
+            }
         );
 
         advanceTo(beatmap, replay, frames, mods, engine, columnCount, frames[^1].Time, time =>
@@ -92,9 +95,9 @@ internal static class BmsReplaySimulation
 
         void recordGauge(double time)
         {
-            var states = health.CurrentGaugeStates;
-            if (states.Count > 0)
-                gauges.Add(new BmsGaugeHistoryEvent(time, states.FirstOrDefault(state => !state.Failed)?.GaugeType ?? states[^1].GaugeType, states));
+            onScore?.Invoke(score.EngineScore);
+            if (health.CaptureHistory(time) is { } snapshot)
+                gauges.Add(snapshot);
         }
     }
 
@@ -113,7 +116,7 @@ internal static class BmsReplaySimulation
         var pressed = new HashSet<BmsAction>();
         var nextInput = 0;
         var time = fromTime ?? Math.Min(targetTime, Math.Min(0, Math.Min(frames.Length > 0 ? frames[0].Time : 0,
-            beatmap.HitObjects.Select(note => note.StartTime - BmsEngineRules.ForBeatmap(beatmap).SearchWindow / 1000.0).DefaultIfEmpty(0).Min())));
+            engine.EarliestInputTime)));
 
         if (fromTime != null)
         {
@@ -213,20 +216,16 @@ internal static class BmsReplaySimulation
 
         public void ApplyBodyTick(in BmsFrameContext frame)
         {
-            health.ApplyEngineTick(frame.EngineResult!.Health);
+            score.ApplyEngineScore(frame.EngineResult!.Score);
+            health.ApplyEngineTick(frame.EngineResult);
             recordGauge(frame.SimulationTime);
         }
 
-        public void ApplyNonConsumingBad(BmsHitObject note, in BmsFrameContext frame)
-            => nonConsuming(HitResult.Ok, note.StartTime, note.Column, frame);
-
-        public void ApplyEmptyPoor(double expectedTime, int column, in BmsFrameContext frame)
-            => nonConsuming(HitResult.Miss, expectedTime, column, frame);
-
-        private void nonConsuming(HitResult type, double expectedTime, int column, in BmsFrameContext frame)
+        public void ApplyNonConsumingResult(BmsHitObject note, HitResult result, in BmsFrameContext frame)
         {
-            score.RegisterNonConsumingJudgement(type, frame.SimulationTime, expectedTime, column, frame.EngineResult!.Score);
-            health.ApplyEngineTick(frame.EngineResult.Health);
+            var engineResult = frame.EngineResult!;
+            score.RegisterNonConsumingJudgement(result, frame.SimulationTime, note.StartTime, note.Column, engineResult);
+            health.ApplyEngineTick(engineResult);
             recordGauge(frame.SimulationTime);
         }
 

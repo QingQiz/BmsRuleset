@@ -96,8 +96,12 @@ public static class O2Jam338Profile
             || definitions.GroupBy(n => (n.Lane, n.HeadTick)).Any(g => g.Count() > 1))
             throw new ArgumentException("Notes require unique lane/tick cells and ordered endpoints inside the clock.", nameof(notes));
 
-        var chart = new Chart(laneCount, definitions.Select(n => new ChartNote(n.Id, n.Lane, clock.TimeAt(n.HeadTick),
-            clock.TimeAt(n.TailTick ?? n.HeadTick), new O2Jam338NoteRule(clock, n.HeadTick, n.TailTick))));
+        var chartNotes = definitions.Select(n => new ChartNote(n.Id, n.Lane, clock.TimeAt(n.HeadTick),
+            clock.TimeAt(n.TailTick ?? n.HeadTick), new O2Jam338NoteRule(clock, n.HeadTick, n.TailTick))).ToImmutableArray();
+        var scoringOpportunities = definitions.SelectMany(n => n.TailTick == null
+            ? new[] { new ScoringOpportunity(n.Id, NoteParts.HEAD, 200) }
+            : [new ScoringOpportunity(n.Id, NoteParts.HEAD, 200), new ScoringOpportunity(n.Id, NoteParts.TAIL, 200)]);
+        var chart = new Chart(laneCount, chartNotes, scoringOpportunities);
         int[] life = difficulty switch { O2JamDifficulty.Easy => [3, 2, -10, -50], O2JamDifficulty.Normal => [2, 1, -7, -40], _ => [1, 0, -5, -30] };
         var health = HealthRules.LatchedGauge(0, 1000, 1000, context => context.Health.HasFailed ? 0 : life[resultIndex(context.Event.Result)],
             value => value <= 0, value => value > 0);
@@ -194,14 +198,6 @@ internal sealed class O2Jam338NoteRule(O2JamClock clock, int headTick, int? tail
     }
 
     public NoteState CreateState(ChartNote note) => new O2Jam338NoteState(new NoteTimer(clock.TimeAt(headTick + 26)), false, false);
-
-    public IEnumerable<ScoringOpportunity> GetScoringOpportunities(ChartNote note)
-    {
-        yield return new ScoringOpportunity(note.Id, NoteParts.HEAD, 200);
-
-        if (tailTick != null)
-            yield return new ScoringOpportunity(note.Id, NoteParts.TAIL, 200);
-    }
 
     public InputCandidate? GetCandidate(NoteContext context, InputEvent input, int noteIndex)
     {

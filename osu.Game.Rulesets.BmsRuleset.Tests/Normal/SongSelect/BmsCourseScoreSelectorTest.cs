@@ -2,6 +2,7 @@ using System;
 using NUnit.Framework;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Course;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Profiles;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Lamp;

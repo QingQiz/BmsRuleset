@@ -52,7 +52,8 @@ public static class ManiaProfiles
                     : "Normal gameplay; mod-specific score multipliers and pre-v8 beatmap break drain are not inferred from difficulty values.",
             ]);
         return new CompiledProfile(chart, new SessionConfiguration(id, score, health, context =>
-            !stable && context.State.Held == context.State.PreviouslyHeld ? [] : ProfileSupport.Oldest(context)), descriptor);
+            !stable && context.State.Held == context.State.PreviouslyHeld ? [] : ProfileSupport.Oldest(context),
+            context => context.Time >= source.EndTime && context.NotesRetired), descriptor);
     }
 
     // Release compilation-only lane/rule lookups before creating runtime delegates.
@@ -76,7 +77,7 @@ public static class ManiaProfiles
                 ? rule
                 : new OrderedNoteRule(rule,
                     laneStarts![note.Lane], laneStarts[note.Lane].BinarySearch(note.StartTime) + 1, windows);
-        });
+        }, note => scoringOpportunities(note, stable));
     }
 
     private static INoteRule createRule(KeyNoteKind kind, TimingWindows windows, TimingWindows? tail, ImmutableArray<long> stableWindows, bool stable)
@@ -85,7 +86,7 @@ public static class ManiaProfiles
 
         if (kind == KeyNoteKind.Tap)
         {
-            return new TapRule(new TapConfiguration(windows, stable ? stableWindows[3] - 1 : late, ManiaResults.MISS, stable ? 300 : 305,
+            return new TapRule(new TapConfiguration(windows, stable ? stableWindows[3] - 1 : late, ManiaResults.MISS,
                 BlockResolvedUntilStart: stable));
         }
 
@@ -96,7 +97,7 @@ public static class ManiaProfiles
             return new StableManiaHoldRule(stableWindows);
 
         var config = new HoldConfiguration(windows, tail!, late, late * 3 / 2, ManiaResults.MISS, ManiaResults.PERFECT, ManiaResults.MISS,
-            305, 305, HoldEndMode.Release, HoldDropMode.Recover,
+            HoldEndMode.Release, HoldDropMode.Recover,
             evaluation => new NoteEmission(NoteParts.TAIL, resolveGrade(evaluation), evaluation.Note.EndTime, evaluation.TailOffset))
         {
             RecoverMissedHead = true,
@@ -117,6 +118,14 @@ public static class ManiaProfiles
             return evaluation.TailResult;
         }
     }
+
+    private static ImmutableArray<ScoringOpportunity> scoringOpportunities(KeyNote note, bool stable) => note.Kind switch
+    {
+        KeyNoteKind.Tap => [new ScoringOpportunity(note.Id, NoteParts.TAP, stable ? 300 : 305)],
+        KeyNoteKind.Hold when stable => [new ScoringOpportunity(note.Id, NoteParts.TAIL, 300)],
+        KeyNoteKind.Hold => [new ScoringOpportunity(note.Id, NoteParts.HEAD, 305), new ScoringOpportunity(note.Id, NoteParts.TAIL, 305)],
+        _ => [],
+    };
 
     private static ScoreConfiguration stableScore(ScorePlan plan)
     {

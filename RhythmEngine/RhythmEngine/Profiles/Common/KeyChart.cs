@@ -53,12 +53,17 @@ public sealed class KeyChart
 
     public ImmutableArray<ChartBreak> Breaks { get; }
 
-    public KeyChart(int laneCount, IEnumerable<KeyNote> notes, IEnumerable<TempoPoint>? tempos = null, IEnumerable<ChartBreak>? breaks = null)
+    public long EndTime { get; }
+
+    public KeyChart(int laneCount, IEnumerable<KeyNote> notes, IEnumerable<TempoPoint>? tempos = null, IEnumerable<ChartBreak>? breaks = null,
+                    long? endTime = null)
     {
         LaneCount = laneCount;
         Notes = [..notes];
         Tempos = [..tempos ?? [new TempoPoint(long.MinValue, 120)]];
         Breaks = [..breaks ?? []];
+        var noteEndTime = Notes.Select(note => note.EndTime).DefaultIfEmpty(endTime ?? 0).Max();
+        EndTime = Math.Max(noteEndTime, endTime ?? noteEndTime);
         if (laneCount <= 0 || Tempos.IsEmpty || Tempos.Any(t => !double.IsFinite(t.BeatsPerMinute) || t.BeatsPerMinute <= 0)
             || Tempos.Zip(Tempos.Skip(1)).Any(p => p.First.Time >= p.Second.Time)
             || Notes.Any(n => n.StartTime < Tempos[0].Time || !double.IsFinite(n.MineDamage) || n.MineDamage < 0)
@@ -90,6 +95,9 @@ public sealed class KeyChart
         return time;
     }
 
-    internal Chart Compile(Func<KeyNote, INoteRule> createRule)
-        => new(LaneCount, Notes.Select(n => new ChartNote(n.Id, n.Lane, n.StartTime, n.EndTime, createRule(n))));
+    internal Chart Compile(Func<KeyNote, INoteRule> createRule, Func<KeyNote, IEnumerable<ScoringOpportunity>> createScoringOpportunities)
+    {
+        var notes = Notes.Select(n => new ChartNote(n.Id, n.Lane, n.StartTime, n.EndTime, createRule(n))).ToImmutableArray();
+        return new Chart(LaneCount, notes, Notes.SelectMany(createScoringOpportunities));
+    }
 }

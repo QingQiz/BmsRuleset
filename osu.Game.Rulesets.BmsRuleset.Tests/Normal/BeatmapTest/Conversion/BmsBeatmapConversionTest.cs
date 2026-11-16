@@ -1,6 +1,7 @@
 using System.IO;
 using System.Linq;
 using NUnit.Framework;
+using RhythmEngine.Profiles.Bms;
 using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
@@ -8,7 +9,6 @@ using osu.Game.Beatmaps.Timing;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Types;
 

@@ -6,6 +6,7 @@ using osu.Game.Models;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Practice;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Preview;
@@ -28,7 +29,7 @@ public class BmsonReleaseSamplesTest
         Assert.That(hold.GetTailSamples().Select(sample => beatmap.SampleDefinitions[sample.SampleKey].Path),
             Is.EqualTo(new[] { "tail-a.wav", "tail-b.wav" }));
         Assert.That(hold.GetTailSamples().Select(sample => sample.Time), Is.All.EqualTo(hold.EndTime));
-        Assert.That(BmsGameplayAudioController.GetSampleUsages(beatmap).Count(usage => usage.Time == hold.EndTime), Is.EqualTo(2));
+        Assert.That(BmsGameplayAudioController.GetSampleUsages(beatmap, new BmsEngineChart(beatmap)).Count(usage => usage.Time == hold.EndTime), Is.EqualTo(2));
 
         var preview = BmsEventPreviewTimeline.Create(beatmap, beatmap, default);
         Assert.That(preview.Entries.Count(entry => entry.Volume == 70), Is.EqualTo(2));

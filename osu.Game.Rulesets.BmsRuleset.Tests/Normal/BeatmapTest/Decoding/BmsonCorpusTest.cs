@@ -12,6 +12,7 @@ using osu.Game.Models;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Practice;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Preview;
@@ -66,7 +67,7 @@ public class BmsonCorpusTest
             Assert.That(beatmap.HitObjects, Has.Count.EqualTo(expected.GetProperty("objects").GetInt32()));
             Assert.That(holds, Has.Length.EqualTo(expected.GetProperty("longNotes").GetInt32()));
             Assert.That(new[] { BmsLongNoteMode.LongNote, BmsLongNoteMode.ChargeNote, BmsLongNoteMode.HellChargeNote }
-                .Select(mode => holds.Count(note => note.EffectiveMode == mode)),
+                .Select(mode => holds.Count(note => note.Kind == mode.ToNoteKind())),
                 Is.EqualTo(expected.GetProperty("longNoteModes").EnumerateArray().Select(value => value.GetInt32())));
             Assert.That(holds.Sum(note => note.GetTailSamples().Count()), Is.EqualTo(expected.GetProperty("releaseSamples").GetInt32()));
             Assert.That(beatmap.HitObjects.Count(note => note is BmsLandmine), Is.EqualTo(expected.GetProperty("mines").GetInt32()));
@@ -121,7 +122,7 @@ public class BmsonCorpusTest
         var preview = BmsEventPreviewTimeline.Create(beatmap, beatmap, default);
         Assert.That(preview.Entries, Has.Count.EqualTo(expectedSamples));
         Assert.That(preview.Entries.Select(entry => entry.Time), Is.Ordered);
-        Assert.That(BmsGameplayAudioController.GetSampleUsages(beatmap).All(usage => beatmap.SampleDefinitions.ContainsKey(usage.SampleKey)), Is.True);
+        Assert.That(BmsGameplayAudioController.GetSampleUsages(beatmap, new BmsEngineChart(beatmap)).All(usage => beatmap.SampleDefinitions.ContainsKey(usage.SampleKey)), Is.True);
 
         var bounds = BmsPracticeBeatmap.GetTimeBounds(beatmap);
         var practice = BmsPracticeBeatmap.Create(beatmap, new BmsPracticeSettings

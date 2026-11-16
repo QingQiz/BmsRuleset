@@ -1,41 +1,40 @@
-using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
+using System;
 using osu.Framework.Bindables;
-using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics;
 using osu.Framework.Input.Events;
 using osu.Framework.Screens;
 using osu.Framework.Threading;
-using osu.Game.Graphics;
-using osu.Game.Graphics.Sprites;
 using osu.Game.Beatmaps;
+using osu.Game.Graphics.Sprites;
+using osu.Game.Graphics;
 using osu.Game.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Practice.Audio;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Scoring;
-using osu.Game.Screens;
 using osu.Game.Screens.Backgrounds;
 using osu.Game.Screens.Play;
 using osu.Game.Screens.Ranking;
-using osuTK;
+using osu.Game.Screens;
 using osuTK.Input;
+using osuTK;
 
 namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Practice;
 
 internal partial class BmsPracticePlayer : Player
 {
     private readonly BmsPracticeSession session;
-    private readonly List<BmsGaugeHistoryEvent> gaugeHistory = [];
+    private readonly List<GameplayHealthHistoryEvent> gaugeHistory = [];
     private readonly CancellationTokenSource preparationCancellation = new();
     private readonly BindableBool visualBreakTime = new();
     private bool completionPending;
@@ -195,7 +194,7 @@ internal partial class BmsPracticePlayer : Player
         var lead = BmsDrawableRuleset.ComputeScrollTime(playfield.ScrollController.ScrollSpeed)
                    * playfield.ScrollController.ScrollRangeScale * playfield.ScrollController.PlaybackRate;
         var earliestVisualEntry = playfield.Beatmap.HitObjects.Where(hit => hit is not BmsInvisibleNote)
-            .Select(hit => new BmsHitObjectLifetimeEntry(hit, playfield.ScrollController, () => playfield.VisualOffset.Value).GetPracticeVisibilityStart())
+            .Select(hit => playfield.CreateNoteLifetimeEntry(hit).GetPracticeVisibilityStart())
             .DefaultIfEmpty(session.Settings.StartTime).Min();
         return Math.Min(session.Settings.StartTime - Math.Max(100, lead), earliestVisualEntry);
     }
@@ -446,12 +445,12 @@ internal partial class BmsPracticePlayer : Player
 
     private void recordGaugeState()
     {
-        var health = (BmsHealthProcessor)HealthProcessor;
-        var states = health.CurrentGaugeStates;
-        if (gaugeHistory.LastOrDefault() is { } last && last.ActiveGaugeType == health.GaugeType && last.States.SequenceEqual(states))
+        var snapshot = ((BmsHealthProcessor)HealthProcessor).CaptureHistory(GameplayClockContainer.CurrentTime);
+        if (snapshot == null)
             return;
-
-        gaugeHistory.Add(new BmsGaugeHistoryEvent(GameplayClockContainer.CurrentTime, health.GaugeType, states.ToArray()));
+        if (gaugeHistory.LastOrDefault() is { } last && last.SelectedLayer == snapshot.SelectedLayer && last.Layers.SequenceEqual(snapshot.Layers))
+            return;
+        gaugeHistory.Add(snapshot);
     }
 
     private partial class PracticeGameplayClockContainer(WorkingBeatmap beatmap, double gameplayStart) : MasterGameplayClockContainer(beatmap, gameplayStart)

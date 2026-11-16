@@ -58,8 +58,7 @@ public class BmsonLayoutTest
     public void KeyboardChargeTailsUseKeyReleaseAndKeyboardWindows(string mode, int lane)
     {
         var beatmap = convert(BmsonParserTest.Chart($$"""[{"name":"a.wav","notes":[{"x":{{lane}},"y":480,"l":240}]}]""",
-            info: $$""", "mode_hint":"{{mode}}" """));
-        beatmap.LockedLongNoteMode = BmsLongNoteMode.ChargeNote;
+            info: $$""", "mode_hint":"{{mode}}", "ln_type":2 """));
         var note = beatmap.HitObjects.OfType<BmsLongNote>().Single();
         var windows = BmsEngineRules.GetTiming(note, false);
         Assert.That(windows.HitAt(30), Is.EqualTo(HitResult.Perfect));

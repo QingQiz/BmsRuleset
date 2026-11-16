@@ -24,7 +24,7 @@ public partial class BmsGameplayVirtualisationTest
         var map = new BmsTimingMap(192, [new BmsMeasureInfo(0, 0, 192, 1)],
             [new BmsBpmEvent(0, 120, 1000)], [new BmsStopEvent(0, 2000, 192, 120, 0)]);
         var scroll = new BmsGameplayScrollController(map) { ConstantScrollActive = constantScroll };
-        var playfield = new BmsPlayfield(attachBeatmap(new BmsBeatmap
+        var playfield = createPlayfield(attachBeatmap(new BmsBeatmap
         {
             TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
             LayoutVariant = BmsLayoutVariant.Bme7K,

@@ -72,14 +72,6 @@ internal sealed class MalodyVCurrentRule(MalodyVTiming timing, bool hold, bool j
     public NoteState CreateState(ChartNote note) => new MalodyHoldState(
         new NoteTimer(note.StartTime + timing.GoodWindow + 1, TimerOrder.BeforeInput), false, false, null);
 
-    public IEnumerable<ScoringOpportunity> GetScoringOpportunities(ChartNote note)
-    {
-        yield return new ScoringOpportunity(note.Id, NoteParts.HEAD, 1000);
-
-        if (hold && judgeAtEnd)
-            yield return new ScoringOpportunity(note.Id, NoteParts.TAIL, 1000);
-    }
-
     public InputCandidate? GetCandidate(NoteContext context, InputEvent input, int noteIndex)
     {
         var state = (MalodyHoldState)context.State;

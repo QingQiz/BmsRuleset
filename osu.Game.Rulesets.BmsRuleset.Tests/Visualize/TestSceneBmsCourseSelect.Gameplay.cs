@@ -135,7 +135,7 @@ public partial class TestSceneBmsCourseSelect
         {
             liveEvents = ((BmsScoreProcessor)player.GameplayState.ScoreProcessor).JudgementEvents.ToArray();
             var health = (BmsHealthProcessor)player.GameplayState.HealthProcessor;
-            liveGaugeStates = health.CurrentGaugeStates.ToArray();
+            liveGaugeStates = health.Gauge().CurrentGaugeStates.ToArray();
             player.AllowImport();
         });
         AddUntilStep("player exits", () => Stack.CurrentScreen, () => Is.SameAs(songSelect));
@@ -171,7 +171,7 @@ public partial class TestSceneBmsCourseSelect
                 var simulated = BmsReplaySimulation.Run(playable, saved.Replay, saved.ScoreInfo);
                 Assert.That(JsonSerializer.Serialize(simulated.Judgements), Is.EqualTo(JsonSerializer.Serialize(liveEvents)));
                 Assert.That(simulated.Gauges, Is.Not.Empty);
-                Assert.That(simulated.Gauges[^1].States, Is.EqualTo(liveGaugeStates));
+                Assert.That(simulated.Gauges[^1].Health.Layers, Is.EqualTo(BmsTestHealth.ToState(liveGaugeStates).Layers));
             });
         }
 

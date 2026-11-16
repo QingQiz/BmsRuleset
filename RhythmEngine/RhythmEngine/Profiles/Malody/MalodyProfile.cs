@@ -169,7 +169,7 @@ public static class MalodyProfile
             if (!rules.TryGetValue(note.Kind, out var rule))
                 rules.Add(note.Kind, rule = createRule(note.Kind, windows, options, timing));
             return rule;
-        });
+        }, note => scoringOpportunities(note, options, timing));
     }
 
     private static INoteRule createRule(KeyNoteKind kind, TimingWindows windows, MalodyOptions options, MalodyVTiming? timing)
@@ -187,13 +187,23 @@ public static class MalodyProfile
             _ => windows.Entries[^1].Late,
         };
         if (kind == KeyNoteKind.Tap)
-            return new TapRule(new TapConfiguration(windows, deadline, MalodyResults.MISS, 1000));
+            return new TapRule(new TapConfiguration(windows, deadline, MalodyResults.MISS));
 
         if (options.Client is MalodyClient.ClassicPc or MalodyClient.ClassicMobile)
             return new MalodyClassicHoldRule(windows, deadline, Time.FromMilliseconds(options.Client == MalodyClient.ClassicMobile ? 130 : 110));
 
         return new MalodyVHoldRule(windows);
     }
+
+    private static ImmutableArray<ScoringOpportunity> scoringOpportunities(KeyNote note, MalodyOptions options, MalodyVTiming? timing)
+        => note.Kind switch
+        {
+            KeyNoteKind.Tap => [new ScoringOpportunity(note.Id, timing != null ? NoteParts.HEAD : NoteParts.TAP, 1000)],
+            KeyNoteKind.Hold when timing != null && options.JudgeAtEnd =>
+                [new ScoringOpportunity(note.Id, NoteParts.HEAD, 1000), new ScoringOpportunity(note.Id, NoteParts.TAIL, 1000)],
+            KeyNoteKind.Hold => [new ScoringOpportunity(note.Id, NoteParts.HEAD, 1000)],
+            _ => [],
+        };
 
     private static ScoreConfiguration createScore(int multiplier, bool vScore)
     {

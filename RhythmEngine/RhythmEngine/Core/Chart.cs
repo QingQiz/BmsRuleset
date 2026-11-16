@@ -13,7 +13,7 @@ public sealed class ScorePlan
 
     public double MaximumAccuracy { get; }
 
-    internal FrozenDictionary<(int NoteId, PartId Part), ScoringOpportunity> OpportunitiesByPart { get; }
+    public FrozenDictionary<(int NoteId, PartId Part), ScoringOpportunity> OpportunitiesByPart { get; }
 
     internal ScorePlan(ImmutableArray<ScoringOpportunity> opportunities)
     {
@@ -35,7 +35,7 @@ public sealed class Chart
 
     internal FrozenDictionary<int, int> NoteIndices { get; }
 
-    public Chart(int laneCount, IEnumerable<ChartNote> notes)
+    public Chart(int laneCount, IEnumerable<ChartNote> notes, IEnumerable<ScoringOpportunity> scoringOpportunities)
     {
         if (laneCount <= 0)
             throw new ArgumentOutOfRangeException(nameof(laneCount));
@@ -47,15 +47,15 @@ public sealed class Chart
             || Notes.Any(n => n.Lane < 0 || n.Lane >= laneCount || n.EndTime < n.StartTime))
             throw new ArgumentException("Notes require unique IDs, valid lanes, rules and ordered endpoints.", nameof(notes));
 
-        var opportunities = Notes.SelectMany(n => n.Rule.GetScoringOpportunities(n)).ToImmutableArray();
-        // Rule implementations cross the public chart boundary, so validate their part IDs at runtime.
+        NoteIndices = Notes.Select((n, i) => (n.Id, Index: i)).ToFrozenDictionary(n => n.Id, n => n.Index);
+        var opportunities = scoringOpportunities.ToImmutableArray();
+        // Scoring policies cross the public chart boundary, so validate their note and part IDs at runtime.
         // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
-        if (opportunities.Any(o => o.Part == null || !double.IsFinite(o.MaximumAccuracy) || o.MaximumAccuracy < 0 || !double.IsFinite(o.Weight) || o.Weight <= 0)
+        if (opportunities.Any(o => !NoteIndices.ContainsKey(o.NoteId) || o.Part == null || !double.IsFinite(o.MaximumAccuracy) || o.MaximumAccuracy < 0 || !double.IsFinite(o.Weight) || o.Weight <= 0)
             || opportunities.Select(o => (o.NoteId, o.Part)).Distinct().Count() != opportunities.Length)
-            throw new ArgumentException("Scoring opportunities require unique part IDs and finite nonnegative potential.", nameof(notes));
+            throw new ArgumentException("Scoring opportunities require chart notes, unique part IDs and finite nonnegative potential.", nameof(scoringOpportunities));
 
         ScorePlan = new ScorePlan(opportunities);
-        NoteIndices = Notes.Select((n, i) => (n.Id, Index: i)).ToFrozenDictionary(n => n.Id, n => n.Index);
         var laneNotes = Notes.Select((n, i) => (n.Lane, Index: i)).ToLookup(n => n.Lane, n => n.Index);
         LaneNotes = [.. Enumerable.Range(0, laneCount).Select(lane => laneNotes[lane].ToImmutableArray())];
     }

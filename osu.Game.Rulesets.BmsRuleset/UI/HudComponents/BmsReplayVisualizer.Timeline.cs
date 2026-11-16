@@ -313,8 +313,7 @@ public sealed partial class BmsReplayVisualizer
                     var key = (column, observation.ActualTime, observation.Kind == BmsTimingObservationKind.LongNoteTail);
                     if (!inputObservations.TryGetValue(key, out var previous) || scoring || !previous.IsScoring)
                     {
-                        var result = scoring && observation.Result == HitResult.Miss ? HitResult.Meh : observation.Result;
-                        inputObservations[key] = new InputJudgement(result, scoring,
+                        inputObservations[key] = new InputJudgement(observation.Result, scoring,
                             observation.Kind == BmsTimingObservationKind.LongNoteHead ? judgement.Source.EndTime : null, observation);
                     }
                 }
@@ -385,7 +384,7 @@ public sealed partial class BmsReplayVisualizer
                 return null;
 
             return judgement.EndTime is { } end
-                ? worseResult(judgement.Result, scoringResult(At(column, end, now)?.Result))
+                ? worseResult(judgement.Result, At(column, end, now)?.Result)
                 : judgement.Result;
         }
 

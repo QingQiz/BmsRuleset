@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Beatmaps;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using osu.Game.Online.API.Requests.Responses;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
@@ -25,7 +26,7 @@ internal static class BmsScoreAggregation
             BeatmapHash = beatmap.Hash,
             Ruleset = beatmap.Ruleset,
             Passed = passed,
-            Rank = scores.Count == 0 ? ScoreRank.F : new BmsScoreProcessor().RankFromScore(accuracy, statistics),
+            Rank = scores.Count == 0 ? ScoreRank.F : GameplayProfile.FromMods(mods).RankFromScore(accuracy, statistics),
             TotalScore = scores.Sum(score => score.TotalScore),
             TotalScoreWithoutMods = scores.Sum(score => score.TotalScoreWithoutMods),
             Accuracy = accuracy,

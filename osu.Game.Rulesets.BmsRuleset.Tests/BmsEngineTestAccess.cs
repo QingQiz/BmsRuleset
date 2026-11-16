@@ -1,22 +1,29 @@
 #nullable enable
-
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using RhythmEngine.Core;
+using RhythmEngine.Profiles.Common;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
+using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
-using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.Presentation;
 using osu.Game.Rulesets.Scoring;
-using RhythmEngine.Core;
-using RhythmEngine.Profiles.Common;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests;
 
 internal static class BmsEngineTestAccess
 {
+    internal static BmsJudgementEngine CreateEngine(BmsHitObject[] notes, BmsLayoutVariant layout,
+                                                    BmsJudgementColumnDefinition[] definitions, Func<BmsEngineChart, HealthConfiguration>? healthFactory = null, GameplayProfile? profile = null)
+        => new(new BmsEngineChart(notes, layout, definitions.Select(definition => definition.Index).ToArray(), profile), definitions, healthFactory);
+
+    internal static BmsJudgementEngine CreateEngine(BmsHitObject[] notes, BmsLayoutVariant layout, int column, IBmsJudgementOutput output, GameplayProfile? profile = null)
+        => CreateEngine(notes, layout, [new BmsJudgementColumnDefinition(column, output)], profile: profile);
+
     internal static JudgementSession Session(this BmsJudgementEngine engine)
         => (JudgementSession)typeof(BmsJudgementEngine).GetField("session", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(engine)!;
 
@@ -41,10 +48,10 @@ internal static class BmsEngineTestAccess
         => column.GetPendingLongNoteTails().Where(n => column.GetNote(n).Parts.Single(p => p.Part == NoteParts.BODY).Active);
 
     internal static IEnumerable<BmsLongNote> GetActiveBodies(this BmsJudgementView column)
-        => column.Notes().OfType<BmsLongNote>().Where(n => n.EffectiveMode == BmsLongNoteMode.HellChargeNote && column.GetNote(n).Parts[0].Resolved && !column.GetNote(n).Parts[1].Resolved);
+        => column.Notes().OfType<BmsLongNote>().Where(n => n.Kind == KeyNoteKind.SustainHold && column.GetNote(n).Parts[0].Resolved && !column.GetNote(n).Parts[1].Resolved);
 
     internal static BmsLongNoteState GetLongNoteState(this BmsJudgementView column, BmsLongNote note)
-        => BmsLongNoteState.From(note, column.GetNote(note), column.Engine().CurrentTime);
+        => BmsLongNoteState.From(note, column.GetNote(note), column.Engine().CurrentTime, column.Profile);
 
     internal static PressOutcome HandleNotePress(this BmsJudgementView column, in BmsPressContext press,
                                                  BmsJudgementAlgorithm? algorithm = BmsJudgementAlgorithm.Combo)

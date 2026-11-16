@@ -79,7 +79,7 @@ public class BmsHotPathPerformanceTest
 
     [TestCase(4000)]
     [TestCase(20000)]
-    public void RewindJudgements(int count) => measure(() =>
+    public void ResetJudgementsForRebuild(int count) => measure(() =>
     {
         var processor = new BmsScoreProcessor();
         var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, TotalColumns = 8 };
@@ -91,11 +91,7 @@ public class BmsHotPathPerformanceTest
             processor.ApplyTestResult(result);
         var score = new ScoreInfo();
         processor.PopulateScore(score);
-        return new Measurement(() =>
-        {
-            for (var i = results.Length - 1; i >= 0; i--)
-                processor.RevertResult(results[i]);
-        }, () =>
+        return new Measurement(processor.ResetReplayState, () =>
         {
             Assert.That(processor.JudgementEvents, Is.Empty);
             Assert.That(score.HitEvents, Is.Empty);

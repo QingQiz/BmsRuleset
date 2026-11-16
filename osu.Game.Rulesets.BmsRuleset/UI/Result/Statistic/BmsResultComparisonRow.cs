@@ -70,7 +70,7 @@ internal partial class BmsResultComparisonRow : GridContainer
                     Child = new BmsResultFittedText(difference.HasValue
                         ? percentage
                             ? BmsStrings.ResultComparisonPercentageDifference(difference.Value)
-                            : BmsStrings.ResultComparisonDifferenceValue((int)difference.Value)
+                            : BmsStrings.ResultComparisonDifferenceValue(difference.Value)
                         : BmsStrings.LeaderboardUnknown, 18, Anchor.CentreRight, colour: differenceColour),
                 },
             ],
@@ -88,7 +88,7 @@ internal partial class BmsResultComparisonRow : GridContainer
             : Empty();
 
         LocalisableString valueText(double? value) => value.HasValue
-            ? percentage ? BmsStrings.ResultPercentage(value.Value) : BmsStrings.ResultNumber((int)value.Value)
+            ? percentage ? BmsStrings.ResultPercentage(value.Value) : BmsStrings.ResultNumber(value.Value)
             : BmsStrings.LeaderboardUnknown;
     }
 }

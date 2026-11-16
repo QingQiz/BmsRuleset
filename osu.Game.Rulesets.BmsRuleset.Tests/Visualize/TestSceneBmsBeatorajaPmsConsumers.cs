@@ -1,3 +1,4 @@
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -65,8 +66,8 @@ public partial class TestSceneBmsBeatorajaPmsConsumers : BmsPlayerTestScene
             Assert.That(((BmsHitObject)hit.HitObject).Column, Is.EqualTo(1));
             Assert.That(hit.HitObject.StartTime, Is.EqualTo(1000));
             Assert.That(hit.TimeOffset, Is.EqualTo(-150));
-            var scatter = BmsHitScatterStatistic.CreateStatistics((BmsBeatmap)Player.GameplayState.Beatmap, saved.HitEvents);
-            Assert.That(scatter.Keys[1].Data.Points.Single().Offset, Is.EqualTo(-150));
+            var scatter = BmsHitScatterStatistic.CreateStatistics(BmsGameplayProfile.INSTANCE, (BmsBeatmap)Player.GameplayState.Beatmap, saved.HitEvents);
+            Assert.That(scatter.Keys[1].Data.Points.Single().DisplayOffset(scatter.Keys[1].Data.OffsetRange), Is.EqualTo(-150));
             Assert.That(saved.Statistics.GetValueOrDefault(HitResult.Ok), Is.EqualTo(1));
         }, advanceNormally: true);
         checkpoint(950, () =>
@@ -115,12 +116,12 @@ public partial class TestSceneBmsBeatorajaPmsConsumers : BmsPlayerTestScene
             saved.Replay = new osu.Game.Replays.Replay();
             var restored = BmsTestReplayArchive.RoundTrip(saved, legacy: true);
             var events = score.JudgementEvents;
-            Assert.That(BmsExScore.CreateProgression(events), Is.EqualTo(new[] { 0, 2, 2, 4 }));
+            Assert.That(BmsTestExScore.CreateProgression(events), Is.EqualTo(new[] { 0, 2, 2, 4 }));
             Assert.That(events.Single(e => e.SuppressPenalty).Source.IsScoring, Is.True);
             Assert.That(restored.ScoreInfo.Statistics.GetValueOrDefault(HitResult.Miss), Is.EqualTo(1));
             Assert.That(restored.ScoreInfo.Statistics.GetValueOrDefault(HitResult.Meh), Is.Zero);
             Assert.That(BmsJudgementEventProjection.CreateTimingHitEvents(events).Select(e => e.Result), Is.EqualTo(new[] { HitResult.Perfect, HitResult.Miss, HitResult.Perfect }));
-            Assert.That(BmsScoreGraph.ScoreAtProgress(4, BmsExScore.CreateProgression(events), 2, 3), Is.EqualTo(2));
+            Assert.That(BmsScoreGraph.ScoreAtProgress(4, BmsTestExScore.States(BmsTestExScore.CreateProgression(events)), 2, 3), Is.EqualTo(2));
             Assert.That(score.Accuracy.Value, Is.EqualTo(2d / 3).Within(1e-10));
             // GaugeProperty.NORMAL_PMS has a 120% ceiling; graph positions are normalised to it.
             Assert.That(BmsGaugeHistoryGraph.CreateSeries(restored.ScoreInfo, Player.GameplayState.Beatmap,
@@ -157,7 +158,7 @@ public partial class TestSceneBmsBeatorajaPmsConsumers : BmsPlayerTestScene
     {
         Assert.That(Player.HealthProcessor.Health.Value, Is.EqualTo(health).Within(1e-8));
         Assert.That(score.Combo.Value, Is.EqualTo(combo));
-        Assert.That(BmsExScore.CreateProgression(score.JudgementEvents), Is.EqualTo(progression));
+        Assert.That(BmsTestExScore.CreateProgression(score.JudgementEvents), Is.EqualTo(progression));
         Assert.That(score.ScoringJudgementEventCount, Is.EqualTo(progression.Length - 1));
     }
 }

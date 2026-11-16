@@ -90,10 +90,29 @@ public class BmsJudgementRulesTest
         }
     }
 
+    [Test]
+    public void SuppressedPmsMissConsumesTheWeightedAccuracyPotential()
+    {
+        var rules = BmsJudgementRules.For(BmsJudgementMode.Pms);
+        var note = new KeyNote(0, 0, 1_000_000, 1_000_000);
+        var chart = new Chart(1, [new ChartNote(0, 0, note.StartTime, note.EndTime, rules.GetProfile(.7).CreateRule(note))],
+            [new ScoringOpportunity(0, NoteParts.TAP, 2, 3)]);
+        var play = new JudgementSession(chart, new SessionConfiguration("weighted-pms", BmsProfiles.CreateScore(true),
+            new HealthConfiguration(new HealthState(1, false), context => context.Health, _ => SessionOutcome.InProgress),
+            context => BmsProfiles.SelectCandidates(context, chart, BmsSelection.Combo)));
+        Assert.That(results(play.AdvanceTo(850_000, [new InputEvent(850_000, 0, true)])), Is.EqualTo(new[] { BmsResults.BAD }));
+        var missed = play.AdvanceTo(2_000_000).Transitions.SelectMany(t => t.Judgements).Single();
+        Assert.That(missed.Event.SuppressPenalty, Is.True);
+        Assert.That(play.Score.AccuracyMaximum, Is.EqualTo(chart.ScorePlan.MaximumAccuracy));
+        Assert.That(play.Score.ResultCounts.GetValueOrDefault(BmsResults.BAD), Is.EqualTo(1));
+        Assert.That(play.Score.ResultCounts.GetValueOrDefault(BmsResults.POOR), Is.Zero);
+    }
+
     private static JudgementSession session(BmsJudgementRules rules, KeyNoteKind kind, long duration = 0)
     {
         var note = new KeyNote(0, 0, 1_000_000, 1_000_000 + duration, kind);
-        var chart = new Chart(1, [new ChartNote(note.Id, note.Lane, note.StartTime, note.EndTime, rules.GetProfile(rules.RateForRank(2)).CreateRule(note))]);
+        var chart = new Chart(1, [new ChartNote(note.Id, note.Lane, note.StartTime, note.EndTime, rules.GetProfile(rules.RateForRank(2)).CreateRule(note))],
+            BmsProfiles.CreateScoringOpportunities(note.Id, note.Kind));
         return new JudgementSession(chart, new SessionConfiguration("test-bms", BmsProfiles.CreateScore(rules.EmptyPoorBreaksCombo),
             new HealthConfiguration(new HealthState(100, false), context => context.Health, context => context.Completed ? SessionOutcome.Cleared : SessionOutcome.InProgress),
             context => BmsProfiles.SelectCandidates(context, chart, rules.SelectionOverride ?? BmsSelection.Combo)));

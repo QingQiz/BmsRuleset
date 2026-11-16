@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -60,7 +60,7 @@ public sealed partial class BmsHealthDisplay : BmsHudComponent
     private float lastClearLineAlpha = float.NaN;
 
     private readonly Bindable<BmsGaugeDisplayProfile> displayProfile =
-        new(BmsGaugeProfileFactory.Create(BmsGaugeType.Normal).Display);
+        new(BmsGaugeProfileFactory.CreateDisplay(BmsGaugeType.Normal, BmsGaugeProfileFactory.Create(BmsGaugeType.Normal)));
 
     [Resolved]
     private HealthProcessor healthProcessor { get; set; } = null!;
@@ -232,10 +232,10 @@ public sealed partial class BmsHealthDisplay : BmsHudComponent
 
     private Color4 resolveFixedColour(BmsGaugeDisplayProfile profile)
     {
-        if (bmsHealthProcessor == null)
+        if (bmsHealthProcessor?.Model is not BmsGaugeController gauge)
             return profile.FillColour;
 
-        return bmsHealthProcessor.GaugeType switch
+        return gauge.GaugeType switch
         {
             BmsGaugeType.Hard or BmsGaugeType.Class => HardFillColour.Value,
             BmsGaugeType.ExHard or BmsGaugeType.ExClass => ExHardFillColour.Value,

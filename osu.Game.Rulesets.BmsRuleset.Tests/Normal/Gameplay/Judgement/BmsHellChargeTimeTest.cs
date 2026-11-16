@@ -1,13 +1,13 @@
 using System;
 using System.Linq;
 using NUnit.Framework;
+using RhythmEngine.Profiles.Common;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
-using RhythmEngine.Profiles.Bms;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
 
@@ -89,16 +89,16 @@ public class BmsHellChargeTimeTest
     public void DelayedUpdateInterleavesColumnsInGaugeOrder()
     {
         var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, Rank = 2, LockedLongNoteMode = BmsLongNoteMode.HellChargeNote };
-        var released = new BmsLongNote { Beatmap = beatmap, Column = 1, StartTime = 1000, Duration = 3000 };
-        var held = new BmsLongNote { Beatmap = beatmap, Column = 2, StartTime = 1000, Duration = 3000 };
+        var released = new BmsLongNote { Kind = KeyNoteKind.SustainHold, Beatmap = beatmap, Column = 1, StartTime = 1000, Duration = 3000 };
+        var held = new BmsLongNote { Kind = KeyNoteKind.SustainHold, Beatmap = beatmap, Column = 2, StartTime = 1000, Duration = 3000 };
         var output = new BmsRecordingJudgementOutput();
         var health = createHealth();
-        output.BodyTick = frame => health.ApplyEngineTick(frame.EngineResult!.Health);
-        var engine = new BmsJudgementEngine([released, held], beatmap.LayoutVariant, [
+        output.BodyTick = frame => health.ApplyEngineTick(frame.EngineResult!);
+        var engine = BmsEngineTestAccess.CreateEngine([released, held], beatmap.LayoutVariant, [
                 new BmsJudgementColumnDefinition(1, output),
                 new BmsJudgementColumnDefinition(2, output)
             ],
-            notes => (BmsProfiles.CreateScore(), health.CreateEngineHealth(notes)));
+            health.CreateEngineHealth);
 
         engine.QueueInput(1000, 1, true, false);
         engine.QueueInput(1000, 2, true, false);
@@ -116,12 +116,12 @@ public class BmsHellChargeTimeTest
         Assert.That(output.BodyTicks.Select(tick => (tick.Column, tick.Holding, tick.Time)), Is.EqualTo(expected));
         var expectedHealth = createHealth();
         foreach (var tick in expected) expectedHealth.ApplyTestBodyTick(tick.Holding);
-        Assert.That(health.CurrentGaugeStates, Is.EqualTo(expectedHealth.CurrentGaugeStates));
+        Assert.That(health.Gauge().CurrentGaugeStates, Is.EqualTo(expectedHealth.Gauge().CurrentGaugeStates));
 
         static BmsHealthProcessor createHealth()
         {
             var processor = new BmsHealthProcessor();
-            processor.SetGaugeTypes([BmsGaugeType.Hard, BmsGaugeType.Normal], initialStates:
+            processor.Gauge().SetGaugeTypes([BmsGaugeType.Hard, BmsGaugeType.Normal], initialStates:
             [
                 new(BmsGaugeType.Hard, 0.01, false), new(BmsGaugeType.Normal, 0.99, false),
             ]);
@@ -132,9 +132,9 @@ public class BmsHellChargeTimeTest
     private static (BmsJudgementEngine Engine, BmsRecordingJudgementOutput Output) create()
     {
         var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, Rank = 2, LockedLongNoteMode = BmsLongNoteMode.HellChargeNote };
-        var note = new BmsLongNote { Beatmap = beatmap, Column = 1, StartTime = 1000, Duration = 3000 };
+        var note = new BmsLongNote { Kind = KeyNoteKind.SustainHold, Beatmap = beatmap, Column = 1, StartTime = 1000, Duration = 3000 };
         var output = new BmsRecordingJudgementOutput();
-        var engine = new BmsJudgementEngine([note], beatmap.LayoutVariant, 1, output);
+        var engine = BmsEngineTestAccess.CreateEngine([note], beatmap.LayoutVariant, 1, output);
 
         engine.QueueInput(1000, 1, true, false);
         engine.ProcessFrame(new BmsFrameContext(1000, 1), 0);

@@ -6,7 +6,6 @@ using NUnit.Framework;
 using osu.Framework.Graphics;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
@@ -231,7 +230,7 @@ public class BmsReplayVisualizerTest
         cursor.Update(
         [
             judgement(100, HitResult.Great),
-            new BmsJudgementEvent(new BmsJudgementSource(100, 1, BmsJudgementSourceKind.NonConsumingBad), HitResult.Ok,
+            new BmsJudgementEvent(new BmsJudgementSource(100, 1, BmsJudgementSourceKind.NonConsumingHit), HitResult.Ok,
                 [new BmsTimingObservation(BmsTimingObservationKind.Note, 100, 120, 1, HitResult.Ok)]),
             new BmsJudgementEvent(new BmsJudgementSource(100, 1, BmsJudgementSourceKind.Note), HitResult.Meh,
                 [new BmsTimingObservation(BmsTimingObservationKind.Note, 100, 130, 1, HitResult.Meh)], suppressPenalty: true),
@@ -253,7 +252,7 @@ public class BmsReplayVisualizerTest
         var cursor = new BmsReplayVisualizer.JudgementCursor();
         cursor.Update(
         [
-            new BmsJudgementEvent(new BmsJudgementSource(80, 1, BmsJudgementSourceKind.EmptyPoor), HitResult.Miss,
+            new BmsJudgementEvent(new BmsJudgementSource(80, 1, BmsJudgementSourceKind.EmptyInput), HitResult.Miss,
                 [new BmsTimingObservation(BmsTimingObservationKind.Note, 100, 80, 1, HitResult.Miss)]),
             judgement(100, HitResult.Meh),
         ]);
@@ -268,7 +267,7 @@ public class BmsReplayVisualizerTest
         Assert.That(BmsReplayVisualizer.ColourFor(BmsReplayVisualizer.NoteResult(null, null)), Is.EqualTo(Colour4.White));
         Assert.That(BmsReplayVisualizer.ColourFor(BmsReplayVisualizer.NoteResult(
             new(BmsTimingObservationKind.Note, 100, 110, 1, HitResult.Miss), null)),
-            Is.EqualTo((Colour4)BmsHitResultColours.ForHitResult(HitResult.Meh)));
+            Is.EqualTo((Colour4)BmsHitResultColours.ForHitResult(HitResult.Miss)));
     }
 
     [Test]

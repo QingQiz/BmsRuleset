@@ -103,7 +103,7 @@ public partial class TestSceneBmsCourseSelect
             Assert.That(first.PracticeRuleset.KeyBindingInputManager.UseParentInput, Is.False);
             Assert.That(first.GameplayState.Beatmap.HitObjects.Select(longPracticeObjectIdentity),
                 Is.EqualTo(selected.Select(note => longPracticeObjectIdentity(note))));
-            Assert.That(((BmsBeatmap)first.GameplayState.Beatmap).PracticeFullNoteCount, Is.EqualTo(full.CountScoringNotes()));
+            Assert.That(((BmsBeatmap)first.GameplayState.Beatmap).PracticeFullScoringOpportunities, Is.EqualTo(full.CountScoringNotes()));
             Assert.That(((BmsBeatmap)first.GameplayState.Beatmap).PracticeEndTime, Is.EqualTo(session.Settings.EndTime));
             Assert.That(scores.ScoringJudgementEventCount, Is.Zero);
             Assert.That(scores.HasCompleted.Value, Is.False);
@@ -182,7 +182,7 @@ public partial class TestSceneBmsCourseSelect
             Assert.That(second.GameplayState.ScoreProcessor.Combo.Value, Is.Zero);
             Assert.That(((BmsScoreProcessor)second.GameplayState.ScoreProcessor).ScoringJudgementEventCount, Is.Zero);
             Assert.That(second.GameplayState.HealthProcessor.Health.Value, Is.EqualTo(initialHealth));
-            Assert.That(((BmsHealthProcessor)second.GameplayState.HealthProcessor).HasEverFailed, Is.False);
+            Assert.That(((BmsHealthProcessor)second.GameplayState.HealthProcessor).CurrentHealth.HasFailed, Is.False);
             Assert.That(second.PracticeRuleset.Playfield, Is.Not.SameAs(first.PracticeRuleset.Playfield));
             Assert.That(secondPreparedAssets, Is.GreaterThan(0));
             Assert.That(secondClock.IsPaused.Value, Is.True);

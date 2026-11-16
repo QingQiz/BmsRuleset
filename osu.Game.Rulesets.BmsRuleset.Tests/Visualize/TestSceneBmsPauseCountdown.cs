@@ -40,7 +40,7 @@ public partial class TestSceneBmsPauseCountdown : BmsPlayerTestScene
         {
             LayoutVariant = BmsLayoutVariant.Bme7K, TotalColumns = 8, Rank = 2, Total = 240,
             LockedLongNoteMode = mode,
-            HitObjects = [new BmsLongNote { StartTime = 3000, Duration = 1000, Column = 1 }, new BmsNote { StartTime = 30000, Column = 2 }],
+            HitObjects = [new BmsLongNote { Kind = mode.ToNoteKind(), StartTime = 3000, Duration = 1000, Column = 1 }, new BmsNote { StartTime = 30000, Column = 2 }],
         };
         BmsTestBeatmaps.SetupBeatmapInfo(beatmap, ruleset);
         return beatmap;
@@ -64,7 +64,7 @@ public partial class TestSceneBmsPauseCountdown : BmsPlayerTestScene
             Assert.That(Player.Pause(), Is.True);
             pauseTime = Player.GameplayClockContainer.CurrentTime;
             judgements = JsonSerializer.Serialize(score.JudgementEvents);
-            gauges = JsonSerializer.Serialize(health.CurrentGaugeStates);
+            gauges = JsonSerializer.Serialize(health.Gauge().CurrentGaugeStates);
         });
         AddStep("change physical input while paused", () =>
         {
@@ -88,7 +88,7 @@ public partial class TestSceneBmsPauseCountdown : BmsPlayerTestScene
             Assert.That(Player.GameplayClockContainer.CurrentTime, Is.EqualTo(pauseTime).Within(.001));
             Assert.That(column.Judgements.GetLongNoteState(note).TailJudged, Is.False);
             Assert.That(JsonSerializer.Serialize(score.JudgementEvents), Is.EqualTo(judgements));
-            Assert.That(JsonSerializer.Serialize(health.CurrentGaugeStates), Is.EqualTo(gauges));
+            Assert.That(JsonSerializer.Serialize(health.Gauge().CurrentGaugeStates), Is.EqualTo(gauges));
         });
         AddUntilStep("countdown resumes gameplay", () => !Player.IsResuming && !Player.GameplayClockContainer.IsPaused.Value);
         AddUntilStep("physical state synchronised", () => column.IsPressed == (pausedInput != PausedInput.Released));
@@ -108,7 +108,7 @@ public partial class TestSceneBmsPauseCountdown : BmsPlayerTestScene
             var saved = BmsTestReplayArchive.RoundTrip(Player.Score.DeepClone());
             var result = BmsReplaySimulation.Run(Playfield.Beatmap, saved.Replay, saved.ScoreInfo);
             Assert.That(JsonSerializer.Serialize(result.Judgements), Is.EqualTo(JsonSerializer.Serialize(score.JudgementEvents)));
-            Assert.That(health.CurrentGaugeStates, Is.EqualTo(result.Gauges[^1].States));
+            Assert.That(health.CurrentHealth.Layers, Is.EqualTo(result.Gauges[^1].Health.Layers));
             var times = Player.Score.Replay.Frames.Select(frame => frame.Time).ToArray();
             Assert.That(times, Is.Ordered);
         });

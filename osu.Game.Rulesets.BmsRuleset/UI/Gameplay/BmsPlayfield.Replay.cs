@@ -20,6 +20,15 @@ public sealed partial class BmsPlayfield
     private bool replayVisualsPending;
     private bool restoringReplayInput;
 
+    internal void ResetReplayState()
+    {
+        scoreProcessor?.ResetReplayState();
+        healthProcessor?.ResetReplayState();
+        foreach (var column in Stage.Columns.Cast<BmsColumn>())
+            column.JudgementBridge.ResetReplayResults();
+        judgementEngine.Reset();
+    }
+
     internal void RewindLiveInputs(Replay replay, IReadOnlyList<Mod> mods, double time)
     {
         if (time >= judgementEngine.CurrentTime || !double.IsFinite(judgementEngine.CurrentTime)) return;
@@ -51,13 +60,7 @@ public sealed partial class BmsPlayfield
                 score.Clock = health.Clock = clock;
 
                 if (fromTime == null)
-                {
-                    score.ResetReplayState();
-                    health.ResetReplayState();
-                    foreach (var column in Stage.Columns.Cast<BmsColumn>())
-                        column.JudgementBridge.ResetReplayResults();
-                    judgementEngine.Reset();
-                }
+                    ResetReplayState();
                 else
                 {
                     foreach (var column in Stage.Columns.Cast<BmsColumn>())

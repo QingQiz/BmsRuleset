@@ -45,6 +45,8 @@ internal static class ProfileSupport
             AccuracyMaximum = state.AccuracyMaximum + opportunity.MaximumAccuracy * opportunity.Weight,
             Combo = combo,
             MaximumCombo = Math.Max(state.MaximumCombo, combo),
+            JudgedOpportunities = state.JudgedOpportunities + 1,
+            ResultCounts = state.ResultCounts.SetItem(context.Event.Result, state.ResultCounts.GetValueOrDefault(context.Event.Result) + 1),
         };
     }
 

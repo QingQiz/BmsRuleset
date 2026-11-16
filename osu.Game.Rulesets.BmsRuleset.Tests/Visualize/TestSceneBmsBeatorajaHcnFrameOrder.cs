@@ -1,15 +1,15 @@
 #nullable enable
-using System;
+using NUnit.Framework;
+using RhythmEngine.Profiles.Common;
 using System.Collections.Generic;
 using System.Linq;
-using NUnit.Framework;
+using System;
 using osu.Game.Beatmaps;
-using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
 using osu.Game.Rulesets.Replays;
 using osu.Game.Rulesets.Scoring;
@@ -42,7 +42,7 @@ public partial class TestSceneBmsBeatorajaHcnFrameOrder : BmsPlayerTestScene
         {
             LayoutVariant = BmsLayoutVariant.Bme7K, TotalColumns = 8, Rank = 2, Total = total,
             LockedLongNoteMode = BmsLongNoteMode.HellChargeNote,
-            HitObjects = [new BmsLongNote { StartTime = 3000, Duration = 2000, Column = hcnColumn },
+            HitObjects = [new BmsLongNote { Kind = KeyNoteKind.SustainHold, StartTime = 3000, Duration = 2000, Column = hcnColumn },
                 new BmsNote { StartTime = released ? 3203 : 3350, Column = hcnColumn == 1 ? 2 : 1 },
                 new BmsNote { StartTime = 10000, Column = 1 }],
         };
@@ -112,7 +112,7 @@ public partial class TestSceneBmsBeatorajaHcnFrameOrder : BmsPlayerTestScene
             var boundary = released ? 3202 : 3200;
             var interval = SimulateGaugeHistory().Where(e => e.Time > boundary && e.Time <= time).ToArray();
             var frameHealth = interval
-                .Select(e => e.States.Single(s => s.GaugeType == BmsGaugeType.Normal).Health).ToArray();
+                .Select(e => e.Health.Layers.Single().Value).ToArray();
             var columns = released && time == boundary ? new[] { hcnColumn, hcnColumn }
                 : expectedResults.Select((_, i) => i == 0 || released && i == 1 ? hcnColumn : hcnColumn == 1 ? 2 : 1).ToArray();
             TestContext.WriteLine($"{time}: HP={health:R}; frame=[{string.Join(",", frameHealth)}]; "

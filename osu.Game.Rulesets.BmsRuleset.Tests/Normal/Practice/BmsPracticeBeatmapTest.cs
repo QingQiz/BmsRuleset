@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using NUnit.Framework;
+using RhythmEngine.Profiles.Bms;
 using osu.Framework.Audio.Track;
 using osu.Framework.Graphics.Textures;
 using osu.Game.Audio;
@@ -12,6 +13,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Randomisation;
@@ -132,7 +134,9 @@ public class BmsPracticeBeatmapTest
             new BmsInvisibleNote { Beatmap = full, StartTime = 1400, Column = 1, SampleKey = 5 },
         ];
         var practice = BmsPracticeBeatmap.Create(full, new BmsPracticeSettings { StartTime = 1000, EndTime = 1501 });
-        var cursor = new BmsKeySoundCursor(practice.HitObjects, practice.PracticeInitialKeySounds.Concat(practice.InvisibleNotes).OrderBy(note => note.StartTime).ToArray());
+        var compiled = new BmsEngineChart(practice);
+        var cursor = new BmsKeySoundCursor(practice.HitObjects, note => note.StartTime + compiled.TimingFor(note).HeadDeadline / 1000.0,
+            practice.PracticeInitialKeySounds.Concat(practice.InvisibleNotes).OrderBy(note => note.StartTime).ToArray());
 
         Assert.That(practice.InvisibleNotes.Select(note => note.SampleKey), Is.EqualTo(new ushort?[] { 5 }));
         Assert.That(practice.PracticeInitialKeySounds.Single().SampleKey, Is.EqualTo(3));
@@ -146,13 +150,13 @@ public class BmsPracticeBeatmapTest
     [TestCase(BmsLongNoteMode.HellChargeNote, 3)]
     public void HealthCountUsesLongNoteMode(BmsLongNoteMode mode, int expected)
     {
-        var full = createBeatmap(new BmsNote(), new BmsLongNote(), new BmsLandmine());
+        var full = createBeatmap(new BmsNote(), new BmsLongNote { Kind = mode.ToNoteKind() }, new BmsLandmine());
         full.LockedLongNoteMode = mode;
         Assert.That(full.CountScoringNotes(), Is.EqualTo(expected));
     }
 
     [Test]
-    public void MixedGaugeChainKeepsFullChartPerJudgementChanges([Values(0d, 230d, 400d)] double total, [Values] BmsGaugeProfileFamily family)
+    public void MixedGaugeChainKeepsFullChartPerJudgementChanges([Values(null, 0d, 230d, 400d)] double? total, [Values] BmsGaugeProfileFamily family)
     {
         var full = createBeatmap([.. Enumerable.Range(0, 100).Select(index => new BmsNote { StartTime = index * 100, Column = 1 })]);
         full.Total = total;
@@ -161,15 +165,15 @@ public class BmsPracticeBeatmapTest
         using var practiceHealth = new BmsHealthProcessor();
         normalHealth.ApplyBeatmap(full);
         practiceHealth.ApplyBeatmap(practice);
-        normalHealth.SetGaugeTypes(Enum.GetValues<BmsGaugeType>(), profileFamilyOverride: family);
-        practiceHealth.SetGaugeTypes(Enum.GetValues<BmsGaugeType>(), profileFamilyOverride: family);
+        normalHealth.Gauge().SetGaugeTypes(Enum.GetValues<BmsGaugeType>(), profileFamilyOverride: family);
+        practiceHealth.Gauge().SetGaugeTypes(Enum.GetValues<BmsGaugeType>(), profileFamilyOverride: family);
 
         foreach (var result in new[] { HitResult.Ok, HitResult.Great, HitResult.Perfect, HitResult.Good, HitResult.Meh })
         {
             normalHealth.ApplyTestNonConsumingJudgement(result);
             practiceHealth.ApplyTestNonConsumingJudgement(result);
-            var expected = normalHealth.CurrentGaugeStates;
-            var actual = practiceHealth.CurrentGaugeStates;
+            var expected = normalHealth.Gauge().CurrentGaugeStates;
+            var actual = practiceHealth.Gauge().CurrentGaugeStates;
 
             for (var i = 0; i < expected.Count; i++)
             {
@@ -180,7 +184,28 @@ public class BmsPracticeBeatmapTest
         }
 
         Assert.That(practice.Total, Is.EqualTo(full.Total));
-        Assert.That(practice.PracticeFullNoteCount, Is.EqualTo(100));
+        Assert.That(practice.PracticeFullScoringOpportunities, Is.EqualTo(100));
+    }
+
+    [Test]
+    public void PracticeWorkingBeatmapUsesSelectedProfilesFullScorePlan()
+    {
+        var full = createBeatmap(new BmsLongNote { StartTime = 1000, Duration = 500, Column = 1 },
+            new BmsNote { StartTime = 2000, Column = 1 });
+        var session = new BmsPracticeSession(new TestWorkingBeatmap(full),
+            new BmsPracticeSettings { StartTime = 2000, EndTime = 2001 }, []);
+        var working = new BmsPracticeWorkingBeatmap(session, null!);
+        var cachedFull = session.GetFullBeatmap(default);
+        var cachedWindows = cachedFull.HitObjects.Select(note => note.HitWindows).ToArray();
+        var attempt = (BmsBeatmap)working.GetPlayableBeatmap(new BmsRuleset().RulesetInfo, session.Mods, default);
+        using var score = new BmsScoreProcessor();
+        score.Mods.Value = session.Mods;
+        score.ApplyBeatmap(attempt);
+        Assert.That(attempt.PracticeFullScoringOpportunities, Is.EqualTo(2));
+        Assert.That(score.EngineChart.Chart.ScorePlan.Opportunities, Has.Length.EqualTo(1));
+        Assert.That(full.PracticeFullScoringOpportunities, Is.Null);
+        Assert.That(full.HitObjects, Has.Count.EqualTo(2));
+        Assert.That(cachedFull.HitObjects.Select(note => note.HitWindows), Is.EqualTo(cachedWindows));
     }
 
     [Test]
@@ -276,7 +301,7 @@ public class BmsPracticeBeatmapTest
             StartTime = 1000, Duration = 500, Column = 2,
             SampleKey = 1, SampleVolume = 70, TailSampleKey = 2, TailSampleVolume = 60,
             ScrollPositionAtStartTime = 123, ScrollPositionAtEndTime = 456, VisualScrollPositionAtEndTime = 789,
-            JudgementRate = 0.8, Samples = [new HitSampleInfo(HitSampleInfo.HIT_NORMAL)],
+            ExRank = 80, Samples = [new HitSampleInfo(HitSampleInfo.HIT_NORMAL)],
         };
         var full = createBeatmap(hold);
         var practice = BmsPracticeBeatmap.Create(full, new BmsPracticeSettings { StartTime = 1000, EndTime = 1501 });
@@ -291,7 +316,7 @@ public class BmsPracticeBeatmapTest
         Assert.That(clone.ScrollPositionAtStartTime, Is.EqualTo(123));
         Assert.That(clone.ScrollPositionAtEndTime, Is.EqualTo(456));
         Assert.That(clone.VisualScrollPositionAtEndTime, Is.EqualTo(789));
-        Assert.That(clone.JudgementRate, Is.EqualTo(hold.JudgementRate));
+        Assert.That(clone.ExRank, Is.EqualTo(hold.ExRank));
         clone.Samples.Clear();
         clone.Column = 3;
         Assert.That(hold.Samples, Has.Count.EqualTo(1));

@@ -1,12 +1,15 @@
-using System;
+using RhythmEngine.Core;
+using RhythmEngine.Profiles.Bms;
 using System.Collections.Generic;
 using System.Linq;
+using System;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Randomisation;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.LongNoteMode;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Randomisation;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Profiles;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
@@ -53,8 +56,6 @@ internal sealed class BmsCourseSession
 
     internal BmsGaugeType GaugeType { get; }
 
-    private BmsGaugeProfileFamily? gaugeProfileFamilyOverride { get; }
-
     /// <summary>
     ///     Whether the course declares the <c>no_speed</c> constraint. Applied at play start by
     ///     locking the playfield scroll speed rather than via a mod.
@@ -67,7 +68,7 @@ internal sealed class BmsCourseSession
 
     internal int CurrentStageIndex { get; private set; }
 
-    internal IReadOnlyList<BmsGaugeStateSnapshot> CurrentGaugeStates { get; private set; }
+    internal HealthState? CurrentHealth { get; private set; }
 
     internal bool AdvanceRequested { get; private set; }
 
@@ -83,10 +84,8 @@ internal sealed class BmsCourseSession
         this.stages = stages.Select(stage => new BmsCourseStageAttempt(stage)).ToArray();
         Mods = mods.Select(mod => mod.DeepClone()).ToArray();
         GaugeType = gaugeType;
-        gaugeProfileFamilyOverride = ResolveCourseGaugeProfileFamily(course.Constraints);
         HasNoSpeedConstraint = course.Constraints.Any(constraint => constraint.Equals("no_speed", StringComparison.OrdinalIgnoreCase));
-        CurrentGaugeStates = [];
-        updateGaugeSettings();
+        updateHealthSettings();
 
         if (this.stages.Length == 0)
             throw new ArgumentException(@"A BMS course must contain at least one stage.", nameof(stages));
@@ -129,10 +128,10 @@ internal sealed class BmsCourseSession
         CurrentStage.Status = BmsCourseStageStatus.Playing;
     }
 
-    internal void CompleteCurrentStage(ScoreInfo score, IReadOnlyList<BmsGaugeStateSnapshot> gaugeStates)
+    internal void CompleteCurrentStage(ScoreInfo score, HealthState health)
     {
         ensurePlaying();
-        storeResult(score, gaugeStates, score.Passed ? BmsCourseStageStatus.Passed : BmsCourseStageStatus.Failed);
+        storeResult(score, health, score.Passed ? BmsCourseStageStatus.Passed : BmsCourseStageStatus.Failed);
 
         if (!score.Passed)
         {
@@ -144,17 +143,17 @@ internal sealed class BmsCourseSession
             Status = BmsCourseStatus.Passed;
     }
 
-    internal void FailCurrentStage(ScoreInfo score, IReadOnlyList<BmsGaugeStateSnapshot> gaugeStates)
+    internal void FailCurrentStage(ScoreInfo score, HealthState health)
     {
         ensurePlaying();
-        storeResult(score, gaugeStates, BmsCourseStageStatus.Failed);
+        storeResult(score, health, BmsCourseStageStatus.Failed);
         Status = BmsCourseStatus.Failed;
     }
 
-    internal void AbortCurrentStage(ScoreInfo score, IReadOnlyList<BmsGaugeStateSnapshot> gaugeStates)
+    internal void AbortCurrentStage(ScoreInfo score, HealthState health)
     {
         ensurePlaying();
-        storeResult(score, gaugeStates, BmsCourseStageStatus.Aborted);
+        storeResult(score, health, BmsCourseStageStatus.Aborted);
         Status = BmsCourseStatus.Aborted;
     }
 
@@ -196,7 +195,7 @@ internal sealed class BmsCourseSession
         CurrentStageIndex++;
         // Each stage owns its settings so advancing cannot mutate the preceding stage's saved score.
         Mods = Mods.Select(mod => mod.DeepClone()).ToArray();
-        updateGaugeSettings();
+        updateHealthSettings();
     }
 
     internal static BmsModGauge CreateGaugeMod(BmsGaugeType gaugeType) => gaugeType switch
@@ -250,8 +249,7 @@ internal sealed class BmsCourseSession
     {
         var selected = selectedMods.ToArray();
         var usesAutoGauge = selected.Any(mod => mod is BmsModAutoGauge);
-        var constraintMods = CreateConstraintMods(constraints ?? []);
-        var requiredMods = ResolveRequiredMods(selected, constraintMods);
+        var requiredMods = CreateConstraintMods(constraints ?? []);
         var hasLnConstraint = requiredMods.Any(mod => mod is BmsModLongNoteModeBase);
         var forbidden = ResolveForbiddenModTypes(constraints ?? []).ToArray();
 
@@ -264,33 +262,9 @@ internal sealed class BmsCourseSession
 
         mods.Add(usesAutoGauge ? new BmsModAutoGauge() : CreateGaugeMod(gaugeType));
 
-        // A required NE replaces a user-selected NG (the course demands the stricter one).
-        if (requiredMods.Any(mod => mod is BmsModNoGreat))
-            mods.RemoveAll(mod => mod is BmsModNoGood);
-
-        foreach (var required in requiredMods)
-        {
-            if (mods.All(mod => mod.GetType() != required.GetType()))
-                mods.Add(required);
-        }
+        mods.AddRange(requiredMods);
 
         return mods;
-    }
-
-    /// <summary>
-    ///     Returns the constraint mods that must be active for the course, dropping a required
-    ///     NG/NE when the user already selected an equal or stricter judgement constraint.
-    /// </summary>
-    internal static IReadOnlyList<Mod> ResolveRequiredMods(IReadOnlyList<Mod> selectedMods, IReadOnlyList<Mod> constraintMods)
-    {
-        var selectedConstraint = selectedMods.OfType<BmsModNoGreat>().Any() ? 0
-            : selectedMods.OfType<BmsModNoGood>().Any() ? 1
-            : 2;
-
-        return constraintMods.Where(mod => mod is BmsModNoGreat
-                ? selectedConstraint > 0
-                : mod is not BmsModNoGood || selectedConstraint > 1)
-            .ToArray();
     }
 
     internal static List<Mod> CreateConstraintMods(IEnumerable<string> constraints)
@@ -348,7 +322,7 @@ internal sealed class BmsCourseSession
     /// </summary>
     internal static IEnumerable<Type> ResolveForbiddenModTypes(IEnumerable<string> constraints)
     {
-        var forbidden = new HashSet<Type> { typeof(BmsModAutoplay) };
+        var forbidden = new HashSet<Type> { typeof(BmsModAutoplay), typeof(IApplicableToGameplayProfile) };
 
         foreach (var constraint in constraints.Select(constraint => constraint.ToLowerInvariant()))
         {
@@ -380,22 +354,13 @@ internal sealed class BmsCourseSession
                     break;
 
                 case "cn":
-                    forbidden.Add(typeof(BmsModLr2));
                     forbidden.Add(typeof(BmsModLongNote));
                     forbidden.Add(typeof(BmsModHellChargeNote));
                     break;
 
                 case "hcn":
-                    forbidden.Add(typeof(BmsModLr2));
                     forbidden.Add(typeof(BmsModLongNote));
                     forbidden.Add(typeof(BmsModChargeNote));
-                    break;
-
-                case "gauge_5k":
-                case "gauge_7k":
-                case "gauge_9k":
-                case "gauge_24k":
-                    forbidden.Add(typeof(BmsModLr2));
                     break;
             }
         }
@@ -403,29 +368,44 @@ internal sealed class BmsCourseSession
         return forbidden;
     }
 
-    private void updateGaugeSettings()
+    private void updateHealthSettings()
     {
-        var initialStates = CurrentGaugeStates.Where(state => !state.Failed).ToArray();
+        var family = ResolveCourseGaugeProfileFamily(Course.Constraints);
+        var previous = CurrentHealth is { } health ? GetGaugeStates(health) : [];
         if (Mods.OfType<BmsModAutoGauge>().FirstOrDefault() is { } autoGauge)
         {
-            autoGauge.GaugeProfileFamily.Value = gaugeProfileFamilyOverride;
+            autoGauge.GaugeProfileFamily.Value = family;
             autoGauge.ClassHealth.Value = startingHealth(BmsGaugeType.Class);
             autoGauge.ExClassHealth.Value = startingHealth(BmsGaugeType.ExClass);
             autoGauge.ExHardClassHealth.Value = startingHealth(BmsGaugeType.ExHardClass);
         }
         else if (Mods.OfType<BmsModGauge>().FirstOrDefault() is { } gauge)
         {
-            gauge.GaugeProfileFamily.Value = gaugeProfileFamilyOverride;
-            gauge.InitialHealth.Value = startingHealth(GaugeType);
+            gauge.GaugeProfileFamily.Value = family;
+            gauge.InitialHealth.Value = startingHealth(gauge.GaugeType);
         }
 
         double? startingHealth(BmsGaugeType type)
-            => CurrentGaugeStates.Count == 0 ? 1 : initialStates.FirstOrDefault(state => state.GaugeType == type)?.Health;
+            => CurrentHealth == null ? 1 : previous.FirstOrDefault(state => state.GaugeType == type && !state.Failed)?.Health;
     }
 
-    private void storeResult(ScoreInfo score, IReadOnlyList<BmsGaugeStateSnapshot> gaugeStates, BmsCourseStageStatus stageStatus)
+    internal IReadOnlyList<BmsGaugeStateSnapshot> GetGaugeStates(HealthState health)
     {
-        CurrentGaugeStates = gaugeStates.Select(state => state with { }).ToArray();
+        var types = Mods.OfType<BmsModAutoGauge>().FirstOrDefault() is { } autoGauge
+            ? new[]
+            {
+                (BmsGaugeType.ExHardClass, autoGauge.ExHardClassHealth.Value),
+                (BmsGaugeType.ExClass, autoGauge.ExClassHealth.Value),
+                (BmsGaugeType.Class, autoGauge.ClassHealth.Value),
+            }.Where(pair => pair.Item2.HasValue).Select(pair => pair.Item1).ToArray()
+            : Mods.OfType<BmsModGauge>().Select(mod => mod.GaugeType).ToArray();
+
+        return types.Select((type, index) => new BmsGaugeStateSnapshot(type, health.Layers[index].Value, health.Layers[index].HasFailed)).ToArray();
+    }
+
+    private void storeResult(ScoreInfo score, HealthState health, BmsCourseStageStatus stageStatus)
+    {
+        CurrentHealth = health;
         CurrentStage.Score = score.DeepClone();
         CurrentStage.Status = stageStatus;
     }

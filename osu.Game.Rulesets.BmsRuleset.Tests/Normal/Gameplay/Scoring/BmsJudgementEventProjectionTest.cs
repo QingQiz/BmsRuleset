@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
@@ -28,9 +27,9 @@ public class BmsJudgementEventProjectionTest
                 [new BmsTimingObservation(BmsTimingObservationKind.Note, 900.2, 988.3, null, HitResult.Good)]),
             new(new BmsJudgementSource(1200.5, 3, BmsJudgementSourceKind.LongNote, 1000), HitResult.Meh,
                 [new BmsTimingObservation(BmsTimingObservationKind.LongNoteHead, 1200.5, 1390.7, 1, HitResult.Meh)]),
-            new(new BmsJudgementSource(600.6, 2, BmsJudgementSourceKind.EmptyPoor), HitResult.Miss,
+            new(new BmsJudgementSource(600.6, 2, BmsJudgementSourceKind.EmptyInput), HitResult.Miss,
                 [new BmsTimingObservation(BmsTimingObservationKind.Note, 1000.1, 600.6, 1, HitResult.Miss)]),
-            new(new BmsJudgementSource(1000.1, 2, BmsJudgementSourceKind.NonConsumingBad), HitResult.Ok,
+            new(new BmsJudgementSource(1000.1, 2, BmsJudgementSourceKind.NonConsumingHit), HitResult.Ok,
                 [new BmsTimingObservation(BmsTimingObservationKind.Note, 1000.1, 800.9, 1, HitResult.Ok)]),
             new(new BmsJudgementSource(1700.8, 4, BmsJudgementSourceKind.Landmine, LandmineDamagePercent: 12.5), HitResult.Miss,
                 [new BmsTimingObservation(BmsTimingObservationKind.Note, 1700.8, 1700.8, 1, HitResult.Miss)]),
@@ -89,7 +88,7 @@ public class BmsJudgementEventProjectionTest
     public void TestEmptyPoorProjectionKeepsPressTimeAndNextNoteOffset()
     {
         var judgementEvent = new BmsJudgementEvent(
-            new BmsJudgementSource(600, 2, BmsJudgementSourceKind.EmptyPoor),
+            new BmsJudgementSource(600, 2, BmsJudgementSourceKind.EmptyInput),
             HitResult.Miss,
             [new BmsTimingObservation(BmsTimingObservationKind.Note, 1000, 600, 1, HitResult.Miss)]);
 
@@ -117,7 +116,7 @@ public class BmsJudgementEventProjectionTest
             ]),
         ];
 
-        Assert.That(BmsExScore.CreateProgression(events), Is.EqualTo([0, 1]));
+        Assert.That(BmsTestExScore.CreateProgression(events), Is.EqualTo([0, 1]));
     }
 
     [Test]

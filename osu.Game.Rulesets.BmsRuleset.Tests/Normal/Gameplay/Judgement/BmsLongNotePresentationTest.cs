@@ -1,9 +1,7 @@
 using System.Linq;
 using NUnit.Framework;
-using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.Presentation;
 using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
@@ -11,29 +9,26 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
 [TestFixture]
 public class BmsLongNotePresentationTest
 {
-    private static readonly BmsLongNoteState held = new(true, true, false, HitResult.Perfect, HitResult.None);
-
     [TestCase(BmsLongNoteMode.LongNote)]
     [TestCase(BmsLongNoteMode.ChargeNote)]
     [TestCase(BmsLongNoteMode.HellChargeNote)]
     public void InputAndTimeRefreshPresentationWithoutStatePublication(BmsLongNoteMode mode)
     {
-        var note = createNote(mode);
-        var map = BmsLongNotePresentation.SelectMapping(mode);
-        var context = new BmsLongNotePresentationContext(1200, true);
-        var first = map(note, held, context);
+        var run = new BmsLongNoteTestContext(mode);
+        run.Press(1000);
+        var first = run.Presentation(true, 1200);
         Assert.That(first.HoldingBody, Is.True);
         Assert.That(first.ReleasedStyle, Is.False);
         Assert.That(first.AnimateBody, Is.True);
         Assert.That(first.PrepareHeadPin && first.RestoreHeadPin && first.HeadReached, Is.True);
 
-        var released = map(note, held, context with { Held = false });
+        var released = run.Presentation(false, 1200);
         Assert.That(released.HoldingBody, Is.False);
         Assert.That(released.ReleasedStyle, Is.True);
         Assert.That(released.AnimateBody, Is.True);
-        Assert.That(map(note, held, context), Is.EqualTo(first), "Repeated visual reads are pure, including at the same timestamp.");
+        Assert.That(run.Presentation(true, 1200), Is.EqualTo(first), "Repeated visual reads are pure, including at the same timestamp.");
 
-        var afterEnd = map(note, held, context with { Time = 1600, Held = false });
+        var afterEnd = run.Presentation(false, 1600);
         Assert.That(afterEnd.ReleasedStyle, Is.False);
         Assert.That(afterEnd.HoldLightActive, Is.False);
         Assert.That(afterEnd.KeepVisibleAfterHit, Is.EqualTo(mode != BmsLongNoteMode.LongNote));
@@ -45,8 +40,7 @@ public class BmsLongNotePresentationTest
         var run = new BmsLongNoteTestContext(BmsLongNoteMode.LongNote);
         run.Press(1000);
         Assert.That(run.Output.GetMainResult(run.Note).HasResult, Is.False);
-        var current = BmsLongNotePresentation.SelectMapping(BmsLongNoteMode.LongNote)(run.Note, run.State,
-            new BmsLongNotePresentationContext(1100, true));
+        var current = run.Presentation(true, 1100);
         Assert.That(current.HoldingBody && current.AnimateBody && current.PrepareHeadPin, Is.True);
     }
 
@@ -184,9 +178,4 @@ public class BmsLongNotePresentationTest
         Assert.That(after.HoldingBody || after.AnimateBody || after.ClearBodyOnRetire, Is.False);
     }
 
-    private static BmsLongNote createNote(BmsLongNoteMode mode) => new()
-    {
-        Beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, Rank = 2, LockedLongNoteMode = mode },
-        Column = 1, StartTime = 1000, Duration = 500,
-    };
 }

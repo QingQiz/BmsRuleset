@@ -1,14 +1,15 @@
 #nullable enable
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using RhythmEngine.Core;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.Presentation;
 using osu.Game.Rulesets.Scoring;
-using RhythmEngine.Core;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
 
@@ -45,6 +46,7 @@ internal sealed class BmsLongNoteTestContext
                                     int column = 1, int rank = 2, BmsLayoutVariant layout = BmsLayoutVariant.Bme7K)
         : this(new BmsLongNote
         {
+            Kind = mode.ToNoteKind(),
             StartTime = start, Duration = duration, Column = column,
             Beatmap = new BmsBeatmap { LayoutVariant = layout, TotalColumns = layout == BmsLayoutVariant.Popn9K ? 9 : 8, Rank = rank, LockedLongNoteMode = mode },
         })
@@ -52,11 +54,12 @@ internal sealed class BmsLongNoteTestContext
     }
 
     internal BmsLongNoteTestContext(BmsLongNote note,
-                                    Func<BmsHitObject[], (ScoreConfiguration Score, HealthConfiguration Health)>? configurationFactory = null)
+                                    Func<BmsEngineChart, HealthConfiguration>? healthFactory = null,
+                                    BmsHitObject[]? notes = null, GameplayProfile? profile = null)
     {
         Note = note;
-        Column = new BmsJudgementEngine([note], note.Beatmap.LayoutVariant, [new BmsJudgementColumnDefinition(note.Column, Output)],
-            configurationFactory).GetColumn(note.Column);
+        Column = BmsEngineTestAccess.CreateEngine(notes ?? [note], note.Beatmap.LayoutVariant, [new BmsJudgementColumnDefinition(note.Column, Output)],
+            healthFactory, profile).GetColumn(note.Column);
 
         Output.ResultApplied = (_, _) => MainResults.Add((Output.GetMainResult(Note).Type, Output.GetEndpoints(Note).ToArray()));
         Output.StatePublished = (_, state, frame) =>
@@ -171,5 +174,5 @@ internal sealed class BmsLongNoteTestContext
     private sealed record Operation(double Time, Action Apply, bool? Holding, double? StartTime);
 
     internal BmsLongNotePresentation Presentation(bool held = false, double time = 0)
-        => BmsLongNotePresentation.SelectMapping(Note.Beatmap.LockedLongNoteMode)(Note, State, new BmsLongNotePresentationContext(time, held));
+        => Column.Profile.LongNotePresentation(Note, Column.GetNote(Note), new BmsLongNotePresentationContext(time, held, Column.GetTiming(Note)));
 }

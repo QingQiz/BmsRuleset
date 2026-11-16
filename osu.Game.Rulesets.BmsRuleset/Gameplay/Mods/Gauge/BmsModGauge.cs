@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using RhythmEngine.Profiles.Bms;
 using osu.Framework.Bindables;
 using osu.Framework.Localisation;
 using osu.Game.Configuration;
@@ -42,7 +43,7 @@ public abstract class BmsModGauge : Mod, IApplicableToHealthProcessor
 
     public void ApplyToHealthProcessor(HealthProcessor healthProcessor)
     {
-        if (healthProcessor is not BmsHealthProcessor health)
+        if (healthProcessor is not BmsHealthProcessor { Model: BmsGaugeController health })
             return;
 
         var family = GaugeProfileFamily.Value ?? health.ConfiguredProfileFamily;

@@ -60,7 +60,7 @@ public partial class TestSceneBmsHealthBar : OsuTestScene
     [Test]
     public void TestAssistEasyGaugeGrooveDisplay()
     {
-        AddStep("set Assist Easy gauge", () => healthProcessor.SetGaugeType(BmsGaugeType.AssistEasy));
+        AddStep("set Assist Easy gauge", () => healthProcessor.Gauge().SetGaugeType(BmsGaugeType.AssistEasy));
         AddAssert("display is GrooveDynamic", () =>
             healthProcessor.DisplayProfile.Value.ColourMode == BmsGaugeColourMode.GrooveDynamic);
         AddAssert("has clear line at 60%", () =>
@@ -88,7 +88,7 @@ public partial class TestSceneBmsHealthBar : OsuTestScene
     [Test]
     public void TestEasyGaugeGrooveDisplay()
     {
-        AddStep("set Easy gauge", () => healthProcessor.SetGaugeType(BmsGaugeType.Easy));
+        AddStep("set Easy gauge", () => healthProcessor.Gauge().SetGaugeType(BmsGaugeType.Easy));
         AddAssert("display is GrooveDynamic", () =>
             healthProcessor.DisplayProfile.Value.ColourMode == BmsGaugeColourMode.GrooveDynamic);
         AddAssert("has clear line at 80%", () =>
@@ -115,7 +115,7 @@ public partial class TestSceneBmsHealthBar : OsuTestScene
     [Test]
     public void TestExHardGaugeDisplay()
     {
-        AddStep("set EX Hard gauge", () => healthProcessor.SetGaugeType(BmsGaugeType.ExHard));
+        AddStep("set EX Hard gauge", () => healthProcessor.Gauge().SetGaugeType(BmsGaugeType.ExHard));
         AddAssert("display is Fixed purple", () =>
         {
             var dp = healthProcessor.DisplayProfile.Value;
@@ -134,7 +134,7 @@ public partial class TestSceneBmsHealthBar : OsuTestScene
     [Test]
     public void TestHardGaugeDisplay()
     {
-        AddStep("set Hard gauge", () => healthProcessor.SetGaugeType(BmsGaugeType.Hard));
+        AddStep("set Hard gauge", () => healthProcessor.Gauge().SetGaugeType(BmsGaugeType.Hard));
         AddAssert("display is Fixed red", () =>
         {
             var dp = healthProcessor.DisplayProfile.Value;
@@ -147,7 +147,7 @@ public partial class TestSceneBmsHealthBar : OsuTestScene
     [Test]
     public void TestHazardGaugeDisplay()
     {
-        AddStep("set Hazard gauge", () => healthProcessor.SetGaugeType(BmsGaugeType.Hazard));
+        AddStep("set Hazard gauge", () => healthProcessor.Gauge().SetGaugeType(BmsGaugeType.Hazard));
         AddAssert("display is Fixed gold", () =>
         {
             var dp = healthProcessor.DisplayProfile.Value;
@@ -160,7 +160,7 @@ public partial class TestSceneBmsHealthBar : OsuTestScene
     [Test]
     public void TestHazardGaugeHealthLevels()
     {
-        AddStep("set Hazard gauge", () => healthProcessor.SetGaugeType(BmsGaugeType.Hazard));
+        AddStep("set Hazard gauge", () => healthProcessor.Gauge().SetGaugeType(BmsGaugeType.Hazard));
         AddStep("set health to 50%", () => healthProcessor.Health.Value = 0.50);
         AddAssert("display still Fixed gold", () =>
         {
@@ -198,10 +198,10 @@ public partial class TestSceneBmsHealthBar : OsuTestScene
     [Test]
     public void TestSwitchFromHardToNormalRestoresGroove()
     {
-        AddStep("set Hard gauge", () => healthProcessor.SetGaugeType(BmsGaugeType.Hard));
+        AddStep("set Hard gauge", () => healthProcessor.Gauge().SetGaugeType(BmsGaugeType.Hard));
         AddAssert("display is Fixed", () =>
             healthProcessor.DisplayProfile.Value.ColourMode == BmsGaugeColourMode.Fixed);
-        AddStep("switch back to Normal", () => healthProcessor.SetGaugeType(BmsGaugeType.Normal));
+        AddStep("switch back to Normal", () => healthProcessor.Gauge().SetGaugeType(BmsGaugeType.Normal));
         AddAssert("display is GrooveDynamic", () =>
             healthProcessor.DisplayProfile.Value.ColourMode == BmsGaugeColourMode.GrooveDynamic);
         AddAssert("clear line restored at 80%", () =>

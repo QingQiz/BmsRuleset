@@ -1,28 +1,28 @@
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
-using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.UserInterface;
+using osu.Framework.Graphics;
 using osu.Framework.Input.Events;
 using osu.Framework.Threading;
-using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
-using osu.Game.Online.Leaderboards;
+using osu.Game.Graphics;
 using osu.Game.Overlays;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Course;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using osu.Game.Rulesets.BmsRuleset.UI.Ranking;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Lamp;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Screens.Select;
-using osuTK;
 using osuTK.Graphics;
+using osuTK;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Course;
 
@@ -48,7 +48,7 @@ internal partial class BmsCoursePanel : Panel
     internal BmsCourseCarousel? CourseCarousel { private get; set; }
 
     private OsuSpriteText titleText = null!;
-    private UpdateableRank courseRank = null!;
+    private BmsUpdateableRank courseRank = null!;
     private BmsLampDisplay courseLamp = null!;
     private SpriteIcon courseIcon = null!;
     private BmsCourseDefinition? currentCourse;
@@ -265,7 +265,7 @@ internal partial class BmsCoursePanel : Panel
 
                     var (lamp, rank) = task.Result;
                     courseLamp.Lamp = lamp;
-                    courseRank.Rank = rank;
+                    courseRank.SetRank(rank, BmsGameplayProfile.INSTANCE);
                     courseRank.Alpha = rank.HasValue ? 1 : 0;
                 });
             }, TaskScheduler.Default);

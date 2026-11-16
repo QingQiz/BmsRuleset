@@ -72,8 +72,6 @@ public sealed record HoldConfiguration(
     ResultId MissResult,
     ResultId AutomaticResult,
     ResultId DropResult,
-    double HeadAccuracy,
-    double TailAccuracy,
     HoldEndMode EndMode,
     HoldDropMode DropMode,
     Func<HoldEvaluation, NoteEmission?> ResolveResult)
@@ -118,8 +116,9 @@ public sealed record HoldConfiguration(
 
     public bool SuppressRepeatedMistakes { get; init; }
 
-    public ImmutableHashSet<ResultId> RecoveringHeadResults { get; init; } = ImmutableHashSet<ResultId>.Empty;
+    public bool SuppressMissedHeadPenalty { get; init; }
 
+    public ImmutableHashSet<ResultId> RecoveringHeadResults { get; init; } = ImmutableHashSet<ResultId>.Empty;
 }
 
 public sealed record HoldState(

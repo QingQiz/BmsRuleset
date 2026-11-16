@@ -2,14 +2,12 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Threading;
-using RhythmEngine.Profiles.Bms;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Conversion;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.Objects;
 
 namespace osu.Game.Rulesets.BmsRuleset.Beatmaps;
@@ -29,11 +27,6 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
     public Func<int, int>? BranchRandomValueSelector { get; init; }
 
     public BmsReferenceBpmMode? ReferenceBpmMode { get; init; }
-
-    public BmsJudgementModifiers JudgementModifiers { get; set; }
-
-    private double judgementRate(BmsLayoutVariant layout, int rank, double? exRank)
-        => BmsEngineRules.ForLayout(layout, JudgementModifiers).ResolveRate(rank, exRank);
 
     public override bool CanConvert()
     {
@@ -58,7 +51,6 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
     protected override Beatmap<BmsHitObject> ConvertBeatmap(IBeatmap original, CancellationToken cancellationToken)
     {
         var converted = convertToBmsBeatmap(original, cancellationToken);
-        converted.JudgementModifiers = JudgementModifiers;
         if (converted.TimingMap is not { TickResolution: > 0, BpmEvents.Count: > 0 }
             || converted.TotalColumns != BmsLayout.GetTotalColumns(converted.LayoutVariant))
             throw new InvalidDataException("BMS conversion requires a complete timing map and layout.");
@@ -81,11 +73,7 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
         difficulty.WriteToOsuDifficulty(converted.BeatmapInfo.Difficulty);
 
         foreach (var note in converted.HitObjects)
-        {
             note.Beatmap = converted;
-            if (double.IsNaN(note.JudgementRate))
-                note.JudgementRate = judgementRate(converted.LayoutVariant, converted.Rank, converted.ExRank);
-        }
 
         return converted;
     }
@@ -173,7 +161,7 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
         if (!string.IsNullOrWhiteSpace(BranchReplayDecisions))
             selector = BmsChartParser.CreateReplayDecisionSelector(BmsChartParser.DeserialiseBranchDecisions(BranchReplayDecisions));
 
-        var parseResult = BmsChartParser.Parse(decoded.RawLines, decoded.BeatmapInfo.Path, selector, JudgementModifiers);
+        var parseResult = BmsChartParser.Parse(decoded.RawLines, decoded.BeatmapInfo.Path, selector);
         converted.CopyFrom(parseResult);
         converted.ControlPointInfo = new ControlPointInfo();
         BmsBeatmapDecoder.PopulateTiming(converted, parseResult.TimingMap.BpmEvents);

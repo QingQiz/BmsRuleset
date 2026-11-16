@@ -42,11 +42,11 @@ public partial class TestSceneBmsBeatorajaScratchInput : BmsPlayerTestScene
         {
             LayoutVariant = layout, TotalColumns = BmsLayout.GetTotalColumns(layout), Rank = 2, Total = 12,
             LockedLongNoteMode = mode,
-            HitObjects = [new BmsLongNote { StartTime = 3000, Duration = 1000, Column = column }],
+            HitObjects = [new BmsLongNote { Kind = mode.ToNoteKind(), StartTime = 3000, Duration = 1000, Column = column }],
         };
         if (!manual)
             beatmap.HitObjects.Add(shortNext
-                ? new BmsLongNote { StartTime = 4000 + nextGap, Duration = 1, Column = column }
+                ? new BmsLongNote { Kind = mode.ToNoteKind(), StartTime = 4000 + nextGap, Duration = 1, Column = column }
                 : new BmsLandmine { StartTime = 4005, Column = column, LandmineDamagePercent = 10 });
         beatmap.HitObjects.Add(new BmsNote { StartTime = 10000, Column = 1 });
         BmsTestBeatmaps.SetupBeatmapInfo(beatmap, ruleset);
@@ -92,7 +92,7 @@ public partial class TestSceneBmsBeatorajaScratchInput : BmsPlayerTestScene
             Assert.That(events.Any(e => e.Source.Kind == BmsJudgementSourceKind.Landmine), Is.False, "beatoraja autoplay does not supply pressed input for mines");
             Assert.That(events.Select(e => e.Result), Is.EqualTo(Enumerable.Repeat(HitResult.Perfect, followingShort ? 4 : 2)),
                 "beatoraja autoplay directly judges every charge endpoint PGREAT, including dense scratches");
-            Assert.That(BmsExScore.CreateProgression(events).Last(), Is.EqualTo(followingShort ? 8 : 4));
+            Assert.That(BmsTestExScore.CreateProgression(events).Last(), Is.EqualTo(followingShort ? 8 : 4));
             Assert.That(Player.ScoreProcessor.Combo.Value, Is.EqualTo(followingShort ? 4 : 2));
         });
     }
@@ -296,7 +296,7 @@ public partial class TestSceneBmsBeatorajaScratchInput : BmsPlayerTestScene
             var score = (BmsScoreProcessor)Player.ScoreProcessor;
             Assert.That(score.JudgementEvents.Select(e => e.Result), Is.EqualTo(new[] { HitResult.Perfect, HitResult.Meh }),
                 "Compatibility evidence only: a pre-direction replay once completed by key-up now loses its tail");
-            Assert.That(BmsExScore.CreateProgression(score.JudgementEvents), Is.EqualTo(new[] { 0, 2, 2 }));
+            Assert.That(BmsTestExScore.CreateProgression(score.JudgementEvents), Is.EqualTo(new[] { 0, 2, 2 }));
         });
     }
 
@@ -306,7 +306,7 @@ public partial class TestSceneBmsBeatorajaScratchInput : BmsPlayerTestScene
         Assert.Multiple(() =>
         {
             Assert.That(score.JudgementEvents.Select(e => e.Result), Is.EqualTo(Enumerable.Repeat(HitResult.Perfect, count)));
-            Assert.That(BmsExScore.CreateProgression(score.JudgementEvents).Last(), Is.EqualTo(count * 2));
+            Assert.That(BmsTestExScore.CreateProgression(score.JudgementEvents).Last(), Is.EqualTo(count * 2));
             Assert.That(score.Combo.Value, Is.EqualTo(count));
         });
     }

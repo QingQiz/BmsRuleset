@@ -125,7 +125,7 @@ public partial class TestSceneBmsMods : BmsPlayerTestScene
         this.AddSetupAssert("loaded bms playfield", () => Player.DrawableRuleset.Playfield, Is.TypeOf<BmsPlayfield>());
 
         AddAssert("gauge starts at hardest tier (Hazard)", () =>
-            Player.GameplayState.HealthProcessor is BmsHealthProcessor hp && hp.GaugeType == BmsGaugeType.Hazard);
+            Player.GameplayState.HealthProcessor is BmsHealthProcessor hp && hp.Gauge().GaugeType == BmsGaugeType.Hazard);
 
         // Let the autoplay phase build a groove-gauge buffer (the replay hits every note before the idle
         // boundary, so no tier has failed yet).
@@ -138,7 +138,7 @@ public partial class TestSceneBmsMods : BmsPlayerTestScene
         // before Hard fails, so the cascade could never land on it without the autoplay buffer.
         AddUntilStep("gauge downgraded through Normal", () =>
             Player.GameplayState.HealthProcessor is BmsHealthProcessor hp
-            && hp.GaugeType == BmsGaugeType.Normal);
+            && hp.Gauge().GaugeType == BmsGaugeType.Normal);
     }
 
     [Test]

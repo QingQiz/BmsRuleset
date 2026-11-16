@@ -1,12 +1,13 @@
 using System.IO;
 using System.Linq;
 using NUnit.Framework;
+using RhythmEngine.Profiles.Bms;
 using osu.Game.Beatmaps;
 using osu.Game.Models;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.BeatmapTest.Decoding;
@@ -49,7 +50,7 @@ public class BmsonAuxiliaryChannelsTest
         var mine = beatmap.HitObjects.OfType<BmsLandmine>().Single();
         Assert.That(mine.LandmineDamagePercent, Is.EqualTo(12.5));
         Assert.That(beatmap.SampleDefinitions[mine.SampleKey!.Value].Path, Is.EqualTo("boom.wav"));
-        Assert.That(BmsGameplayAudioController.GetSampleUsages(beatmap).Any(usage => usage.SampleKey == mine.SampleKey), Is.True);
+        Assert.That(BmsGameplayAudioController.GetSampleUsages(beatmap, new BmsEngineChart(beatmap)).Any(usage => usage.SampleKey == mine.SampleKey), Is.True);
         Assert.That(beatmap.InvisibleNotes.Single().Column, Is.EqualTo(2));
         Assert.That(beatmap.SampleDefinitions[beatmap.InvisibleNotes.Single().SampleKey!.Value].Path, Is.EqualTo("empty.wav"));
         Assert.That(beatmap.TimingMap!.GetScrollPositionAtTime(1000), Is.EqualTo(beatmap.TimingMap.GetScrollPositionAtTime(500)));

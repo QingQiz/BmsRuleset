@@ -1,3 +1,4 @@
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -14,7 +15,7 @@ using osu.Framework.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Profiles;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
 using osu.Game.Scoring;
@@ -55,8 +56,8 @@ public class BmsLocalisationTest
             HitObjects = [new BmsNote { StartTime = 1000, Column = 1 }],
         };
         var first = BmsTimelineStatistic.CreateData(new ScoreInfo(), beatmap);
-        var offset = BmsHitOffsetStatistic.CreateStatistics(beatmap, []);
-        var scatter = BmsHitScatterStatistic.CreateStatistics(beatmap, []);
+        var offset = BmsHitOffsetStatistic.CreateStatistics(BmsGameplayProfile.INSTANCE, beatmap, []);
+        var scatter = BmsHitScatterStatistic.CreateStatistics(BmsGameplayProfile.INSTANCE, beatmap, []);
         var key = localisation.GetLocalisedBindableString(offset.Keys[1].Label);
         var scratch = localisation.GetLocalisedBindableString(scatter.Keys[0].Label);
         var note = localisation.GetLocalisedBindableString(first.Notes.Categories.Single(category => category.Label == BmsStrings.Note).Label);
@@ -90,6 +91,23 @@ public class BmsLocalisationTest
 
         config.SetValue(FrameworkSetting.Locale, "en");
         Assert.That(new[] { key.Value, scratch.Value, note.Value }, Is.EqualTo(new[] { "Key 1", "Scratch", "note" }));
+    }
+
+    [Test]
+    public void TestProfileAttributesLocaliseTimingGroupsAndUnits()
+    {
+        var beatmapInfo = new osu.Game.Beatmaps.BeatmapInfo();
+        new BmsDifficultyInfo { Rank = 3, LayoutVariant = BmsLayoutVariant.Bme7K }.WriteToOsuDifficulty(beatmapInfo);
+        var rank = new BmsRuleset().GetBeatmapAttributesForDisplay(beatmapInfo, []).Single(attribute => attribute.Acronym == "RK");
+        var metric = rank.AdditionalMetrics[0];
+        var name = localisation.GetLocalisedBindableString(metric.Name);
+        var value = localisation.GetLocalisedBindableString(metric.Value);
+        Assert.That(name.Value, Is.EqualTo("Normal note PGREAT"));
+        Assert.That(value.Value, Is.EqualTo("-20 to +20 ms"));
+
+        config.SetValue(FrameworkSetting.Locale, "zh");
+        Assert.That(name.Value, Is.EqualTo("普通音符 PGREAT"));
+        Assert.That(value.Value, Is.EqualTo("-20 至 +20 毫秒"));
     }
 
     [Test]
@@ -246,7 +264,7 @@ public class BmsLocalisationTest
 
     [TestCase("en", "Play with LR2 judgement, long-note and gauge rules.")]
     [TestCase("zh", "使用 LR2 的判定、长条和血量规则游玩。")]
-    public void TestLR2DescriptionUsesLocalisation(string locale, string expected)
+    public void TestLr2DescriptionUsesLocalisation(string locale, string expected)
     {
         config.SetValue(FrameworkSetting.Locale, locale);
         Assert.That(localisation.GetLocalisedString(new BmsModLr2().Description), Is.EqualTo(expected));

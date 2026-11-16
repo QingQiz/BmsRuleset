@@ -6,7 +6,6 @@ using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
@@ -110,12 +109,12 @@ public partial class TestSceneBmsBeatorajaJudgements : BmsPlayerTestScene
                 Assert.That(suppressed[0].Source.Column, Is.EqualTo(1));
                 Assert.That(suppressed[0].Source.IsScoring, Is.True);
                 Assert.That(suppressed[0].Result, Is.EqualTo(HitResult.Meh));
-                Assert.That(BmsExScore.CreateProgression(processor.JudgementEvents), Is.EqualTo(new[] { 0, 2, 2 }));
+                Assert.That(BmsTestExScore.CreateProgression(processor.JudgementEvents), Is.EqualTo(new[] { 0, 2, 2 }));
             }
             Assert.That(saved.HitEvents.Select(e => e.Result), Is.EqualTo(expectedSequence));
         }
 
-        bool matches()
+        void matches()
         {
             var events = ((BmsScoreProcessor)Player.ScoreProcessor).JudgementEvents;
             var details = string.Join(", ", events.Select(e => $"{e.Source.StartTime}:{e.Result}"));
@@ -123,7 +122,6 @@ public partial class TestSceneBmsBeatorajaJudgements : BmsPlayerTestScene
             Assert.That(events.Count(e => e.Result == HitResult.Perfect), Is.EqualTo(perfect), details);
             Assert.That(events.Count(e => e.Result == HitResult.Miss), Is.EqualTo(emptyPoor), details);
             Assert.That(events.Where(e => !e.SuppressPenalty).All(e => e.Result != HitResult.Meh), Is.True, details);
-            return true;
         }
     }
     private void checkpoint(double time, string description, Action assertion)

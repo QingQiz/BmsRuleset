@@ -4,6 +4,7 @@ using NUnit.Framework;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
@@ -22,12 +23,12 @@ public class BmsBeatorajaParityTest
     {
         var processor = new BmsHealthProcessor();
         var note = new BmsNote();
-        processor.SetGaugeType(gauge);
+        processor.Gauge().SetGaugeType(gauge);
         processor.ApplyBeatmap(new BmsBeatmap { Total = 10, HitObjects = { note } });
         for (var i = 0; i < 100; i++)
             processor.ApplyTestEmptyPoor();
         Assert.That(processor.Health.Value, Is.EqualTo(0.02));
-        Assert.That(processor.HasEverFailed, Is.False);
+        Assert.That(processor.CurrentHealth.HasFailed, Is.False);
         processor.ApplyTestResult(new BmsJudgementResult(note, note.CreateJudgement()) { Type = HitResult.Perfect });
         Assert.That(processor.Health.Value, Is.EqualTo(0.12).Within(1e-9));
     }
@@ -37,12 +38,14 @@ public class BmsBeatorajaParityTest
     [TestCase(BmsLongNoteMode.HellChargeNote, 0.25)]
     public void ChargeEndpointsShareTotalRecovery(BmsLongNoteMode mode, double expected)
     {
-        var note = new BmsLongNote();
+        var note = new BmsLongNote { Kind = mode.ToNoteKind() };
         var beatmap = new BmsBeatmap { Total = 10, LockedLongNoteMode = mode, HitObjects = { note } };
         note.Beatmap = beatmap;
         var processor = new BmsHealthProcessor();
         processor.ApplyBeatmap(beatmap);
-        processor.ApplyTestResult(new BmsJudgementResult(note, note.CreateJudgement()) { Type = HitResult.Perfect });
+        var kind = mode == BmsLongNoteMode.LongNote ? BmsLongNoteEndpointKind.Tail : BmsLongNoteEndpointKind.Head;
+        var endpoint = new BmsLongNoteEndpointResult(note, kind, 0, 1, HitResult.Perfect);
+        processor.ApplyTestResult(new BmsLongNoteJudgementResult(note, note.CreateJudgement(), [endpoint]) { Type = HitResult.Perfect });
         Assert.That(processor.Health.Value, Is.EqualTo(expected).Within(1e-9));
     }
 
@@ -68,10 +71,16 @@ public class BmsBeatorajaParityTest
     [TestCase(BmsLayoutVariant.Popn9K, 0)]
     public void EmptyPoorComboRuleAndReset(BmsLayoutVariant layout, int expectedCombo)
     {
-        var processor = new BmsScoreProcessor();
-        processor.ApplyBeatmap(new BmsBeatmap { LayoutVariant = layout });
-        processor.Combo.Value = 3;
-        processor.ApplyTestEmptyPoor(1000, 1100, 1);
+        var beatmap = new BmsBeatmap { LayoutVariant = layout };
+        beatmap.HitObjects.AddRange(Enumerable.Range(0, 4).Select(index => new BmsNote
+        {
+            Beatmap = beatmap, Column = 1, StartTime = index * 1000,
+        }));
+        using var processor = new BmsScoreProcessor();
+        processor.ApplyBeatmap(beatmap);
+        foreach (var note in beatmap.HitObjects.Take(3))
+            processor.ApplyTestResult(new BmsJudgementResult(note, note.CreateJudgement()) { Type = HitResult.Perfect });
+        processor.ApplyTestEmptyPoor(2501, 3000, 1);
         Assert.That(processor.Combo.Value, Is.EqualTo(expectedCombo));
         processor.ResetReplayState();
         Assert.That(processor.Combo.Value, Is.Zero);
@@ -93,7 +102,7 @@ public class BmsBeatorajaParityTest
     }
 
     [Test]
-    public void SuppressedPmsPoorStillCountsForAccuracyAndRevertsWithoutPenalty()
+    public void SuppressedPmsPoorStillCountsForAccuracyAndRebuildsWithoutPenalty()
     {
         var first = new BmsNote();
         var missed = new BmsNote { StartTime = 1000 };
@@ -116,18 +125,19 @@ public class BmsBeatorajaParityTest
         Assert.That(score.JudgementEvents, Has.Count.EqualTo(2));
         Assert.That(score.JudgementEvents[1].Source.IsScoring, Is.True);
         Assert.That(score.JudgementEvents[1].SuppressPenalty, Is.True);
-        Assert.That(BmsExScore.CreateProgression(score.JudgementEvents), Is.EqualTo(new[] { 0, 2, 2 }));
+        Assert.That(BmsTestExScore.CreateProgression(score.JudgementEvents), Is.EqualTo(new[] { 0, 2, 2 }));
         var saved = new ScoreInfo();
         score.PopulateScore(saved);
         Assert.That(saved.Statistics.GetValueOrDefault(HitResult.Meh), Is.Zero);
         Assert.That(saved.HitEvents.Select(e => e.Result), Is.EqualTo(new[] { HitResult.Perfect }));
         Assert.That(health.Health.Value, Is.EqualTo(oldHealth));
-        score.RevertResult(result);
+        score.ResetReplayState();
+        score.ApplyTestResult(new BmsJudgementResult(first, first.CreateJudgement()) { Type = HitResult.Perfect });
         Assert.That(score.Accuracy.Value, Is.EqualTo(1));
         Assert.That(score.Combo.Value, Is.EqualTo(1));
         Assert.That(score.HighestCombo.Value, Is.EqualTo(1));
         Assert.That(score.ScoringJudgementEventCount, Is.EqualTo(1));
-        Assert.That(BmsExScore.CreateProgression(score.JudgementEvents), Is.EqualTo(new[] { 0, 2 }));
+        Assert.That(BmsTestExScore.CreateProgression(score.JudgementEvents), Is.EqualTo(new[] { 0, 2 }));
         score.ApplyTestResult(result);
         Assert.That(score.Accuracy.Value, Is.EqualTo(0.5));
         Assert.That(score.Combo.Value, Is.EqualTo(1));

@@ -3,7 +3,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.Graphics;
-using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.Scoring;
 using osuTK.Graphics;
@@ -18,14 +18,13 @@ internal partial class BmsResultFastSlow : CompositeDrawable
 
     internal double FastProportion { get; }
 
-    internal BmsResultFastSlow(IReadOnlyList<HitEvent> hitEvents)
+    internal BmsResultFastSlow(GameplayProfile profile, IReadOnlyList<HitEvent> hitEvents)
     {
         RelativeSizeAxes = Axes.Both;
 
-        // Match Timeline's timing events, excluding automatic misses and landmines.
         foreach (var hit in hitEvents)
         {
-            if (hit.HitObject is not BmsHitObject or BmsLandmine || !hit.Result.IsBasic() || !hit.Result.IsHit())
+            if (!profile.IsTimingEvent(hit) || !profile.CountsForFastSlow(hit.Result))
                 continue;
 
             if (hit.TimeOffset < 0)

@@ -87,7 +87,7 @@ public partial class TestSceneBmsCourseResults : ScreenTestScene
             BmsGaugeType.Class);
 
         session.BeginCurrentStage();
-        session.CompleteCurrentStage(createScore(beatmaps[0], true, 765432, 0.91), [new BmsGaugeStateSnapshot(BmsGaugeType.Class, 0.72, false)]);
+        session.CompleteCurrentStage(createScore(beatmaps[0], true, 765432, 0.91), BmsTestHealth.ToState([new BmsGaugeStateSnapshot(BmsGaugeType.Class, 0.72, false)]));
         session.RequestAdvance();
         session.Advance();
         session.BeginCurrentStage();
@@ -96,7 +96,7 @@ public partial class TestSceneBmsCourseResults : ScreenTestScene
         if (includeFailureEvent)
             addFailureHitEvent(abortedScore);
 
-        session.AbortCurrentStage(abortedScore, [new BmsGaugeStateSnapshot(BmsGaugeType.Class, 0.28, false)]);
+        session.AbortCurrentStage(abortedScore, BmsTestHealth.ToState([new BmsGaugeStateSnapshot(BmsGaugeType.Class, 0.28, false)]));
 
         return session;
     }
@@ -114,7 +114,7 @@ public partial class TestSceneBmsCourseResults : ScreenTestScene
         addFailureHitEvent(score);
 
         session.BeginCurrentStage();
-        session.FailCurrentStage(score, [new BmsGaugeStateSnapshot(BmsGaugeType.Class, 0, true)]);
+        session.FailCurrentStage(score, BmsTestHealth.ToState([new BmsGaugeStateSnapshot(BmsGaugeType.Class, 0, true)]));
         return session;
     }
 
@@ -481,7 +481,7 @@ public partial class TestSceneBmsCourseResults : ScreenTestScene
         for (var index = 0; index < stages.Length; index++)
         {
             session.BeginCurrentStage();
-            session.CompleteCurrentStage(createScore(beatmaps[index], true, 123456, 0.9), [new BmsGaugeStateSnapshot(BmsGaugeType.Class, 0.8, false)]);
+            session.CompleteCurrentStage(createScore(beatmaps[index], true, 123456, 0.9), BmsTestHealth.ToState([new BmsGaugeStateSnapshot(BmsGaugeType.Class, 0.8, false)]));
             if (index < stages.Length - 1)
             {
                 session.RequestAdvance();

@@ -1,3 +1,4 @@
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 #nullable enable
 
 using System;
@@ -33,7 +34,7 @@ public partial class TestSceneBmsStatisticsPanel : OsuTestScene
         BmsResultStatisticsGrid grid = null!;
         AddStep("load grid with cached data", () =>
         {
-            grid = new BmsResultStatisticsGrid();
+            grid = new BmsResultStatisticsGrid(BmsGameplayProfile.INSTANCE);
             grid.OnLoadComplete += _ => grid.SetData(data(3));
             Child = grid;
         });

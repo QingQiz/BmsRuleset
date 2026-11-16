@@ -132,8 +132,8 @@ internal sealed class BmsGitComparisonRecorder : IDisposable
     {
         Event = name, Time = playfield.Time.Current, Data = data,
         Events = score.JudgementEvents.ToArray(), Combo = score.Combo.Value, Score = score.TotalScore.Value,
-        ExScore = BmsExScore.CreateProgression(score.JudgementEvents)[^1], Health = health.Health.Value,
-        Gauges = health.CurrentGaugeStates.ToArray(),
+        ExScore = BmsTestExScore.CreateProgression(score.JudgementEvents)[^1], Health = health.Health.Value,
+        Gauges = health.Gauge().CurrentGaugeStates.ToArray(),
     });
 
     internal void Mark(string name)

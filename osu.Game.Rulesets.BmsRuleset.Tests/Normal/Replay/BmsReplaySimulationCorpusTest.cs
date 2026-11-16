@@ -32,8 +32,8 @@ public class BmsReplaySimulationCorpusTest
         if (string.IsNullOrEmpty(storage))
             Assert.Ignore("Set BMS_REPLAY_CORPUS to compare existing local replays.");
 
-        using var realm = Realm.GetInstance(new RealmConfiguration(Path.Combine(storage!, "client.realm")) { IsReadOnly = true, SchemaVersion = 52 });
-        using var files = new StorageFiles(Path.Combine(storage!, "files"));
+        using var realm = Realm.GetInstance(new RealmConfiguration(Path.Combine(storage, "client.realm")) { IsReadOnly = true, SchemaVersion = 52 });
+        using var files = new StorageFiles(Path.Combine(storage, "files"));
         var candidates = realm.All<ScoreInfo>().ToArray().Where(score => score.Ruleset.ShortName == Constant.SHORT_NAME
                                                                          && score.BeatmapInfo != null && score.Files.Any(file => file.Filename == BmsReplayArchive.FILENAME))
             .OrderByDescending(score => score.Date).ToArray();
@@ -46,12 +46,11 @@ public class BmsReplaySimulationCorpusTest
             var source = candidate.DeepClone();
             if (source.BeatmapInfo?.Path is not { } chartPath || !Constant.IsChartFile(chartPath)) continue;
             using var oldStream = files.GetStream(source.Files.Single(file => file.Filename == BmsReplayArchive.FILENAME).File.GetStoragePath());
-            var originalBytes = oldStream?.Length;
+            var originalBytes = oldStream.Length;
             var archived = BmsReplayArchive.ReadScore(source, files);
             var beatmapFile = source.BeatmapInfo.BeatmapSet?.Files.FirstOrDefault(file => file.Filename == chartPath);
             if (beatmapFile == null) continue;
             using var stream = files.GetStream(beatmapFile.File.GetStoragePath());
-            if (stream == null) continue;
             using var reader = new LineBufferedReader(stream);
             var decoded = Decoder.GetDecoder<Beatmap>(reader).Decode(reader);
             var mods = source.Mods;
@@ -67,11 +66,11 @@ public class BmsReplaySimulationCorpusTest
             var compactGauges = restored.Gauges;
             var changedEvents = Math.Abs(events.Count - compactEvents.Count) + events.Zip(compactEvents).Count(pair => !equivalent(pair.First, pair.Second));
             var changedGauges = Math.Abs(gauges.Count - compactGauges.Count) + gauges.Zip(compactGauges).Count(pair =>
-                pair.First.Time != pair.Second.Time || pair.First.ActiveGaugeType != pair.Second.ActiveGaugeType || !pair.First.States.SequenceEqual(pair.Second.States));
+                pair.First.Time != pair.Second.Time || pair.First.SelectedLayer != pair.Second.SelectedLayer || !pair.First.Layers.SequenceEqual(pair.Second.Layers));
             compactDifferences += changedEvents + changedGauges;
             var changedCadenceEvents = Math.Abs(events.Count - sampled.Judgements.Count) + events.Zip(sampled.Judgements).Count(pair => !equivalent(pair.First, pair.Second));
             var changedCadenceGauges = Math.Abs(gauges.Count - sampled.Gauges.Count) + gauges.Zip(sampled.Gauges).Count(pair =>
-                pair.First.Time != pair.Second.Time || pair.First.ActiveGaugeType != pair.Second.ActiveGaugeType || !pair.First.States.SequenceEqual(pair.Second.States));
+                pair.First.Time != pair.Second.Time || pair.First.SelectedLayer != pair.Second.SelectedLayer || !pair.First.Layers.SequenceEqual(pair.Second.Layers));
             cadenceDifferences += changedCadenceEvents + changedCadenceGauges;
             var statistics = events.Where(entry => !entry.SuppressPenalty)
                 .GroupBy(entry => entry.Result).ToDictionary(group => group.Key, group => group.Count());

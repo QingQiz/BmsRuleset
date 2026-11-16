@@ -1,31 +1,32 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
+using System;
+using RhythmEngine.Core;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
-using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
+using osu.Framework.Graphics;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Database;
-using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
+using osu.Game.Graphics;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
-using osu.Game.Rulesets.BmsRuleset.UI.Ranking;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Lamp;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Scoring;
 using osu.Game.Screens.Play;
-using osuTK;
 using osuTK.Graphics;
+using osuTK;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 
@@ -121,16 +122,17 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
     private readonly Dictionary<HitResult, JudgementCountTexts> judgementCountTexts = [];
 
     private BmsScoreProcessor? scoreProcessor;
-    private int maximumExScore = 2000;
+    private GameplayProfile profile = BmsGameplayProfile.INSTANCE;
+    private double maximumScore = 2000;
     private int totalScoringEvents = 1000;
-    private int personalBestFinalScore = 1300;
-    private int targetFinalScore = 1334;
+    private double personalBestFinalScore = 1300;
+    private double targetFinalScore = 1334;
     private ScoreRank targetRank = ScoreRank.B;
-    private int[] personalBestProgression = [];
+    private readonly List<ScoreState> personalBestProgression = [];
     private readonly JudgementProgressCursor personalBestJudgementProgress = new();
     private readonly int[] displayedCurrentJudgementCounts = new int[displayed_judgements.Length];
     private IReadOnlyList<int>? displayedPersonalBestJudgementCounts;
-    private int displayedCurrentScore;
+    private double displayedCurrentScore;
     private int displayedJudgedEvents;
     private long displayedStatisticsVersion = -1;
     private bool currentDisplayValid;
@@ -243,7 +245,7 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
                         out personalBestScoreText,
                         out personalBestDifferenceText),
                     targetScoreRow = createScoreRow(
-                        BmsStrings.ScoreGraphTarget(BmsRankDisplay.GetRankLetter(targetRank)),
+                        BmsStrings.ScoreGraphTarget(profile.RankLabel(targetRank)),
                         showDifference: true,
                         out var targetAccent,
                         out targetScoreText,
@@ -333,10 +335,13 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
         if (scoreProcessor == null)
             return;
 
-        maximumExScore = BmsExScore.Calculate(scoreProcessor.MaximumStatistics);
-        totalScoringEvents = maximumExScore / 2;
+        profile = scoreProcessor.EngineChart.Profile;
+        maximumScore = scoreProcessor.EngineChart.MaximumScore;
+        totalScoringEvents = scoreProcessor.EngineChart.Chart.ScorePlan.Opportunities.Length;
+        foreach (var (result, texts) in judgementCountTexts)
+            texts.Label.Text = profile.JudgementLabel(result);
         personalBestFinalScore = 0;
-        personalBestProgression = [];
+        personalBestProgression.Clear();
         personalBestJudgementProgress.SetProgression([]);
 
         updateRankLines();
@@ -361,7 +366,7 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
 
         if (statisticsChanged)
         {
-            var currentScore = BmsExScore.Calculate(scoreProcessor.Statistics);
+            var currentScore = scoreProcessor.EngineScore.Score;
             var judgedEvents = scoreProcessor.ScoringJudgementEventCount;
 
             if (!currentDisplayValid || currentScore != displayedCurrentScore || judgedEvents != displayedJudgedEvents)
@@ -390,7 +395,7 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
 
     private void loadPersonalBest()
     {
-        if (gameplayState == null || realm == null || scoreManager == null || maximumExScore <= 0)
+        if (gameplayState == null || realm == null || scoreManager == null || maximumScore <= 0)
             return;
 
         try
@@ -407,12 +412,12 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
                 .Select(score => score.DeepClone())
                 .ToArray());
 
-            var personalBest = BmsLampScoreSelector.SelectBest(scores, gameplayState.Mods, maximumExScore);
+            var personalBest = BmsLampScoreSelector.SelectBest(scores, gameplayState.Mods, maximumScore);
 
-            if (personalBest == null)
+            if (personalBest == null || profile.StoredScore(personalBest, maximumScore) is not { } storedScore)
                 return;
 
-            personalBestFinalScore = BmsExScore.Calculate(personalBest, maximumExScore);
+            personalBestFinalScore = storedScore;
 
             var scoreWithReplay = scoreManager.GetScore(personalBest);
 
@@ -428,10 +433,13 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
 
                 var beatmap = beatmapManager.GetWorkingBeatmap(personalBest.BeatmapInfo).GetPlayableBeatmap(personalBest.Ruleset, mods);
                 if (beatmap is BmsBeatmap bmsBeatmap)
-                    judgementEvents = BmsReplaySimulation.Run(bmsBeatmap, replay, scoreWithReplay.ScoreInfo).Judgements;
+                    judgementEvents = BmsReplaySimulation.Run(bmsBeatmap, replay, scoreWithReplay.ScoreInfo, onScore: state =>
+                    {
+                        if (personalBestProgression.Count == 0 || !ReferenceEquals(personalBestProgression[^1], state))
+                            personalBestProgression.Add(state);
+                    }).Judgements;
             }
 
-            personalBestProgression = BmsExScore.CreateProgression(judgementEvents);
             personalBestJudgementProgress.SetProgression(CreateJudgementProgression(judgementEvents));
         }
         catch (Exception exception)
@@ -442,10 +450,10 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
 
     private void updateTarget()
     {
-        var personalBestRank = BmsExScore.RankFromScore(personalBestFinalScore, maximumExScore);
-        targetRank = BmsExScore.NextRank(personalBestRank);
-        targetFinalScore = BmsExScore.MinimumScoreForRank(targetRank, maximumExScore);
-        targetLabelText.Text = BmsStrings.ScoreGraphTarget(BmsRankDisplay.GetRankLetter(targetRank));
+        targetRank = displayed_ranks.Reverse().FirstOrDefault(rank => profile.ScoreForRank(rank, maximumScore) > personalBestFinalScore, ScoreRank.X);
+        var rankTarget = profile.ScoreForRank(targetRank, maximumScore);
+        targetFinalScore = rankTarget ?? maximumScore;
+        targetLabelText.Text = rankTarget.HasValue ? BmsStrings.ScoreGraphTarget(profile.RankLabel(targetRank)) : BmsStrings.ScoreGraphMaximumTarget;
     }
 
     private void updateSectionVisibility(BindableBool changedSetting, bool isVisible)
@@ -530,17 +538,17 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
     private void updateRankLines()
     {
         foreach (var rankLine in rankLines)
-            rankLine.SetMaximumScore(maximumExScore);
+            rankLine.SetProfile(profile, maximumScore);
     }
 
-    private void updateDisplay(int currentScore, int judgedEvents)
+    private void updateDisplay(double currentScore, int judgedEvents)
     {
         updateScoreDisplay(currentScore, judgedEvents);
         updateCurrentJudgementCounts(scoreProcessor?.Statistics, true);
         updatePersonalBestJudgementCounts(null);
     }
 
-    private void updateScoreDisplay(int currentScore, int judgedEvents)
+    private void updateScoreDisplay(double currentScore, int judgedEvents)
     {
         var clampedJudgedEvents = Math.Clamp(judgedEvents, 0, totalScoringEvents);
         var personalBestScore = ScoreAtProgress(
@@ -550,15 +558,15 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
             totalScoringEvents);
         var targetScore = scaleScore(targetFinalScore, clampedJudgedEvents, totalScoringEvents);
 
-        currentScoreText.Text = BmsStrings.ScoreGraphExScore(currentScore);
-        personalBestScoreText.Text = BmsStrings.ScoreGraphExScore(personalBestScore);
+        currentScoreText.Text = BmsStrings.ScoreGraphScore(profile.ScoreLabel, currentScore);
+        personalBestScoreText.Text = BmsStrings.ScoreGraphScore(profile.ScoreLabel, personalBestScore);
         personalBestDifferenceText.Text = BmsStrings.ScoreGraphDifference(currentScore - personalBestScore);
-        targetScoreText.Text = BmsStrings.ScoreGraphExScore(targetScore);
+        targetScoreText.Text = BmsStrings.ScoreGraphScore(profile.ScoreLabel, targetScore);
         targetDifferenceText.Text = BmsStrings.ScoreGraphDifference(currentScore - targetScore);
 
-        currentBar.SetScores(currentScore, currentScore, maximumExScore);
-        personalBestBar.SetScores(personalBestScore, personalBestFinalScore, maximumExScore);
-        targetBar.SetScores(targetScore, targetFinalScore, maximumExScore);
+        currentBar.SetScores(currentScore, currentScore, maximumScore);
+        personalBestBar.SetScores(personalBestScore, personalBestFinalScore, maximumScore);
+        targetBar.SetScores(targetScore, targetFinalScore, maximumScore);
     }
 
     private void updateCurrentJudgementCounts(IReadOnlyDictionary<HitResult, int>? currentStatistics, bool force)
@@ -630,26 +638,31 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
         return lower - 1;
     }
 
-    internal static int ScoreAtProgress(
-        int finalScore,
-        IReadOnlyList<int> progression,
+    internal static double ScoreAtProgress(
+        double finalScore,
+        IReadOnlyList<ScoreState> progression,
         int judgedEvents,
         int totalEvents)
     {
         var clampedJudgedEvents = Math.Clamp(judgedEvents, 0, Math.Max(0, totalEvents));
+        if (progression.Count == 0)
+            return scaleScore(finalScore, clampedJudgedEvents, totalEvents);
 
-        return progression.Count > 1
-            ? progression[Math.Min(clampedJudgedEvents, progression.Count - 1)]
-            : scaleScore(finalScore, clampedJudgedEvents, totalEvents);
+        var lower = 0;
+        var upper = progression.Count;
+        while (lower < upper)
+        {
+            var middle = lower + (upper - lower) / 2;
+            if (progression[middle].JudgedOpportunities <= clampedJudgedEvents)
+                lower = middle + 1;
+            else
+                upper = middle;
+        }
+        return lower == 0 ? 0 : progression[lower - 1].Score;
     }
 
-    private static int scaleScore(int finalScore, int judgedEvents, int totalEvents)
-    {
-        if (totalEvents <= 0)
-            return 0;
-
-        return (int)Math.Floor((double)finalScore * Math.Clamp(judgedEvents, 0, totalEvents) / totalEvents);
-    }
+    private static double scaleScore(double finalScore, int judgedEvents, int totalEvents)
+        => totalEvents <= 0 ? 0 : Math.Floor(finalScore * Math.Clamp(judgedEvents, 0, totalEvents) / totalEvents);
 
     private Drawable[] createJudgementRows()
     {
@@ -658,16 +671,17 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
         for (var i = 0; i < displayed_judgements.Length; i++)
         {
             var result = displayed_judgements[i];
-            rows[i] = createJudgementRow(result, 13 + i * 9.5f, out var current, out var personalBest);
-            judgementCountTexts.Add(result, new JudgementCountTexts(current, personalBest));
+            rows[i] = createJudgementRow(result, 13 + i * 9.5f, out var label, out var current, out var personalBest);
+            judgementCountTexts.Add(result, new JudgementCountTexts(label, current, personalBest));
         }
 
         return rows;
     }
 
-    private static Container createJudgementRow(
+    private Container createJudgementRow(
         HitResult result,
         float y,
+        out OsuSpriteText label,
         out OsuSpriteText current,
         out OsuSpriteText personalBest) => new()
     {
@@ -676,10 +690,10 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
         Y = y,
         Children =
         [
-            new OsuSpriteText
+            label = new OsuSpriteText
             {
                 Position = new Vector2(4, 0),
-                Text = BmsRuleset.HIT_RESULT_LABELS[result],
+                Text = profile.JudgementLabel(result),
                 Font = OsuFont.GetFont(size: 8, weight: FontWeight.SemiBold),
                 Colour = BmsHitResultColours.ForHitResult(result),
             },
@@ -776,7 +790,6 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
 
             RelativePositionAxes = Axes.Y;
             RelativeSizeAxes = Axes.X;
-            Y = 1 - (float)BmsExScore.AccuracyCutoffFromRank(rank);
             Width = 1;
             Height = 1;
 
@@ -803,9 +816,15 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
             ];
         }
 
-        public void SetMaximumScore(int maximumScore)
+        public void SetProfile(GameplayProfile profile, double maximumScore)
         {
-            label.Text = $"{BmsRankDisplay.GetRankLetter(rank)} {BmsExScore.MinimumScoreForRank(rank, maximumScore):D4}";
+            var threshold = profile.ScoreForRank(rank, maximumScore);
+            Alpha = threshold.HasValue && maximumScore > 0 ? 1 : 0;
+            if (threshold.HasValue && maximumScore > 0)
+            {
+                Y = 1 - (float)(threshold.Value / maximumScore);
+                label.Text = BmsStrings.ScoreGraphRank(profile.RankLabel(rank), threshold.Value);
+            }
         }
     }
 
@@ -864,18 +883,18 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
             fill.Colour = colour;
         }
 
-        public void SetScores(int score, int finalScore, int maximumScore)
+        public void SetScores(double score, double finalScore, double maximumScore)
         {
             fill.Height = ratio(score, maximumScore);
             ghost.Height = ratio(finalScore, maximumScore);
         }
 
-        private static float ratio(int score, int maximumScore) => maximumScore <= 0
+        private static float ratio(double score, double maximumScore) => maximumScore <= 0
             ? 0
-            : Math.Clamp((float)score / maximumScore, 0, 1);
+            : (float)Math.Clamp(score / maximumScore, 0, 1);
     }
 
-    private sealed record JudgementCountTexts(OsuSpriteText Current, OsuSpriteText PersonalBest);
+    private sealed record JudgementCountTexts(OsuSpriteText Label, OsuSpriteText Current, OsuSpriteText PersonalBest);
 
     internal sealed class JudgementProgressCursor
     {

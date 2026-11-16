@@ -1,16 +1,16 @@
 #nullable enable
-using System;
+using NUnit.Framework;
+using RhythmEngine.Profiles.Common;
 using System.Collections.Generic;
 using System.Linq;
-using NUnit.Framework;
+using System;
 using osu.Game.Beatmaps;
-using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Tests.Visual;
@@ -32,7 +32,7 @@ public partial class TestSceneBmsBeatorajaLandmineRewindLifecycle : BmsPlayerTes
         {
             LayoutVariant = BmsLayoutVariant.Bme7K, TotalColumns = 8, Rank = 2, Total = 12,
             LockedLongNoteMode = BmsLongNoteMode.HellChargeNote,
-            HitObjects = [new BmsLongNote { StartTime = 3000, Duration = 2000, Column = 1 },
+            HitObjects = [new BmsLongNote { Kind = KeyNoteKind.SustainHold, StartTime = 3000, Duration = 2000, Column = 1 },
                 new BmsLandmine { StartTime = 3201, Column = 2, LandmineDamagePercent = 10 },
                 new BmsNote { StartTime = 10000, Column = 3 }],
         };
@@ -148,7 +148,7 @@ public partial class TestSceneBmsBeatorajaLandmineRewindLifecycle : BmsPlayerTes
             var history = SimulateGaugeHistory().ToArray();
             var interval = history.Where(e => e.Time > (time == 3210 ? 3200 : 3201) && e.Time <= time).ToArray();
             var frameHealth = interval
-                .Select(e => e.States.Single(s => s.GaugeType == BmsGaugeType.Normal).Health).ToArray();
+                .Select(e => e.Health.Layers.Single().Value).ToArray();
             HitResult[] expectedResults = expectedMine ? [HitResult.Perfect, HitResult.Meh] : [HitResult.Perfect];
             BmsJudgementSourceKind[] expectedKinds = expectedMine
                 ? [BmsJudgementSourceKind.LongNote, BmsJudgementSourceKind.Landmine] : [BmsJudgementSourceKind.LongNote];

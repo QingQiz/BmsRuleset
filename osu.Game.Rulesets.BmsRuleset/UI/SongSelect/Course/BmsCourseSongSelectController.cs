@@ -563,13 +563,10 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
     {
         locked = course == null
             ? []
-            : BmsCourseSession.ResolveRequiredMods(userMods, BmsCourseSession.CreateConstraintMods(course.Constraints))
-                .Select(mod => mod.DeepClone())
+            : BmsCourseSession.CreateConstraintMods(course.Constraints)
                 .ToArray();
 
-        var forbidden = course == null
-            ? []
-            : BmsCourseSession.ResolveForbiddenModTypes(course.Constraints).ToArray();
+        var forbidden = BmsCourseSession.ResolveForbiddenModTypes(course?.Constraints ?? []).ToArray();
 
         var mods = userMods
             .Where(mod => !forbidden.Any(type => type.IsInstanceOfType(mod)))
@@ -594,13 +591,9 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
         if (modSelect == null)
             return;
 
-        var forbidden = course == null
-            ? []
-            : BmsCourseSession.ResolveForbiddenModTypes(course.Constraints).ToArray();
+        var forbidden = BmsCourseSession.ResolveForbiddenModTypes(course?.Constraints ?? []).ToArray();
 
-        modSelect.IsValidMod = forbidden.Length == 0
-            ? _ => true
-            : mod => !forbidden.Any(type => type.IsInstanceOfType(mod));
+        modSelect.IsValidMod = mod => !forbidden.Any(type => type.IsInstanceOfType(mod));
     }
 
     private void setMods(IReadOnlyList<Mod> mods)
@@ -619,13 +612,14 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
     private void onModsChanged(ValueChangedEvent<IReadOnlyList<Mod>> change)
     {
         cancelCourseStart();
-        if (adjustingMods || !IsCourseMode || modsAdjustedForCourse == null)
+        if (adjustingMods || !IsCourseMode)
             return;
 
-        var forbidden = BmsCourseSession.ResolveForbiddenModTypes(modsAdjustedForCourse.Constraints).ToArray();
+        var forbidden = BmsCourseSession.ResolveForbiddenModTypes(modsAdjustedForCourse?.Constraints ?? []).ToArray();
 
         userMods = change.NewValue
             .Where(mod => lockedMods.All(locked => locked.GetType() != mod.GetType()))
+            .Where(mod => !forbidden.Any(type => type.IsInstanceOfType(mod)))
             .Select(mod => mod.DeepClone())
             .Concat(userMods.Where(mod => forbidden.Any(type => type.IsInstanceOfType(mod))))
             .ToArray();

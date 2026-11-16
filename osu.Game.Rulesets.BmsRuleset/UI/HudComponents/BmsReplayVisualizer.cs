@@ -13,7 +13,6 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
@@ -335,7 +334,7 @@ public sealed partial class BmsReplayVisualizer : BmsHudComponent
         // current state lets this independent HUD colour a held note immediately.
         var part = columns[note.Column].Judgements.GetNote(longNote).Parts.Single(p => p.Part == (tail ? NoteParts.TAIL : NoteParts.HEAD));
         var actualTime = part.Time / 1000.0;
-        var result = BmsEngineChart.HitResultFor(part.Result);
+        var result = columns[note.Column].Judgements.Profile.HitResultFor(part.Result);
         return actualTime is { } time && time <= now && result != HitResult.None
             ? new BmsTimingObservation(tail ? BmsTimingObservationKind.LongNoteTail : BmsTimingObservationKind.LongNoteHead,
                 expectedTime, time, null, result)
@@ -351,9 +350,7 @@ public sealed partial class BmsReplayVisualizer : BmsHudComponent
         : BmsHitResultColours.ForHitResult(result.Value);
 
     internal static HitResult? NoteResult(BmsTimingObservation? head, BmsTimingObservation? tail)
-        => worseResult(scoringResult(head?.Result), scoringResult(tail?.Result));
-
-    private static HitResult? scoringResult(HitResult? result) => result == HitResult.Miss ? HitResult.Meh : result;
+        => worseResult(head?.Result, tail?.Result);
 
     private static HitResult? worseResult(HitResult? first, HitResult? second)
         => first is null or HitResult.None ? second : second is null or HitResult.None ? first : (HitResult)Math.Min((int)first, (int)second);

@@ -8,7 +8,6 @@ public sealed record TapConfiguration(
     TimingWindows Windows,
     long LateDeadline,
     ResultId MissResult,
-    double MaximumAccuracy,
     bool OnRelease = false,
     ImmutableHashSet<ResultId>? NonResolvingResults = null,
     TimingWindows? ResolvedWindows = null,
@@ -26,8 +25,10 @@ public sealed record TapState(NoteTimer? Timer, bool Done, bool Resolved, bool M
     public override bool Completed => Done;
 }
 
-public sealed class TapRule : INoteRule
+public sealed class TapRule : INoteRule, INoteTiming
 {
+    public NoteTiming Timing { get; }
+
     public ImmutableArray<NotePartState> GetParts(NoteContext context)
         => [new(NoteParts.TAP, ((TapState)context.State).Resolved)];
 
@@ -35,18 +36,15 @@ public sealed class TapRule : INoteRule
 
     public TapRule(TapConfiguration configuration)
     {
-        if (configuration.LateDeadline < 0 || configuration.MaximumAccuracy < 0 || !double.IsFinite(configuration.MaximumAccuracy))
+        if (configuration.LateDeadline < 0)
             throw new ArgumentOutOfRangeException(nameof(configuration));
 
         Configuration = configuration;
+        Timing = new NoteTiming(configuration.Windows, configuration.LateDeadline, configuration.NonResolvingResults,
+            ResolvedHeadDeadline: configuration.ResolvedWindows?.Entries.Max(window => window.Late) ?? 0);
     }
 
     public NoteState CreateState(ChartNote note) => new TapState(new NoteTimer(checked(note.StartTime + Configuration.LateDeadline + 1), Configuration.PassiveOrder), false, false);
-
-    public IEnumerable<ScoringOpportunity> GetScoringOpportunities(ChartNote note)
-    {
-        yield return new ScoringOpportunity(note.Id, NoteParts.TAP, Configuration.MaximumAccuracy);
-    }
 
     public InputCandidate? GetCandidate(NoteContext context, InputEvent input, int noteIndex)
     {

@@ -8,12 +8,13 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using NUnit.Framework;
+using RhythmEngine.Profiles.Common;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Profiles;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
@@ -48,14 +49,14 @@ public partial class TestSceneBmsAdvancingJudgementPerformance : BmsPlayerTestSc
             var time = 3000 + i * (profile == "dense" ? .5 : 4);
             var column = profile == "dense" ? 1 : i % 7 + 1;
             beatmap.HitObjects.Add(profile is "overlap" or "rewind" or "mine-hcn"
-                ? new BmsLongNote { StartTime = time, Duration = 1000, Column = column }
+                ? new BmsLongNote { Kind = KeyNoteKind.SustainHold, StartTime = time, Duration = 1000, Column = column }
                 : new BmsNote { StartTime = time, Column = column });
         }
 
         endTime = beatmap.HitObjects.Max(n => n.GetEndTime()) + 500;
         if (profile == "mine-hcn")
         {
-            beatmap.HitObjects.Add(new BmsLongNote { StartTime = 3000, Duration = endTime - 3500, Column = 0 });
+            beatmap.HitObjects.Add(new BmsLongNote { Kind = KeyNoteKind.SustainHold, StartTime = 3000, Duration = endTime - 3500, Column = 0 });
             for (var time = 3201d; time < endTime - 500; time += 201)
                 beatmap.HitObjects.Add(new BmsLandmine { StartTime = time, Column = 0, LandmineDamagePercent = .1 });
         }
@@ -129,7 +130,7 @@ public partial class TestSceneBmsAdvancingJudgementPerformance : BmsPlayerTestSc
                 var health = (BmsHealthProcessor)Player.HealthProcessor;
                 Assert.That(score.JudgementEvents.Count, Is.GreaterThanOrEqualTo(objects), "Every sample must execute new results instead of repeatedly timing completed notes.");
                 Assert.That(Player.DrawableRuleset.FrameStableClock.CurrentTime, Is.EqualTo(endTime).Within(.001));
-                var verification = JsonSerializer.Serialize(new { score.JudgementEvents, health.CurrentGaugeStates, Score = score.TotalScore.Value, Combo = score.Combo.Value });
+                var verification = JsonSerializer.Serialize(new { score.JudgementEvents, health.Gauge().CurrentGaugeStates, Score = score.TotalScore.Value, Combo = score.Combo.Value });
                 var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(verification)));
                 if (sampleIndex >= 0)
                     samples.Add(new Sample(elapsed, allocated, retained, peakAlive, frameTimes, score.JudgementEvents.Count, hash));

@@ -5,24 +5,6 @@ using RhythmEngine.Profiles.Patterns;
 
 namespace RhythmEngine.Profiles.Bms;
 
-/// <summary>The four gauges in LR2 beta3 100201, preserving its two-point health quantisation and distinct damage calculations.</summary>
-public enum Lr2Beta3Gauge
-{
-    /// <summary>The standard recovery gauge, starting at 20 with a floor of 2 and a final clear threshold of 80.</summary>
-    Normal,
-
-    /// <summary>A survival gauge starting at 100 and failing below 2; damage depends on TOTAL and note count, with a reduction at low health.</summary>
-    Hard,
-
-    /// <summary>A BAD or POOR depletes the gauge; successful judgements do not recover health and empty POOR causes no damage.</summary>
-    Hazard,
-
-    /// <summary>A recovery gauge with Normal's initial value, floor and clear threshold, but more recovery and less damage.</summary>
-    Easy,
-}
-
-public sealed record Lr2Beta3Options(BmsRank Rank = BmsRank.Normal, Lr2Beta3Gauge Gauge = Lr2Beta3Gauge.Normal, int Total = 260);
-
 public static class Lr2Beta3Profile
 {
     public static CompiledProfile Create(KeyChart source, Lr2Beta3Options? options = null)
@@ -46,7 +28,7 @@ public static class Lr2Beta3Profile
                 throw new ArgumentException("LR2 LN endpoints must have positive duration.", nameof(source));
 
             return new Lr2Beta3NoteRule([.. bounds], note.Kind == KeyNoteKind.Hold);
-        });
+        }, note => [new ScoringOpportunity(note.Id, NoteParts.NOTE, 2)]);
         var values = ProfileSupport.Values((BmsResults.PGREAT, 2, 2, ComboChange.Increment), (BmsResults.GREAT, 1, 1, ComboChange.Increment),
             (BmsResults.GOOD, 0, 0, ComboChange.Increment), (BmsResults.BAD, 0, 0, ComboChange.Reset), (BmsResults.POOR, 0, 0, ComboChange.Reset));
         var score = new ScoreConfiguration(new ScoreState(), (state, context) => ProfileSupport.Accumulate(state, context, values), p => p.MaximumAccuracy);
@@ -137,11 +119,6 @@ internal sealed class Lr2Beta3NoteRule(ImmutableArray<int> bounds, bool hold) : 
 
     public NoteState CreateState(ChartNote note) => new Lr2Beta3NoteState(
         new NoteTimer(note.StartTime + (hold ? bounds[2] : 200) * 1000L + 1000, TimerOrder.BeforeInput), null, null, false);
-
-    public IEnumerable<ScoringOpportunity> GetScoringOpportunities(ChartNote note)
-    {
-        yield return new ScoringOpportunity(note.Id, NoteParts.NOTE, 2);
-    }
 
     public InputCandidate? GetCandidate(NoteContext context, InputEvent input, int noteIndex)
     {

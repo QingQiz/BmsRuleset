@@ -1,22 +1,34 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
-using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
-using osu.Game.Rulesets.Objects;
+using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Replays;
 
 namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 
-public class BmsAutoGenerator(BmsBeatmap beatmap, bool scratchOnly = false) : AutoGenerator<BmsReplayFrame>(beatmap)
+public class BmsAutoGenerator : AutoGenerator<BmsReplayFrame>
 {
-    public const double RELEASE_DELAY = 10;
+    private readonly BmsBeatmap beatmap;
+    private readonly BmsEngineChart compiled;
+    private readonly bool scratchOnly;
 
-    // ReSharper disable once InconsistentNaming
-    private new BmsBeatmap Beatmap => (BmsBeatmap)base.Beatmap;
+    public BmsAutoGenerator(BmsBeatmap beatmap, IReadOnlyList<Mod>? mods = null, bool scratchOnly = false)
+        : this(beatmap, new BmsEngineChart(beatmap, GameplayProfile.FromMods(mods ?? [])), scratchOnly)
+    {
+    }
+
+    internal BmsAutoGenerator(BmsBeatmap beatmap, BmsEngineChart compiled, bool scratchOnly = false)
+        : base(beatmap)
+    {
+        this.beatmap = beatmap;
+        this.compiled = compiled;
+        this.scratchOnly = scratchOnly;
+    }
 
     internal readonly record struct ActionPoint(double Time, BmsAction Action, bool Press);
 
@@ -40,80 +52,8 @@ public class BmsAutoGenerator(BmsBeatmap beatmap, bool scratchOnly = false) : Au
         }
     }
 
-    protected override HitObject? GetNextObject(int currentIndex)
-    {
-        var column = Beatmap.HitObjects[currentIndex].Column;
-
-        for (var i = currentIndex + 1; i < Beatmap.HitObjects.Count; i++)
-        {
-            if (Beatmap.HitObjects[i].Column == column)
-                return Beatmap.HitObjects[i];
-        }
-
-        return null;
-    }
-
-    private static double calculateReleaseTime(BmsHitObject current, HitObject? nextObject)
-    {
-        var endTime = current.GetEndTime();
-
-        if (current is BmsLongNote)
-        {
-            // LN body must be held to endTime exactly; if a mine in the same column fires
-            // at or right after the tail, release a moment earlier so the column isn't pressed.
-            if (nextObject is BmsLandmine mineAfterLn && mineAfterLn.StartTime <= endTime + 1)
-                return Math.Max(current.StartTime, mineAfterLn.StartTime - 1);
-
-            // IN can create sub-millisecond holds. Extending them by the tap release delay
-            // swallows the next press in the same column and also mistimes charge-note tails.
-            return endTime;
-        }
-
-        return calculateTapReleaseTime(endTime, nextObject?.StartTime);
-    }
-
-    private static double calculateTapReleaseTime(double pressTime, double? nextPressTime)
-        // A tail reversal is a tap too: it must stop before the next head or mine, even
-        // for sub-millisecond gaps, so the following reversal can form a new key-down.
-        => nextPressTime == null || nextPressTime <= pressTime
-            ? pressTime + RELEASE_DELAY
-            : Math.Min(pressTime + RELEASE_DELAY, pressTime + (nextPressTime.Value - pressTime) * 0.9);
-
     internal IEnumerable<ActionPoint> GenerateActionPoints()
-    {
-        for (var i = 0; i < Beatmap.HitObjects.Count; i++)
-        {
-            var current = Beatmap.HitObjects[i];
-
-            if (scratchOnly && !BmsLayout.IsScratchColumn(current.Column, Beatmap.LayoutVariant))
-                continue;
-
-            // Autoplay must never press a mine: doing so detonates it (POOR judgement).
-            // Mines are passive — leave the column untouched at their StartTime.
-            if (current is BmsLandmine)
-                continue;
-
-            if (BmsKeyBindingConfiguration.ActionForColumn(Beatmap.LayoutVariant, current.Column) is not { } action)
-                continue;
-
-            yield return new ActionPoint(current.StartTime, action, true);
-
-            var nextObject = GetNextObject(i);
-            var releaseTime = calculateReleaseTime(current, nextObject);
-            yield return new ActionPoint(releaseTime, action, false);
-
-            if (current is BmsLongNote { EffectiveMode: BmsLongNoteMode.ChargeNote or BmsLongNoteMode.HellChargeNote }
-                && BmsKeyBindingConfiguration.ReverseScratchAction(action) is { } reverseAction)
-            {
-                yield return new ActionPoint(releaseTime, reverseAction, true);
-
-                // A same-time head uses the forward direction; release the reversal before its tail,
-                // rather than at its head where release-before-press ordering would leave it stuck.
-                var nextReversalTime = nextObject is BmsLongNote nextHold && nextHold.StartTime <= releaseTime
-                    ? nextHold.EndTime
-                    : nextObject?.StartTime;
-                yield return new ActionPoint(calculateTapReleaseTime(releaseTime, nextReversalTime), reverseAction, false);
-            }
-        }
-    }
+        => compiled.Profile.GenerateAutoplayActions(beatmap, compiled)
+            .Where(point => !scratchOnly || (BmsKeyBindingConfiguration.ActionToColumn(point.Action, beatmap.LayoutVariant) is { } column
+                && BmsLayout.IsScratchColumn(column, beatmap.LayoutVariant)));
 }

@@ -1,4 +1,5 @@
 using System;
+using osu.Framework.Localisation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
@@ -16,7 +17,7 @@ internal partial class BmsResultJudgementRow : CompositeDrawable
 
     internal int Count { get; }
 
-    internal BmsResultJudgementRow(HitResult result, int count, int total)
+    internal BmsResultJudgementRow(LocalisableString label, HitResult result, int count, int total)
     {
         Result = result;
         Count = count;
@@ -34,7 +35,7 @@ internal partial class BmsResultJudgementRow : CompositeDrawable
             {
                 new Drawable[]
                 {
-                    new BmsResultFittedText(BmsStrings.ResultJudgement(result), 22, colour: labelColour, useFullGlyphHeight: false),
+                    new BmsResultFittedText(label, 22, colour: labelColour, useFullGlyphHeight: false),
                     new Container
                     {
                         RelativeSizeAxes = Axes.Both,

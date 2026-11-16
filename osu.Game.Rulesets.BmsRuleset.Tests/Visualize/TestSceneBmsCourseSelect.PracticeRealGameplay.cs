@@ -1,3 +1,4 @@
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 #nullable enable
 
 using System;
@@ -262,7 +263,7 @@ public partial class TestSceneBmsCourseSelect
                 Attempts = practice.Results.Select((result, index) => new
                 {
                     result.Attempt,
-                    result.ExScore,
+                    Score = GameplayProfile.FromMods(result.Score.Mods).StoredScore(result.Score),
                     result.Score.Accuracy,
                     result.Score.MaxCombo,
                     result.Score.Statistics,
@@ -315,10 +316,10 @@ public partial class TestSceneBmsCourseSelect
         Assert.That(result.Score.Statistics.GetValueOrDefault(HitResult.Perfect)
                     + result.Score.Statistics.GetValueOrDefault(HitResult.Great)
                     + result.Score.Statistics.GetValueOrDefault(HitResult.Good), Is.GreaterThan(expectedCount * 0.7));
-        Assert.That(result.ExScore, Is.GreaterThan(0));
+        Assert.That(GameplayProfile.FromMods(result.Score.Mods).StoredScore(result.Score), Is.GreaterThan(0));
         Assert.That(result.Score.MaxCombo, Is.GreaterThan(3));
         Assert.That(player.MaxActiveVoices, Is.GreaterThan(0), "Real chart samples must reach the PCM mixer.");
-        Assert.That(result.Statistics.EndingGaugeStates, Is.Not.Empty);
+        Assert.That(result.Statistics.EndingHealth, Is.Not.Null);
         Assert.That(result.Statistics.Gauges.Any(series => series.Points.Count > 1), Is.True);
         Assert.That(player.ImportCount, Is.Zero);
         if (requireLongNote)

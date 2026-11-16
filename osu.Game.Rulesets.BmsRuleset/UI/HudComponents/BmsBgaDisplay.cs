@@ -779,7 +779,7 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
         if (result is BmsJudgementResult { SuppressPenalty: true })
             return;
 
-        triggerAnimations(result.Type.IsHit() && result.Type != HitResult.Meh ? BmsBgaTrigger.Play : BmsBgaTrigger.Miss);
+        triggerAnimations(scoreProcessor!.EngineChart.Profile.ShowHitEffect(result.Type) ? BmsBgaTrigger.Play : BmsBgaTrigger.Miss);
         tryShowPoorLayer();
     }
 

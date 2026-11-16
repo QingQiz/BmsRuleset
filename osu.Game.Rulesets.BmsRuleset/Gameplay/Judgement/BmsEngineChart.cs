@@ -1,60 +1,73 @@
-using System;
+using System.Collections.Generic;
 using System.Linq;
 using RhythmEngine.Core;
-using RhythmEngine.Profiles.Bms;
 using RhythmEngine.Profiles.Common;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.Scoring;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 
 namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 
 /// <summary>Freezes imported chart and mod values into the standalone engine's contracts.</summary>
-internal static class BmsEngineChart
+internal sealed class BmsEngineChart
 {
-    internal static Chart Compile(BmsHitObject[] notes, int columns)
-    {
-        return new Chart(columns, notes.Select((note, id) =>
-        {
-            var longNote = note as BmsLongNote;
-            var kind = note switch
-            {
-                BmsLandmine => KeyNoteKind.Mine,
-                BmsLongNote hold => hold.EffectiveMode switch
-                {
-                    BmsLongNoteMode.ChargeNote => KeyNoteKind.ReleaseHold,
-                    BmsLongNoteMode.HellChargeNote => KeyNoteKind.SustainHold,
-                    _ => KeyNoteKind.Hold,
-                },
-                _ => KeyNoteKind.Tap,
-            };
-            var source = new KeyNote(id, note.Column, Time.FromMilliseconds(note.StartTime),
-                Time.FromMilliseconds(longNote?.EndTime ?? note.StartTime), kind,
-                Directional: BmsLayout.IsScratchColumn(note.Column, note.Beatmap.LayoutVariant)
-                             && note.Beatmap.LayoutVariant is not (BmsLayoutVariant.Keyboard24K or BmsLayoutVariant.Keyboard24KDouble));
+    internal BmsHitObject[] Objects { get; }
 
-            var rule = BmsEngineRules.ForBeatmap(note.Beatmap).GetProfile(note.EffectiveJudgementRate).CreateRule(source);
-            return new ChartNote(id, source.Lane, source.StartTime, source.EndTime, rule);
-        }));
+    internal IReadOnlyDictionary<BmsHitObject, int> Ids { get; }
+
+    internal Chart Chart { get; }
+
+    internal GameplayProfile Profile { get; }
+
+    internal SessionConfiguration Configuration { get; }
+
+    internal ScoreConfiguration Score => Configuration.Score;
+
+    internal double MaximumScore { get; }
+
+    internal BmsEngineChart(BmsBeatmap beatmap, GameplayProfile? profile = null)
+        : this(beatmap.HitObjects.ToArray(), beatmap.LayoutVariant, Enumerable.Range(0, BmsLayout.GetTotalColumns(beatmap.LayoutVariant)).ToArray(), profile,
+            beatmap.PracticeEndTime is { } practiceEndTime ? Time.FromMilliseconds(practiceEndTime) : null)
+    {
     }
 
-    internal static ResultId ResultId(HitResult result) => result switch
+    internal BmsEngineChart(BmsHitObject[] notes, BmsLayoutVariant layout, int[] columns, GameplayProfile? profile = null, long? endTime = null)
     {
-        HitResult.Perfect => BmsResults.PGREAT, HitResult.Great => BmsResults.GREAT, HitResult.Good => BmsResults.GOOD,
-        HitResult.Ok => BmsResults.BAD, HitResult.Meh => BmsResults.POOR, HitResult.Miss => BmsResults.EMPTY_POOR,
-        _ => throw new ArgumentOutOfRangeException(nameof(result)),
+        var scratch = layout switch
+        {
+            BmsLayoutVariant.Bms5K or BmsLayoutVariant.Bms5K2P or BmsLayoutVariant.Bms5KDouble => 5,
+            BmsLayoutVariant.Bme7K or BmsLayoutVariant.Bme7K2P or BmsLayoutVariant.Bme7KDouble => 7,
+            _ => -1,
+        };
+        var notesByColumn = notes.Where(n => n is not BmsInvisibleNote).ToLookup(n => n.Column);
+        // The host's chart traversal order is observable when simultaneous results clip a gauge.
+        Objects = columns.OrderBy(column => scratch < 0 || column > scratch ? column : column == 0 ? scratch : column - 1)
+            .SelectMany(column => notesByColumn[column].OrderBy(n => n.StartTime)).ToArray();
+        Ids = Objects.Select((note, id) => (note, id)).ToDictionary(pair => pair.note, pair => pair.id);
+        Profile = profile ?? BmsGameplayProfile.INSTANCE;
+        (Chart, Configuration) = Profile.Compile(Objects, new KeyChart(columns.Max() + 1, Objects.Select(createKeyNote), endTime: endTime));
+        MaximumScore = Score.MaximumScore(Chart.ScorePlan);
+    }
+
+    internal NoteTiming TimingFor(BmsHitObject note) => ((INoteTiming)Chart.Notes[Ids[note]].Rule).Timing;
+
+    private static KeyNoteKind getKind(BmsHitObject note) => note switch
+    {
+        BmsLandmine => KeyNoteKind.Mine,
+        BmsLongNote hold => hold.Kind,
+        _ => KeyNoteKind.Tap,
     };
 
-    internal static HitResult HitResultFor(ResultId? result) => result switch
+    private static KeyNote createKeyNote(BmsHitObject note, int id)
     {
-        null => HitResult.None,
-        var id when id == BmsResults.PGREAT => HitResult.Perfect,
-        var id when id == BmsResults.GREAT => HitResult.Great,
-        var id when id == BmsResults.GOOD => HitResult.Good,
-        var id when id == BmsResults.BAD => HitResult.Ok,
-        var id when id == BmsResults.POOR || id == BmsResults.MINE_HIT => HitResult.Meh,
-        var id when id == BmsResults.EMPTY_POOR => HitResult.Miss,
-        var id when id == BmsResults.MINE_AVOIDED || id == BmsResults.SUSTAIN_GAIN || id == BmsResults.SUSTAIN_LOSS => HitResult.None,
-        _ => throw new ArgumentOutOfRangeException(nameof(result), result, "The BMS adapter requires a BMS result identity."),
-    };
+        var longNote = note as BmsLongNote;
+        var layout = note.Beatmap.LayoutVariant;
+        return new KeyNote(id, note.Column, Time.FromMilliseconds(note.StartTime),
+            Time.FromMilliseconds(longNote?.EndTime ?? note.StartTime), getKind(note),
+            Directional: BmsLayout.IsScratchColumn(note.Column, layout)
+                         && layout is not (BmsLayoutVariant.Keyboard24K or BmsLayoutVariant.Keyboard24KDouble),
+            MineDamage: note is BmsLandmine mine ? mine.LandmineDamagePercent : 0);
+    }
+
 }

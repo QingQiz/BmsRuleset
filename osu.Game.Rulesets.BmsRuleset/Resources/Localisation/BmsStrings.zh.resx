@@ -64,6 +64,7 @@
   <data name="visual_offset" xml:space="preserve"><value>视觉偏移</value></data>
   <data name="bms_visual_offset" xml:space="preserve"><value>BMS 视觉偏移</value></data>
   <data name="long_note_tail_visual_offset" xml:space="preserve"><value>LN 尾视觉偏移</value></data>
+  <data name="mean_offset_milliseconds" xml:space="preserve"><value>{0:+0.0;-0.0;0.0} 毫秒</value></data>
   <data name="offset_milliseconds" xml:space="preserve"><value>{0:N0} 毫秒</value></data>
   <data name="visual_offset_earlier" xml:space="preserve"><value>{0:N0} 毫秒 - 音符提前显示；适合 Slow 较多的玩家</value></data>
   <data name="visual_offset_later" xml:space="preserve"><value>{0:N0} 毫秒 - 音符延后显示；适合 Fast 较多的玩家</value></data>
@@ -125,10 +126,10 @@
   <data name="scratch" xml:space="preserve"><value>皿</value></data>
   <data name="fast" xml:space="preserve"><value>偏快</value></data>
   <data name="slow" xml:space="preserve"><value>偏慢</value></data>
-  <data name="hit_error_meter_show_empty_poor" xml:space="preserve"><value>显示 E-POOR</value></data>
-  <data name="hit_error_meter_show_empty_poor_description" xml:space="preserve"><value>显示 E-POOR 判定及其灰色判定区间。</value></data>
-  <data name="hit_error_meter_show_poor" xml:space="preserve"><value>显示 POOR</value></data>
-  <data name="hit_error_meter_show_poor_description" xml:space="preserve"><value>在当前显示的判定区域两端显示偏早和偏晚的 POOR 判定。</value></data>
+  <data name="hit_error_meter_show_empty_poor" xml:space="preserve"><value>显示空打</value></data>
+  <data name="hit_error_meter_show_empty_poor_description" xml:space="preserve"><value>显示空打判定及其判定区间。</value></data>
+  <data name="hit_error_meter_show_poor" xml:space="preserve"><value>显示未命中</value></data>
+  <data name="hit_error_meter_show_poor_description" xml:space="preserve"><value>在判定区域两端显示不计入偏差平均值的未命中判定。</value></data>
   <data name="hit_error_meter_fade_duration" xml:space="preserve"><value>判定线淡出时间</value></data>
   <data name="hit_error_meter_fade_duration_description" xml:space="preserve"><value>判定线完成淡出所需的秒数。</value></data>
   <data name="hit_error_meter_line_thickness" xml:space="preserve"><value>判定线粗细</value></data>
@@ -137,8 +138,8 @@
   <data name="hit_error_meter_background_opacity_description" xml:space="preserve"><value>调整误差条黑色背景的不透明度。</value></data>
   <data name="hit_error_meter_colour_bar_height" xml:space="preserve"><value>横轴高度</value></data>
   <data name="hit_error_meter_colour_bar_height_description" xml:space="preserve"><value>调整彩色判定区域的高度，设为 0 可隐藏判定区域。</value></data>
-  <data name="judgement_display_show_empty_poor" xml:space="preserve"><value>显示 E-POOR</value></data>
-  <data name="judgement_display_show_empty_poor_description" xml:space="preserve"><value>在判定 HUD 中显示空 POOR 判定。</value></data>
+  <data name="judgement_display_show_empty_poor" xml:space="preserve"><value>显示空打</value></data>
+  <data name="judgement_display_show_empty_poor_description" xml:space="preserve"><value>在判定 HUD 中显示空打判定。</value></data>
   <data name="key" xml:space="preserve"><value>按键 {0}</value></data>
   <data name="notes" xml:space="preserve"><value>音符</value></data>
   <data name="judgement" xml:space="preserve"><value>判定</value></data>
@@ -302,8 +303,7 @@
   <data name="score_graph_personal_best" xml:space="preserve"><value>个人最好</value></data>
   <data name="score_graph_personal_best_short" xml:space="preserve"><value>最好</value></data>
   <data name="score_graph_target" xml:space="preserve"><value>目标 {0}</value></data>
-  <data name="score_graph_ex_score" xml:space="preserve"><value>{0:D4}</value></data>
-  <data name="score_graph_difference" xml:space="preserve"><value>{0:+0000;-0000;+0000}</value></data>
+<data name="score_graph_difference" xml:space="preserve"><value>{0:+0000;-0000;+0000}</value></data>
   <data name="score_graph_current_colour" xml:space="preserve"><value>当前成绩颜色</value></data>
   <data name="score_graph_current_colour_description" xml:space="preserve"><value>当前 EX Score 柱体的颜色。</value></data>
   <data name="score_graph_personal_best_colour" xml:space="preserve"><value>个人最好颜色</value></data>
@@ -504,7 +504,7 @@
     <value>练习结果汇总</value>
   </data>
   <data name="practice_completed_attempts" xml:space="preserve"><value>已完成 {0} 轮</value></data>
-  <data name="practice_attempt_metrics" xml:space="preserve"><value>EX {0} · 连击 {1} · 血条 {2:0}%</value></data>
+  <data name="practice_attempt_metrics" xml:space="preserve"><value>{0} {1} · 连击 {2:N0} · 血量 {3:0.0}%</value></data>
   <data name="practice_input_time" xml:space="preserve">
     <value>{0:0.000}</value>
   </data>
@@ -612,4 +612,85 @@
   <data name="difficulty_refresh_failed" xml:space="preserve">
     <value>BMS 难度更新结束，{0} 张谱面计算失败。</value>
   </data>
+  <data name="health" xml:space="preserve">
+    <value>血量</value>
+  </data>
+  <data name="gauge_name_assisteasy" xml:space="preserve">
+    <value>Assist Easy</value>
+  </data>
+  <data name="gauge_name_easy" xml:space="preserve">
+    <value>Easy</value>
+  </data>
+  <data name="gauge_name_normal" xml:space="preserve">
+    <value>Normal</value>
+  </data>
+  <data name="gauge_name_hard" xml:space="preserve">
+    <value>Hard</value>
+  </data>
+  <data name="gauge_name_exhard" xml:space="preserve">
+    <value>ExHard</value>
+  </data>
+  <data name="gauge_name_hazard" xml:space="preserve">
+    <value>Hazard</value>
+  </data>
+  <data name="gauge_name_class" xml:space="preserve">
+    <value>Class</value>
+  </data>
+  <data name="gauge_name_exclass" xml:space="preserve">
+    <value>ExClass</value>
+  </data>
+  <data name="gauge_name_exhardclass" xml:space="preserve">
+    <value>ExHard Class</value>
+  </data>
+  <data name="rank_letter_s" xml:space="preserve">
+    <value>S</value>
+  </data>
+  <data name="rank_letter_aaa" xml:space="preserve">
+    <value>AAA</value>
+  </data>
+  <data name="rank_letter_aa" xml:space="preserve">
+    <value>AA</value>
+  </data>
+  <data name="rank_letter_a" xml:space="preserve">
+    <value>A</value>
+  </data>
+  <data name="rank_letter_b" xml:space="preserve">
+    <value>B</value>
+  </data>
+  <data name="rank_letter_c" xml:space="preserve">
+    <value>C</value>
+  </data>
+  <data name="rank_letter_f" xml:space="preserve">
+    <value>F</value>
+  </data>
+  <data name="score_graph_score" xml:space="preserve">
+    <value>{0} {1:0000}</value>
+  </data>
+  <data name="score_graph_rank" xml:space="preserve">
+    <value>{0} {1:0000}</value>
+  </data>
+  <data name="score_graph_maximum_target" xml:space="preserve">
+    <value>目标 满分</value>
+  </data>
+  <data name="difficulty_attribute_exrank" xml:space="preserve"><value>EXRANK</value></data>
+  <data name="difficulty_attribute_exrank_acronym" xml:space="preserve"><value>EX</value></data>
+  <data name="difficulty_attribute_rank" xml:space="preserve"><value>RANK</value></data>
+  <data name="difficulty_attribute_rank_acronym" xml:space="preserve"><value>RK</value></data>
+  <data name="difficulty_attribute_lnmode" xml:space="preserve"><value>长键模式</value></data>
+  <data name="difficulty_attribute_lnmode_acronym" xml:space="preserve"><value>LM</value></data>
+  <data name="difficulty_attribute_total" xml:space="preserve"><value>TOTAL</value></data>
+  <data name="difficulty_attribute_total_acronym" xml:space="preserve"><value>TL</value></data>
+  <data name="timing_metric_group_note" xml:space="preserve"><value>普通音符</value></data>
+  <data name="timing_metric_group_tail" xml:space="preserve"><value>长键尾</value></data>
+  <data name="timing_metric_group_scratch_tail" xml:space="preserve"><value>皿长键尾</value></data>
+  <data name="timing_metric_label" xml:space="preserve"><value>{0} {1}</value></data>
+  <data name="empty_input_fast_zone" xml:space="preserve"><value>E-POOR 提前区间</value></data>
+  <data name="timing_window" xml:space="preserve"><value>{0:0.##} 至 {1:+0.##;-0.##;0} 毫秒</value></data>
+  <data name="gauge_best_judgements" xml:space="preserve"><value>PGREAT/GREAT</value></data>
+  <data name="gauge_delta" xml:space="preserve"><value>{0:+0.###;-0.###;0}%</value></data>
+  <data name="total_value" xml:space="preserve"><value>#TOTAL {0:0.###}</value></data>
+  <data name="default_total_value" xml:space="preserve"><value>默认 TOTAL {0:0.###}</value></data>
+  <data name="long_note_mode_longnote" xml:space="preserve"><value>LN</value></data>
+  <data name="long_note_mode_chargenote" xml:space="preserve"><value>CN</value></data>
+  <data name="long_note_mode_hellchargenote" xml:space="preserve"><value>HCN</value></data>
 </root>

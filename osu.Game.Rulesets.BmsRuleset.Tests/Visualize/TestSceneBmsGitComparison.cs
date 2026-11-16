@@ -52,22 +52,22 @@ public partial class TestSceneBmsGitComparison : BmsPlayerTestScene
             Rank = 2, Total = 24, LockedLongNoteMode = mode,
             HitObjects =
             [
-                new BmsLongNote { StartTime = 3000, Duration = 1000, Column = 0, SampleKey = 11, TailSampleKey = 12 },
+                new BmsLongNote { Kind = mode.ToNoteKind(), StartTime = 3000, Duration = 1000, Column = 0, SampleKey = 11, TailSampleKey = 12 },
                 new BmsNote { StartTime = 3000, Column = 1, SampleKey = 13 },
-                new BmsLongNote { StartTime = 3002, Duration = 1000, Column = 1, SampleKey = 14, TailSampleKey = 15 },
+                new BmsLongNote { Kind = mode.ToNoteKind(), StartTime = 3002, Duration = 1000, Column = 1, SampleKey = 14, TailSampleKey = 15 },
                 new BmsNote { StartTime = 3030, Column = 1, SampleKey = 16 },
                 new BmsLandmine { StartTime = 3201, Column = 1, LandmineDamagePercent = 3 },
                 new BmsLandmine { StartTime = 3202, Column = 0, LandmineDamagePercent = 3 },
                 new BmsNote { StartTime = 3400, Column = 1, SampleKey = 18 },
                 new BmsNote { StartTime = 3400, Column = 1, SampleKey = 19 },
-                new BmsLongNote { StartTime = 3600, Duration = 500, Column = 2, SampleKey = 20, TailSampleKey = 21 },
+                new BmsLongNote { Kind = mode.ToNoteKind(), StartTime = 3600, Duration = 500, Column = 2, SampleKey = 20, TailSampleKey = 21 },
                 new BmsNote { StartTime = 4200, Column = 2, SampleKey = 22 },
                 new BmsNote { StartTime = 12000, Column = 3 },
             ],
             InvisibleNotes = [new BmsInvisibleNote { StartTime = 3100, Column = 1, SampleKey = 17 }],
         };
         if (layout == BmsLayoutVariant.Bme7KDouble)
-            beatmap.HitObjects.Add(new BmsLongNote { StartTime = 3000, Duration = 1000, Column = 15, SampleKey = 23, TailSampleKey = 24 });
+            beatmap.HitObjects.Add(new BmsLongNote { Kind = mode.ToNoteKind(), StartTime = 3000, Duration = 1000, Column = 15, SampleKey = 23, TailSampleKey = 24 });
         if (!autoScratchMine)
             beatmap.HitObjects.RemoveAll(n => n is BmsLandmine && n.Column == 0);
         beatmap.HitObjects = beatmap.HitObjects.OrderBy(n => n.StartTime).ToList();

@@ -1,15 +1,15 @@
-using System;
+using RhythmEngine.Core;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using System;
 using osu.Framework.Allocation;
 using osu.Framework.Screens;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
-using osu.Game.Rulesets.BmsRuleset.UI.Result;
 using osu.Game.Rulesets.BmsRuleset.UI.Result.Course;
+using osu.Game.Rulesets.BmsRuleset.UI.Result;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
 using osu.Game.Screens.Play;
@@ -122,7 +122,7 @@ internal partial class BmsCoursePlayer : SoloPlayer
 
     protected override ResultsScreen CreateResults(ScoreInfo score)
     {
-        session.CompleteCurrentStage(score, currentGaugeStates);
+        session.CompleteCurrentStage(score, currentHealth);
 
         if (session.CurrentStageIndex < session.Stages.Count - 1 && session.CanContinue)
             return new BmsResultsScreenRequest(createStageResults(score));
@@ -143,7 +143,7 @@ internal partial class BmsCoursePlayer : SoloPlayer
                 ScoreProcessor.PopulateScore(score.ScoreInfo);
                 score.ScoreInfo.Date = DateTimeOffset.Now;
                 DrawableRuleset.SetRecordTarget(null);
-                var gaugeStates = currentGaugeStates;
+                var health = currentHealth;
 
                 try
                 {
@@ -153,7 +153,7 @@ internal partial class BmsCoursePlayer : SoloPlayer
                 {
                     Scheduler.Add(() =>
                     {
-                        session.FailCurrentStage(score.ScoreInfo, gaugeStates);
+                        session.FailCurrentStage(score.ScoreInfo, health);
                         Schedule(this.Exit);
                     });
                 }
@@ -186,14 +186,14 @@ internal partial class BmsCoursePlayer : SoloPlayer
 
             // Course history resolves each stage from the score database. The normal player
             // skips importing aborted plays, so finish this import before recording the course.
-            _ = importAbortedScore(Score.DeepClone(), currentGaugeStates.ToArray());
+            _ = importAbortedScore(Score.DeepClone(), currentHealth);
             return true;
         }
 
         return base.OnExiting(e);
     }
 
-    private async Task importAbortedScore(Score score, IReadOnlyList<BmsGaugeStateSnapshot> gaugeStates)
+    private async Task importAbortedScore(Score score, HealthState health)
     {
         var imported = false;
 
@@ -210,7 +210,7 @@ internal partial class BmsCoursePlayer : SoloPlayer
         Scheduler.Add(() =>
         {
             if (imported)
-                session.AbortCurrentStage(score.ScoreInfo, gaugeStates);
+                session.AbortCurrentStage(score.ScoreInfo, health);
             else
                 session.AbortCurrentStageWithoutScore();
 
@@ -220,8 +220,7 @@ internal partial class BmsCoursePlayer : SoloPlayer
         });
     }
 
-    private IReadOnlyList<BmsGaugeStateSnapshot> currentGaugeStates =>
-        ((BmsHealthProcessor)GameplayState.HealthProcessor).CurrentGaugeStates;
+    private HealthState currentHealth => ((BmsHealthProcessor)GameplayState.HealthProcessor).CurrentHealth;
 
     private BmsCourseStageResultsScreen createStageResults(ScoreInfo? score = null)
     {

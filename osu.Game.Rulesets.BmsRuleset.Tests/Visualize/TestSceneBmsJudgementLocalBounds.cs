@@ -10,7 +10,6 @@ using osu.Framework.Audio.Sample;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Animations;
-using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Primitives;
 using osu.Framework.Graphics.Rendering.Dummy;
@@ -113,7 +112,7 @@ public partial class TestSceneBmsJudgementLocalBounds : OsuTestScene
         Container candidateParent = null!;
         Container referenceParent = null!;
         Container pool = null!;
-        var skin = new JudgementSkin(() => new LegacyBmsJudgementPiece(HitResult.Perfect, new Sprite { Texture = textures[0] }));
+        var skin = new JudgementSkin(() => new BmsJudgementPiece(false, new Sprite { Texture = textures[0] }));
         var provider = new JudgementSkinProvider(skin);
         var generate = typeof(Drawable).GetMethod("GenerateDrawNodeSubtree", BindingFlags.Instance | BindingFlags.NonPublic)!
             .CreateDelegate<Func<Drawable, ulong, int, bool, DrawNode?>>();
@@ -234,8 +233,8 @@ public partial class TestSceneBmsJudgementLocalBounds : OsuTestScene
         var alternateTexture = renderer.CreateTexture(91, 37);
         var (candidateContent, candidateSprite) = content();
         var (referenceContent, referenceSprite) = content();
-        var candidatePiece = new LegacyBmsJudgementPiece(HitResult.Perfect, candidateContent);
-        var referencePiece = new LegacyBmsJudgementPiece(HitResult.Perfect, referenceContent);
+        var candidatePiece = new BmsJudgementPiece(false, candidateContent);
+        var referencePiece = new BmsJudgementPiece(false, referenceContent);
         var (candidateRoot, candidateLayers) = createChain(candidatePiece, localOuterBounds);
         var (referenceRoot, referenceLayers) = createChain(referencePiece, false);
         var manualClock = new ManualClock { CurrentTime = 2000, IsRunning = true, Rate = 1 };

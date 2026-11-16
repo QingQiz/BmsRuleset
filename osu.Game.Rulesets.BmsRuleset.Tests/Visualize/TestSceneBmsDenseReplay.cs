@@ -141,7 +141,7 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
             foreach (var entry in Playfield.Stage.Columns.SelectMany(c => c.HitObjectContainer.Entries))
             {
                 var note = (BmsNote)entry.HitObject;
-                var table = BmsEngineRules.GetTiming(BmsLayoutVariant.Bme7K, note.Column, note.EffectiveJudgementRate, false);
+                var table = BmsEngineRules.GetTiming(BmsLayoutVariant.Bme7K, note.Column, BmsEngineRules.RateFor(note), false);
                 Assert.That(entry.LifetimeStart, Is.LessThanOrEqualTo(note.StartTime - table.FastWindowFor(HitResult.Miss)));
             }
         });
@@ -288,7 +288,7 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
         AddUntilStep("all hundred markers rendered", () => meter.Judgements.Lines.Count == 100);
         AddStep("markers and average retain timing semantics", () =>
         {
-            var domain = BmsHitErrorMeter.CreateDomain(BmsLayoutVariant.Bme7K, Playfield.Beatmap.HitObjects[0].EffectiveJudgementRate);
+            var domain = BmsHitErrorMeter.CreateDomain(BmsHitErrorMeter.CreateWindows(Playfield.EngineChart));
             var expected = Enumerable.Range(0, 100).Select(i => domain.RelativePosition(i - 50)).Order().ToArray();
             Assert.That(meter.Judgements.Lines.Select(d => d.X).Order(), Is.EqualTo(expected).Within(0.00001));
             var average = Enumerable.Range(0, 100).Aggregate(0d, (value, i) => value * 0.8 + (domain.RelativePosition(i - 50) - 0.5f) * 0.2);
@@ -327,7 +327,7 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
             reference.UpdateSubTree();
             var arrow = meter.ChildrenOfType<Triangle>().Single();
             var note = Playfield.Beatmap.HitObjects[0];
-            var domain = BmsHitErrorMeter.CreateDomain(BmsLayoutVariant.Bme7K, Playfield.Beatmap.HitObjects[0].EffectiveJudgementRate);
+            var domain = BmsHitErrorMeter.CreateDomain(BmsHitErrorMeter.CreateWindows(Playfield.EngineChart));
             reference.X = domain.RelativePosition(0);
             var average = 0d;
 

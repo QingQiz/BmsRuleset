@@ -52,8 +52,8 @@ public partial class TestSceneBmsLongNoteLifecycle : BmsPlayerTestScene
             LockedLongNoteMode = mode,
             HitObjects =
             [
-                new BmsLongNote { StartTime = 5000, Duration = 2000, Column = 1 },
-                new BmsLongNote { StartTime = duplicateHeads ? 5000 : 9000, Duration = 1000, Column = 1 },
+                new BmsLongNote { Kind = mode.ToNoteKind(), StartTime = 5000, Duration = 2000, Column = 1 },
+                new BmsLongNote { Kind = mode.ToNoteKind(), StartTime = duplicateHeads ? 5000 : 9000, Duration = 1000, Column = 1 },
                 new BmsNote { StartTime = 30000, Column = 2 },
             ],
         };
@@ -330,10 +330,10 @@ public partial class TestSceneBmsLongNoteLifecycle : BmsPlayerTestScene
                 checkpoint,
                 events = score.JudgementEvents,
                 results = Player.Results.Select(r => new { id = Array.IndexOf(objects, r.HitObject), r.Type, r.TimeAbsolute, r.GameplayRate }),
-                progression = BmsExScore.CreateProgression(score.JudgementEvents),
+                progression = BmsTestExScore.CreateProgression(score.JudgementEvents),
                 combo = score.Combo.Value,
                 total = score.TotalScore.Value,
-                health = ((BmsHealthProcessor)Player.HealthProcessor).CurrentGaugeStates,
+                health = ((BmsHealthProcessor)Player.HealthProcessor).Gauge().CurrentGaugeStates,
             });
             TestContext.WriteLine("P3_TRACE " + trace);
             var time = Playfield.Time.Current;
@@ -348,14 +348,17 @@ public partial class TestSceneBmsLongNoteLifecycle : BmsPlayerTestScene
                 var replay = new Replay { Frames = frames.Cast<ReplayFrame>().ToList(), HasReceivedAllFrames = true };
                 var expected = BmsReplaySimulation.Run(Playfield.Beatmap, replay, simulationScore);
                 Assert.That(JsonSerializer.Serialize(score.JudgementEvents), Is.EqualTo(JsonSerializer.Serialize(expected.Judgements)));
-                Assert.That(((BmsHealthProcessor)Player.HealthProcessor).CurrentGaugeStates, Is.EqualTo(expected.Gauges[^1].States));
+                Assert.That(((BmsHealthProcessor)Player.HealthProcessor).CurrentHealth.Layers, Is.EqualTo(expected.Gauges[^1].Health.Layers));
             }
 
-            // Keep the pre-refactor score expectations while allowing intentional logical timestamp changes.
+            // Keep the recorded judgement progression; mines no longer dilute its normalised score.
             var previous = baseline.RootElement.GetProperty("traces").GetProperty(scenario).GetProperty(checkpoint);
-            Assert.That(JsonSerializer.Serialize(BmsExScore.CreateProgression(score.JudgementEvents)), Is.EqualTo(JsonSerializer.Serialize(previous.GetProperty("progression"))));
+            Assert.That(JsonSerializer.Serialize(BmsTestExScore.CreateProgression(score.JudgementEvents)), Is.EqualTo(JsonSerializer.Serialize(previous.GetProperty("progression"))));
             Assert.That(score.Combo.Value, Is.EqualTo(previous.GetProperty("combo").GetInt32()));
-            Assert.That(score.TotalScore.Value, Is.EqualTo(previous.GetProperty("total").GetInt64()));
+            var progression = previous.GetProperty("progression");
+            var maximumExScore = mode == BmsLongNoteMode.LongNote ? 6 : 10;
+            var expectedTotal = (long)Math.Round(1_000_000.0 * progression[progression.GetArrayLength() - 1].GetInt32() / maximumExScore);
+            Assert.That(score.TotalScore.Value, Is.EqualTo(expectedTotal));
         });
     }
 

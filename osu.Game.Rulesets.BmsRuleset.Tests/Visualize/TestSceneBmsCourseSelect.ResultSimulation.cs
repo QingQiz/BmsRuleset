@@ -87,7 +87,7 @@ public partial class TestSceneBmsCourseSelect
                 health.Mods = session.Mods;
                 foreach (var mod in session.Mods.OfType<IApplicableToHealthProcessor>())
                     mod.ApplyToHealthProcessor(health);
-                openings[stage] = health.CurrentGaugeStates.ToArray();
+                openings[stage] = health.Gauge().CurrentGaugeStates.ToArray();
                 for (var i = 0; i < beatmap.HitObjects.Count; i++)
                     health.ApplyTestNonConsumingJudgement(HitResult.Meh);
                 Assert.That(health.HasPassedAtEnd(), Is.True);
@@ -102,13 +102,13 @@ public partial class TestSceneBmsCourseSelect
                         Ruleset = charts[stage].Ruleset,
                         Passed = true,
                         Mods = autoGauge
-                            ? [new BmsModAutoGauge(), BmsCourseSession.CreateGaugeMod(health.GaugeType)]
+                            ? [new BmsModAutoGauge(), BmsCourseSession.CreateGaugeMod(health.Gauge().GaugeType)]
                             : [BmsCourseSession.CreateGaugeMod(gaugeType)],
                     },
                     Replay = { Frames = [new BmsReplayFrame(0), new BmsReplayFrame(6000)] },
                 };
                 replays.Add(score.ScoreInfo.ID, BmsTestReplayArchive.RoundTrip(score, legacy: true));
-                session.CompleteCurrentStage(score.ScoreInfo, health.CurrentGaugeStates);
+                session.CompleteCurrentStage(score.ScoreInfo, health.CurrentHealth);
 
                 if (stage + 1 < stages.Length)
                 {

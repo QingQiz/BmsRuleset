@@ -1,11 +1,11 @@
 #nullable enable
-
 using System;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using NUnit.Framework;
+using RhythmEngine.Profiles.Common;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
@@ -44,7 +44,7 @@ public partial class TestSceneBmsColumnJudgement : BmsPlayerTestScene
             [
                 new BmsNote { StartTime = 5000, Column = 1 },
                 new BmsNote { StartTime = 5000, Column = 1 },
-                new BmsLongNote { StartTime = 5000, Duration = 200, Column = 1 },
+                new BmsLongNote { Kind = KeyNoteKind.ReleaseHold, StartTime = 5000, Duration = 200, Column = 1 },
                 new BmsNote { StartTime = 20000, Column = 2 },
             ],
         };
@@ -114,7 +114,7 @@ public partial class TestSceneBmsColumnJudgement : BmsPlayerTestScene
         {
             var note = (BmsHitObject)Player.GameplayState.Beatmap.HitObjects.First(h => h.StartTime == 5000);
             deadline = note.StartTime + BmsEngineRules.GetTiming(note.Beatmap.LayoutVariant,
-                note.Column, note.EffectiveJudgementRate, false).SlowWindowFor(HitResult.Ok);
+                note.Column, BmsEngineRules.RateFor(note), false).SlowWindowFor(HitResult.Ok);
         });
         hideNotes();
     }
@@ -153,10 +153,10 @@ public partial class TestSceneBmsColumnJudgement : BmsPlayerTestScene
             {
                 checkpoint,
                 events = score.JudgementEvents,
-                progression = BmsExScore.CreateProgression(score.JudgementEvents),
+                progression = BmsTestExScore.CreateProgression(score.JudgementEvents),
                 combo = score.Combo.Value,
                 total = score.TotalScore.Value,
-                health = ((BmsHealthProcessor)Player.HealthProcessor).CurrentGaugeStates,
+                health = ((BmsHealthProcessor)Player.HealthProcessor).Gauge().CurrentGaugeStates,
             });
             TestContext.WriteLine("P2_TRACE " + trace);
             var expected = baseline.RootElement.GetProperty("traces").GetProperty(scenario).GetProperty(checkpoint);

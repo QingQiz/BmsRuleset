@@ -1,31 +1,29 @@
-using System;
 using System.Linq;
-using RhythmEngine.Core;
-using RhythmEngine.Profiles.Bms;
+using System;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
-using osu.Framework.Graphics;
 using osu.Framework.Graphics.Primitives;
+using osu.Framework.Graphics;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Framework.Platform;
-using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
-using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Embedded;
 using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Runtime;
-using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
+using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Screens.Play;
@@ -51,9 +49,14 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     #region Construction
 
-    public BmsPlayfield(BmsBeatmap beatmap)
+    private readonly Func<BmsEngineChart> getEngineChart;
+
+    internal BmsEngineChart EngineChart => getEngineChart();
+
+    internal BmsPlayfield(BmsBeatmap beatmap, Func<BmsEngineChart> getEngineChart)
     {
         Beatmap = beatmap;
+        this.getEngineChart = getEngineChart;
         textEventController = new BmsGameplayTextEventController(beatmap.TextEvents);
 
         activeSkin = new BmsEmbeddedSkinSource();
@@ -77,7 +80,6 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         Stage.SkinHitTargetPositionChanged += onSkinHitTargetPositionChanged;
         foreach (var column in Stage.Columns.Cast<BmsColumn>())
             column.JudgementBridge = new BmsJudgementBridge(this, column);
-        initialiseJudgementEngine();
 
         InternalChildren =
         [
@@ -88,11 +90,13 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     private void initialiseJudgementEngine()
     {
         var judgementColumns = Stage.Columns.Cast<BmsColumn>().ToArray();
-        var judgementObjects = Beatmap.HitObjects.ToArray();
-        judgementEngine = new BmsJudgementEngine(judgementObjects, LayoutVariant, judgementColumns.Select(column =>
-            new BmsJudgementColumnDefinition(column.Index, column.JudgementBridge)).ToArray(), objects =>
-            (BmsProfiles.CreateScore(BmsEngineRules.ForBeatmap(Beatmap).EmptyPoorBreaksCombo),
-                healthProcessor?.CreateEngineHealth(objects) ?? BmsEngineGauge.CreateDefault(objects)));
+        judgementEngine = new BmsJudgementEngine(EngineChart, judgementColumns.Select(column =>
+            new BmsJudgementColumnDefinition(column.Index, column.JudgementBridge)).ToArray(), chart =>
+            healthProcessor?.CreateEngineHealth(chart) ?? chart.Configuration.Health, session =>
+        {
+            scoreProcessor?.ApplyEngineState(session);
+            healthProcessor?.ApplyEngineState(session);
+        });
 
         foreach (var column in judgementColumns)
         {
@@ -406,6 +410,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     [BackgroundDependencyLoader(true)]
     private void load()
     {
+        initialiseJudgementEngine();
         ScrollController.SetHitTargetPosition(Stage.SkinHitTargetPosition);
 
         parentSkin.SourceChanged += updateEmbeddedSkinFallback;
@@ -413,8 +418,11 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         skinCache.WarmLongNoteTextures(Beatmap, host.Renderer);
     }
 
-    protected override HitObjectLifetimeEntry CreateLifetimeEntry(HitObject hitObject) =>
-        new BmsHitObjectLifetimeEntry(hitObject, ScrollController, () => VisualOffset.Value);
+    protected override HitObjectLifetimeEntry CreateLifetimeEntry(HitObject hitObject)
+        => hitObject is BmsHitObject note ? CreateNoteLifetimeEntry(note) : base.CreateLifetimeEntry(hitObject);
+
+    internal BmsHitObjectLifetimeEntry CreateNoteLifetimeEntry(BmsHitObject note)
+        => new(note, ScrollController, () => VisualOffset.Value, note is BmsInvisibleNote ? null : EngineChart.TimingFor(note));
 
     protected override void LoadComplete()
     {
@@ -494,26 +502,24 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     {
         if (result is BmsJudgementResult { SuppressPenalty: true })
             return;
-        if (drawableHitObject is not DrawableBmsHitObject bmsHitObject)
+        if (drawableHitObject is not DrawableBmsHitObject)
             return;
-
-        if (bmsHitObject.HitObject is BmsLandmine)
-        {
-            requestJudgementDisplay(HitResult.Meh);
-            return;
-        }
 
         requestJudgementDisplay(result.Type);
     }
 
     internal void RegisterNonConsumingJudgement(HitResult type, double expectedTime, int column, in BmsFrameContext frame)
     {
-        scoreProcessor?.RegisterNonConsumingJudgement(type, frame.SimulationTime, expectedTime, column, frame.EngineResult!.Score);
-        ApplyEngineHealth(frame.EngineResult!.Health);
+        scoreProcessor?.RegisterNonConsumingJudgement(type, frame.SimulationTime, expectedTime, column, frame.EngineResult!);
+        ApplyEngineResult(frame.EngineResult!);
         requestJudgementDisplay(type);
     }
 
-    internal void ApplyEngineHealth(HealthState state) => healthProcessor?.ApplyEngineTick(state);
+    internal void ApplyEngineResult(RhythmEngine.Core.JudgementResult result)
+    {
+        scoreProcessor?.ApplyEngineScore(result.Score);
+        healthProcessor?.ApplyEngineTick(result);
+    }
 
     private void requestJudgementDisplay(HitResult result)
     {
@@ -521,7 +527,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         if (result is HitResult.IgnoreMiss or HitResult.IgnoreHit)
             return;
 
-        if (result == HitResult.Meh)
+        if (judgementEngine.Profile.TimingKindFor(result) == ResultTimingKind.Untimed)
             textEventController.TriggerMistake(gameplayEvents.RaiseText);
 
         gameplayEvents.RaiseJudgementDisplayed(result);

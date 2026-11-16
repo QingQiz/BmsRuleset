@@ -15,7 +15,7 @@ public class EngineContractTest
         [
             new ChartNote(7, 0, 1000000, 1000000, tapRule()),
             new ChartNote(3, 0, 2000000, 2000000, tapRule()),
-        ]);
+        ], [new ScoringOpportunity(7, NoteParts.TAP, 1), new ScoringOpportunity(3, NoteParts.TAP, 1)]);
         var session = new JudgementSession(chart, configuration());
         var first = session.AdvanceTo(1000000, [new InputEvent(1000000, 0, true)]);
         var clone = session.Clone();
@@ -43,8 +43,8 @@ public class EngineContractTest
         var hit = new ResultId("hit");
         var miss = new ResultId("miss");
         var rule = new TapRule(new TapConfiguration(new TimingWindows([new(hit, -30000, 30000), new(empty, -500000, -30001)]),
-            30000, miss, 1, NonResolvingResults: [empty]));
-        var session = new JudgementSession(new Chart(1, [new ChartNote(7, 0, 1000000, 1000000, rule)]), configuration());
+            30000, miss, NonResolvingResults: [empty]));
+        var session = new JudgementSession(new Chart(1, [new ChartNote(7, 0, 1000000, 1000000, rule)], []), configuration());
         var early = session.AdvanceTo(700000,
         [
             new InputEvent(600000, 0, true), new InputEvent(600001, 0, false),
@@ -130,7 +130,7 @@ public class EngineContractTest
     public void RepeatedPhysicalPressDoesNotHitAnotherNote()
     {
         var rule = tapRule();
-        var chart = new Chart(1, [new ChartNote(0, 0, 1000000, 1000000, rule), new ChartNote(1, 0, 1000000, 1000000, rule)]);
+        var chart = new Chart(1, [new ChartNote(0, 0, 1000000, 1000000, rule), new ChartNote(1, 0, 1000000, 1000000, rule)], []);
         var session = new RecordingSession(chart, configuration());
         session.AdvanceTo(1000000, [new InputEvent(1000000, 0, true), new InputEvent(1000000, 0, true)]);
         Assert.That(session.EventCount, Is.EqualTo(1));
@@ -145,7 +145,7 @@ public class EngineContractTest
         var chart = new Chart(1, [
             new ChartNote(0, 0, 1000000, 1000000, new MineRule(0, 0, new ResultId("mine"), new ResultId("avoided"), order)),
             new ChartNote(1, 0, 1000000, 1000000, tapRule())
-        ]);
+        ], []);
         var session = new RecordingSession(chart, configuration());
         session.AdvanceTo(1000000, [new InputEvent(1000000, 0, true)]);
         Assert.That(session.GetEventsSince(0).Select(e => e.Result.Value), Is.EqualTo([expectedMine, "hit"]));
@@ -154,16 +154,34 @@ public class EngineContractTest
     [Test]
     public void SimultaneousInputKeepsSourceOrder()
     {
-        var chart = new Chart(2, [new ChartNote(7, 0, 1000000, 1000000, tapRule()), new ChartNote(3, 1, 1000000, 1000000, tapRule())]);
+        var chart = new Chart(2, [new ChartNote(7, 0, 1000000, 1000000, tapRule()), new ChartNote(3, 1, 1000000, 1000000, tapRule())], []);
         var session = new RecordingSession(chart, configuration());
         session.AdvanceTo(1000000, [new InputEvent(1000000, 1, true), new InputEvent(1000000, 0, true)]);
         Assert.That(session.GetEventsSince(0).Select(e => (e.Sequence, e.NoteId)), Is.EqualTo([(0L, 3), (1L, 7)]));
     }
 
     [Test]
+    public void ScoringPlanDoesNotChangeJudgementRules()
+    {
+        var note = new ChartNote(7, 0, 1_000_000, 1_000_000, tapRule());
+        var unscoredChart = new Chart(1, [note], []);
+        var scoredChart = new Chart(1, [note], [new ScoringOpportunity(note.Id, NoteParts.TAP, 3)]);
+        var unscoredSession = new JudgementSession(unscoredChart, configuration());
+        var scoredSession = new JudgementSession(scoredChart, configuration());
+
+        var unscoredBatch = unscoredSession.AdvanceTo(1_000_000, [new InputEvent(1_000_000, 0, true)]);
+        var scoredBatch = scoredSession.AdvanceTo(1_000_000, [new InputEvent(1_000_000, 0, true)]);
+
+        Assert.That(unscoredChart.ScorePlan.Opportunities, Is.Empty);
+        Assert.That(scoredChart.ScorePlan.MaximumAccuracy, Is.EqualTo(3));
+        Assert.That(unscoredBatch.Transitions.Single().Judgements.Single().Event.Result,
+            Is.EqualTo(scoredBatch.Transitions.Single().Judgements.Single().Event.Result));
+    }
+
+    [Test]
     public void SimultaneousAutomaticEventsKeepChartSourceOrder()
     {
-        var chart = new Chart(1, [new ChartNote(7, 0, 1000000, 1000000, tapRule()), new ChartNote(3, 0, 1000000, 1000000, tapRule())]);
+        var chart = new Chart(1, [new ChartNote(7, 0, 1000000, 1000000, tapRule()), new ChartNote(3, 0, 1000000, 1000000, tapRule())], []);
         var session = new RecordingSession(chart, configuration());
         session.AdvanceTo(2000000);
         Assert.That(session.GetEventsSince(0).Select(e => e.NoteId), Is.EqualTo([7, 3]));
@@ -177,6 +195,10 @@ public class EngineContractTest
             new ChartNote(42, 2, 1000000, 1000000, tapRule()),
             new ChartNote(7, 0, 1000000, 1000000, tapRule()),
             new ChartNote(-9, 2, 1000000, 1000000, tapRule()),
+        ],
+        [
+            new ScoringOpportunity(42, NoteParts.TAP, 1), new ScoringOpportunity(7, NoteParts.TAP, 1),
+            new ScoringOpportunity(-9, NoteParts.TAP, 1),
         ]);
         var first = new RecordingSession(chart, configuration());
         var second = new RecordingSession(chart, configuration());
@@ -231,7 +253,7 @@ public class EngineContractTest
     public void HealthBoundsAndFailureAreLatched()
     {
         var rule = tapRule();
-        var chart = new Chart(1, [new ChartNote(0, 0, 1000000, 1000000, rule), new ChartNote(1, 0, 2000000, 2000000, rule)]);
+        var chart = new Chart(1, [new ChartNote(0, 0, 1000000, 1000000, rule), new ChartNote(1, 0, 2000000, 2000000, rule)], []);
         var config = configuration() with { Health = HealthRules.LatchedGauge(0, 1, 0.5, c => c.Event.Result.Value == "hit" ? 2 : -2, v => v <= 0, v => v > 0) };
         var session = new RecordingSession(chart, config);
         session.AdvanceTo(1500000);
@@ -247,8 +269,8 @@ public class EngineContractTest
         var windows = new[] { new TimingWindow(new ResultId("hit"), -30000, 30000) };
         var table = new TimingWindows(windows);
         windows[0] = new TimingWindow(new ResultId("changed"), 0, 0);
-        var notes = new List<ChartNote> { new(0, 0, 1000000, 1000000, new TapRule(new TapConfiguration(table, 30000, new ResultId("miss"), 1))) };
-        var chart = new Chart(1, notes);
+        var notes = new List<ChartNote> { new(0, 0, 1000000, 1000000, new TapRule(new TapConfiguration(table, 30000, new ResultId("miss")))) };
+        var chart = new Chart(1, notes, []);
         notes.Clear();
         var session = new RecordingSession(chart, configuration());
         session.AdvanceTo(1000000, [new InputEvent(1000000, 0, true)]);
@@ -259,7 +281,7 @@ public class EngineContractTest
     public void InputDispatchPreservesUnmatchedRepeatedEdgesAndTimerOrder()
     {
         var session = new RecordingSession(new Chart(1,
-            [new ChartNote(0, 0, 1000000, 1000000, tapRule()), new ChartNote(1, 0, 2000000, 2000000, tapRule())]), configuration());
+            [new ChartNote(0, 0, 1000000, 1000000, tapRule()), new ChartNote(1, 0, 2000000, 2000000, tapRule())], []), configuration());
         var dispatched = session.AdvanceTo(3000000,
         [
             new InputEvent(1000000, 0, true), new InputEvent(1000000, 0, false),
@@ -280,7 +302,7 @@ public class EngineContractTest
             new ChartNote(0, 0, 1000000, 1000000, tapRule()),
             new ChartNote(1, 0, 1000000, 1000000, tapRule()),
             new ChartNote(2, 0, 1000000, 1000000, new MineRule(0, 0, new ResultId("mine"), new ResultId("avoided"), acceptsInput: false)),
-        ]), configuration());
+        ], []), configuration());
         session.AdvanceTo(1000000, [new InputEvent(1000000, 0, true)]);
         Assert.Throws<ArgumentException>(() => session.AppendInputs([new InputEvent(1000000, 0, false), new InputEvent(999999, 0, true)]));
         Assert.That(session.GetNote(0).Held, Is.True);
@@ -300,7 +322,7 @@ public class EngineContractTest
                 Layers = [.. c.Health.Layers.Select(layer => layer with { Value = layer.Value + (c.Event.Result.Value == "hit" ? .1 : -.2) })],
             }, _ => SessionOutcome.InProgress),
         };
-        var session = new RecordingSession(new Chart(1, [new ChartNote(0, 0, 1000000, 1000000, tapRule())]), config);
+        var session = new RecordingSession(new Chart(1, [new ChartNote(0, 0, 1000000, 1000000, tapRule())], []), config);
         var clone = session.Clone();
         session.AdvanceTo(2000000, [new InputEvent(1000000, 0, true)]);
         var snapshot = session.Health;
@@ -324,9 +346,10 @@ public class EngineContractTest
         var hit = new ResultId("hit");
         var drop = new ResultId("drop");
         var windows = new TimingWindows([new(hit, -100, 100)]);
-        var rule = new HoldRule(new HoldConfiguration(windows, windows, 100, 100, new ResultId("miss"), hit, drop, 0, 1,
+        var rule = new HoldRule(new HoldConfiguration(windows, windows, 100, 100, new ResultId("miss"), hit, drop,
             HoldEndMode.Release, HoldDropMode.Resolve, e => new NoteEmission(new PartId("tail"), e.TailResult, e.Note.EndTime)));
-        var session = new RecordingSession(new Chart(1, [new ChartNote(7, 0, 1000, 2000, rule)]), configuration());
+        var session = new RecordingSession(new Chart(1, [new ChartNote(7, 0, 1000, 2000, rule)],
+            [new ScoringOpportunity(7, NoteParts.TAIL, 1)]), configuration());
         session.AdvanceTo(1000, [new InputEvent(1000, 0, true)]);
         var active = session.GetNote(7);
 
@@ -353,9 +376,9 @@ public class EngineContractTest
         Assert.That(session.GetNote(7).Parts.All(p => !p.Resolved && p.Reason == null), Is.True);
     }
 
-    private static TapRule tapRule() => new(new TapConfiguration(new TimingWindows([new TimingWindow(new ResultId("hit"), -30000, 30000)]), 30000, new ResultId("miss"), 1));
+    private static TapRule tapRule() => new(new TapConfiguration(new TimingWindows([new TimingWindow(new ResultId("hit"), -30000, 30000)]), 30000, new ResultId("miss")));
 
-    private static RecordingSession createTapSession() => new(new Chart(1, [new ChartNote(0, 0, 1000000, 1000000, tapRule())]), configuration());
+    private static RecordingSession createTapSession() => new(new Chart(1, [new ChartNote(0, 0, 1000000, 1000000, tapRule())], []), configuration());
 
     private static SessionConfiguration configuration() => new("test-unfamiliar-results", new ScoreConfiguration(new ScoreState(),
             (state, context) => context.Opportunity == null ? state : state with { Score = state.Score + (context.Event.Result.Value == "hit" ? 1 : 0) },

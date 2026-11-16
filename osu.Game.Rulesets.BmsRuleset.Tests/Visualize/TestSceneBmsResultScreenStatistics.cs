@@ -1,3 +1,4 @@
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -420,7 +421,7 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
         AddStep("load timing balance", () => Child = new Container
         {
             Size = new Vector2(320, 40),
-            Child = balance = new BmsResultFastSlow(hitEvents),
+            Child = balance = new BmsResultFastSlow(BmsGameplayProfile.INSTANCE, hitEvents),
         });
         AddUntilStep("timing balance loaded", () => balance.IsLoaded);
         AddAssert("only directional BMS hits are counted", () => (balance.FastCount, balance.SlowCount), () => Is.EqualTo((2, 1)));
@@ -442,7 +443,7 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
         AddStep("load timing balance", () => Child = new Container
         {
             Size = new Vector2(320, 40),
-            Child = balance = new BmsResultFastSlow(Enumerable.Repeat(-10, fast).Concat(Enumerable.Repeat(10, slow))
+            Child = balance = new BmsResultFastSlow(BmsGameplayProfile.INSTANCE, Enumerable.Repeat(-10, fast).Concat(Enumerable.Repeat(10, slow))
                 .Select(offset => new HitEvent(offset, 1, HitResult.Perfect, new BmsNote(), null, null)).ToArray()),
         });
         AddUntilStep("timing balance loaded", () => balance.IsLoaded);
@@ -475,7 +476,7 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
     }
 
     [Test]
-    public void TestBmsResultStatisticsUseExScoreInsteadOfPerformance()
+    public void TestResultStatisticsUseProfileScore()
     {
         TestBmsSoloResultsScreen screen = null!;
 
@@ -483,15 +484,18 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
         {
             OsuScreenStack stack;
             Child = stack = new OsuScreenStack { RelativeSizeAxes = Axes.Both };
-            stack.Push(screen = new TestBmsSoloResultsScreen(createScore()));
+            var score = createScore();
+            stack.Push(screen = new TestBmsSoloResultsScreen(score));
         });
 
         AddUntilStep("results screen loaded", () => screen.IsLoaded);
         AddUntilStep("statistics shown automatically", () => this.ChildrenOfType<BmsStatisticsPanel>().Single().State.Value == Visibility.Visible);
         AddAssert("performance statistic is absent", () => this.ChildrenOfType<PerformanceStatistic>().Count() == 0);
         AddUntilStep("new overview loaded", () => screen.ChildrenOfType<BmsResultOverview>().SingleOrDefault()?.IsLoaded == true);
-        AddAssert("EXSCORE uses actual judgement values", () => screen.ChildrenOfType<BmsResultFittedText>()
-            .Single(text => text.Name == "EXSCORE value").ChildrenOfType<SpriteText>().Single().Text.ToString(), () => Is.EqualTo("1542"));
+        AddAssert("score uses selected profile", () => screen.ChildrenOfType<BmsResultFittedText>()
+            .Single(text => text.Name == "Score value").ChildrenOfType<SpriteText>().Single().Text.ToString(), () => Is.EqualTo("1542"));
+        AddAssert("judgement labels use selected profile", () => screen.ChildrenOfType<BmsResultJudgementRow>()
+            .Single(row => row.Result == HitResult.Miss).ChildrenOfType<SpriteText>().Any(text => text.Text.ToString() == "E-POOR"));
         AddAssert("six judgement bars use score counts", () => screen.ChildrenOfType<BmsResultJudgementRow>().Select(row => row.Count),
             () => Is.EqualTo(new[] { 621, 300, 41, 12, 8, 3 }));
         AddAssert("judgement bar uses count proportion", () => screen.ChildrenOfType<BmsResultJudgementRow>()
@@ -931,7 +935,7 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
                 Origin = Anchor.Centre,
                 Width = 720,
                 AutoSizeAxes = Axes.Y,
-                Child = hitOffsetStatistic = new BmsHitOffsetStatistic(createGaugeHitEvents(), new BmsBeatmap
+                Child = hitOffsetStatistic = new BmsHitOffsetStatistic(new ScoreInfo { HitEvents = createGaugeHitEvents() }, new BmsBeatmap
                 {
                     LayoutVariant = BmsLayoutVariant.Bms5K,
                     TotalColumns = BmsLayout.GetTotalColumns(BmsLayoutVariant.Bms5K),
@@ -981,7 +985,7 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
                 Origin = Anchor.Centre,
                 Width = 720,
                 AutoSizeAxes = Axes.Y,
-                Child = hitOffsetStatistic = new BmsHitOffsetStatistic(createGaugeHitEvents(), beatmap),
+                Child = hitOffsetStatistic = new BmsHitOffsetStatistic(new ScoreInfo { HitEvents = createGaugeHitEvents() }, beatmap),
             };
         });
 
@@ -1007,7 +1011,7 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
                 Origin = Anchor.Centre,
                 Width = 720,
                 AutoSizeAxes = Axes.Y,
-                Child = hitScatterStatistic = new BmsHitScatterStatistic(createGaugeHitEvents(), new BmsBeatmap
+                Child = hitScatterStatistic = new BmsHitScatterStatistic(new ScoreInfo { HitEvents = createGaugeHitEvents() }, new BmsBeatmap
                 {
                     LayoutVariant = BmsLayoutVariant.Bms5K,
                     TotalColumns = BmsLayout.GetTotalColumns(BmsLayoutVariant.Bms5K),
@@ -1082,7 +1086,7 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
             {
                 Width = 720,
                 AutoSizeAxes = Axes.Y,
-                Child = hitScatterStatistic = new BmsHitScatterStatistic(hitEvents, new BmsBeatmap
+                Child = hitScatterStatistic = new BmsHitScatterStatistic(new ScoreInfo { HitEvents = [.. hitEvents] }, new BmsBeatmap
                 {
                     LayoutVariant = BmsLayoutVariant.Bms5K,
                     TotalColumns = BmsLayout.GetTotalColumns(BmsLayoutVariant.Bms5K),
@@ -1138,7 +1142,7 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
                 Origin = Anchor.Centre,
                 Width = 720,
                 AutoSizeAxes = Axes.Y,
-                Child = hitScatterStatistic = new BmsHitScatterStatistic(createGaugeHitEvents(), new BmsBeatmap
+                Child = hitScatterStatistic = new BmsHitScatterStatistic(new ScoreInfo { HitEvents = createGaugeHitEvents() }, new BmsBeatmap
                 {
                     LayoutVariant = BmsLayoutVariant.Bms5K,
                     TotalColumns = BmsLayout.GetTotalColumns(BmsLayoutVariant.Bms5K),
@@ -1203,4 +1207,5 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
             () => Is.EqualTo(accuracy - 0.001).Within(0.0001));
         AddAssert("native score panels absent", () => screen.ChildrenOfType<ScorePanel>(), () => Is.Empty);
     }
+
 }

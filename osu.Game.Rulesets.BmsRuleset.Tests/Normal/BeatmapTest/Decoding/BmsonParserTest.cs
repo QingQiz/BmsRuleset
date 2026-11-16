@@ -132,7 +132,7 @@ public class BmsonParserTest
         Assert.That(beatmap.HitObjects, Has.Count.EqualTo(1));
         Assert.That(beatmap.HitObjects[0].SampleKey, Is.EqualTo(1));
         Assert.That(beatmap.HitObjects[0].AdditionalSampleKeys, Is.EqualTo(new[] { 2 }));
-        Assert.That(beatmap.HitObjects[0].EffectiveJudgementRate, Is.EqualTo(1.5));
+        Assert.That(BmsEngineRules.RateFor(beatmap.HitObjects[0]), Is.EqualTo(1.5));
         Assert.That(beatmap.Total, Is.EqualTo(BmsGaugeCalculator.CalculateDefaultTotal(1) / 2));
         Assert.That(beatmap.BeatmapInfo.DifficultyName, Is.EqualTo("ANOTHER"));
         Assert.That(BmsDifficultyInfo.FromOsuDifficulty(beatmap.Difficulty).ExRank, Is.EqualTo(200));
@@ -141,7 +141,7 @@ public class BmsonParserTest
         Assert.That(summary.Metadata.RawTitle, Is.EqualTo("Song [title]"));
         Assert.That(summary.Metadata.DifficultyName, Is.EqualTo("ANOTHER"));
         Assert.That(summary.Metadata.ExRank, Is.EqualTo(200));
-        Assert.That(BmsGameplayAudioController.GetSampleUsages(beatmap).Select(usage => usage.SampleKey), Is.EquivalentTo(new[] { 1, 2 }));
+        Assert.That(BmsGameplayAudioController.GetSampleUsages(beatmap, new BmsEngineChart(beatmap)).Select(usage => usage.SampleKey), Is.EquivalentTo(new[] { 1, 2 }));
         beatmap.HitObjects[0].SampleVolume = 70;
         var preview = BmsEventPreviewTimeline.Create(beatmap, beatmap, default);
         Assert.That(preview.Entries, Has.Count.EqualTo(2));
@@ -223,7 +223,7 @@ public class BmsonParserTest
         var profile = BmsGaugeProfileFactory.Create(BmsGaugeType.Normal);
         var calculator = new BmsGaugeCalculator(profile, result.Total, 1);
         Assert.That(calculator.Total, Is.Zero);
-        Assert.That(calculator.GetDeltaFor(osu.Game.Rulesets.Scoring.HitResult.Perfect, .5), Is.Zero);
+        Assert.That(calculator.GetDeltaFor(BmsResults.PGREAT, .5), Is.Zero);
         Assert.That(BmsonParser.Parse(Chart(info: ""","total":-50""")).Total,
             Is.EqualTo(BmsGaugeCalculator.CalculateDefaultTotal(0) / 2));
     }
@@ -262,13 +262,13 @@ public class BmsonParserTest
         info.BeatmapSet.Files.Add(new RealmNamedFileUsage(new RealmFile { Hash = info.Hash }, "chart.bmson"));
         var decoded = BmsBeatmapDecoder.DecodeBytes(bytes, info);
         var converted = (BmsBeatmap)new BmsBeatmapConverter(decoded, new BmsRuleset()).Convert();
-        Assert.That(converted.HitObjects.Single().EffectiveJudgementRate, Is.EqualTo(expectedRate).Within(1e-10));
+        Assert.That(BmsEngineRules.RateFor(converted.HitObjects.Single()), Is.EqualTo(expectedRate).Within(1e-10));
         Assert.That(BmsDifficultyInfo.FromOsuDifficulty(converted.Difficulty).ExRank, Is.EqualTo(expectedExRank).Within(1e-4));
 
-        var adjusted = (BmsBeatmap)new BmsBeatmapConverter(decoded, new BmsRuleset()) { JudgementModifiers = BmsJudgementModifiers.Lr2oraja }.Convert();
-        Assert.That(adjusted.HitObjects.Single().EffectiveJudgementRate, Is.EqualTo(expectedExRank / 100 * .75).Within(1e-10),
+        var adjusted = (BmsBeatmap)new BmsBeatmapConverter(decoded, new BmsRuleset()).Convert();
+        Assert.That(BmsEngineRules.RateFor(adjusted.HitObjects.Single(), BmsJudgementModifiers.Lr2oraja), Is.EqualTo(expectedExRank / 100 * .75).Within(1e-10),
             "BMSON uses the selected engine profile when resolving its header rate.");
-        Assert.That(((BmsHitObject)decoded.HitObjects.Single()).JudgementRate, Is.NaN);
+        Assert.That(((BmsHitObject)decoded.HitObjects.Single()).ExRank, Is.Null);
     }
 
     [TestCase("#TITLE Song [HYPER]", "", "chart", "HYPER")]

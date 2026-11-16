@@ -1,7 +1,6 @@
-using System;
-using osu.Game.Rulesets.Scoring;
+using RhythmEngine.Core;
 
-namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
+namespace RhythmEngine.Profiles.Bms;
 
 public class BmsGaugeCalculator
 {
@@ -17,12 +16,23 @@ public class BmsGaugeCalculator
         BmsGaugeProfile profile,
         double? total,
         int noteCount,
-        BmsGaugeProfileFamily profileFamily = BmsGaugeProfileFamily.SevenKeys)
+        BmsGaugeProfileFamily profileFamily = BmsGaugeProfileFamily.SevenKeys,
+        int? fullNoteCount = null)
     {
         Profile = profile;
         NoteCount = Math.Max(1, noteCount);
 
-        Total = ResolveTotal(profile, total, NoteCount, profileFamily);
+        var fullCount = Math.Max(1, fullNoteCount ?? NoteCount);
+        Total = total ?? profile.DefaultTotal?.Invoke(fullCount) ?? CalculateDefaultTotal(fullCount, profileFamily);
+
+        if (fullNoteCount.HasValue)
+        {
+            // Partial plays retain full-chart survival settings and proportional recovery TOTAL.
+            if (profile.Algorithm == BmsGaugeAlgorithm.Total)
+                Total = Total * NoteCount / fullCount;
+            else
+                NoteCount = fullCount;
+        }
 
         var perNoteMaxPercent = Math.Max(Math.Min(0.15, (2 * Total - 320) / NoteCount), 0);
         limitIncrementScale = perNoteMaxPercent / 0.15;
@@ -37,24 +47,21 @@ public class BmsGaugeCalculator
             : Math.Max(260.0, 7.605 * noteCount / (0.01 * noteCount + 6.5));
     }
 
-    internal static double ResolveTotal(BmsGaugeProfile profile, double? total, int noteCount, BmsGaugeProfileFamily family)
-        => total ?? profile.DefaultTotal?.Invoke(noteCount) ?? CalculateDefaultTotal(noteCount, family);
-
-    public double GetDeltaFor(HitResult result, double currentHealth)
+    public double GetDeltaFor(ResultId result, double currentHealth)
     {
         var delta = result switch
         {
-            HitResult.Perfect => gain(Profile.PerfectGain),
-            HitResult.Great => gain(Profile.GreatGain),
-            HitResult.Good => gain(Profile.GoodGain),
-            HitResult.Ok => Profile.BadDelta,
-            HitResult.Meh => Profile.PoorDelta,
-            HitResult.Miss => Profile.EmptyPoorDelta,
+            var id when id == BmsResults.PGREAT => gain(Profile.PerfectGain),
+            var id when id == BmsResults.GREAT => gain(Profile.GreatGain),
+            var id when id == BmsResults.GOOD => gain(Profile.GoodGain),
+            var id when id == BmsResults.BAD => Profile.BadDelta,
+            var id when id == BmsResults.POOR => Profile.PoorDelta,
+            var id when id == BmsResults.EMPTY_POOR => Profile.EmptyPoorDelta,
             _ => 0,
         };
 
         if (delta < 0 && Profile.Algorithm == BmsGaugeAlgorithm.ModifyDamage)
-            delta *= Profile.DamageScale?.Invoke(Total, NoteCount) ?? calculateDamageScale();
+            delta *= Profile.DamageScale?.Invoke(Total, NoteCount) ?? CalculateDamageScale(Total, NoteCount);
 
         return applyGuts(delta, currentHealth);
     }
@@ -79,9 +86,9 @@ public class BmsGaugeCalculator
         };
     }
 
-    private double calculateDamageScale()
+    internal static double CalculateDamageScale(double total, int noteCount)
     {
-        var totalScale = Total switch
+        var totalScale = total switch
         {
             >= 240 => 1,
             >= 230 => 1.11,
@@ -99,9 +106,9 @@ public class BmsGaugeCalculator
         var note = 1000;
         var modifier = 0.002;
 
-        while (note > NoteCount || note > 1)
+        while (note > noteCount || note > 1)
         {
-            noteScale += modifier * (note - Math.Max(NoteCount, note / 2));
+            noteScale += modifier * (note - Math.Max(noteCount, note / 2));
             note /= 2;
             modifier *= 2;
         }

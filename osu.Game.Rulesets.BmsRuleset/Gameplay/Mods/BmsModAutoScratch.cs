@@ -2,10 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using osu.Framework.Allocation;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
@@ -60,16 +62,17 @@ public partial class BmsModAutoScratch : Mod, IApplicableToDrawableRuleset<BmsHi
     {
         playfield = (BmsPlayfield)drawableRuleset.Playfield;
         input = (BmsInputManager)((BmsDrawableRuleset)drawableRuleset).KeyBindingInputManager;
-        PrepareActions(playfield.Beatmap, action => input.KeyBindingContainer.TriggerPressed(action), input.KeyBindingContainer.TriggerReleased);
+        PrepareActions(playfield.Beatmap, drawableRuleset.Dependencies.Get<BmsEngineChart>(),
+            action => input.KeyBindingContainer.TriggerPressed(action), input.KeyBindingContainer.TriggerReleased);
     }
 
-    internal void PrepareActions(BmsBeatmap beatmap, Action<BmsAction> onPress, Action<BmsAction> onRelease)
+    internal void PrepareActions(BmsBeatmap beatmap, BmsEngineChart compiled, Action<BmsAction> onPress, Action<BmsAction> onRelease)
     {
         press = onPress;
         release = onRelease;
         var schedule = new List<(double Time, uint Actions)>();
         var actions = 0u;
-        foreach (var point in new BmsAutoGenerator(beatmap, scratchOnly: true).GenerateActionPoints().OrderBy(p => p.Time).ThenBy(p => p.Press))
+        foreach (var point in new BmsAutoGenerator(beatmap, compiled, scratchOnly: true).GenerateActionPoints().OrderBy(p => p.Time).ThenBy(p => p.Press))
         {
             var direction = 1u << Array.IndexOf(scratch_actions, point.Action);
             actions = point.Press ? actions | direction : actions & ~direction;

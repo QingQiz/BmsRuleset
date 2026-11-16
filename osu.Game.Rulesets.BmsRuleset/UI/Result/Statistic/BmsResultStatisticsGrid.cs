@@ -1,10 +1,11 @@
-using System;
 using System.Linq;
-using osu.Framework.Graphics;
+using System;
 using osu.Framework.Graphics.Containers;
-using osu.Game.Graphics;
+using osu.Framework.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
+using osu.Game.Graphics;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Screens.Ranking.Statistics;
 using osuTK;
@@ -30,13 +31,13 @@ internal partial class BmsResultStatisticsGrid : CompositeDrawable
     private readonly BmsHitScatterStatistic scatter;
     private readonly BmsHitOffsetStatistic offset;
 
-    internal BmsResultStatisticsGrid()
+    internal BmsResultStatisticsGrid(GameplayProfile profile)
     {
         RelativeSizeAxes = Axes.Both;
         var empty = BmsResultStatisticsData.Empty();
         gauge = new BmsGaugeHistoryGraph(empty.Gauges, empty.StageBoundaries);
         timeline = new BmsTimelineStatistic(empty.Timeline);
-        scatter = new BmsHitScatterStatistic(empty.Scatter);
+        scatter = new BmsHitScatterStatistic(empty.Scatter, profile);
         offset = new BmsHitOffsetStatistic(empty.Offset);
         StatisticItem[] items =
         [

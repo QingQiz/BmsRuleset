@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using NUnit.Framework;
+using RhythmEngine.Profiles.Bms;
 using osu.Framework.Screens;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
@@ -102,8 +103,8 @@ public partial class TestSceneBmsCourseSelect
                 player = (BmsCoursePlayer)Stack.CurrentScreen;
                 var health = (BmsHealthProcessor)player.GameplayState.HealthProcessor;
                 Assert.That(player.GameplayState.Beatmap.BeatmapInfo.Hash, Is.EqualTo(charts[stageIndex].Hash));
-                Assert.That(health.CurrentGaugeStates, Is.EqualTo(expected));
-                Assert.That(health.ConfiguredProfileFamily, Is.EqualTo(BmsGaugeProfileFamily.Lr2));
+                Assert.That(health.Gauge().CurrentGaugeStates, Is.EqualTo(expected));
+                Assert.That(health.Gauge().ConfiguredProfileFamily, Is.EqualTo(BmsGaugeProfileFamily.Lr2));
                 var scroll = player.ChildrenOfType<BmsPlayfield>().Single().ScrollController;
                 var speed = scroll.ScrollSpeed;
                 scroll.AdjustScrollSpeed(1);
@@ -116,8 +117,8 @@ public partial class TestSceneBmsCourseSelect
             AddStep("capture surviving gauges before result transition", () =>
             {
                 var health = (BmsHealthProcessor)player.GameplayState.HealthProcessor;
-                Assert.That(player.GameplayState.HasFailed, Is.False, $"Stage {stageIndex}: {string.Join(", ", health.CurrentGaugeStates)}");
-                expected = health.CurrentGaugeStates.Where(state => !state.Failed).ToArray();
+                Assert.That(player.GameplayState.HasFailed, Is.False, $"Stage {stageIndex}: {string.Join(", ", health.Gauge().CurrentGaugeStates)}");
+                expected = health.Gauge().CurrentGaugeStates.Where(state => !state.Failed).ToArray();
                 Assert.That(health.HasPassedAtEnd(), Is.True);
                 Assert.That(expected, Has.Length.EqualTo(autoGauge ? 2 - Math.Min(stageIndex, 1) : 1));
                 Assert.That(expected[0].Health, Is.LessThan(openings[stageIndex].Last().Health));
@@ -146,7 +147,7 @@ public partial class TestSceneBmsCourseSelect
                 health.ApplyBeatmap(beatmaps.GetWorkingBeatmap(charts[stage]).Beatmap);
                 foreach (var mod in score.Mods.OfType<IApplicableToHealthProcessor>())
                     mod.ApplyToHealthProcessor(health);
-                Assert.That(health.CurrentGaugeStates, Is.EqualTo(openings[stage]));
+                Assert.That(health.Gauge().CurrentGaugeStates, Is.EqualTo(openings[stage]));
             }
         });
     }
@@ -213,31 +214,31 @@ public partial class TestSceneBmsCourseSelect
                 initial[stageIndex] = expected;
                 Assert.Multiple(() =>
                 {
-                    Assert.That(player.Health.CurrentGaugeStates, Is.EqualTo(expected));
+                    Assert.That(player.Health.Gauge().CurrentGaugeStates, Is.EqualTo(expected));
                     Assert.That(player.Health.Health.Value, Is.EqualTo(expected[0].Health));
-                    Assert.That(player.Health.ConfiguredProfileFamily, Is.EqualTo(BmsGaugeProfileFamily.Lr2));
+                    Assert.That(player.Health.Gauge().ConfiguredProfileFamily, Is.EqualTo(BmsGaugeProfileFamily.Lr2));
                     Assert.That(player.Health.HasFailed, Is.False);
-                    Assert.That(player.Health.HasEverFailed, Is.False);
+                    Assert.That(player.Health.CurrentHealth.HasFailed, Is.False);
                 });
             });
             AddWaitStep("allow subsequent updates", 3);
             AddStep("damage current stage and save its result", () =>
             {
-                Assert.That(player.Health.CurrentGaugeStates, Is.EqualTo(expected));
-                var tierAtStart = player.Health.GaugeType;
+                Assert.That(player.Health.Gauge().CurrentGaugeStates, Is.EqualTo(expected));
+                var tierAtStart = player.Health.Gauge().GaugeType;
 
                 if (autoGauge && stageIndex < 2)
                 {
-                    for (var bad = 0; player.Health.GaugeType == tierAtStart && bad < 200; bad++)
+                    for (var bad = 0; player.Health.Gauge().GaugeType == tierAtStart && bad < 200; bad++)
                         player.Health.ApplyTestNonConsumingJudgement(HitResult.Ok);
-                    Assert.That(player.Health.GaugeType, Is.Not.EqualTo(tierAtStart));
+                    Assert.That(player.Health.Gauge().GaugeType, Is.Not.EqualTo(tierAtStart));
                 }
                 else
                     player.Health.ApplyTestNonConsumingJudgement(HitResult.Ok);
 
-                expected = player.Health.CurrentGaugeStates.Where(state => !state.Failed).ToArray();
+                expected = player.Health.Gauge().CurrentGaugeStates.Where(state => !state.Failed).ToArray();
                 saved[stageIndex] = player.CompleteStage();
-                Assert.That(session.CurrentGaugeStates.Where(state => !state.Failed), Is.EqualTo(expected));
+                Assert.That(session.CourseGauges().Where(state => !state.Failed), Is.EqualTo(expected));
                 player.Exit();
             });
             AddUntilStep("return from stage", () => Stack.CurrentScreen == songSelect);
@@ -255,7 +256,7 @@ public partial class TestSceneBmsCourseSelect
                 health.ApplyBeatmap(new BmsBeatmap { LayoutVariant = layouts[stage] });
                 foreach (var mod in reloaded.Mods.OfType<IApplicableToHealthProcessor>())
                     mod.ApplyToHealthProcessor(health);
-                Assert.That(health.CurrentGaugeStates, Is.EqualTo(initial[stage]));
+                Assert.That(health.Gauge().CurrentGaugeStates, Is.EqualTo(initial[stage]));
             }
         });
     }

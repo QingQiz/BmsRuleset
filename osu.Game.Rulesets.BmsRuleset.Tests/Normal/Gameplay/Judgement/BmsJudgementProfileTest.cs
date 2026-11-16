@@ -39,10 +39,10 @@ public class BmsJudgementProfileTest
             "#00011:01", "#001A0:01", "#00111:01", "#002A0:02", "#00211:01",
         ]);
         Assert.That(parsed.DefaultExRank, Is.EqualTo(150.5));
-        Assert.That(parsed.HitObjects[0].JudgementRate, Is.EqualTo(1.12875).Within(1e-12));
-        Assert.That(parsed.HitObjects[1].JudgementRate, Is.EqualTo(1.006875).Within(1e-12));
+        Assert.That(parsed.HitObjects[0].ExRank, Is.Null);
+        Assert.That(parsed.HitObjects[1].ExRank, Is.EqualTo(134.25));
         Assert.That(parsed.HitObjects[1].StartTime, Is.EqualTo(2000));
-        Assert.That(parsed.HitObjects[2].JudgementRate, Is.Zero);
+        Assert.That(parsed.HitObjects[2].ExRank, Is.Zero);
         Assert.That(parsed.HitObjects[2].StartTime, Is.EqualTo(4000));
     }
 

@@ -15,7 +15,6 @@ using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Configuration;
 using osu.Game.Rulesets.Objects;
-using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Skinning;
 
@@ -149,7 +148,7 @@ public partial class BmsColumn : Playfield, IBmsColumn
 
     protected override void Dispose(bool isDisposing)
     {
-        if (JudgementBridge != null)
+        if (JudgementBridge.IsNotNull())
             NewResult -= JudgementBridge.OnFrameworkNewResult;
         showInvisibleNotes.UnbindAll();
         base.Dispose(isDisposing);
@@ -166,10 +165,7 @@ public partial class BmsColumn : Playfield, IBmsColumn
             () => HitTargetPosition);
 
     protected override HitObjectLifetimeEntry CreateLifetimeEntry(HitObject hitObject)
-        => new BmsHitObjectLifetimeEntry(
-            hitObject,
-            ParentPlayfield.ScrollController,
-            () => ParentPlayfield.VisualOffset.Value);
+        => ParentPlayfield.CreateNoteLifetimeEntry((BmsHitObject)hitObject);
 
     protected override void LoadComplete()
     {
@@ -320,9 +316,6 @@ public partial class BmsColumn : Playfield, IBmsColumn
         foreach (var sample in hitObject.GetSamples())
             keySound?.PlaySample(sample.SampleKey, sample.Volume);
     }
-
-    // Framework Meh counts as a hit, but BMS POOR has no successful hit feedback.
-    internal static bool ShouldTriggerHitExplosion(HitResult result) => result != HitResult.Meh && result.IsHit();
 
     #endregion
 

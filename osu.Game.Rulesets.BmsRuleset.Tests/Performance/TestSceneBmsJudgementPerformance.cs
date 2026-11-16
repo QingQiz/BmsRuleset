@@ -1,20 +1,20 @@
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using System;
 using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
+using RhythmEngine.Profiles.Common;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
-using osu.Game.Rulesets.Scoring;
-using osu.Game.Tests.Visual;
 using osu.Game.Screens.Play;
+using osu.Game.Tests.Visual;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Performance;
 
@@ -32,12 +32,12 @@ public partial class TestSceneBmsJudgementPerformance : BmsPlayerTestScene
         {
             LayoutVariant = BmsLayoutVariant.Bme7K, TotalColumns = 8, Rank = 2,
             LockedLongNoteMode = BmsLongNoteMode.HellChargeNote,
-            HitObjects = [new BmsLongNote { StartTime = 3000, Duration = 1000, Column = 1 },
+            HitObjects = [new BmsLongNote { Kind = KeyNoteKind.SustainHold, StartTime = 3000, Duration = 1000, Column = 1 },
                 new BmsLandmine { StartTime = 3201, Column = 1, LandmineDamagePercent = 10 }],
         };
         for (var i = 0; i < futureNotes; i++)
             beatmap.HitObjects.Add(i % 2 == 0
-                ? new BmsLongNote { StartTime = 5000 + i * .01, Duration = 500, Column = 1 }
+                ? new BmsLongNote { Kind = KeyNoteKind.SustainHold, StartTime = 5000 + i * .01, Duration = 500, Column = 1 }
                 : new BmsNote { StartTime = 5000 + i * .01, Column = 1 });
         beatmap.HitObjects.Add(new BmsNote { StartTime = 10000, Column = 2 });
         BmsTestBeatmaps.SetupBeatmapInfo(beatmap, ruleset);

@@ -2,30 +2,26 @@
 using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Rulesets.Judgements;
-using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables;
 
-/// <summary>
-/// Legacy BMS judgement image wrapper.
-/// </summary>
-/// <remarks>
-/// BMS judgement names are mapped to osu!mania legacy image names by
-/// BmsLegacySkinTransformer. This drawable only owns the playback transform:
-/// PGREAT/GREAT/GOOD use the shrinking stable-style pop, while POOR/E-POOR use a simpler pulse.
-/// </remarks>
-internal sealed partial class LegacyBmsJudgementPiece : CompositeDrawable, IAnimatableJudgement
+internal sealed partial class BmsJudgementPiece : CompositeDrawable, IAnimatableJudgement
 {
-    private readonly HitResult result;
+    private readonly bool missed;
     private readonly Drawable animation;
 
-    public LegacyBmsJudgementPiece(HitResult result, Drawable animation)
+    public BmsJudgementPiece(bool missed, Drawable animation)
     {
-        this.result = result;
+        this.missed = missed;
         this.animation = animation;
 
         Origin = Anchor.Centre;
         AutoSizeAxes = Axes.Both;
+        InternalChild = animation.With(drawable =>
+        {
+            drawable.Anchor = Anchor.Centre;
+            drawable.Origin = Anchor.Centre;
+        });
     }
 
     public void PlayAnimation()
@@ -36,7 +32,7 @@ internal sealed partial class LegacyBmsJudgementPiece : CompositeDrawable, IAnim
             .Then().Delay(160)
             .FadeOutFromOne(40, Easing.In);
 
-        if (result is HitResult.Meh or HitResult.Miss)
+        if (missed)
         {
             animation.ScaleTo(1.2f).Then().ScaleTo(1, 100, Easing.Out);
             return;
@@ -52,14 +48,4 @@ internal sealed partial class LegacyBmsJudgementPiece : CompositeDrawable, IAnim
 
     public Drawable? GetAboveHitObjectsProxiedContent() => null;
 
-    protected override void LoadComplete()
-    {
-        base.LoadComplete();
-
-        InternalChild = animation.With(d =>
-        {
-            d.Anchor = Anchor.Centre;
-            d.Origin = Anchor.Centre;
-        });
-    }
 }

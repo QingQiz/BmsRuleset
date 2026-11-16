@@ -46,11 +46,11 @@ public class BmsCourseScoreAggregationTest
             BmsGaugeType.Class);
 
         session.BeginCurrentStage();
-        session.CompleteCurrentStage(createScore(beatmaps[0], 120), [new BmsGaugeStateSnapshot(BmsGaugeType.Class, 0.8, false)]);
+        session.CompleteCurrentStage(createScore(beatmaps[0], 120), BmsTestHealth.ToState([new BmsGaugeStateSnapshot(BmsGaugeType.Class, 0.8, false)]));
         session.RequestAdvance();
         session.Advance();
         session.BeginCurrentStage();
-        session.CompleteCurrentStage(createScore(beatmaps[1], 360), [new BmsGaugeStateSnapshot(BmsGaugeType.Class, 0.7, false)]);
+        session.CompleteCurrentStage(createScore(beatmaps[1], 360), BmsTestHealth.ToState([new BmsGaugeStateSnapshot(BmsGaugeType.Class, 0.7, false)]));
 
         var aggregate = BmsCourseScoreAggregation.CreateScore(session);
 

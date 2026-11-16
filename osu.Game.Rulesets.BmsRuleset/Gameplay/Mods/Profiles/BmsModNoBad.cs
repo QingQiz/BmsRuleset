@@ -1,13 +1,14 @@
 using RhythmEngine.Profiles.Bms;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.UI.Icons;
 using osu.Game.Rulesets.Mods;
 
-namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
+namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Profiles;
 
-public class BmsModNoBad : Mod, IApplicableToJudgement, IApplicableToScoreSelection
+public class BmsModNoBad : Mod, IApplicableToGameplayProfile, IApplicableToScoreSelection
 {
     public override string Name => BmsStrings.ModNoBadName.ToString();
 
@@ -21,5 +22,6 @@ public class BmsModNoBad : Mod, IApplicableToJudgement, IApplicableToScoreSelect
 
     public IScoreSelectionRule ScoreSelectionRule => BmsModTypeScoreSelectionRule<BmsModNoBad>.REDUCTION;
 
-    public BmsJudgementModifiers JudgementModifier => BmsJudgementModifiers.NoBad;
+    GameplayProfile IApplicableToGameplayProfile.ApplyToGameplayProfile(GameplayProfile profile)
+        => ((BmsGameplayProfile)profile).WithJudgementModifier(BmsJudgementModifiers.NoBad);
 }

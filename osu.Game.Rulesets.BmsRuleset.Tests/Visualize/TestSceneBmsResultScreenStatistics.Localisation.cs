@@ -1,3 +1,4 @@
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 #nullable enable
 using System;
 using System.Linq;
@@ -44,8 +45,8 @@ public partial class TestSceneBmsResultScreenStatistics
             config.SetValue(FrameworkSetting.Locale, "en");
             var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bms5K, TotalColumns = 6 };
             var hits = createGaugeHitEvents();
-            offset = new BmsHitOffsetStatistic(BmsHitOffsetStatistic.CreateStatistics(beatmap, hits));
-            scatter = new BmsHitScatterStatistic(BmsHitScatterStatistic.CreateStatistics(beatmap, hits));
+            offset = new BmsHitOffsetStatistic(BmsHitOffsetStatistic.CreateStatistics(BmsGameplayProfile.INSTANCE, beatmap, hits));
+            scatter = new BmsHitScatterStatistic(BmsHitScatterStatistic.CreateStatistics(BmsGameplayProfile.INSTANCE, beatmap, hits), BmsGameplayProfile.INSTANCE);
             timeline = new BmsTimelineStatistic(BmsTimelineStatistic.CreateData(new ScoreInfo { HitEvents = hits.ToList() }, beatmap));
             Child = new GridContainer
             {

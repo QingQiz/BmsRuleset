@@ -2,12 +2,13 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
-using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
+using osu.Framework.Graphics;
 using osu.Framework.Input.Events;
-using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
+using osu.Game.Graphics;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Practice;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
@@ -26,6 +27,7 @@ internal partial class BmsPracticeAttemptCard : OsuClickableContainer
     internal BmsPracticeAttemptCard(BmsPracticeAttemptResult result, Bindable<BmsPracticeAttemptResult?> selectedAttempt)
     {
         this.result = result;
+        var profile = GameplayProfile.FromMods(result.Score.Mods);
         this.selectedAttempt = selectedAttempt.GetBoundCopy();
         Name = $"Practice attempt {result.Attempt} result";
         RelativeSizeAxes = Axes.X;
@@ -52,7 +54,7 @@ internal partial class BmsPracticeAttemptCard : OsuClickableContainer
                         Content = new Drawable[][] { [new BmsResultFittedText(BmsStrings.PracticeAttempt(result.Attempt), 16),
                             new BmsResultFittedText(BmsStrings.ResultPercentage(result.Score.Accuracy), 16, Anchor.CentreRight)] },
                     }],
-                    [new BmsResultFittedText(BmsStrings.PracticeAttemptMetrics(result.ExScore, result.Score.MaxCombo, result.Health), 12)],
+                    [new BmsResultFittedText(BmsStrings.PracticeAttemptMetrics(profile.ScoreLabel, profile.StoredScore(result.Score), result.Score.MaxCombo, result.Health), 12)],
                     [new GridContainer
                     {
                         RelativeSizeAxes = Axes.Both,
@@ -62,7 +64,7 @@ internal partial class BmsPracticeAttemptCard : OsuClickableContainer
                                 RelativeSizeAxes = Axes.Both,
                                 Content = new Drawable[][]
                                 {
-                                    [new BmsResultFittedText(BmsStrings.ResultJudgement(judgement), 9, Anchor.Centre, BmsHitResultColours.ForHitResult(judgement))],
+                                    [new BmsResultFittedText(profile.JudgementLabel(judgement), 9, Anchor.Centre, BmsHitResultColours.ForHitResult(judgement))],
                                     [new BmsResultFittedText(BmsStrings.ResultNumber(result.Score.Statistics.GetValueOrDefault(judgement)), 14, Anchor.Centre)],
                                 },
                             }).ToArray() },

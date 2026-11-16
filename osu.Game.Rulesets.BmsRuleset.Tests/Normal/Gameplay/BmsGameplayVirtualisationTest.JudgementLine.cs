@@ -3,7 +3,6 @@ using NUnit.Framework;
 using osu.Game.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Components;
@@ -16,7 +15,7 @@ public partial class BmsGameplayVirtualisationTest
     [Test]
     public void TestJudgementLineOffsetPreservesVisibleTime()
     {
-        var playfield = new BmsPlayfield(attachBeatmap(new BmsBeatmap
+        var playfield = createPlayfield(attachBeatmap(new BmsBeatmap
         {
             TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
             LayoutVariant = BmsLayoutVariant.Bme7K,
@@ -43,7 +42,7 @@ public partial class BmsGameplayVirtualisationTest
     [Test]
     public void TestLightPositionOffsetDoesNotMoveJudgementLine()
     {
-        var playfield = new BmsPlayfield(attachBeatmap(new BmsBeatmap
+        var playfield = createPlayfield(attachBeatmap(new BmsBeatmap
         {
             TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
             LayoutVariant = BmsLayoutVariant.Bme7K,

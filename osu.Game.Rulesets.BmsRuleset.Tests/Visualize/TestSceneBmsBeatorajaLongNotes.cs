@@ -39,7 +39,7 @@ public partial class TestSceneBmsBeatorajaLongNotes : BmsPlayerTestScene
             LockedLongNoteMode = mode,
             HitObjects =
             [
-                new BmsLongNote { StartTime = startTime, Duration = duration, Column = 1 },
+                new BmsLongNote { Kind = mode.ToNoteKind(), StartTime = startTime, Duration = duration, Column = 1 },
                 new BmsNote { StartTime = 10000, Column = 1 },
             ],
         };

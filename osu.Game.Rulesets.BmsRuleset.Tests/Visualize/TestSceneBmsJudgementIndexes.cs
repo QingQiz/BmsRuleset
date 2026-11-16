@@ -1,22 +1,16 @@
 #nullable enable
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
+using RhythmEngine.Profiles.Common;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
-using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.Presentation;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
-using osu.Game.Rulesets.BmsRuleset.Tests.Performance;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
-using osu.Game.Rulesets.Scoring;
 using osu.Game.Tests.Visual;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
@@ -68,7 +62,7 @@ public partial class TestSceneBmsJudgementIndexes : BmsPlayerTestScene
             LayoutVariant = BmsLayoutVariant.Bme7K, TotalColumns = 8, Rank = 2,
             Total = (3 + 3 * future_note_count) * 4,
             LockedLongNoteMode = BmsLongNoteMode.HellChargeNote,
-            HitObjects = includeLongNotes ? [new BmsLongNote { StartTime = 3000, Duration = 1000, Column = 1 }] : [],
+            HitObjects = includeLongNotes ? [new BmsLongNote { Kind = KeyNoteKind.SustainHold, StartTime = 3000, Duration = 1000, Column = 1 }] : [],
         };
         if (includeMine)
             beatmap.HitObjects.Add(new BmsLandmine { StartTime = 3201, Column = 1, LandmineDamagePercent = 10 });
@@ -85,7 +79,7 @@ public partial class TestSceneBmsJudgementIndexes : BmsPlayerTestScene
         for (var i = 0; i < future_note_count; i++)
         {
             if (includeLongNotes)
-                beatmap.HitObjects.Add(new BmsLongNote { StartTime = 5000 + i, Duration = 500, Column = 1 });
+                beatmap.HitObjects.Add(new BmsLongNote { Kind = KeyNoteKind.SustainHold, StartTime = 5000 + i, Duration = 500, Column = 1 });
             beatmap.HitObjects.Add(new BmsNote { StartTime = 5200 + i, Column = 1 });
         }
 
@@ -121,5 +115,4 @@ public partial class TestSceneBmsJudgementIndexes : BmsPlayerTestScene
         });
         AddUntilStep("reached " + time, () => Math.Abs(Player.DrawableRuleset.FrameStableClock.CurrentTime - time) < .001);
     }
-
 }

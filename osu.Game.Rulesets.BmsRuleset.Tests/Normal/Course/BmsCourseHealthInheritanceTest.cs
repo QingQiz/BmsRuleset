@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
+using RhythmEngine.Profiles.Bms;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
@@ -51,10 +52,10 @@ public class BmsCourseHealthInheritanceTest
 
             health.ApplyTestNonConsumingJudgement(HitResult.Ok);
             health.ApplyTestBodyTick(true);
-            Assert.That(health.HasPassedAtEnd(), Is.True);
+            Assert.That(health.EvaluateTestClear(), Is.True);
             Assert.That(health.Health.Value, Is.LessThan(expected[0].Health));
-            expected = health.CurrentGaugeStates.ToArray();
-            session.CompleteCurrentStage(score.ScoreInfo, expected);
+            expected = health.Gauge().CurrentGaugeStates.ToArray();
+            session.CompleteCurrentStage(score.ScoreInfo, BmsTestHealth.ToState(expected));
 
             if (stage + 1 < layouts.Length)
             {
@@ -93,22 +94,22 @@ public class BmsCourseHealthInheritanceTest
 
             var score = archive(mods);
             saved.Add((score, expected));
-            var tierAtStart = health.GaugeType;
+            var tierAtStart = health.Gauge().GaugeType;
 
             if (stage < 2)
             {
-                for (var miss = 0; health.GaugeType == tierAtStart && miss < 200; miss++)
+                for (var miss = 0; health.Gauge().GaugeType == tierAtStart && miss < 200; miss++)
                     health.ApplyTestNonConsumingJudgement(HitResult.Ok);
-                Assert.That(health.GaugeType, Is.Not.EqualTo(tierAtStart), "The stage must exercise a real AG downgrade.");
+                Assert.That(health.Gauge().GaugeType, Is.Not.EqualTo(tierAtStart), "The stage must exercise a real AG downgrade.");
             }
             else
                 health.ApplyTestNonConsumingJudgement(HitResult.Ok);
 
-            Assert.That(health.HasPassedAtEnd(), Is.True);
+            Assert.That(health.EvaluateTestClear(), Is.True);
             mods.OfType<BmsModAutoGauge>().Single().ApplyToScore(score.ScoreInfo);
-            expected = health.CurrentGaugeStates.Where(state => !state.Failed).ToArray();
+            expected = health.Gauge().CurrentGaugeStates.Where(state => !state.Failed).ToArray();
             Assert.That(expected, Has.Length.EqualTo(2 - Math.Min(stage, 1)));
-            session.CompleteCurrentStage(score.ScoreInfo, health.CurrentGaugeStates);
+            session.CompleteCurrentStage(score.ScoreInfo, health.CurrentHealth);
 
             if (stage + 1 < layouts.Length)
             {
@@ -136,7 +137,7 @@ public class BmsCourseHealthInheritanceTest
     {
         var session = createSession(type, BmsGaugeProfileFamily.Lr2, false);
         session.BeginCurrentStage();
-        session.CompleteCurrentStage(new ScoreInfo { Passed = true }, [new(type, remaining, false)]);
+        session.CompleteCurrentStage(new ScoreInfo { Passed = true }, BmsTestHealth.ToState([new(type, remaining, false)]));
         session.RequestAdvance();
         session.Advance();
         session.BeginCurrentStage();
@@ -144,15 +145,15 @@ public class BmsCourseHealthInheritanceTest
         using var health = createHealth(1);
         applyMods(persistMods(session.Mods), health);
         Assert.That(health.Health.Value, Is.EqualTo(remaining));
-        Assert.That(health.HasPassedAtEnd(), Is.True);
+        Assert.That(health.EvaluateTestClear(), Is.True);
         health.ApplyTestNonConsumingJudgement(HitResult.Ok);
 
         if (remaining <= 0.005)
         {
             Assert.That(health.Health.Value, Is.Zero);
-            Assert.That(health.HasEverFailed, Is.True);
-            Assert.That(health.HasPassedAtEnd(), Is.False);
-            session.FailCurrentStage(new ScoreInfo { Passed = false }, health.CurrentGaugeStates);
+            Assert.That(health.CurrentHealth.HasFailed, Is.True);
+            Assert.That(health.EvaluateTestClear(), Is.False);
+            session.FailCurrentStage(new ScoreInfo { Passed = false }, health.CurrentHealth);
             Assert.That(session.CanContinue, Is.False);
             Assert.That(session.Stages[2].Status, Is.EqualTo(BmsCourseStageStatus.NotPlayed));
         }
@@ -165,12 +166,12 @@ public class BmsCourseHealthInheritanceTest
     {
         var session = createSession(type, BmsGaugeProfileFamily.Lr2, false);
         session.BeginCurrentStage();
-        session.CompleteCurrentStage(new ScoreInfo { Passed = true }, [new(type, 0.001, false)]);
+        session.CompleteCurrentStage(new ScoreInfo { Passed = true }, BmsTestHealth.ToState([new(type, 0.001, false)]));
         session.RequestAdvance();
         session.Advance();
         using var health = createHealth(1);
         applyMods(persistMods(session.Mods), health);
-        var initial = health.CurrentGaugeStates.ToArray();
+        var initial = health.Gauge().CurrentGaugeStates.ToArray();
 
         health.ApplyTestNonConsumingJudgement(HitResult.Ok);
         Assert.That(health.HasFailed, Is.True);
@@ -178,15 +179,15 @@ public class BmsCourseHealthInheritanceTest
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(health.CurrentGaugeStates, Is.EqualTo(initial));
+            Assert.That(health.Gauge().CurrentGaugeStates, Is.EqualTo(initial));
             Assert.That(health.Health.Value, Is.EqualTo(0.001));
             Assert.That(health.HasFailed, Is.False);
-            Assert.That(health.HasEverFailed, Is.False);
-            Assert.That(health.HasPassedAtEnd(), Is.True);
+            Assert.That(health.CurrentHealth.HasFailed, Is.False);
+            Assert.That(health.EvaluateTestClear(), Is.True);
         }
 
         health.ApplyTestNonConsumingJudgement(HitResult.Ok);
-        Assert.That(health.HasPassedAtEnd(), Is.False);
+        Assert.That(health.EvaluateTestClear(), Is.False);
     }
 
     [Test]
@@ -194,23 +195,22 @@ public class BmsCourseHealthInheritanceTest
     {
         var session = createSession(BmsGaugeType.ExHardClass, BmsGaugeProfileFamily.Lr2, true);
         session.BeginCurrentStage();
-        session.CompleteCurrentStage(new ScoreInfo { Passed = true },
-        [
+        session.CompleteCurrentStage(new ScoreInfo { Passed = true }, BmsTestHealth.ToState([
             new(BmsGaugeType.ExHardClass, 0, true),
             new(BmsGaugeType.ExClass, 0, true),
             new(BmsGaugeType.Class, 0.001, false),
-        ]);
+        ]));
         session.RequestAdvance();
         session.Advance();
         session.BeginCurrentStage();
         using var health = createHealth(1);
         applyMods(persistMods(session.Mods), health);
         BmsGaugeStateSnapshot[] expected = [new(BmsGaugeType.Class, 0.001, false)];
-        Assert.That(health.CurrentGaugeStates, Is.EqualTo(expected));
+        Assert.That(health.Gauge().CurrentGaugeStates, Is.EqualTo(expected));
         health.ApplyTestNonConsumingJudgement(HitResult.Ok);
         Assert.That(health.HasFailed, Is.True);
-        Assert.That(health.HasPassedAtEnd(), Is.False);
-        session.FailCurrentStage(new ScoreInfo { Passed = false }, health.CurrentGaugeStates);
+        Assert.That(health.EvaluateTestClear(), Is.False);
+        session.FailCurrentStage(new ScoreInfo { Passed = false }, health.CurrentHealth);
         Assert.That(session.Status, Is.EqualTo(BmsCourseStatus.Failed));
         Assert.Throws<InvalidOperationException>(session.RequestAdvance);
         Assert.That(session.Stages[2].Status, Is.EqualTo(BmsCourseStageStatus.NotPlayed));
@@ -270,14 +270,14 @@ public class BmsCourseHealthInheritanceTest
         var effectiveFamily = family ?? BmsGaugeProfileFamilyProvider.FromLayout(layouts[stage]);
         Assert.Multiple(() =>
         {
-            Assert.That(health.IsCourseGaugeMode, Is.True);
-            Assert.That(health.ConfiguredProfileFamily, Is.EqualTo(family));
-            Assert.That(health.CurrentGaugeStates, Is.EqualTo(expected));
+            Assert.That(health.Gauge().IsCourseGaugeMode, Is.True);
+            Assert.That(health.Gauge().ConfiguredProfileFamily, Is.EqualTo(family));
+            Assert.That(health.Gauge().CurrentGaugeStates, Is.EqualTo(expected));
             Assert.That(health.Health.Value, Is.EqualTo(expected[0].Health));
-            Assert.That(health.GaugeType, Is.EqualTo(expected[0].GaugeType));
-            Assert.That(health.GaugeProfile, Is.EqualTo(BmsGaugeProfileFactory.Create(expected[0].GaugeType, effectiveFamily)));
+            Assert.That(health.Gauge().GaugeType, Is.EqualTo(expected[0].GaugeType));
+            Assert.That(health.Gauge().GaugeProfile, Is.EqualTo(BmsGaugeProfileFactory.Create(expected[0].GaugeType, effectiveFamily)));
             Assert.That(health.HasFailed, Is.False);
-            Assert.That(health.HasEverFailed, Is.False);
+            Assert.That(health.CurrentHealth.HasFailed, Is.False);
         });
     }
 }

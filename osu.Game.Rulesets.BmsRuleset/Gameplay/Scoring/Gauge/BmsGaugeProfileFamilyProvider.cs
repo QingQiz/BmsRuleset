@@ -1,16 +1,8 @@
 using System;
+using RhythmEngine.Profiles.Bms;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 
 namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
-
-public enum BmsGaugeProfileFamily
-{
-    FiveKeys,
-    SevenKeys,
-    Pms,
-    Keyboard,
-    Lr2,
-}
 
 public static class BmsGaugeProfileFamilyProvider
 {

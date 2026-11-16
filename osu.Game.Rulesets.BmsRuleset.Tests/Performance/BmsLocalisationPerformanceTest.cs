@@ -24,7 +24,7 @@ public class BmsLocalisationPerformanceTest
         var samples = new List<Sample>();
         var started = Stopwatch.GetTimestamp();
         var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
-        texts[0] = BmsStrings.ScoreGraphExScore(0);
+        texts[0] = BmsStrings.ScoreGraphScore(BmsStrings.ExScore, 0);
         var firstAccessMilliseconds = Stopwatch.GetElapsedTime(started).TotalMilliseconds;
         var firstAccessAllocatedBytes = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
         refresh(10000);
@@ -65,10 +65,10 @@ public class BmsLocalisationPerformanceTest
             for (var i = 0; i < count; i++)
             {
                 var slot = i % 100 * 5;
-                texts[slot] = BmsStrings.ScoreGraphExScore(i);
-                texts[slot + 1] = BmsStrings.ScoreGraphExScore(i / 2);
+                texts[slot] = BmsStrings.ScoreGraphScore(BmsStrings.ExScore, i);
+                texts[slot + 1] = BmsStrings.ScoreGraphScore(BmsStrings.ExScore, i / 2);
                 texts[slot + 2] = BmsStrings.ScoreGraphDifference(i - i / 2);
-                texts[slot + 3] = BmsStrings.ScoreGraphExScore(i * 2 / 3);
+                texts[slot + 3] = BmsStrings.ScoreGraphScore(BmsStrings.ExScore, i * 2 / 3);
                 texts[slot + 4] = BmsStrings.ScoreGraphDifference(i - i * 2 / 3);
             }
         }

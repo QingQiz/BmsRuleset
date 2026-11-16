@@ -13,9 +13,11 @@ public sealed record OrderedNoteState(NoteState Inner, bool Retired = false) : N
 }
 
 /// <summary>Time-ordered note lock: a successful later input retires earlier finished objects.</summary>
-public sealed class OrderedNoteRule(INoteRule inner, ImmutableArray<long> laneStarts, int nextIndex, TimingWindows windows) : INoteRule
+public sealed class OrderedNoteRule(INoteRule inner, ImmutableArray<long> laneStarts, int nextIndex, TimingWindows windows) : INoteRule, INoteTiming
 {
     public INoteRule Inner => inner;
+
+    public NoteTiming Timing => ((INoteTiming)inner).Timing;
 
     public NoteState CreateState(ChartNote note) => new OrderedNoteState(inner.CreateState(note));
 
@@ -25,8 +27,6 @@ public sealed class OrderedNoteRule(INoteRule inner, ImmutableArray<long> laneSt
         var parts = inner.GetParts(unwrap(context));
         return ordered.Retired ? [.. parts.Select(p => p with { Resolved = true, Active = false })] : parts;
     }
-
-    public IEnumerable<ScoringOpportunity> GetScoringOpportunities(ChartNote note) => inner.GetScoringOpportunities(note);
 
     public InputCandidate? GetCandidate(NoteContext context, InputEvent input, int noteIndex)
     {

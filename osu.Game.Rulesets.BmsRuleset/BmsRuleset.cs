@@ -1,33 +1,27 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using RhythmEngine.Profiles.Bms;
 using osu.Framework.Graphics;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
-using osu.Game.Graphics;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Conversion;
-using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Database;
 using osu.Game.Rulesets.BmsRuleset.Editor;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Difficulty;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Profiles;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.LongNoteMode;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Randomisation;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
-using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.Icons;
 using osu.Game.Rulesets.BmsRuleset.UI.Result;
@@ -62,16 +56,6 @@ public partial class BmsRuleset : Ruleset
 
     public override LocalisableString VariantDescription => BmsStrings.Layout;
 
-    public static readonly IReadOnlyDictionary<HitResult, string> HIT_RESULT_LABELS = new Dictionary<HitResult, string>
-    {
-        [HitResult.Perfect] = "PGREAT",
-        [HitResult.Great] = "GREAT",
-        [HitResult.Good] = "GOOD",
-        [HitResult.Ok] = "BAD",
-        [HitResult.Meh] = "POOR",
-        [HitResult.Miss] = "E-POOR",
-    };
-
     public static readonly IReadOnlyList<HitResult> STATIC_VALID_HIT_RESULTS =
     [
         HitResult.Perfect,
@@ -79,7 +63,7 @@ public partial class BmsRuleset : Ruleset
         HitResult.Good,
         HitResult.Ok,
         HitResult.Meh,
-        HitResult.Miss, // Empty POOR counter (keypress with no note to consume)
+        HitResult.Miss,
     ];
 
     static BmsRuleset()
@@ -146,8 +130,8 @@ public partial class BmsRuleset : Ruleset
     [
         new(BmsStrings.GaugeHistory, () => new BmsGaugeHistoryGraph(score, playableBeatmap), requiresHitEvents: true),
         new(BmsStrings.Timeline, () => new BmsTimelineStatistic(score, playableBeatmap), requiresHitEvents: true),
-        new(BmsStrings.HitScatter, () => new BmsHitScatterStatistic(score.HitEvents, playableBeatmap), requiresHitEvents: true),
-        new(BmsStrings.HitOffset, () => new BmsHitOffsetStatistic(score.HitEvents, playableBeatmap), requiresHitEvents: true),
+        new(BmsStrings.HitScatter, () => new BmsHitScatterStatistic(score, playableBeatmap), requiresHitEvents: true),
+        new(BmsStrings.HitOffset, () => new BmsHitOffsetStatistic(score, playableBeatmap), requiresHitEvents: true),
     ];
 
     public override IEnumerable<Mod> GetModsFor(ModType type) => type switch
@@ -211,11 +195,6 @@ public partial class BmsRuleset : Ruleset
         _ => [],
     };
 
-    #region Attributes display
-
-    /// <summary>Bar maximum for the EXRANK attribute (200% = full bar; 100% = NORMAL at midpoint).</summary>
-    private const float exrank_display_max = 200;
-
     public override BeatmapDifficulty GetAdjustedDisplayDifficulty(IBeatmapInfo beatmapInfo, IReadOnlyCollection<Mod> mods)
     {
         var adjustedDifficulty = new BeatmapDifficulty(beatmapInfo.Difficulty);
@@ -225,58 +204,12 @@ public partial class BmsRuleset : Ruleset
         foreach (var mod in mods.OfType<IApplicableToDifficulty>())
             mod.ApplyToDifficulty(adjustedDifficulty);
 
+        GameplayProfile.FromMods(mods).AdjustDisplayDifficulty(adjustedDifficulty);
         return adjustedDifficulty;
     }
 
     public override IEnumerable<RulesetBeatmapAttribute> GetBeatmapAttributesForDisplay(IBeatmapInfo beatmapInfo, IReadOnlyCollection<Mod> mods)
-    {
-        var original = Mania7KBeatmapConverter.CanConvert(beatmapInfo)
-            ? Mania7KBeatmapConverter.GetConvertedDifficultyInfo(beatmapInfo)
-            : BmsDifficultyInfo.FromOsuDifficulty(beatmapInfo.Difficulty);
-        var adjustedDifficulty = GetAdjustedDisplayDifficulty(beatmapInfo, mods);
-        var adjusted = BmsDifficultyInfo.FromOsuDifficulty(adjustedDifficulty);
-        var colours = new OsuColour();
-        var layout = adjusted.LayoutVariant;
-        var modifiers = BmsEngineRules.ModifiersFor(mods);
-        var rules = BmsEngineRules.ForLayout(layout, modifiers);
-
-        if (adjusted.ExRank is { } exRank)
-        {
-            var rate = rules.ResolveRate(adjusted.Rank, exRank);
-            yield return new RulesetBeatmapAttribute("EXRANK", "EX", (float)original.ExRank.GetValueOrDefault(exRank), (float)exRank, exrank_display_max)
-            {
-                Description = BmsStrings.ExRankDescription(exRank),
-                AdditionalMetrics = createRankMetrics(rate, layout, modifiers),
-            };
-        }
-        else
-        {
-            var rate = rules.ResolveRate(adjusted.Rank, null);
-            yield return new RulesetBeatmapAttribute("RANK", "RK", original.Rank, adjusted.Rank, 4)
-            {
-                Description = BmsStrings.RankDescription(adjusted.Rank),
-                AdditionalMetrics = createRankMetrics(rate, layout, modifiers),
-            };
-        }
-
-        if (original.LockedLongNoteMode != BmsLongNoteMode.Undefined)
-        {
-            yield return new RulesetBeatmapAttribute("LNMODE", "LM", (float)original.LockedLongNoteMode, (float)adjusted.LockedLongNoteMode, 3)
-            {
-                Description = BmsStrings.LockedLongNoteMode(formatLongNoteMode(adjusted.LockedLongNoteMode)),
-                AdditionalMetrics =
-                [
-                    new(BmsStrings.LockedMode, formatLongNoteMode(adjusted.LockedLongNoteMode), colours.Gray4),
-                ],
-            };
-        }
-
-        yield return new RulesetBeatmapAttribute("TOTAL", "TL", (float)original.Total.GetValueOrDefault(), (float)adjusted.Total.GetValueOrDefault(), 300)
-        {
-            Description = createTotalDescription(beatmapInfo, adjusted, mods, layout),
-            AdditionalMetrics = createTotalMetrics(beatmapInfo, adjusted, mods, layout),
-        };
-    }
+        => GameplayProfile.FromMods(mods).BeatmapAttributes(beatmapInfo, mods, GetAdjustedDisplayDifficulty(beatmapInfo, mods));
 
     public override ISkin? CreateSkinTransformer(ISkin skin, IBeatmap beatmap) => skin switch
     {
@@ -289,7 +222,7 @@ public partial class BmsRuleset : Ruleset
     public override IEnumerable<HitResult> GetValidHitResults() => STATIC_VALID_HIT_RESULTS;
 
     public override LocalisableString GetDisplayNameForHitResult(HitResult result) =>
-        HIT_RESULT_LABELS.TryGetValue(result, out var label) ? label : base.GetDisplayNameForHitResult(result);
+        STATIC_VALID_HIT_RESULTS.Contains(result) ? BmsGameplayProfile.INSTANCE.JudgementLabel(result) : base.GetDisplayNameForHitResult(result);
 
     public override IRulesetConfigManager CreateConfig(SettingsStore? settings)
     {
@@ -304,136 +237,4 @@ public partial class BmsRuleset : Ruleset
 
     public override Drawable CreateIcon() => new BmsRulesetIcon();
 
-    private static (BmsGaugeType Type, BmsGaugeCalculator Calculator) createDisplayGaugeCalculator(
-        IBeatmapInfo beatmapInfo, BmsDifficultyInfo difficulty, IReadOnlyCollection<Mod> mods, BmsLayoutVariant layout)
-    {
-        var gaugeType = mods.OfType<BmsModGauge>().FirstOrDefault()?.GaugeType ?? BmsGaugeType.Normal;
-        var family = BmsGaugeProfileFamilyProvider.FromLayout(layout);
-        var profile = BmsGaugeProfileFactory.Create(gaugeType, family);
-        foreach (var mod in mods.OfType<IApplicableToGaugeProfile>())
-            profile = mod.ApplyToGaugeProfile(gaugeType, profile);
-        return (gaugeType, new BmsGaugeCalculator(profile, difficulty.Total, Math.Max(1, beatmapInfo.TotalObjectCount), family));
-    }
-
-    private static LocalisableString createTotalDescription(
-        IBeatmapInfo beatmapInfo,
-        BmsDifficultyInfo difficulty,
-        IReadOnlyCollection<Mod> mods,
-        BmsLayoutVariant layout)
-    {
-        var (gaugeType, calculator) = createDisplayGaugeCalculator(beatmapInfo, difficulty, mods, layout);
-        var profile = calculator.Profile;
-        var noteCount = calculator.NoteCount;
-
-        var gaugeName = formatGaugeName(gaugeType);
-        var total = formatTotal(difficulty, calculator);
-
-        return profile.GutsRules.Count > 0
-            ? BmsStrings.GaugeSummaryWithGuts(gaugeName, noteCount, total)
-            : BmsStrings.GaugeSummary(gaugeName, noteCount, total);
-
-        static string formatGaugeName(BmsGaugeType gaugeType) => gaugeType switch
-        {
-            BmsGaugeType.AssistEasy => "Assist Easy",
-            BmsGaugeType.Easy => "Easy",
-            BmsGaugeType.Normal => "Normal",
-            BmsGaugeType.Hard => "Hard",
-            BmsGaugeType.ExHard => "ExHard",
-            BmsGaugeType.Hazard => "Hazard",
-            BmsGaugeType.Class => "Class",
-            BmsGaugeType.ExClass => "ExClass",
-            BmsGaugeType.ExHardClass => "ExHard Class",
-            _ => gaugeType.ToString(),
-        };
-
-        static string formatTotal(BmsDifficultyInfo difficulty, BmsGaugeCalculator calculator) => difficulty.Total.HasValue
-            ? $"#TOTAL {calculator.Total:0.###}"
-            : $"default TOTAL {calculator.Total:0.###}";
-    }
-
-    private static RulesetBeatmapAttribute.AdditionalMetric[] createRankMetrics(double rate, BmsLayoutVariant layout, BmsJudgementModifiers modifiers)
-    {
-        var metrics = new List<RulesetBeatmapAttribute.AdditionalMetric>();
-
-        addHeadMetrics("Normal note", BmsEngineRules.GetTiming(layout, column: 1, judgementRate: rate, tail: false, modifiers: modifiers));
-
-        if (tryGetScratchColumn(layout, out var scratchColumn))
-            addHeadMetrics("Scratch", BmsEngineRules.GetTiming(layout, scratchColumn, rate, tail: false, modifiers: modifiers));
-
-        addTailMetrics("LN tail", BmsEngineRules.GetTiming(layout, column: 1, judgementRate: rate, tail: true, modifiers: modifiers));
-
-        if (tryGetScratchColumn(layout, out scratchColumn))
-            addTailMetrics("Scratch LN tail", BmsEngineRules.GetTiming(layout, scratchColumn, rate, tail: true, modifiers: modifiers));
-
-        return metrics.ToArray();
-
-        void addHeadMetrics(string prefix, BmsTimingDefinition table)
-        {
-            addJudgementMetrics(prefix, table);
-            metrics.Add(new RulesetBeatmapAttribute.AdditionalMetric($"{prefix} E-POOR fast zone",
-                $"-{formatMilliseconds(table.FastWindowFor(HitResult.Miss))} to -{formatMilliseconds(table.FastWindowFor(HitResult.Ok))} ms", BmsHitResultColours.ForHitResult(HitResult.Miss)));
-        }
-
-        void addTailMetrics(string prefix, BmsTimingDefinition table)
-        {
-            addJudgementMetrics(prefix, table);
-        }
-
-        void addJudgementMetrics(string prefix, BmsTimingDefinition table)
-        {
-            foreach (var result in new[] { HitResult.Perfect, HitResult.Great, HitResult.Good, HitResult.Ok })
-                metrics.Add(new RulesetBeatmapAttribute.AdditionalMetric($"{prefix} {HIT_RESULT_LABELS[result]}", formatWindow(table, result), BmsHitResultColours.ForHitResult(result)));
-        }
-
-        static string formatWindow(BmsTimingDefinition table, HitResult result)
-            => $"-{formatMilliseconds(table.FastWindowFor(result))} to +{formatMilliseconds(table.SlowWindowFor(result))} ms";
-
-        static string formatMilliseconds(double value) => $"{value:0.##}";
-
-        static bool tryGetScratchColumn(BmsLayoutVariant layout, out int scratchColumn)
-        {
-            for (var column = 0; column < BmsLayout.GetTotalColumns(layout); column++)
-            {
-                if (!BmsLayout.IsScratchColumn(column, layout))
-                    continue;
-
-                scratchColumn = column;
-                return true;
-            }
-
-            scratchColumn = -1;
-            return false;
-        }
-    }
-
-    private static RulesetBeatmapAttribute.AdditionalMetric[] createTotalMetrics(
-        IBeatmapInfo beatmapInfo,
-        BmsDifficultyInfo difficulty,
-        IReadOnlyCollection<Mod> mods,
-        BmsLayoutVariant layout)
-    {
-        var (_, calculator) = createDisplayGaugeCalculator(beatmapInfo, difficulty, mods, layout);
-        var referenceHealth = calculator.Profile.InitialHealth;
-
-        return
-        [
-            new("PGREAT/GREAT", formatDelta(calculator.GetDeltaFor(HitResult.Perfect, referenceHealth)), BmsHitResultColours.ForHitResult(HitResult.Perfect)),
-            new("GOOD", formatDelta(calculator.GetDeltaFor(HitResult.Good, referenceHealth)), BmsHitResultColours.ForHitResult(HitResult.Good)),
-            new("BAD", formatDelta(calculator.GetDeltaFor(HitResult.Ok, referenceHealth)), BmsHitResultColours.ForHitResult(HitResult.Ok)),
-            new("POOR", formatDelta(calculator.GetDeltaFor(HitResult.Meh, referenceHealth)), BmsHitResultColours.ForHitResult(HitResult.Meh)),
-            new("E-POOR", formatDelta(calculator.GetDeltaFor(HitResult.Miss, referenceHealth)), BmsHitResultColours.ForHitResult(HitResult.Miss)),
-        ];
-
-        static string formatDelta(double delta) => $"{delta * 100:+0.###;-0.###;0}%";
-    }
-
-    private static string formatLongNoteMode(BmsLongNoteMode mode) => mode switch
-    {
-        BmsLongNoteMode.LongNote => "LN",
-        BmsLongNoteMode.ChargeNote => "CN",
-        BmsLongNoteMode.HellChargeNote => "HCN",
-        _ => "??",
-    };
-
-    #endregion
 }

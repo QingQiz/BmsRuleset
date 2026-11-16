@@ -175,7 +175,7 @@ public partial class TestSceneBmsCourseSelect
             preparedTime = first.ChildrenOfType<GameplayClockContainer>().Single().CurrentTime;
             Assert.That(first.GameplayState.HealthProcessor.IsLoaded, Is.True);
             Assert.That(first.GameplayState.ScoreProcessor.IsLoaded, Is.True);
-            Assert.That(((BmsHealthProcessor)first.GameplayState.HealthProcessor).GaugeType, Is.EqualTo(BmsGaugeType.Hazard));
+            Assert.That(((BmsHealthProcessor)first.GameplayState.HealthProcessor).Gauge().GaugeType, Is.EqualTo(BmsGaugeType.Hazard));
             Assert.That(firstPlayfield.IsLoaded, Is.True);
             var column = (BmsColumn)firstPlayfield.Stage.Columns[1];
             var notePool = column.ChildrenOfType<DrawablePool<DrawableBmsNote>>().Single();
@@ -224,7 +224,7 @@ public partial class TestSceneBmsCourseSelect
             Assert.That(first.Score.ScoreInfo.Mods.OfType<BmsModBranchReplay>(), Is.Empty);
             Assert.That(first.ChildrenOfType<osu.Game.Rulesets.UI.ModIcon>().Any(icon => icon.Mod is BmsModBranchReplay), Is.False);
             Assert.That(first.GameplayState.ScoreProcessor.JudgedHits, Is.Zero);
-            Assert.That(((BmsHealthProcessor)first.GameplayState.HealthProcessor).GaugeType, Is.EqualTo(BmsGaugeType.Hazard));
+            Assert.That(((BmsHealthProcessor)first.GameplayState.HealthProcessor).Gauge().GaugeType, Is.EqualTo(BmsGaugeType.Hazard));
             Assert.That(((BmsHealthProcessor)first.GameplayState.HealthProcessor).Health.Value, Is.EqualTo(1));
             Assert.That(first.ChildrenOfType<GameplayClockContainer>().Single().Rate, Is.EqualTo(1.25));
             Assert.That(firstPlayfield.ScrollController.PlaybackRate, Is.EqualTo(1.25));
@@ -232,7 +232,7 @@ public partial class TestSceneBmsCourseSelect
             Assert.That(new BmsPracticeSettingsStore(Dependencies.Get<osu.Framework.Platform.Storage>()).Load(source.BeatmapInfo.Hash), Is.EqualTo(session.Settings));
             first.ChildrenOfType<GameplayClockContainer>().Single().Seek(21300);
         });
-        AddUntilStep("hazard exhausted by first missed note", () => ((BmsHealthProcessor)first.GameplayState.HealthProcessor).HasEverFailed);
+        AddUntilStep("hazard exhausted by first missed note", () => ((BmsHealthProcessor)first.GameplayState.HealthProcessor).CurrentHealth.HasFailed);
         AddAssert("zero gauge keeps same attempt active", () => Stack.CurrentScreen == first && !first.GameplayState.HasFailed);
         AddStep("finish remaining selected note", () => first.ChildrenOfType<GameplayClockContainer>().Single().Seek(23400));
         AddUntilStep("clock beyond last selected note", () => first.ChildrenOfType<GameplayClockContainer>().Single().CurrentTime >= 23400);
@@ -253,7 +253,7 @@ public partial class TestSceneBmsCourseSelect
             Assert.That(practice.SelectedScore.Value, Is.Null);
             Assert.That(practice.LastResult!.Score.Statistics.Values.Sum(), Is.GreaterThan(0));
             Assert.That(practice.LastResult.Score.Mods.OfType<BmsModBranchReplay>(), Is.Empty);
-            Assert.That(practice.LastResult.Statistics.EndingGaugeStates.Any(gauge => gauge.Failed), Is.True);
+            Assert.That(practice.LastResult.Statistics.EndingHealth!.Value.Layers.Any(gauge => gauge.HasFailed), Is.True);
             Assert.That(practice.LastResult.Health, Is.Zero);
             Assert.That(practice.LastResult.Statistics.Gauges.Any(series => series.FailurePoint != null), Is.True);
             Assert.That(second, Is.Not.SameAs(first));
@@ -272,8 +272,8 @@ public partial class TestSceneBmsCourseSelect
         {
             Assert.That(second.GameplayState.ScoreProcessor.JudgedHits, Is.Zero);
             Assert.That(second.GameplayState.ScoreProcessor.Combo.Value, Is.Zero);
-            Assert.That(((BmsHealthProcessor)second.GameplayState.HealthProcessor).HasEverFailed, Is.False);
-            Assert.That(((BmsHealthProcessor)second.GameplayState.HealthProcessor).GaugeType, Is.EqualTo(BmsGaugeType.Hazard));
+            Assert.That(((BmsHealthProcessor)second.GameplayState.HealthProcessor).CurrentHealth.HasFailed, Is.False);
+            Assert.That(((BmsHealthProcessor)second.GameplayState.HealthProcessor).Gauge().GaugeType, Is.EqualTo(BmsGaugeType.Hazard));
             Assert.That(((BmsHealthProcessor)second.GameplayState.HealthProcessor).Health.Value, Is.EqualTo(1));
             var adjustments = second.ChildrenOfType<GameplayClockContainer>().Single().AdjustmentsFromMods;
             Assert.That(adjustments.AggregateFrequency.Value * adjustments.AggregateTempo.Value, Is.EqualTo(1.25));

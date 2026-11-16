@@ -2,9 +2,12 @@ using System.Linq;
 using NUnit.Framework;
 using RhythmEngine.Core;
 using RhythmEngine.Profiles.Bms;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Profiles;
 using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
@@ -43,15 +46,18 @@ public class BmsModNoBadTest
     [TestCase(true)]
     public void TestCombinationWithConstraintsIsOrderIndependent(bool noGreat)
     {
-        var firstMods = BmsEngineRules.ModifiersFor([new BmsModNoBad(), noGreat ? new BmsModNoGreat() : new BmsModNoGood()]);
-        var secondMods = BmsEngineRules.ModifiersFor([noGreat ? new BmsModNoGreat() : new BmsModNoGood(), new BmsModNoBad()]);
-        var first = BmsEngineRules.GetTiming(BmsLayoutVariant.Bme7K, 1, 2, false, firstMods);
-        var second = BmsEngineRules.GetTiming(BmsLayoutVariant.Bme7K, 1, 2, false, secondMods);
+        var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, TotalColumns = 8, Rank = 2 };
+        var note = new BmsNote { Beatmap = beatmap, StartTime = 1000, Column = 1 };
+        beatmap.HitObjects.Add(note);
+        var firstProfile = GameplayProfile.FromMods([new BmsModNoBad(), noGreat ? new BmsModNoGreat() : new BmsModNoGood()]);
+        var secondProfile = GameplayProfile.FromMods([noGreat ? new BmsModNoGreat() : new BmsModNoGood(), new BmsModNoBad()]);
+        var first = new BmsEngineChart(beatmap, firstProfile).TimingFor(note);
+        var second = new BmsEngineChart(beatmap, secondProfile).TimingFor(note);
 
-        Assert.That(first.Windows.Entries, Is.EqualTo(second.Windows.Entries));
-        Assert.That(first.HitAt(60), Is.EqualTo(HitResult.None));
-        Assert.That(first.HitAt(20), Is.EqualTo(noGreat ? HitResult.None : HitResult.Great));
-        Assert.That(first.HitAt(0), Is.EqualTo(HitResult.Perfect));
+        Assert.That(first.HeadWindows.Entries, Is.EqualTo(second.HeadWindows.Entries));
+        Assert.That(first.HeadWindows.ResultFor(60_000), Is.EqualTo(BmsResults.EMPTY_POOR));
+        Assert.That(first.HeadWindows.ResultFor(20_000), Is.EqualTo(noGreat ? BmsResults.EMPTY_POOR : BmsResults.GREAT));
+        Assert.That(first.HeadWindows.ResultFor(0), Is.EqualTo(BmsResults.PGREAT));
     }
 
     [Test]

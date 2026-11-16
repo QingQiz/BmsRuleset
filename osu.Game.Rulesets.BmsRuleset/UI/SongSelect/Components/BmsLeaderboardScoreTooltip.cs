@@ -2,26 +2,26 @@
 // See the LICENCE file in the repository root for full licence text.
 // Adapted from osu! Screens/Select/BeatmapLeaderboardScore.Tooltip.cs at 3c1c96f742e7aae2ff67a7361e058fe91ca3b955.
 
-using System;
 using System.Collections.Generic;
 using System.Linq;
+using System;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.Color4Extensions;
-using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Cursor;
 using osu.Framework.Graphics.Effects;
 using osu.Framework.Graphics.Shapes;
+using osu.Framework.Graphics;
 using osu.Framework.Localisation;
 using osu.Framework.Utils;
 using osu.Game.Configuration;
-using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
+using osu.Game.Graphics;
 using osu.Game.Overlays;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.UI.Ranking;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Lamp;
@@ -29,8 +29,8 @@ using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Scoring;
-using osuTK;
 using osuTK.Graphics;
+using osuTK;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Components;
 
@@ -110,15 +110,16 @@ internal sealed partial class BmsLeaderboardScoreTooltip(OverlayColourProvider c
                 updateAbsoluteDate();
                 relativeDate.Date = value.Date;
 
-                var maximum = BmsExScore.Calculate(value.MaximumStatistics);
+                var profile = GameplayProfile.FromMods(value.Mods);
+                var maximum = profile.StoredMaximumScore(value);
                 statistics.Children =
                 [
-                    .. results.Select(result => new JudgementRow(result, value.Statistics.GetValueOrDefault(result))),
+                    .. results.Select(result => new JudgementRow(profile.JudgementLabel(result), result, value.Statistics.GetValueOrDefault(result))),
                     Empty().With(drawable => drawable.Height = 8),
                     new StatisticRow(BmsStrings.LeaderboardClearStatus, BmsStrings.LeaderboardLamp(BmsLampCalculator.Calculate(value))),
-                    new StatisticRow(BmsStrings.ExScore, maximum > 0
-                        ? BmsStrings.LeaderboardFraction(BmsExScore.Calculate(value, maximum), maximum)
-                        : BmsStrings.ResultNumber(BmsExScore.Calculate(value, maximum))),
+                    new StatisticRow(profile.ScoreLabel, maximum is > 0
+                        ? BmsStrings.LeaderboardFraction(profile.StoredScore(value), maximum.Value)
+                        : BmsStrings.ResultNumber(profile.StoredScore(value))),
                     new StatisticRow(BmsStrings.MaxCombo, BmsStrings.ResultNumber(value.MaxCombo)),
                     new StatisticRow(BmsStrings.ResultAccuracy, BmsStrings.ResultPercentage(value.Accuracy)),
                 ];
@@ -265,8 +266,8 @@ internal sealed partial class BmsLeaderboardScoreTooltip(OverlayColourProvider c
 
         internal int Count { get; }
 
-        internal JudgementRow(HitResult result, int count)
-            : base(BmsStrings.ResultJudgement(result), BmsStrings.ResultNumber(count), BmsHitResultColours.ForHitResult(result))
+        internal JudgementRow(LocalisableString label, HitResult result, int count)
+            : base(label, BmsStrings.ResultNumber(count), BmsHitResultColours.ForHitResult(result))
         {
             Result = result;
             Count = count;
@@ -342,8 +343,8 @@ internal sealed partial class BmsLeaderboardScoreTooltip(OverlayColourProvider c
                 rankBackground.Colour = ColourInfo.GradientVertical(
                     OsuColour.ForRank(value.Rank).Opacity(0f),
                     OsuColour.ForRank(value.Rank).Opacity(0.5f));
-                rankContainer.Child = new BmsDrawableRank(value.Rank);
-                totalScore.Text = BmsStrings.ResultNumber(BmsExScore.Calculate(value, BmsExScore.Calculate(value.MaximumStatistics)));
+                rankContainer.Child = new BmsDrawableRank(value.Rank, GameplayProfile.FromMods(value.Mods));
+                totalScore.Text = BmsStrings.ResultNumber(GameplayProfile.FromMods(value.Mods).StoredScore(value));
             }
         }
 

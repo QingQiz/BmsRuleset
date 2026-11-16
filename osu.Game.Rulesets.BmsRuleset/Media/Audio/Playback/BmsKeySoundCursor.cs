@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 
 namespace osu.Game.Rulesets.BmsRuleset.Media.Audio.Playback;
 
@@ -9,14 +8,15 @@ namespace osu.Game.Rulesets.BmsRuleset.Media.Audio.Playback;
 ///     Passed invisible notes select persistent empty-press samples, with newer visible notes taking priority.
 ///     Pure per-column cursor that finds the next hit object whose key-sound should play on an
 ///     empty press. Linear-walks this column's sorted hit-object slice from a cursor that advances
-///     forward, skipping landmines, notes past their slow BAD window, and notes the caller reports
-///     as finished (judged or past its active lifetime). The cursor repositions via binary search
-///     only on a backward seek; forward time progression (including normal gaps with no key press)
-///     is handled by the linear scan, which advances past notes whose slow BAD window expired.
+///     forward, skipping landmines, notes past their head deadline, and notes the caller reports
+///     as finished (judged or past its active lifetime). The cursor resets on a backward seek;
+///     forward time progression (including normal gaps with no key press)
+///     is handled by the linear scan, which advances past notes whose head deadline expired.
 ///     The caller supplies the core's result and activation query; selecting a sample does not
 ///     require a representation or advance judgement state.
 /// </summary>
-public sealed class BmsKeySoundCursor(IReadOnlyList<BmsHitObject> hitObjects, IReadOnlyList<BmsInvisibleNote>? invisibleNotes = null)
+public sealed class BmsKeySoundCursor(IReadOnlyList<BmsHitObject> hitObjects, Func<BmsHitObject, double> getExpiryTime,
+                                      IReadOnlyList<BmsInvisibleNote>? invisibleNotes = null)
 {
     private int nextSoundIndex;
     private double lastSoundSearchTime = double.MinValue;
@@ -28,6 +28,12 @@ public sealed class BmsKeySoundCursor(IReadOnlyList<BmsHitObject> hitObjects, IR
     /// </summary>
     public BmsHitObject? Next(double currentTime, Func<BmsHitObject, bool> isFinished)
     {
+        // A profile may give earlier notes wider windows, so start time alone cannot exclude them.
+        if (currentTime < lastSoundSearchTime)
+            nextSoundIndex = 0;
+
+        lastSoundSearchTime = currentTime;
+
         if (invisibleNotes is { Count: > 0 })
         {
             var invisibleIndex = findFirstAtOrAfter(invisibleNotes, currentTime) - 1;
@@ -38,7 +44,7 @@ public sealed class BmsKeySoundCursor(IReadOnlyList<BmsHitObject> hitObjects, IR
                 // a newer visible note takes over. Its sound persists after its drawable expires.
                 var sample = invisibleNotes[invisibleIndex];
 
-                for (var i = findFirstSoundCandidateIndex(currentTime) - 1; i >= 0; i--)
+                for (var i = findFirstAtOrAfter(hitObjects, currentTime) - 1; i >= 0; i--)
                 {
                     var note = hitObjects[i];
                     if (note.StartTime < sample.StartTime)
@@ -52,17 +58,9 @@ public sealed class BmsKeySoundCursor(IReadOnlyList<BmsHitObject> hitObjects, IR
             }
         }
 
-        // Reposition only on a backward seek — the linear scan below already advances past notes
-        // whose slow BAD window has expired, so forward time progression (normal gaps included)
-        // needs no time-threshold reset.
-        if (currentTime < lastSoundSearchTime)
-            nextSoundIndex = findFirstSoundCandidateIndex(currentTime - maxLookAhead());
-
-        lastSoundSearchTime = currentTime;
-
         var index = nextSoundIndex;
 
-        while (index < hitObjects.Count && isPastBadWindow(hitObjects[index], currentTime))
+        while (index < hitObjects.Count && (hitObjects[index] is BmsLandmine || currentTime > getExpiryTime(hitObjects[index])))
             index++;
 
         while (index < hitObjects.Count)
@@ -82,22 +80,6 @@ public sealed class BmsKeySoundCursor(IReadOnlyList<BmsHitObject> hitObjects, IR
         nextSoundIndex = index;
         return null;
     }
-
-    /// <summary>
-    /// A note's slow BAD window has fully expired at <paramref name="currentTime"/>.
-    /// Mirrors the old centralized player's isPastBadWindow.
-    /// </summary>
-    private static bool isPastBadWindow(BmsHitObject hitObject, double currentTime)
-        => currentTime > hitObject.StartTime + BmsEngineRules.GetTiming(hitObject, false).PassiveDeadline / 1000.0;
-
-    /// <summary>
-    /// Generous lookahead for the binary-search cursor reset, covering the widest possible slow
-    /// BAD window. A larger value is safe — the linear scan advances past finished notes anyway.
-    /// </summary>
-    private static double maxLookAhead() => 1000;
-
-    /// <summary>Binary search: first index where hitObjects[i].StartTime &gt;= time.</summary>
-    private int findFirstSoundCandidateIndex(double time) => findFirstAtOrAfter(hitObjects, time);
 
     private static int findFirstAtOrAfter(IReadOnlyList<BmsHitObject> notes, double time)
     {

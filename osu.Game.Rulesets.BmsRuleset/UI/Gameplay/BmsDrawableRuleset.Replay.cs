@@ -37,6 +37,8 @@ public partial class BmsDrawableRuleset
         handler.ConfigureSeeking(() => gameplayClockContainer?.CurrentTime,
             time => seekReplay(replay, time),
             playfield.FinishReplaySeekInput);
+        if (IsLoaded)
+            handler.RequestSeek();
         return handler;
     }
 

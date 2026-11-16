@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
+using RhythmEngine.Profiles.Bms;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osuTK.Graphics;
@@ -20,8 +21,8 @@ public class BmsGaugeProfileTest
         Assert.That(profile.BadDelta, Is.EqualTo(-0.03).Within(0.0001));
         Assert.That(profile.PoorDelta, Is.EqualTo(-0.06).Within(0.0001));
         Assert.That(profile.EmptyPoorDelta, Is.EqualTo(-0.02).Within(0.0001));
-        Assert.That(profile.Display.ColourMode, Is.EqualTo(BmsGaugeColourMode.GrooveDynamic));
-        Assert.That(profile.Display.ShowClearLine, Is.True);
+        Assert.That(BmsGaugeProfileFactory.CreateDisplay(BmsGaugeType.Normal, profile).ColourMode, Is.EqualTo(BmsGaugeColourMode.GrooveDynamic));
+        Assert.That(BmsGaugeProfileFactory.CreateDisplay(BmsGaugeType.Normal, profile).ShowClearLine, Is.True);
     }
 
     [Test]
@@ -31,25 +32,25 @@ public class BmsGaugeProfileTest
         var exHard = BmsGaugeProfileFactory.Create(BmsGaugeType.ExHard);
         var hazard = BmsGaugeProfileFactory.Create(BmsGaugeType.Hazard);
 
-        Assert.That(hard.Display.ColourMode, Is.EqualTo(BmsGaugeColourMode.Fixed));
-        Assert.That(exHard.Display.ColourMode, Is.EqualTo(BmsGaugeColourMode.Fixed));
-        Assert.That(hazard.Display.ColourMode, Is.EqualTo(BmsGaugeColourMode.Fixed));
+        Assert.That(BmsGaugeProfileFactory.CreateDisplay(BmsGaugeType.Hard, hard).ColourMode, Is.EqualTo(BmsGaugeColourMode.Fixed));
+        Assert.That(BmsGaugeProfileFactory.CreateDisplay(BmsGaugeType.ExHard, exHard).ColourMode, Is.EqualTo(BmsGaugeColourMode.Fixed));
+        Assert.That(BmsGaugeProfileFactory.CreateDisplay(BmsGaugeType.Hazard, hazard).ColourMode, Is.EqualTo(BmsGaugeColourMode.Fixed));
 
-        Assert.That(hard.Display.FillColour, Is.EqualTo(new Color4(220, 55, 50, 255)));
-        Assert.That(exHard.Display.FillColour, Is.EqualTo(new Color4(195, 55, 210, 255)));
-        Assert.That(hazard.Display.FillColour, Is.EqualTo(new Color4(255, 215, 0, 255)));
+        Assert.That(BmsGaugeProfileFactory.CreateDisplay(BmsGaugeType.Hard, hard).FillColour, Is.EqualTo(new Color4(220, 55, 50, 255)));
+        Assert.That(BmsGaugeProfileFactory.CreateDisplay(BmsGaugeType.ExHard, exHard).FillColour, Is.EqualTo(new Color4(195, 55, 210, 255)));
+        Assert.That(BmsGaugeProfileFactory.CreateDisplay(BmsGaugeType.Hazard, hazard).FillColour, Is.EqualTo(new Color4(255, 215, 0, 255)));
 
-        Assert.That(hard.Display.ShowClearLine, Is.False);
-        Assert.That(exHard.Display.ShowClearLine, Is.False);
-        Assert.That(hazard.Display.ShowClearLine, Is.False);
+        Assert.That(BmsGaugeProfileFactory.CreateDisplay(BmsGaugeType.Hard, hard).ShowClearLine, Is.False);
+        Assert.That(BmsGaugeProfileFactory.CreateDisplay(BmsGaugeType.ExHard, exHard).ShowClearLine, Is.False);
+        Assert.That(BmsGaugeProfileFactory.CreateDisplay(BmsGaugeType.Hazard, hazard).ShowClearLine, Is.False);
     }
 
     [Test]
     public void TestCourseProfilesUseTieredGaugeDisplay()
     {
-        var hardColour = BmsGaugeProfileFactory.Create(BmsGaugeType.Hard).Display.FillColour;
-        var exHardColour = BmsGaugeProfileFactory.Create(BmsGaugeType.ExHard).Display.FillColour;
-        var hazardColour = BmsGaugeProfileFactory.Create(BmsGaugeType.Hazard).Display.FillColour;
+        var hardColour = BmsGaugeProfileFactory.CreateDisplay(BmsGaugeType.Hard, BmsGaugeProfileFactory.Create(BmsGaugeType.Hard)).FillColour;
+        var exHardColour = BmsGaugeProfileFactory.CreateDisplay(BmsGaugeType.ExHard, BmsGaugeProfileFactory.Create(BmsGaugeType.ExHard)).FillColour;
+        var hazardColour = BmsGaugeProfileFactory.CreateDisplay(BmsGaugeType.Hazard, BmsGaugeProfileFactory.Create(BmsGaugeType.Hazard)).FillColour;
 
         var expectedColours = new Dictionary<BmsGaugeType, Color4>
         {
@@ -63,16 +64,16 @@ public class BmsGaugeProfileTest
             var profile = BmsGaugeProfileFactory.Create(type);
 
             Assert.That(profile.Algorithm, Is.EqualTo(BmsGaugeAlgorithm.Fixed));
-            Assert.That(profile.Display.ColourMode, Is.EqualTo(BmsGaugeColourMode.Fixed));
-            Assert.That(profile.Display.FillColour, Is.EqualTo(expectedColour));
-            Assert.That(profile.Display.ShowClearLine, Is.False);
+            Assert.That(BmsGaugeProfileFactory.CreateDisplay(type, profile).ColourMode, Is.EqualTo(BmsGaugeColourMode.Fixed));
+            Assert.That(BmsGaugeProfileFactory.CreateDisplay(type, profile).FillColour, Is.EqualTo(expectedColour));
+            Assert.That(BmsGaugeProfileFactory.CreateDisplay(type, profile).ShowClearLine, Is.False);
         }
     }
 
     [Test]
     public void TestHazardDisplayIsGoldAndHasNoClearLine()
     {
-        var display = BmsGaugeProfileFactory.Create(BmsGaugeType.Hazard).Display;
+        var display = BmsGaugeProfileFactory.CreateDisplay(BmsGaugeType.Hazard, BmsGaugeProfileFactory.Create(BmsGaugeType.Hazard));
 
         Assert.That(display.ColourMode, Is.EqualTo(BmsGaugeColourMode.Fixed));
         Assert.That(display.FillColour, Is.EqualTo(new Color4(255, 215, 0, 255)));

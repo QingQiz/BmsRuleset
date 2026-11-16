@@ -10,6 +10,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Tests.Performance;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.BeatmapTest.Decoding;
@@ -18,8 +19,8 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.BeatmapTest.Decoding;
 [NonParallelizable]
 public class BmsTimingMapQueryTest
 {
-    private const string CAUTION_LIFETIMES = "FB282145C2C0AC8E90BBC4C4FFC9F2C9CB2E818D81A0E1EBCBE8342043D0FFFD";
-    private const string SCROLLPLUS_LIFETIMES = "21B40B5B5E0F4CD4BA9797873F5B01FBCA901A54418B6327656CF7EE1D92E337";
+    private const string caution_lifetimes = "AC70CA94E712020E4426A5E8A0642FC9444C2238440A6C1997F91E69FB1C955B";
+    private const string scrollplus_lifetimes = "C4C9D8B5BDD4723152B05AC28FD0AC689715C8EE50B9DAA0B2A817D5083FE88F";
 
     private static int binarySearches;
     private static BmsTimingMap observedMap;
@@ -29,10 +30,10 @@ public class BmsTimingMapQueryTest
     private static long originalWalkSteps;
     private static long boundedWalkSteps;
     private static long statelessQueries;
-    private static readonly FieldInfo timingCursor = typeof(BmsTimingMap).GetField("cursor", BindingFlags.Instance | BindingFlags.NonPublic)!;
+    private static readonly FieldInfo timing_cursor = typeof(BmsTimingMap).GetField("cursor", BindingFlags.Instance | BindingFlags.NonPublic)!;
 
-    [TestCase("99_outlaw_caution.bms", CAUTION_LIFETIMES)]
-    [TestCase("99_outlaw_scrollplus.bms", SCROLLPLUS_LIFETIMES)]
+    [TestCase("99_outlaw_caution.bms", caution_lifetimes)]
+    [TestCase("99_outlaw_scrollplus.bms", scrollplus_lifetimes)]
     public void RealChartLifetimeRefreshKeepsStatelessSnapshotResults(string chart, string expectedFingerprint)
     {
         // The observed stateless oracle supplies exact double fingerprints, so normal
@@ -43,8 +44,8 @@ public class BmsTimingMapQueryTest
         Assert.That(fingerprint(actual), Is.EqualTo(expectedFingerprint));
     }
 
-    [TestCase("99_outlaw_caution.bms", CAUTION_LIFETIMES)]
-    [TestCase("99_outlaw_scrollplus.bms", SCROLLPLUS_LIFETIMES)]
+    [TestCase("99_outlaw_caution.bms", caution_lifetimes)]
+    [TestCase("99_outlaw_scrollplus.bms", scrollplus_lifetimes)]
     [Category("JudgementInstrumentation")]
     public void RealChartLifetimeRefreshKeepsIndependentStatelessResults(string chart, string expectedFingerprint)
     {
@@ -99,7 +100,8 @@ public class BmsTimingMapQueryTest
     private static (double Start, double End)[] refreshLifetimes(BmsTimingMap map, BmsHitObject[] selected)
     {
         var scroll = new BmsGameplayScrollController(map);
-        var entries = selected.Select(note => new BmsHitObjectLifetimeEntry(note, scroll, () => 0)).ToArray();
+        var compiled = new BmsEngineChart((BmsBeatmap)selected[0].Beatmap);
+        var entries = selected.Select(note => new BmsHitObjectLifetimeEntry(note, scroll, () => 0, compiled.TimingFor(note))).ToArray();
         double[] speeds = [8, 12, 6];
         return speeds.SelectMany(speed =>
         {
@@ -127,7 +129,7 @@ public class BmsTimingMapQueryTest
         => Path.GetFullPath(Path.Combine(Path.GetDirectoryName(sourceFile)!, "../../../bms_test_songs/103_outlaw_ogg", chart));
 
     private static void beginQuery(BmsTimingMap __instance, out int __state)
-        => __state = ReferenceEquals(__instance, observedMap) ? (int)timingCursor.GetValue(__instance)! : -1;
+        => __state = ReferenceEquals(__instance, observedMap) ? (int)timing_cursor.GetValue(__instance)! : -1;
 
     private static void endQuery(int __result, int __state)
     {

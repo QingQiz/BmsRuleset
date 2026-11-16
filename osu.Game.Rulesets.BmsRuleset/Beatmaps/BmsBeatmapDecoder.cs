@@ -57,13 +57,13 @@ public class BmsBeatmapDecoder(Func<int, int>? randomValueSelector = null) : Dec
         hitObject.SampleKey = parsedObject.SampleKey;
         hitObject.SampleVolume = parsedObject.SampleVolume;
         hitObject.AdditionalSampleKeys = parsedObject.AdditionalSampleKeys;
-        hitObject.JudgementRate = parsedObject.JudgementRate;
+        hitObject.ExRank = parsedObject.ExRank;
         if (hitObject is BmsLandmine mine)
             mine.LandmineDamagePercent = parsedObject.LandmineDamagePercent;
         if (hitObject is BmsLongNote ln)
         {
             ln.Duration = parsedObject.Duration;
-            ln.Mode = parsedObject.LongNoteMode;
+            ln.Kind = (parsedObject.LongNoteMode == BmsLongNoteMode.Undefined ? beatmap.LockedLongNoteMode : parsedObject.LongNoteMode).ToNoteKind();
             ln.AdditionalTailSampleKeys = parsedObject.AdditionalTailSampleKeys;
             ln.TailSampleKey = parsedObject.TailSampleKey;
             ln.TailSampleVolume = parsedObject.TailSampleVolume;

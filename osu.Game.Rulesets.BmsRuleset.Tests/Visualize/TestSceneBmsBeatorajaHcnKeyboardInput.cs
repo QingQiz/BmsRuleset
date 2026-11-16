@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
+using RhythmEngine.Profiles.Common;
 using osu.Framework.Input;
 using osu.Framework.Input.Handlers;
 using osu.Framework.Input.StateChanges;
@@ -41,7 +42,7 @@ public partial class TestSceneBmsBeatorajaHcnKeyboardInput : BmsPlayerTestScene
         {
             LayoutVariant = BmsLayoutVariant.Bme7K, TotalColumns = 8, Rank = 2, Total = 12,
             LockedLongNoteMode = BmsLongNoteMode.HellChargeNote,
-            HitObjects = [new BmsLongNote { StartTime = 3000, Duration = 1101, Column = scratch ? 0 : 1 },
+            HitObjects = [new BmsLongNote { Kind = KeyNoteKind.SustainHold, StartTime = 3000, Duration = 1101, Column = scratch ? 0 : 1 },
                 new BmsNote { StartTime = 10000, Column = 1 }],
         };
         BmsTestBeatmaps.SetupBeatmapInfo(beatmap, ruleset);

@@ -21,13 +21,13 @@ internal sealed class BmsGameplayAudioController
 
     internal BindableBool BackgroundAudioPaused { get; } = new(true);
 
-    internal BmsGameplayAudioController(BmsBeatmap beatmap, IReadOnlyList<Mod>? mods, BmsSamplePlayback? samplePlayback = null)
+    internal BmsGameplayAudioController(BmsBeatmap beatmap, IReadOnlyList<Mod>? mods, BmsEngineChart compiled, BmsSamplePlayback? samplePlayback = null)
     {
         SamplePlayback = samplePlayback ?? new BmsSamplePlayback(
             beatmap.SampleDefinitions,
             ResolveBeatmapSource(beatmap),
             GetPlaybackRate(mods),
-            GetSampleUsages(beatmap));
+            GetSampleUsages(beatmap, compiled));
     }
 
     internal BmsBackgroundAudioPlayer CreateBackgroundAudioPlayer(BmsBeatmap beatmap)
@@ -91,7 +91,7 @@ internal sealed class BmsGameplayAudioController
         return rateMod?.SpeedChange.Value ?? 1;
     }
 
-    internal static IEnumerable<BmsSampleUsage> GetSampleUsages(BmsBeatmap beatmap)
+    internal static IEnumerable<BmsSampleUsage> GetSampleUsages(BmsBeatmap beatmap, BmsEngineChart compiled)
     {
         foreach (var mine in beatmap.HitObjects.OfType<BmsLandmine>())
         {
@@ -131,25 +131,25 @@ internal sealed class BmsGameplayAudioController
                     // A column exposes its next note's sample as soon as the preceding note can be judged.
                     var earliestTriggerTime = previousHitObject == null
                         ? 0
-                        : Math.Max(0, previousHitObject.StartTime - getFastJudgementWindow(previousHitObject));
-                    var latestTriggerTime = hitObject.StartTime + getSlowJudgementWindow(hitObject);
+                        : Math.Max(0, previousHitObject.StartTime + compiled.TimingFor(previousHitObject).EarliestResolvingOffset / 1000.0);
+                    var latestTriggerTime = hitObject.StartTime + compiled.TimingFor(hitObject).HeadDeadline / 1000.0;
 
                     foreach (var sample in hitObject.GetSamples())
                         yield return new BmsSampleUsage(sample.SampleKey, sample.Time, earliestTriggerTime, latestTriggerTime);
                 }
 
                 if (hitObject is BmsLongNote longNote)
+                {
+                    var timing = compiled.TimingFor(longNote);
+                    // A release can play its sample on an early drop, as well as a late tail hit.
+                    var earliest = Math.Max(0, longNote.StartTime + timing.EarliestResolvingOffset / 1000.0);
+                    var latest = Math.Max(longNote.StartTime + timing.HeadDeadline / 1000.0, longNote.EndTime + timing.TailDeadline / 1000.0);
                     foreach (var tail in longNote.GetTailSamples())
-                        yield return new BmsSampleUsage(tail.SampleKey, tail.Time);
+                        yield return new BmsSampleUsage(tail.SampleKey, tail.Time, earliest, latest);
+                }
 
                 previousHitObject = hitObject;
             }
         }
     }
-
-    private static double getFastJudgementWindow(BmsHitObject hitObject) =>
-        -BmsEngineRules.GetTiming(hitObject, tail: false).EarliestHitOffset / 1000.0;
-
-    private static double getSlowJudgementWindow(BmsHitObject hitObject) =>
-        BmsEngineRules.GetTiming(hitObject, tail: false).PassiveDeadline / 1000.0;
 }

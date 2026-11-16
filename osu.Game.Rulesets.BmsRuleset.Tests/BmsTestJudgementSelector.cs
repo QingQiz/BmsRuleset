@@ -1,7 +1,9 @@
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using RhythmEngine.Profiles.Bms;
+using RhythmEngine.Profiles.Common;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
@@ -30,18 +32,18 @@ internal static class BmsTestJudgementSelector
                                                       BmsJudgementModifiers modifiers = BmsJudgementModifiers.None)
     {
         var ordered = candidates.OrderBy(c => c.StartTime).ThenBy(c => c.Column).ToArray();
-        var beatmap = new BmsBeatmap { LayoutVariant = layout, JudgementModifiers = modifiers };
+        var beatmap = new BmsBeatmap { LayoutVariant = layout };
         var objects = ordered.Select(c =>
         {
             BmsHitObject note = c.IsLongNote ? new BmsLongNote { Duration = c.EndTime - c.StartTime } : new BmsNote();
             note.StartTime = c.StartTime;
             note.Column = c.Column;
-            note.JudgementRate = c.JudgementRate;
+            note.ExRank = c.JudgementRate * 100 / BmsEngineRules.RateForRank(layout, 2);
             note.Beatmap = beatmap;
             return note;
         }).ToArray();
         var output = new BmsRecordingJudgementOutput();
-        var engine = new BmsJudgementEngine(objects, layout, column, output);
+        var engine = BmsEngineTestAccess.CreateEngine(objects, layout, column, output, new BmsGameplayProfile(modifiers));
 
         foreach (var candidate in ordered.Where(c => c.Column == column && (c.IsJudged || c.HasMistake)))
         {
@@ -61,7 +63,7 @@ internal static class BmsTestJudgementSelector
             selection = new BmsJudgementSelection(ordered.First(c => c.StartTime == expected && c.Column == lane), result, result == HitResult.Miss);
         output.StatePublished = (note, state, _) =>
         {
-            if (note.EffectiveMode == BmsLongNoteMode.LongNote && engine.GetColumn(column).GetNote(note).Parts[0].Time / 1000.0 == inputTime && !state.TailJudged)
+            if (note.Kind == KeyNoteKind.Hold && engine.GetColumn(column).GetNote(note).Parts[0].Time / 1000.0 == inputTime && !state.TailJudged)
                 selection = new BmsJudgementSelection(ordered[Array.IndexOf(objects, note)], state.HeadResult, false);
         };
         engine.QueueInput(inputTime, column, true, false);

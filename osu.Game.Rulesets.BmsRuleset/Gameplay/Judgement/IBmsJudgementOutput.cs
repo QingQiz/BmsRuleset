@@ -25,9 +25,7 @@ internal interface IBmsJudgementOutput
 
     void PublishState(BmsLandmine note, in BmsLandmineState state, in BmsFrameContext frame);
 
-    void ApplyNonConsumingBad(BmsHitObject note, in BmsFrameContext frame);
-
-    void ApplyEmptyPoor(double expectedTime, int column, in BmsFrameContext frame);
+    void ApplyNonConsumingResult(BmsHitObject note, HitResult result, in BmsFrameContext frame);
 
     void PlaySample(BmsHitObject note);
 

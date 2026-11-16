@@ -1,10 +1,11 @@
 using System;
 using System.Linq;
 using System.Threading;
+using RhythmEngine.Profiles.Bms;
+using RhythmEngine.Profiles.Common;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Types;
 
@@ -62,7 +63,7 @@ internal static class Mania7KBeatmapConverter
             throw new InvalidOperationException($"Invalid mania 7K column for {original.GetType().FullName}.");
 
         BmsHitObject converted = original is IHasDuration hasDuration
-            ? new BmsLongNote { Duration = hasDuration.Duration }
+            ? new BmsLongNote { Duration = hasDuration.Duration, Kind = KeyNoteKind.ReleaseHold }
             : new BmsNote();
 
         converted.StartTime = original.StartTime;

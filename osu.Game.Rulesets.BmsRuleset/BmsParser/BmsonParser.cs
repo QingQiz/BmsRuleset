@@ -5,6 +5,8 @@ using System.Linq;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
+using RhythmEngine.Profiles.Bms;
+using RhythmEngine.Profiles.Common;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Difficulty;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
@@ -127,7 +129,7 @@ internal static class BmsonParser
             var isLongNote = note.EndPulse > key.Pulse;
             var tailSamples = isLongNote && releases.Remove((key.Column, note.EndPulse), out var samples) ? samples : null;
             parsedObjects.Add(new BmsParsedHitObject(key.Pulse, time, timing.ProjectTickToTime(note.EndPulse) - time,
-                key.Column, note.Samples[0], isLongNote, false, 0, tailSamples?[0], JudgementRate: double.NaN)
+                key.Column, note.Samples[0], isLongNote, false, 0, tailSamples?[0])
             {
                 LongNoteMode = note.Mode,
                 AdditionalSampleKeys = note.Samples.Skip(1).ToArray(),
@@ -179,12 +181,10 @@ internal static class BmsonParser
             ? info.TryGetProperty("total", out var legacyTotal) && legacyTotal.ValueKind != JsonValueKind.Null
                 ? Math.Abs(number(info, "total"))
                 : null
-            : BmsGaugeCalculator.CalculateDefaultTotal(hitObjects.Where(note => !note.IsMine)
-                    .Sum(note => note.IsLongNote
-                                 && (note.LongNoteMode == BmsLongNoteMode.Undefined ? longNoteMode : note.LongNoteMode)
-                                 is BmsLongNoteMode.ChargeNote or BmsLongNoteMode.HellChargeNote
-                        ? 2
-                        : 1),
+            : BmsGaugeCalculator.CalculateDefaultTotal(hitObjects.Select((note, id) => BmsProfiles.CreateScoringOpportunities(id,
+                    note.IsMine ? KeyNoteKind.Mine : note.IsLongNote
+                        ? (note.LongNoteMode == BmsLongNoteMode.Undefined ? longNoteMode : note.LongNoteMode).ToNoteKind()
+                        : KeyNoteKind.Tap).Length).Sum(),
                 BmsGaugeProfileFamilyProvider.FromLayout(layout)) * Math.Abs(number(info, "total", 100)) / 100;
         var credits = array(info, "subartists").Select(value => value.GetString() ?? string.Empty).ToArray();
         var maker = credits.Select(credit => credit.Split(':', 2, StringSplitOptions.TrimEntries))
@@ -219,7 +219,7 @@ internal static class BmsonParser
                             $"BMSON {field}.damage must be non-negative; received {note.GetProperty("damage").GetRawText()} at x={lane}, y={position}, sample=\"{samplePath}\".");
 
                     var parsed = new BmsParsedHitObject(position, timing.ProjectTickToTime(position), 0, column, sampleId,
-                        false, mine, damage, null, JudgementRate: double.NaN);
+                        false, mine, damage, null);
                     if (mine)
                         parsedObjects.Add(parsed);
                     else

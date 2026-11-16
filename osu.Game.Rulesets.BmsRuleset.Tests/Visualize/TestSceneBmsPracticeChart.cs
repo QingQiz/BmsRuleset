@@ -38,7 +38,7 @@ public partial class TestSceneBmsPracticeChart : OsuManualInputManagerTestScene
                 TimingMap = BmsChartParser.Parse(["#BPM 120", "#03011:01"]).TimingMap,
             };
             beatmap.HitObjects = Enumerable.Range(1, 60).Select(i => (BmsHitObject)new BmsNote { StartTime = i * 1000, Column = i % 8, Beatmap = beatmap }).ToList();
-            beatmap.HitObjects.Add(new BmsLongNote { StartTime = 18000, Duration = 10000, Column = 4, Beatmap = beatmap });
+            beatmap.HitObjects.Add(new BmsLongNote { StartTime = 18000, Duration = 10000, Column = 4, Kind = beatmap.LockedLongNoteMode.ToNoteKind(), Beatmap = beatmap });
             settings = new BmsPracticeSettings { StartTime = 10000, EndTime = 20000 };
             Child = new Container
             {
@@ -330,7 +330,6 @@ public partial class TestSceneBmsPracticeChart : OsuManualInputManagerTestScene
         AddAssert("close-up tap and hold heads remain twelve pixels thick", () =>
         {
             var laneWidth = (chart.TimelineRight - chart.TimelineLeft) / 8;
-            var rectangles = chart.ChildrenOfType<BmsReplayVisualizer.PlotLayer>().Single().Rectangles;
             (double Time, int Column)[] notes = [(1000, 1), (2000, 1), (3000, 2)];
             return notes.All(note => hasSquareHead(note.Time, note.Column, laneWidth));
         });
@@ -419,7 +418,6 @@ public partial class TestSceneBmsPracticeChart : OsuManualInputManagerTestScene
         AddAssert("normal note and LN head end on their time lines", () =>
         {
             var laneWidth = (chart.TimelineRight - chart.TimelineLeft) / 8;
-            var rectangles = chart.ChildrenOfType<BmsReplayVisualizer.PlotLayer>().Single().Rectangles;
             (double Time, int Column)[] notes = [(1000, 1), (2000, 2)];
             return notes.All(note => hasSquareHead(note.Time, note.Column, laneWidth));
         });

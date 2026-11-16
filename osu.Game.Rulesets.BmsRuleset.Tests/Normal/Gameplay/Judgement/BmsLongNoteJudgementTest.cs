@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using NUnit.Framework;
+using RhythmEngine.Profiles.Common;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
@@ -9,7 +10,6 @@ using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.LnHelper;
-using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
@@ -53,6 +53,7 @@ public class BmsLongNoteJudgementTest
         var processor = new BmsScoreProcessor();
         var source = new BmsLongNote
         {
+            Kind = KeyNoteKind.SustainHold,
             StartTime = 1000,
             Duration = 500,
             Column = 1,
@@ -80,6 +81,7 @@ public class BmsLongNoteJudgementTest
         var processor = new BmsScoreProcessor();
         var source = new BmsLongNote
         {
+            Kind = KeyNoteKind.ReleaseHold,
             StartTime = 1000,
             Duration = 500,
             Column = 1,
@@ -106,6 +108,7 @@ public class BmsLongNoteJudgementTest
         var processor = new BmsScoreProcessor();
         var source = new BmsLongNote
         {
+            Kind = KeyNoteKind.ReleaseHold,
             StartTime = 1000,
             Duration = 500,
             Column = 1,
@@ -157,6 +160,7 @@ public class BmsLongNoteJudgementTest
         var processor = new BmsScoreProcessor();
         var source = new BmsLongNote
         {
+            Kind = KeyNoteKind.ReleaseHold,
             StartTime = 1000,
             Duration = 500,
             Column = 1,
@@ -177,80 +181,6 @@ public class BmsLongNoteJudgementTest
         Assert.That(result, Is.Not.Null);
         Assert.That(result.Type, Is.EqualTo(HitResult.Perfect));
         Assert.That(processor.TotalScore.Value, Is.GreaterThan(0));
-    }
-
-    [Test]
-    public void TestCreateSyntheticEndpointClearsTailSample()
-    {
-        var ln = new BmsLongNote
-        {
-            StartTime = 1000,
-            Duration = 500,
-            TailSampleKey = 99,
-        };
-
-        var endpoint = ln.CreateSyntheticEndpoint(1500);
-
-        Assert.That(endpoint, Is.Not.InstanceOf<BmsLongNote>());
-    }
-
-    [Test]
-    public void TestCreateSyntheticEndpointCopiesNonTimeProperties()
-    {
-        var beatmap = new BmsBeatmap
-        {
-            Rank = 1,
-            LayoutVariant = BmsLayoutVariant.Popn9K,
-        };
-
-        var ln = new BmsLongNote
-        {
-            StartTime = 1000,
-            Duration = 500,
-            Column = 5,
-            Beatmap = beatmap,
-            SampleKey = 77,
-        };
-
-        var endpoint = ln.CreateSyntheticEndpoint(1500);
-
-        Assert.That(endpoint.Column, Is.EqualTo(5));
-        Assert.That(endpoint.Beatmap.Rank, Is.EqualTo(1));
-        Assert.That(endpoint.SampleKey, Is.EqualTo(77));
-    }
-
-    [Test]
-    public void TestCreateSyntheticEndpointCreatesBmsNoteType()
-    {
-        var ln = new BmsLongNote
-        {
-            StartTime = 1000,
-            Duration = 500,
-        };
-
-        var endpoint = ln.CreateSyntheticEndpoint(1500);
-
-        Assert.That(endpoint, Is.InstanceOf<BmsNote>());
-    }
-
-    // --- Synthetic endpoint tests ---
-
-    [Test]
-    public void TestCreateSyntheticEndpointHasCorrectTime()
-    {
-        var ln = new BmsLongNote
-        {
-            StartTime = 1000,
-            Duration = 500,
-            Column = 3,
-            SampleKey = 42,
-        };
-
-        var endpoint = ln.CreateSyntheticEndpoint(1500);
-
-        Assert.That(endpoint.StartTime, Is.EqualTo(1500));
-        Assert.That(endpoint.GetEndTime() - endpoint.StartTime, Is.Zero);
-        Assert.That(endpoint.Column, Is.EqualTo(3));
     }
 
     [Test]
@@ -276,6 +206,7 @@ public class BmsLongNoteJudgementTest
             {
                 new BmsLongNote
                 {
+                    Kind = KeyNoteKind.ReleaseHold,
                     StartTime = 1000,
                     Duration = 500,
                     Column = 1,
@@ -284,9 +215,9 @@ public class BmsLongNoteJudgementTest
         };
         processor.ApplyBeatmap(bindNotes(beatmap));
 
-        processor.Health.Value = 0.5;
+        processor.Gauge().RestoreGaugeStates([new BmsGaugeStateSnapshot(processor.Gauge().GaugeType, 0.5, false)]);
         var source = (BmsLongNote)beatmap.HitObjects[0];
-        var endpoint = source.CreateSyntheticEndpoint(1500);
+        var endpoint = BmsTestJudgements.CreateEndpoint(source, 1500);
         var result = new BmsJudgementResult(endpoint, endpoint.CreateJudgement())
         {
             Type = HitResult.Meh,
@@ -314,6 +245,7 @@ public class BmsLongNoteJudgementTest
             {
                 new BmsLongNote
                 {
+                    Kind = KeyNoteKind.ReleaseHold,
                     StartTime = 1000,
                     Duration = 500,
                     Column = 1,
@@ -322,9 +254,9 @@ public class BmsLongNoteJudgementTest
         };
         processor.ApplyBeatmap(bindNotes(beatmap));
 
-        processor.Health.Value = 0.2;
+        processor.Gauge().RestoreGaugeStates([new BmsGaugeStateSnapshot(processor.Gauge().GaugeType, 0.2, false)]);
         var source = (BmsLongNote)beatmap.HitObjects[0];
-        var endpoint = source.CreateSyntheticEndpoint(1500);
+        var endpoint = BmsTestJudgements.CreateEndpoint(source, 1500);
         var result = new BmsJudgementResult(endpoint, endpoint.CreateJudgement())
         {
             Type = HitResult.Perfect,
@@ -372,7 +304,7 @@ public class BmsLongNoteJudgementTest
     public void TestHellChargeTickCanTriggerFailure()
     {
         var processor = new BmsHealthProcessor();
-        processor.SetGaugeType(BmsGaugeType.Hard);
+        processor.Gauge().SetGaugeType(BmsGaugeType.Hard);
         var beatmap = new BmsBeatmap
         {
             LayoutVariant = BmsLayoutVariant.Bme7K,
@@ -383,6 +315,7 @@ public class BmsLongNoteJudgementTest
             {
                 new BmsLongNote
                 {
+                    Kind = KeyNoteKind.SustainHold,
                     StartTime = 1000,
                     Duration = 500,
                     Column = 1,
@@ -391,11 +324,11 @@ public class BmsLongNoteJudgementTest
         };
         processor.ApplyBeatmap(bindNotes(beatmap));
 
-        processor.Health.Value = 0.01;
+        processor.Gauge().RestoreGaugeStates([new BmsGaugeStateSnapshot(processor.Gauge().GaugeType, 0.01, false)]);
         processor.ApplyTestBodyTick(false);
 
         Assert.That(processor.Health.Value, Is.Zero);
-        Assert.That(processor.HasEverFailed, Is.True);
+        Assert.That(processor.CurrentHealth.HasFailed, Is.True);
     }
 
     [Test]
@@ -412,6 +345,7 @@ public class BmsLongNoteJudgementTest
             {
                 new BmsLongNote
                 {
+                    Kind = KeyNoteKind.SustainHold,
                     StartTime = 1000,
                     Duration = 500,
                     Column = 1,
@@ -420,7 +354,7 @@ public class BmsLongNoteJudgementTest
         };
         processor.ApplyBeatmap(bindNotes(beatmap));
 
-        processor.Health.Value = 0.005;
+        processor.Gauge().RestoreGaugeStates([new BmsGaugeStateSnapshot(processor.Gauge().GaugeType, 0.005, false)]);
         processor.ApplyTestBodyTick(false);
 
         Assert.That(processor.Health.Value, Is.EqualTo(0.02));
@@ -442,6 +376,7 @@ public class BmsLongNoteJudgementTest
             {
                 new BmsLongNote
                 {
+                    Kind = KeyNoteKind.SustainHold,
                     StartTime = 1000,
                     Duration = 500,
                     Column = 1,
@@ -450,7 +385,7 @@ public class BmsLongNoteJudgementTest
         };
         processor.ApplyBeatmap(bindNotes(beatmap));
 
-        processor.Health.Value = 0.5;
+        processor.Gauge().RestoreGaugeStates([new BmsGaugeStateSnapshot(processor.Gauge().GaugeType, 0.5, false)]);
         var before = processor.Health.Value;
         processor.ApplyTestBodyTick(true);
 
@@ -471,6 +406,7 @@ public class BmsLongNoteJudgementTest
             {
                 new BmsLongNote
                 {
+                    Kind = KeyNoteKind.SustainHold,
                     StartTime = 1000,
                     Duration = 500,
                     Column = 1,
@@ -479,7 +415,7 @@ public class BmsLongNoteJudgementTest
         };
         processor.ApplyBeatmap(bindNotes(beatmap));
 
-        processor.Health.Value = 0.2;
+        processor.Gauge().RestoreGaugeStates([new BmsGaugeStateSnapshot(processor.Gauge().GaugeType, 0.2, false)]);
         var before = processor.Health.Value;
         processor.ApplyTestBodyTick(true);
         var after = processor.Health.Value;
@@ -505,6 +441,7 @@ public class BmsLongNoteJudgementTest
             {
                 new BmsLongNote
                 {
+                    Kind = KeyNoteKind.SustainHold,
                     StartTime = 1000,
                     Duration = 500,
                     Column = 1,
@@ -513,7 +450,7 @@ public class BmsLongNoteJudgementTest
         };
         processor.ApplyBeatmap(bindNotes(beatmap));
 
-        processor.Health.Value = 0.5;
+        processor.Gauge().RestoreGaugeStates([new BmsGaugeStateSnapshot(processor.Gauge().GaugeType, 0.5, false)]);
         var before = processor.Health.Value;
         processor.ApplyTestBodyTick(false);
         var after = processor.Health.Value;
@@ -538,6 +475,7 @@ public class BmsLongNoteJudgementTest
             {
                 new BmsLongNote
                 {
+                    Kind = KeyNoteKind.SustainHold,
                     StartTime = 1000,
                     Duration = 500,
                     Column = 1,
@@ -546,7 +484,7 @@ public class BmsLongNoteJudgementTest
         };
         processor.ApplyBeatmap(bindNotes(beatmap));
 
-        processor.Health.Value = 0.5;
+        processor.Gauge().RestoreGaugeStates([new BmsGaugeStateSnapshot(processor.Gauge().GaugeType, 0.5, false)]);
         var before = processor.Health.Value;
         processor.ApplyTestBodyTick(false);
 
@@ -636,7 +574,7 @@ public class BmsLongNoteJudgementTest
 
     private static (BmsScoreProcessor processor, BmsLongNote source) createLongNoteProcessor(BmsLongNoteMode mode)
     {
-        var source = new BmsLongNote { StartTime = 1000, Duration = 500, Column = 1 };
+        var source = new BmsLongNote { Kind = mode.ToNoteKind(), StartTime = 1000, Duration = 500, Column = 1 };
         var beatmap = new BmsBeatmap
         {
             LayoutVariant = BmsLayoutVariant.Bme7K,

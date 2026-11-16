@@ -1,3 +1,4 @@
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -28,21 +29,12 @@ public class BmsBeatorajaReferenceTest
         processor.ApplyTestNonConsumingJudgement(HitResult.Ok, 850, 1000, 1);
         var saved = new ScoreInfo();
         processor.PopulateScore(saved);
-        var statistics = BmsHitScatterStatistic.CreateStatistics(beatmap, saved.HitEvents);
-        Assert.That(statistics.Keys[1].Data.Points.Single().Offset, Is.EqualTo(-150));
+        var statistics = BmsHitScatterStatistic.CreateStatistics(BmsGameplayProfile.INSTANCE, beatmap, saved.HitEvents);
+        Assert.That(statistics.Keys[1].Data.Points.Single().DisplayOffset(statistics.Keys[1].Data.OffsetRange), Is.EqualTo(-150));
         Assert.That(statistics.Keys[0].Data.Points, Is.Empty);
         Assert.That(processor.ScoringJudgementEventCount, Is.Zero);
         Assert.That(saved.Statistics.GetValueOrDefault(HitResult.Ok), Is.EqualTo(1));
         Assert.That(statistics.Overall.Points, Has.Count.EqualTo(1), "beatoraja updateMicro records BAD in its recent timing observations even when it does not consume the note.");
-    }
-
-    [Test]
-    public void SuppressedPmsPoorDoesNotProduceHitErrorMarker()
-    {
-        var note = new BmsNote { StartTime = 1000 };
-        var result = new BmsJudgementResult(note, note.CreateJudgement()) { Type = HitResult.Meh, SuppressPenalty = true };
-        Assert.That(BmsHitErrorMeter.GetTimingObservations(result), Is.Empty,
-            "OnNewJudgement sends these observations to the hit error meter without a suppression check.");
     }
 
     [Test]
@@ -85,7 +77,7 @@ public class BmsBeatorajaReferenceTest
         processor.ApplyTestEmptyPoor(1600, 2000, 0);
         processor.ApplyTestResult(new BmsJudgementResult(notes[1], notes[1].CreateJudgement()) { Type = HitResult.Meh, SuppressPenalty = true });
         processor.ApplyTestResult(new BmsJudgementResult(notes[2], notes[2].CreateJudgement()) { Type = HitResult.Perfect });
-        Assert.That(BmsScoreGraph.ScoreAtProgress(4, BmsExScore.CreateProgression(processor.JudgementEvents), 2, 3), Is.EqualTo(2),
+        Assert.That(BmsScoreGraph.ScoreAtProgress(4, BmsTestExScore.States(BmsTestExScore.CreateProgression(processor.JudgementEvents)), 2, 3), Is.EqualTo(2),
             "After two consumed notes the recorded PB has only its first PGREAT; the third note must not advance early.");
     }
 
@@ -144,6 +136,7 @@ public class BmsBeatorajaReferenceTest
     {
         var note = new BmsLongNote
         {
+            Kind = mode.ToNoteKind(),
             StartTime = 1000, Duration = 1000, Column = 0,
             Beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, Rank = 2, LockedLongNoteMode = mode }
         };

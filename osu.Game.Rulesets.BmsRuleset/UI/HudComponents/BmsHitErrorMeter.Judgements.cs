@@ -14,7 +14,7 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 
 public partial class BmsHitErrorMeter
 {
-    internal readonly record struct JudgementLine(float X, SRGBColour Colour, bool? PoorIsFast, double FadeStart, double FadeEnd)
+    internal readonly record struct JudgementLine(float X, SRGBColour Colour, bool? BoundaryIsFast, double FadeStart, double FadeEnd)
     {
         public double LifetimeEnd => FadeEnd + 1;
 
@@ -44,14 +44,14 @@ public partial class BmsHitErrorMeter
             Blending = BlendingParameters.Additive;
         }
 
-        public void AddJudgement(float x, SRGBColour colour, bool? poorIsFast)
-            => lines.Add(new JudgementLine(x, colour, poorIsFast, double.NaN, double.NaN));
+        public void AddJudgement(float x, SRGBColour colour, bool? boundaryIsFast)
+            => lines.Add(new JudgementLine(x, colour, boundaryIsFast, double.NaN, double.NaN));
 
-        public void UpdatePoorPositions(float fast, float slow)
+        public void UpdateBoundaryPositions(float fast, float slow)
         {
             for (var i = 0; i < lines.Count; i++)
             {
-                if (lines[i].PoorIsFast is { } isFast) lines[i] = lines[i] with { X = isFast ? fast : slow };
+                if (lines[i].BoundaryIsFast is { } isFast) lines[i] = lines[i] with { X = isFast ? fast : slow };
             }
 
             Invalidate(Invalidation.DrawNode);

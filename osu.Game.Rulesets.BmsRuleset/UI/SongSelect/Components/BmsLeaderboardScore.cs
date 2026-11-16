@@ -3,13 +3,14 @@
 // Adapted from osu! Screens/Select/BeatmapLeaderboardScore.cs at 3c1c96f742e7aae2ff67a7361e058fe91ca3b955.
 // A local copy preserves the native composition because the upstream row is sealed.
 
-using System;
 using System.Collections.Generic;
 using System.Linq;
+using System;
+using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.Color4Extensions;
-using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Cursor;
@@ -17,31 +18,29 @@ using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Graphics.UserInterface;
+using osu.Framework.Graphics;
 using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
-using osu.Game.Graphics;
 using osu.Game.Graphics.Backgrounds;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
+using osu.Game.Graphics;
 using osu.Game.Online.API;
 using osu.Game.Online.Leaderboards;
-using osu.Game.Overlays;
 using osu.Game.Overlays.Dialog;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
+using osu.Game.Overlays;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
-using osu.Game.Rulesets.BmsRuleset.UI.Ranking;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Lamp;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.UI;
 using osu.Game.Scoring;
-using osu.Game.Users;
 using osu.Game.Users.Drawables;
+using osu.Game.Users;
 using osu.Game.Utils;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
-using osuTK;
 using osuTK.Graphics;
+using osuTK;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Components;
 
@@ -390,7 +389,7 @@ internal sealed partial class BmsLeaderboardScore : OsuClickableContainer, IHasC
                                     Name = "Leaderboard grade",
                                     Colour = DrawableRank.GetRankLetterColour(Score.Rank),
                                     Font = OsuFont.Numeric.With(size: 14),
-                                    Text = BmsStrings.LeaderboardGrade(BmsRankDisplay.GetRankLetter(Score.Rank)),
+                                    Text = BmsStrings.LeaderboardGrade(GameplayProfile.FromMods(Score.Mods).RankLabel(Score.Rank)),
                                     ShadowColour = Color4.Black.Opacity(0.3f),
                                     ShadowOffset = new Vector2(0, 0.08f),
                                     Shadow = true,
@@ -435,8 +434,8 @@ internal sealed partial class BmsLeaderboardScore : OsuClickableContainer, IHasC
                                                     Anchor = Anchor.TopRight,
                                                     Origin = Anchor.TopRight,
                                                     UseFullGlyphHeight = false,
-                                                    Name = "Leaderboard EXSCORE",
-                                                    Text = BmsStrings.ResultNumber(BmsExScore.Calculate(Score, BmsExScore.Calculate(Score.MaximumStatistics))),
+                                                    Name = "Leaderboard score",
+                                                    Text = BmsStrings.ResultNumber(GameplayProfile.FromMods(Score.Mods).StoredScore(Score)),
                                                     Font = OsuFont.Style.Subtitle.With(weight: FontWeight.Light, fixedWidth: true),
                                                     Shear = sheared ? -OsuGame.SHEAR : Vector2.Zero,
                                                 },

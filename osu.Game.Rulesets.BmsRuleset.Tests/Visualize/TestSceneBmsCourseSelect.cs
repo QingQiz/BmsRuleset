@@ -29,6 +29,7 @@ using osu.Game.Overlays;
 using osu.Game.Overlays.Toolbar;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Course;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Profiles;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.UI.Result.Course;
@@ -827,10 +828,16 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
         AddUntilStep("hidden beatmap history opened", () => Stack.CurrentScreen, Is.TypeOf<BmsCourseResultsScreen>);
     }
 
-    [Test]
-    public void TestRemovingStricterModRestoresRequiredConstraintMod()
+    [TestCase(null)]
+    [TestCase("no_good")]
+    [TestCase("no_great")]
+    public void TestCourseProfileModsAreDisabledAndRestored(string constraint)
     {
-        AddStep("configure a no-good course", () =>
+        Mod original = constraint == "no_good" ? new BmsModNoGreat() : new BmsModLr2();
+        TestParentScreen parentScreen = null!;
+        AddStep("load parent screen", () => Stack.Push(parentScreen = new TestParentScreen()));
+        AddUntilStep("parent screen loaded", () => Stack.CurrentScreen == parentScreen && parentScreen.IsLoaded);
+        AddStep("configure course", () =>
         {
             var bmsRuleset = rulesets.AvailableRulesets.Single(ruleset => ruleset.ShortName == Constant.SHORT_NAME);
             var imported = beatmaps.Import(createBeatmapSet(bmsRuleset));
@@ -842,33 +849,58 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
                 new BmsCourseDefinition(
                     "constraint-test",
                     "Constraint Table",
-                    "No Good Course",
+                    "Course",
                     [new BmsCourseStage("Stage", "1", BeatmapHash: beatmap.Hash)],
-                    ["no_good"]),
+                    constraint == null ? [] : [constraint]),
             ]);
         });
-        AddStep("load real song select", () => Stack.Push(songSelect = new BmsSoloSongSelect()));
+        AddStep("load real song select", () => parentScreen.Push(songSelect = new BmsSoloSongSelect()));
         AddUntilStep("wait for song select load", () => Stack.CurrentScreen == songSelect && songSelect.IsLoaded);
         AddUntilStep("wait for filtering", () => !carousel.IsFiltering);
-        AddStep("show course mode", () => controller.ShowCourseMode());
+        AddStep("select single-song profile", () => songSelect.Mods.Value = [original]);
+        AddStep("show course mode", () => controller.ToggleMode());
+        AddUntilStep("course song select loaded", () => Stack.CurrentScreen is BmsSoloSongSelect current
+                                                        && current != songSelect && current.IsLoaded
+                                                        && current.ChildrenOfType<BmsCourseSongSelectController>().SingleOrDefault()?.IsCourseMode == true);
+        AddStep("capture course song select", () => songSelect = (BmsSoloSongSelect)Stack.CurrentScreen);
         AddUntilStep("course carousel filtered", () => controller.CourseCarousel.GetCarouselItems() != null
                                                        && !controller.CourseCarousel.IsFiltering);
-        AddUntilStep("required no-good applied", () => songSelect.Mods.Value.Any(mod => mod is BmsModNoGood));
-        AddStep("select stricter no-great", () => songSelect.Mods.Value = [new BmsModNoGreat()]);
-        AddUntilStep("no-great replaces no-good", () =>
-            songSelect.Mods.Value.Any(mod => mod is BmsModNoGreat) && songSelect.Mods.Value.All(mod => mod is not BmsModNoGood));
-        AddStep("remove no-great", () => songSelect.Mods.Value = []);
-        AddUntilStep("no-good restored after stricter mod removal", () => songSelect.Mods.Value.Any(mod => mod is BmsModNoGood));
-        AddStep("add mirror alongside constraint", () => songSelect.Mods.Value = [new BmsModNoGood(), new BmsModMirror()]);
-        AddUntilStep("manual mirror kept with required no-good", () =>
-            songSelect.Mods.Value.Any(mod => mod is BmsModMirror) && songSelect.Mods.Value.Any(mod => mod is BmsModNoGood));
-        AddStep("remove everything", () => songSelect.Mods.Value = []);
-        AddUntilStep("required no-good survives removal", () => songSelect.Mods.Value.Any(mod => mod is BmsModNoGood));
-        AddStep("select no-great again", () => songSelect.Mods.Value = [new BmsModNoGreat()]);
-        AddUntilStep("no-great replaces no-good again", () =>
-            songSelect.Mods.Value.Any(mod => mod is BmsModNoGreat) && songSelect.Mods.Value.All(mod => mod is not BmsModNoGood));
-        AddStep("clear mods", () => songSelect.Mods.Value = []);
-        AddUntilStep("no-good restored after second removal", () => songSelect.Mods.Value.Any(mod => mod is BmsModNoGood));
+        AddAssert("course owns judgement modifiers", hasCourseJudgement);
+        foreach (var mod in new Mod[] { new BmsModLr2(), new BmsModNoBad(), new BmsModNoGood(), new BmsModNoGreat() })
+        {
+            AddAssert($"{mod.Acronym} disabled in mod overlay", () => !songSelect.ModSelectOverlay.IsValidMod(mod));
+            AddStep($"apply {mod.Acronym} through selection", () => songSelect.Mods.Value = [mod, new BmsModMirror()]);
+            AddAssert("course judgement remains authoritative", hasCourseJudgement);
+            AddAssert("allowed mirror retained", () => songSelect.Mods.Value.Any(selected => selected is BmsModMirror));
+        }
+
+        AddStep("clear course mods", () => songSelect.Mods.Value = []);
+        AddAssert("required judgement survives clearing", hasCourseJudgement);
+        AddStep("filter out all courses", () => controller.SearchTerm.Value = "no-matching-course");
+        AddUntilStep("no course selected", () => !controller.CourseCarousel.IsFiltering && controller.SelectedCourse == null);
+        AddAssert("profile remains disabled without a course", () => !songSelect.ModSelectOverlay.IsValidMod(original));
+        AddStep("apply profile without a course", () => songSelect.Mods.Value = [new BmsModLr2()]);
+        AddAssert("empty course selection still forbids profile changes", () => !songSelect.Mods.Value.OfType<IApplicableToGameplayProfile>().Any());
+        AddStep("return to single songs", () => controller.ToggleMode());
+        AddUntilStep("single song select restored", () => Stack.CurrentScreen is BmsSoloSongSelect current
+                                                          && current != songSelect && current.IsLoaded
+                                                          && current.ChildrenOfType<BmsCourseSongSelectController>().SingleOrDefault()?.IsCourseMode == false);
+        AddStep("capture restored song select", () => songSelect = (BmsSoloSongSelect)Stack.CurrentScreen);
+        AddUntilStep("restored carousel presented", () => songSelect.CarouselItemsPresented && !songSelect.IsFiltering);
+        AddAssert("original profile selection restored", () => songSelect.Mods.Value.Select(mod => mod.GetType()),
+            () => Is.EqualTo(new[] { original.GetType() }));
+        AddAssert("profile mod enabled for single songs", () => songSelect.ModSelectOverlay.IsValidMod(original));
+
+        bool hasCourseJudgement()
+        {
+            var modifiers = songSelect.Mods.Value.OfType<IApplicableToGameplayProfile>().ToArray();
+            return constraint switch
+            {
+                "no_good" => modifiers is [BmsModNoGood],
+                "no_great" => modifiers is [BmsModNoGreat],
+                _ => modifiers.Length == 0,
+            };
+        }
     }
 
     [Test]

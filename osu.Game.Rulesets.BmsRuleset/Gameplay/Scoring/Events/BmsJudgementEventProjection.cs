@@ -24,10 +24,10 @@ public static class BmsJudgementEventProjection
             var observation = relativeObservation(judgementEvent.TimingObservations[^1], timeOrigin);
             var hitObject = createScoringHitObject(source, observation);
 
-            // E-POOR stays anchored to the press for timeline ordering, while its timing error is
+            // Empty inputs stay anchored to the press for timeline ordering, while their timing error is
             // measured against the upcoming note that caused the non-consuming miss row.
             var hitEvent = new HitEvent(
-                judgementEvent.Source.Kind == BmsJudgementSourceKind.EmptyPoor
+                judgementEvent.Source.Kind == BmsJudgementSourceKind.EmptyInput
                     ? observation.TimeOffset
                     : observation.ActualTime - hitObject.GetEndTime(),
                 observation.GameplayRate,
@@ -90,7 +90,7 @@ public static class BmsJudgementEventProjection
 
     private static HitObject createScoringHitObject(BmsJudgementSource source, BmsTimingObservation observation)
     {
-        if (source.Kind == BmsJudgementSourceKind.NonConsumingBad)
+        if (source.Kind == BmsJudgementSourceKind.NonConsumingHit)
             return createNote(source, observation.ExpectedTime);
 
         if (source.Kind == BmsJudgementSourceKind.LongNote
@@ -102,7 +102,7 @@ public static class BmsJudgementEventProjection
 
     private static HitObject createObservationHitObject(BmsJudgementSource source, BmsTimingObservation observation)
     {
-        if (source.Kind == BmsJudgementSourceKind.NonConsumingBad)
+        if (source.Kind == BmsJudgementSourceKind.NonConsumingHit)
             return createNote(source, observation.ExpectedTime);
 
         if (source.Kind == BmsJudgementSourceKind.LongNote

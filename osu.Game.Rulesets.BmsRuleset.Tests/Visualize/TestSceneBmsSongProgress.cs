@@ -14,7 +14,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Profiles;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
@@ -31,11 +31,18 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 [TestFixture]
 public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
 {
+    private bool tapWindowChart;
+
+    [SetUp]
+    public void ResetChart() => tapWindowChart = false;
+
     protected override TestPlayer CreatePlayer(Ruleset ruleset) => CreateBmsPlayer(null);
 
     protected override IBeatmap CreateBeatmap(RulesetInfo ruleset)
     {
         var beatmap = BmsTestBeatmaps.CreateBeatmap();
+        if (tapWindowChart)
+            beatmap.HitObjects.RemoveAll(note => note is BmsLongNote or BmsLandmine || note.Column != 1);
         BmsTestBeatmaps.SetupBeatmapInfo(beatmap, ruleset);
         return beatmap;
     }
@@ -66,7 +73,7 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
     {
         const double input_time = BmsTestBeatmaps.FIRST_NOTE_TIME - 400;
 
-        Box emptyPoorWindow() => Player.HUDOverlay.ChildrenOfType<Box>().Single(child => child.Name == "empty poor window");
+        Box emptyPoorWindow() => Player.HUDOverlay.ChildrenOfType<Box>().Single(child => child.Name == $"{HitResult.Miss} window");
 
         AddStep("load player", LoadPlayer);
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
@@ -84,6 +91,35 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
         AddAssert("EPOOR line is on fast side", () =>
             Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter>().Single().Judgements.Lines.Single().X
             < 0.5f);
+    }
+
+    [TestCase(false, 2)]
+    [TestCase(true, 0)]
+    public void TestHitErrorMeterUsesBothLongNoteEndpoints(bool suppressed, int markerCount)
+    {
+        BmsHitErrorMeter meter() => Player.ChildrenOfType<BmsHitErrorMeter>().Single();
+        AddStep("load player", LoadPlayer);
+        AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
+        AddStep("deliver combined endpoint result", () =>
+        {
+            Player.GameplayClockContainer.Stop();
+            meter().Clear();
+            var note = Playfield.Beatmap.HitObjects.OfType<BmsLongNote>().First();
+            var result = new BmsLongNoteJudgementResult(note, note.CreateJudgement(),
+            [
+                new BmsLongNoteEndpointResult(note, BmsLongNoteEndpointKind.Head, note.StartTime - 12, 1, HitResult.Perfect),
+                new BmsLongNoteEndpointResult(note, BmsLongNoteEndpointKind.Tail, note.EndTime + 19, 1, HitResult.Great),
+            ]) { Type = HitResult.Great, SuppressPenalty = suppressed };
+            ((BmsScoreProcessor)Player.ScoreProcessor).ApplyTestResult(result);
+        });
+        AddWaitStep("process judgement notification", 1);
+        AddAssert("meter receives both offsets unless suppressed", () =>
+        {
+            var domain = BmsHitErrorMeter.CreateDomain(BmsHitErrorMeter.CreateWindows(Playfield.EngineChart));
+            var lines = meter().Judgements.Lines;
+            return lines.Count == markerCount && (suppressed || lines.Select(line => line.X)
+                .SequenceEqual(new[] { domain.RelativePosition(-12), domain.RelativePosition(19) }));
+        });
     }
 
     [Test]
@@ -347,7 +383,7 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
         AddUntilStep("hit error meter loaded", () => Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter>().SingleOrDefault()?.IsLoaded == true);
         AddAssert("legacy dimensions follow the BMS domain", () =>
         {
-            var domain = BmsHitErrorMeter.CreateDomain(Playfield.Beatmap.LayoutVariant, Playfield.Beatmap.HitObjects[0].EffectiveJudgementRate);
+            var domain = BmsHitErrorMeter.CreateDomain(BmsHitErrorMeter.CreateWindows(Playfield.EngineChart));
             return Math.Abs(meter().Width - (domain.SlowOffset - domain.FastOffset) / 2 * LegacySkin.STABLE_MAGIC_SCALE_FACTOR) < 0.001
                    && Math.Abs(meter().Height - 12 * LegacySkin.STABLE_MAGIC_SCALE_FACTOR) < 0.001
                    && meter().Scale == Vector2.One;
@@ -379,7 +415,7 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
         {
             HitResult[] results = [HitResult.Perfect, HitResult.Great, HitResult.Good, HitResult.Ok];
             return results.All(result => meter().ChildrenOfType<Box>().Single(child => child.Name == $"{result} window").Colour == BmsHitResultColours.ForHitResult(result))
-                   && meter().ChildrenOfType<Box>().Single(child => child.Name == "empty poor window").Colour == BmsHitResultColours.ForHitResult(HitResult.Miss);
+                   && meter().ChildrenOfType<Box>().Single(child => child.Name == $"{HitResult.Miss} window").Colour == BmsHitResultColours.ForHitResult(HitResult.Miss);
         });
         AddAssert("centre marker is white", () =>
         {
@@ -395,14 +431,13 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
         });
         AddAssert("BAD window retains asymmetric BMS edges", () =>
         {
-            var domain = BmsHitErrorMeter.CreateDomain(Playfield.Beatmap.LayoutVariant, Playfield.Beatmap.HitObjects[0].EffectiveJudgementRate);
-            var windows = BmsEngineRules.GetTiming(Playfield.Beatmap.LayoutVariant, 1, Playfield.Beatmap.HitObjects[0].EffectiveJudgementRate, tail: false,
-                modifiers: Playfield.Beatmap.JudgementModifiers);
-            return Math.Abs(badWindow().X - domain.RelativePosition(-windows.FastWindowFor(HitResult.Ok))) < 0.00001
-                   && Math.Abs(badWindow().X + badWindow().Width - domain.RelativePosition(windows.SlowWindowFor(HitResult.Ok))) < 0.00001;
+            var domain = BmsHitErrorMeter.CreateDomain(BmsHitErrorMeter.CreateWindows(Playfield.EngineChart));
+            var windows = BmsHitErrorMeter.CreateWindows(Playfield.EngineChart).Single(window => window.Result == HitResult.Ok);
+            return Math.Abs(badWindow().X - domain.RelativePosition(windows.FastOffset)) < 0.00001
+                   && Math.Abs(badWindow().X + badWindow().Width - domain.RelativePosition(windows.SlowOffset)) < 0.00001;
         });
         AddAssert("EPOOR window is an added fast segment", () =>
-            meter().ChildrenOfType<Box>().Single(child => child.Name == "empty poor window").ScreenSpaceDrawQuad.Centre.X
+            meter().ChildrenOfType<Box>().Single(child => child.Name == $"{HitResult.Miss} window").ScreenSpaceDrawQuad.Centre.X
             < meter().ScreenSpaceDrawQuad.Centre.X);
         AddAssert("meter is horizontal", () => meter().ScreenSpaceDrawQuad.AABBFloat.Width > meter().ScreenSpaceDrawQuad.AABBFloat.Height);
         AddStep("capture original dimensions", () =>
@@ -424,6 +459,8 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
 
         AddStep("load window mods", () =>
         {
+            // This assertion compares key-head windows; mixed charts also expose scratch and tail regions.
+            tapWindowChart = true;
             Mod[] mods = constraint switch
             {
                 1 => [new BmsModNoGood()],
@@ -436,17 +473,15 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
         AddUntilStep("meter loaded", () => meter().IsLoaded);
         AddStep("check visible colours against playable windows", () =>
         {
-            var windows = BmsEngineRules.GetTiming(Playfield.Beatmap.LayoutVariant, 1,
-                Playfield.Beatmap.HitObjects[0].EffectiveJudgementRate, tail: false, modifiers: Playfield.Beatmap.JudgementModifiers);
+            var compiled = ((BmsScoreProcessor)Player.ScoreProcessor).EngineChart;
+            var windows = compiled.TimingFor(Playfield.Beatmap.HitObjects[0]).HeadWindows;
             var bars = meter().ChildrenOfType<Container>().Single(child => child.Name == "judgement windows").Children.OfType<Box>().ToArray();
 
             // Quarter-millisecond samples avoid shared inclusive boundaries while covering both sides
             // and the unused space beyond E-POOR's finite slow boundary.
             for (var offset = -499.75; offset < 500; offset++)
             {
-                var result = windows.HitAt(offset);
-                if (result == HitResult.None && windows.EmptyPoorAt(offset))
-                    result = HitResult.Miss;
+                var result = compiled.Profile.HitResultFor(windows.ResultFor(RhythmEngine.Core.Time.FromMilliseconds(offset)));
 
                 var position = (float)((offset + 500) / 1000);
                 var visible = bars.LastOrDefault(bar => bar.Width > 0 && position > bar.X && position < bar.X + bar.Width);
@@ -460,7 +495,7 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
         });
         AddStep("hide E-POOR regions", () => meter().ShowEmptyPoor.Value = false);
         AddAssert("E-POOR background is hidden", () =>
-            !meter().ChildrenOfType<Box>().Single(child => child.Name == "empty poor window").IsPresent);
+            !meter().ChildrenOfType<Box>().Single(child => child.Name == $"{HitResult.Miss} window").IsPresent);
     }
 
     [Test]
@@ -490,9 +525,6 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
     {
         BmsHitErrorMeter meter() => Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter>().Single();
 
-        Box window(HitResult result) => meter().ChildrenOfType<Box>().Single(child =>
-            child.Name == (result == HitResult.Miss ? "empty poor window" : $"{result} window"));
-
         AddStep("load player", () =>
         {
             Mod[] mods = constraint switch
@@ -508,16 +540,16 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
         AddStep("stop gameplay clock", () => Player.GameplayClockContainer.Stop());
         AddStep("register Fast and Slow POOR", registerPoors);
         AddUntilStep("both POOR lines appear", () => meter().Judgements.Lines.Count == 2);
-        AddStep("POOR lines match visible outer edges", () => assertEnds(showEmptyPoor: true));
+        AddStep("POOR lines match visible outer edges", () => assertEnds());
         AddStep("hide E-POOR", () => meter().ShowEmptyPoor.Value = false);
-        AddStep("existing POOR lines follow remaining hit windows", () => assertEnds(showEmptyPoor: false));
+        AddStep("existing POOR lines follow remaining hit windows", () => assertEnds());
         AddStep("clear lines", () => meter().Clear());
         AddUntilStep("lines cleared", () => !meter().Judgements.Lines.Any());
         AddStep("register POOR with E-POOR hidden", registerPoors);
         AddUntilStep("both POOR lines appear again", () => meter().Judgements.Lines.Count == 2);
-        AddStep("new POOR lines use remaining hit windows", () => assertEnds(showEmptyPoor: false));
+        AddStep("new POOR lines use remaining hit windows", () => assertEnds());
         AddStep("show E-POOR", () => meter().ShowEmptyPoor.Value = true);
-        AddStep("existing POOR lines return to outer edges", () => assertEnds(showEmptyPoor: true));
+        AddStep("existing POOR lines return to outer edges", () => assertEnds());
 
         void registerPoors()
         {
@@ -531,18 +563,11 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
             }
         }
 
-        void assertEnds(bool showEmptyPoor)
+        void assertEnds()
         {
-            var hitResult = !noBad
-                ? HitResult.Ok
-                : constraint switch
-                {
-                    1 => HitResult.Great,
-                    2 => HitResult.Perfect,
-                    _ => HitResult.Good,
-                };
-            var left = window(showEmptyPoor ? HitResult.Miss : hitResult).ScreenSpaceDrawQuad.AABBFloat.Left;
-            var right = window(showEmptyPoor && noBad ? HitResult.Miss : hitResult).ScreenSpaceDrawQuad.AABBFloat.Right;
+            var visible = meter().ChildrenOfType<Box>().Where(box => box.Name.EndsWith(" window", StringComparison.Ordinal) && box.Alpha > 0).ToArray();
+            var left = visible.Min(box => box.ScreenSpaceDrawQuad.AABBFloat.Left);
+            var right = visible.Max(box => box.ScreenSpaceDrawQuad.AABBFloat.Right);
             var lines = meter().Judgements.Lines.OrderBy(line => line.X).ToArray();
 
             Assert.That(lines, Has.Length.EqualTo(2));

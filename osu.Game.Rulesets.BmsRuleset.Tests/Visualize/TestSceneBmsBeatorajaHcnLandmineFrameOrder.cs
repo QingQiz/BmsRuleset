@@ -1,16 +1,16 @@
 #nullable enable
-using System;
+using NUnit.Framework;
+using RhythmEngine.Profiles.Common;
 using System.Collections.Generic;
 using System.Linq;
-using NUnit.Framework;
+using System;
 using osu.Game.Beatmaps;
-using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
 using osu.Game.Rulesets.Replays;
 using osu.Game.Rulesets.Scoring;
@@ -42,7 +42,7 @@ public partial class TestSceneBmsBeatorajaHcnLandmineFrameOrder : BmsPlayerTestS
         {
             LayoutVariant = BmsLayoutVariant.Bme7K, TotalColumns = 8, Rank = 2, Total = total,
             LockedLongNoteMode = BmsLongNoteMode.HellChargeNote,
-            HitObjects = [new BmsLongNote { StartTime = 3000, Duration = 2000, Column = 1 },
+            HitObjects = [new BmsLongNote { Kind = KeyNoteKind.SustainHold, StartTime = 3000, Duration = 2000, Column = 1 },
                 new BmsLandmine { StartTime = 3201, Column = mineColumn, LandmineDamagePercent = 10 },
                 new BmsNote { StartTime = 10000, Column = 3 }],
         };
@@ -114,7 +114,7 @@ public partial class TestSceneBmsBeatorajaHcnLandmineFrameOrder : BmsPlayerTestS
             var history = SimulateGaugeHistory().ToArray();
             var interval = history.Where(e => e.Time > (time == 3202 ? 3201 : 3200) && e.Time <= time).ToArray();
             var frameHealth = interval
-                .Select(e => e.States.Single(s => s.GaugeType == BmsGaugeType.Normal).Health).ToArray();
+                .Select(e => e.Health.Layers.Single().Value).ToArray();
             var events = ((BmsScoreProcessor)Player.ScoreProcessor).JudgementEvents.ToArray();
             HitResult[] expectedResults = expectedMine ? [HitResult.Perfect, HitResult.Meh] : [HitResult.Perfect];
             BmsJudgementSourceKind[] expectedKinds = expectedMine

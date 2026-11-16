@@ -1,14 +1,16 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using RhythmEngine.Core;
-using RhythmEngine.Profiles.Bms;
+using RhythmEngine.Profiles.Common;
 using osu.Framework.Bindables;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
 using osu.Game.Rulesets.Objects;
@@ -18,13 +20,15 @@ using JudgementResult = osu.Game.Rulesets.Judgements.JudgementResult;
 
 namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 
-public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
+public partial class BmsScoreProcessor : ScoreProcessor
 {
-    private static readonly ResultId[] counted_results =
-    [
-        BmsResults.PGREAT, BmsResults.GREAT, BmsResults.GOOD, BmsResults.BAD,
-        BmsResults.POOR, BmsResults.EMPTY_POOR, BmsResults.MINE_HIT,
-    ];
+    private GameplayProfile profile = BmsGameplayProfile.INSTANCE;
+
+    public BmsScoreProcessor()
+        : base(new BmsRuleset())
+    {
+        Mods.BindValueChanged(change => profile = GameplayProfile.FromMods(change.NewValue), true);
+    }
 
     private static readonly Action<JudgementResult, int> set_combo_after = typeof(JudgementResult)
         .GetProperty(nameof(JudgementResult.ComboAfterJudgement))!.GetSetMethod(true)!
@@ -34,16 +38,29 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
         .GetProperty(nameof(JudgementResult.HighestComboAfterJudgement))!.GetSetMethod(true)!
         .CreateDelegate<Action<JudgementResult, int>>();
 
-    private double latestEndTime = double.MaxValue;
-    private int maximumScoringJudgementCount;
+    internal ScoreState EngineScore { get; private set; } = new();
+    private bool engineCompleted;
+
+    internal SessionOutcome Outcome { get; private set; }
+
+    internal void ApplyEngineState(JudgementSession session)
+    {
+        ApplyEngineScore(session.Score);
+        engineCompleted = session.Completed;
+        Outcome = session.Outcome;
+    }
+
+    [UnsafeAccessor(UnsafeAccessorKind.Method, Name = "updateScore")]
+    private static extern void updateScore(ScoreProcessor processor);
+
+    internal BmsEngineChart EngineChart { get; private set; } = null!;
     private readonly List<BmsJudgementEvent> judgementEvents = [];
-    private readonly Dictionary<JudgementResult, BmsJudgementEvent> eventsByResult = new();
     private readonly List<TimingHitEventEntry> timingHitEventEntries = [];
     private readonly List<HitEvent> timingHitEvents = [];
 
     public IReadOnlyList<BmsJudgementEvent> JudgementEvents => judgementEvents;
 
-    public int ScoringJudgementEventCount { get; private set; }
+    public int ScoringJudgementEventCount => EngineScore.JudgedOpportunities;
 
     /// <summary>
     ///     Changes whenever the result-count dictionary changes.
@@ -60,67 +77,32 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
         ((BindableBool)HasCompleted).Value = false;
     }
 
-    public event Action<BmsTimingObservation>? EmptyPoorRegistered;
-
     public event Action<BmsTimingObservation>? NonConsumingJudgementRegistered;
 
     public override void ApplyBeatmap(IBeatmap beatmap)
     {
+        EngineChart = new BmsEngineChart((BmsBeatmap)beatmap, profile);
+        // Only the active playable conversion publishes framework windows; rating and practice compilation are read-only.
+        foreach (var note in EngineChart.Objects)
+            note.HitWindows = profile.CreateHitWindows(note, EngineChart.TimingFor(note), NoteParts.HEAD);
         base.ApplyBeatmap(beatmap);
-
-        if (beatmap.HitObjects.Count == 0)
-            latestEndTime = 0;
-        else
-        {
-            // Latest possible judgement time = max object end time + worst-case slow window.
-            var maxEndTime = beatmap.HitObjects.Max(h => h.GetEndTime());
-            var slowWindow = beatmap.HitObjects.Cast<BmsHitObject>()
-                .Select(note => BmsEngineRules.GetTiming(note, false).PassiveDeadline / 1000.0)
-                .Max();
-
-            latestEndTime = maxEndTime + slowWindow;
-        }
-
-        // A selected interval includes its trailing silence, while complete holds and slow judgements may extend beyond it.
-        if (beatmap is BmsBeatmap { PracticeEndTime: { } practiceEndTime })
-            latestEndTime = Math.Max(latestEndTime, practiceEndTime);
     }
 
-    public override int GetBaseScoreForResult(HitResult result) => result switch
-    {
-        HitResult.Perfect => 2,
-        HitResult.Great => 1,
-        _ => 0,
-    };
+    public override int GetBaseScoreForResult(HitResult result) => profile.AccuracyValue(result);
 
     public override ScoreRank RankFromScore(double accuracy, IReadOnlyDictionary<HitResult, int> results)
+        => profile.RankFromScore(accuracy, results);
+
+    public override double AccuracyCutoffFromRank(ScoreRank rank) => profile.AccuracyCutoffFromRank(rank);
+
+    public void RegisterNonConsumingJudgement(HitResult result, double eventTime, double expectedTime, int column, RhythmEngine.Core.JudgementResult engineResult)
     {
-        return accuracy switch
-        {
-            // All PGREATs → rainbow S (DJ LEVEL MAX / perfect full combo).
-            >= 1.0 - 1e-9 when results.GetValueOrDefault(HitResult.Great) == 0 &&
-                               results.GetValueOrDefault(HitResult.Good) == 0 &&
-                               results.GetValueOrDefault(HitResult.Ok) == 0 &&
-                               results.GetValueOrDefault(HitResult.Meh) == 0
-                => ScoreRank.X,
-            // Traditional BMS DJ LEVEL thresholds expressed as EX-score ratios.
-            // AAA = 8/9 of max ≈ 0.889, AA = 7/9 ≈ 0.778, A = 6/9 ≈ 0.667.
-            // We expose S/A/B/C/D as approximate equivalents.
-            _ => BmsExScore.RankFromAccuracy(accuracy, allowX: false),
-        };
-
-        // BMS pass/fail is determined solely by gauge at song end, not by score accuracy.
-        // ScoreRank.F is never assigned here; failure is communicated through BmsHealthProcessor.
-    }
-
-    public override double AccuracyCutoffFromRank(ScoreRank rank) => BmsExScore.AccuracyCutoffFromRank(rank);
-
-    public void RegisterNonConsumingJudgement(HitResult result, double eventTime, double expectedTime, int column, ScoreState engineScore)
-    {
-        applyEngineScore(engineScore);
+        ApplyEngineScore(engineResult.Score);
         StatisticsVersion++;
         var source = new BmsJudgementSource(eventTime, column,
-            result == HitResult.Ok ? BmsJudgementSourceKind.NonConsumingBad : BmsJudgementSourceKind.EmptyPoor);
+            profile.EventKind(engineResult.Event) == GameplayEventKind.NonConsumingHit
+                ? BmsJudgementSourceKind.NonConsumingHit
+                : BmsJudgementSourceKind.EmptyInput);
         var observation = new BmsTimingObservation(BmsTimingObservationKind.Note, expectedTime, eventTime, 1, result);
         var judgementEvent = new BmsJudgementEvent(source, result, [observation]);
         addJudgementEvent(judgementEvent);
@@ -128,8 +110,6 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
         if (!IsRebuildingReplay)
         {
             NonConsumingJudgementRegistered?.Invoke(observation);
-            if (result == HitResult.Miss)
-                EmptyPoorRegistered?.Invoke(observation);
         }
     }
 
@@ -139,7 +119,7 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
     public BmsLongNoteJudgementResult ApplySyntheticLongNoteEndpoint(BmsLongNoteEndpointResult endpointResult, bool suppressPenalty,
                                                                      RhythmEngine.Core.JudgementResult engineResult)
     {
-        var endpoint = endpointResult.Source.CreateSyntheticEndpoint(endpointResult.ExpectedTime);
+        var endpoint = createEndpoint(endpointResult.Source, endpointResult.Kind);
         var result = new BmsLongNoteJudgementResult(endpoint, endpoint.CreateJudgement(), [endpointResult])
         {
             Type = endpointResult.Result,
@@ -166,101 +146,86 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
 
     protected override void Update()
     {
-        // The clock can reach the end before the final passive POOR or CN/HCN tail is processed.
-        // Wait for every scoring judgement so pass/fail and Auto Gauge use the final HP.
-        // Mines may expire without a result, so they must not contribute to this count.
-        // This must also clear completion after a rewind because looping players wait for
-        // that transition before they stop seeking back to the start of the beatmap.
         if (HasCompleted is BindableBool bb)
-            bb.Value = Time.Current >= latestEndTime && ScoringJudgementEventCount == maximumScoringJudgementCount;
+            bb.Value = engineCompleted;
     }
 
     protected override void Reset(bool storeResults)
     {
         if (storeResults)
-            maximumScoringJudgementCount = ScoringJudgementEventCount;
+        {
+            EngineScore = EngineScore with { Score = EngineChart.MaximumScore };
+            var statistics = GetScoreProcessorStatistics();
+            statistics.BaseScore = statistics.MaximumBaseScore = EngineChart.Chart.ScorePlan.MaximumAccuracy;
+            SetScoreProcessorStatistics(statistics);
+        }
 
         base.Reset(storeResults);
+        EngineScore = EngineChart.Score.InitialState;
+        engineCompleted = false;
+        Outcome = SessionOutcome.InProgress;
         TotalScoreWithoutMods.Value = 0;
         judgementEvents.Clear();
-        eventsByResult.Clear();
         timingHitEventEntries.Clear();
         timingHitEvents.Clear();
-        ScoringJudgementEventCount = 0;
         StatisticsVersion++;
     }
 
-    /// <summary>
-    ///     Scaled EX-score.  Accuracy = EXScore / MaxEXScore (0–1).
-    ///     Total score = accuracy × 1 000 000; bonus portion carries over from base.
-    /// </summary>
     protected override double ComputeTotalScore(double comboProgress, double accuracyProgress, double bonusPortion)
-        => 1_000_000 * Accuracy.Value * accuracyProgress;
+        => EngineChart is { MaximumScore: > 0 } ? 1_000_000 * EngineScore.Score / EngineChart.MaximumScore : 0;
 
-    // EX-score has no combo multiplier — every PGREAT is always worth exactly 2.
+    // The engine already applies the scoring policy's combo contribution.
     protected override double GetComboScoreChange(JudgementResult result) => 0;
 
     protected override void ApplyScoreChange(JudgementResult result)
     {
         StatisticsVersion++;
-        // Count independently of hit-event recording, which can be disabled by the host.
-        if (result.HitObject is BmsHitObject and not BmsLandmine)
-            ScoringJudgementEventCount++;
-
         if (IsSimulating)
             return;
 
         if (result is not BmsJudgementResult { EngineResult: { } engine })
             throw new InvalidOperationException("Gameplay scoring requires an engine judgement.");
 
-        applyEngineScore(engine.Score);
+        ApplyEngineScore(engine.Score);
         set_combo_after(result, engine.Score.Combo);
         set_highest_combo_after(result, engine.Score.MaximumCombo);
     }
 
-    private void applyEngineScore(ScoreState state)
+    internal void ApplyEngineScore(ScoreState state)
     {
+        if (ReferenceEquals(EngineScore, state))
+            return;
+
+        EngineScore = state;
+        StatisticsVersion++;
         Combo.Value = state.Combo;
         HighestCombo.Value = state.MaximumCombo;
         SetScoreProcessorStatistics(new ScoreProcessorStatistics
         {
-            BaseScore = state.Score,
+            BaseScore = state.AccuracyPoints,
             MaximumBaseScore = state.AccuracyMaximum,
-            // Stored ruleset scores include detonated mines in osu!'s progress count, with zero EX potential.
-            AccuracyJudgementCount = (int)(state.AccuracyMaximum / 2 + state.Counters.GetValueOrDefault(BmsResults.MINE_HIT.Value)),
+            AccuracyJudgementCount = profile.AccuracyJudgementCount(state),
         });
         ScoreResultCounts.Clear();
 
-        foreach (var id in counted_results)
+        foreach (var (id, count) in state.ResultCounts)
         {
-            if (!state.Counters.TryGetValue(id.Value, out var count))
-                continue;
-
-            var result = BmsEngineChart.HitResultFor(id);
-            ScoreResultCounts[result] = ScoreResultCounts.GetValueOrDefault(result) + (int)count;
+            var result = profile.HitResultFor(id);
+            if (result != HitResult.None)
+                ScoreResultCounts[result] = ScoreResultCounts.GetValueOrDefault(result) + count;
         }
+
+        updateScore(this);
     }
 
     protected override void RemoveScoreChange(JudgementResult result)
-    {
-        StatisticsVersion++;
-        base.RemoveScoreChange(result);
-        if (result is BmsJudgementResult { SuppressPenalty: true })
-            ScoreResultCounts[result.Type]++;
-
-        if (result.HitObject is BmsHitObject and not BmsLandmine)
-            ScoringJudgementEventCount--;
-
-        if (eventsByResult.Remove(result, out var judgementEvent))
-            removeJudgementEvent(judgementEvent);
-    }
+        => throw new NotSupportedException("Rewind must rebuild the engine session from recorded inputs.");
 
     protected override HitEvent CreateHitEvent(JudgementResult result)
     {
         var frameworkEvent = base.CreateHitEvent(result);
         var judgementEvent = createJudgementEvent(result);
         var timingHitEvent = addJudgementEvent(judgementEvent, result.HitObject);
-        eventsByResult.Add(result, judgementEvent);
 
         if (judgementEvent.SuppressPenalty)
             return frameworkEvent;
@@ -273,39 +238,28 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
     }
 
     protected override IEnumerable<HitObject> EnumerateHitObjects(IBeatmap beatmap)
-    {
-        foreach (var hitObject in base.EnumerateHitObjects(beatmap).Order(JudgementOrderComparer.DEFAULT))
+        => EngineChart.Chart.ScorePlan.Opportunities.Select(opportunity =>
         {
-            yield return hitObject;
+            var note = EngineChart.Objects[opportunity.NoteId];
+            return note is BmsLongNote longNote
+                ? createEndpoint(longNote, opportunity.Part == NoteParts.HEAD ? BmsLongNoteEndpointKind.Head : BmsLongNoteEndpointKind.Tail)
+                : note;
+        }).Order(JudgementOrderComparer.DEFAULT);
 
-            if (hitObject is BmsLongNote longNote && longNote.EffectiveMode is BmsLongNoteMode.ChargeNote or BmsLongNoteMode.HellChargeNote)
-                yield return longNote.CreateSyntheticEndpoint(longNote.EndTime);
-        }
-    }
-
-    protected override HitResult GetSimulatedHitResult(Judgements.Judgement judgement) => judgement is BmsJudgement { MaxResult: HitResult.Meh }
-        ? HitResult.IgnoreMiss
-        : base.GetSimulatedHitResult(judgement);
+    private BmsNote createEndpoint(BmsLongNote note, BmsLongNoteEndpointKind kind)
+        => new()
+        {
+            StartTime = kind == BmsLongNoteEndpointKind.Head ? note.StartTime : note.EndTime,
+            Column = note.Column,
+            Beatmap = note.Beatmap,
+            HitWindows = profile.CreateHitWindows(note, EngineChart.TimingFor(note),
+                kind == BmsLongNoteEndpointKind.Head ? NoteParts.HEAD : NoteParts.TAIL),
+        };
 
     private HitEvent? addJudgementEvent(BmsJudgementEvent judgementEvent, HitObject? sourceHitObject = null)
     {
         judgementEvents.Add(judgementEvent);
         return addTimingHitEvents(judgementEvent, sourceHitObject);
-    }
-
-    private void removeJudgementEvent(BmsJudgementEvent judgementEvent)
-    {
-        // Framework reverts usually target the newest event, so search from the end.
-        for (var i = judgementEvents.Count - 1; i >= 0; i--)
-        {
-            if (!ReferenceEquals(judgementEvents[i], judgementEvent))
-                continue;
-
-            judgementEvents.RemoveAt(i);
-            break;
-        }
-
-        removeTimingHitEvents(judgementEvent);
     }
 
     private HitEvent? addTimingHitEvents(BmsJudgementEvent judgementEvent, HitObject? sourceHitObject)
@@ -324,37 +278,13 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
                 ? sourceHitObject
                 : BmsJudgementEventProjection.CreateTimingHitEvent(judgementEvent.Source, observation, null).HitObject;
 
-            timingHitEventEntries.Insert(insertionIndex, new TimingHitEventEntry(judgementEvent, observation, hitObject));
+            timingHitEventEntries.Insert(insertionIndex, new TimingHitEventEntry(observation, hitObject));
             timingHitEvents.Insert(insertionIndex, createTimingHitEvent(insertionIndex));
             lastTimingHitEvent = timingHitEvents[insertionIndex];
             repairNextTimingHitEvent(insertionIndex);
         }
 
         return lastTimingHitEvent;
-    }
-
-    private void removeTimingHitEvents(BmsJudgementEvent judgementEvent)
-    {
-        if (judgementEvent.SuppressPenalty)
-            return;
-
-        for (var observationIndex = judgementEvent.TimingObservations.Count - 1; observationIndex >= 0; observationIndex--)
-        {
-            var time = judgementEvent.TimingObservations[observationIndex].ActualTime;
-
-            // Normal LN observations can surround other notes. Locate each endpoint
-            // by time and identity rather than scanning all remaining hit events.
-            for (var i = findTimingInsertionIndex(time) - 1; i >= 0 && timingHitEventEntries[i].Observation.ActualTime == time; i--)
-            {
-                if (!ReferenceEquals(timingHitEventEntries[i].JudgementEvent, judgementEvent))
-                    continue;
-
-                timingHitEventEntries.RemoveAt(i);
-                timingHitEvents.RemoveAt(i);
-                repairNextTimingHitEvent(i - 1);
-                break;
-            }
-        }
     }
 
     private int findTimingInsertionIndex(double actualTime)
@@ -455,7 +385,6 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
     }
 
     private readonly record struct TimingHitEventEntry(
-        BmsJudgementEvent JudgementEvent,
         BmsTimingObservation Observation,
         HitObject HitObject);
 }

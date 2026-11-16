@@ -43,12 +43,14 @@ public partial class TestSceneBmsLongNoteBodyTint : BmsPlayerTestScene
             {
                 new BmsLongNote
                 {
+                    Kind = mode.ToNoteKind(),
                     StartTime = start_time,
                     Duration = duration,
                     Column = 1,
                 },
                 new BmsLongNote
                 {
+                    Kind = mode.ToNoteKind(),
                     StartTime = second_start_time,
                     Duration = duration,
                     Column = 1,

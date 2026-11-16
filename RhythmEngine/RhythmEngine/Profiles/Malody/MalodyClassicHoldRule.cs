@@ -25,11 +25,6 @@ internal sealed class MalodyClassicHoldRule(TimingWindows windows, long headDead
     public NoteState CreateState(ChartNote note) => new MalodyHoldState(
         new NoteTimer(note.StartTime + headDeadline + 1, TimerOrder.BeforeInput), false, false, null);
 
-    public IEnumerable<ScoringOpportunity> GetScoringOpportunities(ChartNote note)
-    {
-        yield return new ScoringOpportunity(note.Id, NoteParts.HEAD, 1000);
-    }
-
     public InputCandidate? GetCandidate(NoteContext context, InputEvent input, int noteIndex)
     {
         var state = (MalodyHoldState)context.State;

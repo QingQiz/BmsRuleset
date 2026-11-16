@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -266,6 +266,7 @@ public class BmsBeatmapDecoderTest
                 new BmsHitObject { StartTime = 1000, Column = 1 },
             },
         };
+        beatmap.HitObjects[0].Beatmap = beatmap;
         ICreateReplayData autoplay = new BmsModAutoplay();
 
         var score = autoplay.CreateScoreFromReplayData(beatmap, [(Mod)autoplay]);
@@ -286,6 +287,7 @@ public class BmsBeatmapDecoderTest
                 new BmsHitObject { StartTime = 1000, Column = 1 },
             },
         };
+        beatmap.HitObjects[0].Beatmap = beatmap;
         var autoplay = new BmsModAutoplay();
 
         var replayData = autoplay.CreateReplayData(beatmap, [autoplay]);
@@ -307,7 +309,7 @@ public class BmsBeatmapDecoderTest
         var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
         var note = converted.HitObjects.Single();
 
-        Assert.That(note.JudgementRate, Is.EqualTo(1.125).Within(0.0001));
+        Assert.That(BmsEngineRules.RateFor(note), Is.EqualTo(1.125).Within(0.0001));
     }
 
     [Test]
@@ -804,7 +806,7 @@ public class BmsBeatmapDecoderTest
 
         var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
 
-        Assert.That(converted.HitObjects.Select(h => h.JudgementRate), Is.EqualTo([1.5, 1.5, 0.375, 0.375]).Within(0.0001));
+        Assert.That(converted.HitObjects.Select(note => BmsEngineRules.RateFor(note)), Is.EqualTo([1.5, 1.5, 0.375, 0.375]).Within(0.0001));
     }
 
     [Test]
@@ -820,7 +822,7 @@ public class BmsBeatmapDecoderTest
 
         var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
 
-        Assert.That(converted.HitObjects.Select(h => h.JudgementRate), Is.EqualTo([1.5, 1.5, 1.5, 1.5]).Within(0.0001));
+        Assert.That(converted.HitObjects.Select(note => BmsEngineRules.RateFor(note)), Is.EqualTo([1.5, 1.5, 1.5, 1.5]).Within(0.0001));
     }
 
     [Test]
@@ -986,7 +988,7 @@ public class BmsBeatmapDecoderTest
         Assert.That(mine is BmsLandmine, Is.True);
         Assert.That(mine.Column, Is.EqualTo(8));
         Assert.That(beatmap.HitObjects.OfType<BmsNote>().Single().Column, Is.EqualTo(14));
-        Assert.That((mine as BmsLandmine)?.LandmineDamagePercent ?? 0, Is.EqualTo(5));
+        Assert.That(((BmsLandmine)mine).LandmineDamagePercent, Is.EqualTo(5));
     }
 
     [Test]
@@ -1054,7 +1056,7 @@ public class BmsBeatmapDecoderTest
         var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
         var note = converted.HitObjects.Single();
 
-        Assert.That(note.JudgementRate, Is.EqualTo(0.75).Within(0.0001));
+        Assert.That(BmsEngineRules.RateFor(note), Is.EqualTo(0.75).Within(0.0001));
     }
 
     [Test]
@@ -1070,7 +1072,7 @@ public class BmsBeatmapDecoderTest
         var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
         var note = converted.HitObjects.Single();
 
-        Assert.That(note.JudgementRate, Is.EqualTo(0.65625).Within(0.0001));
+        Assert.That(BmsEngineRules.RateFor(note), Is.EqualTo(0.65625).Within(0.0001));
     }
 
     [Test]
@@ -1086,7 +1088,7 @@ public class BmsBeatmapDecoderTest
         var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
         var note = converted.HitObjects.Single();
 
-        Assert.That(note.JudgementRate, Is.EqualTo(1.5).Within(0.0001));
+        Assert.That(BmsEngineRules.RateFor(note), Is.EqualTo(1.5).Within(0.0001));
     }
 
     [Test]
@@ -1213,7 +1215,7 @@ public class BmsBeatmapDecoderTest
         var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
         var note = converted.HitObjects.Single();
 
-        Assert.That(note.JudgementRate, Is.EqualTo(0.75).Within(0.0001));
+        Assert.That(BmsEngineRules.RateFor(note), Is.EqualTo(0.75).Within(0.0001));
     }
 
     [Test]
@@ -2048,7 +2050,7 @@ public class BmsBeatmapDecoderTest
         var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
         var note = converted.HitObjects.Single();
 
-        Assert.That(note.JudgementRate, Is.EqualTo(0.75).Within(0.0001));
+        Assert.That(BmsEngineRules.RateFor(note), Is.EqualTo(0.75).Within(0.0001));
     }
 
     [Test]
@@ -2235,7 +2237,7 @@ public class BmsBeatmapDecoderTest
         var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
         var note = converted.HitObjects.Single();
 
-        Assert.That(note.JudgementRate, Is.EqualTo(0.25).Within(0.0001));
+        Assert.That(BmsEngineRules.RateFor(note), Is.EqualTo(0.25).Within(0.0001));
     }
 
     [Test]

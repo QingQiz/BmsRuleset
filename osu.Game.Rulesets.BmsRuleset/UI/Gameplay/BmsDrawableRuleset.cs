@@ -11,6 +11,8 @@ using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Practice;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
@@ -32,16 +34,25 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
     public BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IReadOnlyList<Mod>? mods = null)
         : base(ruleset, beatmap, mods)
     {
-        var bmsBeatmap = (BmsBeatmap)beatmap;
-        audioController = createGameplayAudioController(bmsBeatmap, Mods);
-        samplePlayback = audioController.SamplePlayback;
+    }
+
+    protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent)
+    {
+        var dependencies = new DependencyContainer(base.CreateChildDependencies(parent));
+        // Player compiles after constructing the drawable ruleset. Standalone previews have no processor.
+        var compiled = (parent.Get<ScoreProcessor>() as BmsScoreProcessor)?.EngineChart
+                       ?? new BmsEngineChart((BmsBeatmap)Beatmap, GameplayProfile.FromMods(Mods));
+        dependencies.CacheAs(compiled);
+        audioController = createGameplayAudioController((BmsBeatmap)Beatmap, Mods, compiled);
+        dependencies.CacheAs(audioController.SamplePlayback);
+        return dependencies;
     }
 
     internal BmsStageHudController StageHudController => field ??= new BmsStageHudController((BmsPlayfield)Playfield);
 
-    internal BmsSamplePlayback SamplePlayback => samplePlayback;
+    internal BmsSamplePlayback SamplePlayback => audioController!.SamplePlayback;
 
-    internal BindableBool BackgroundAudioPaused => audioController.BackgroundAudioPaused;
+    internal BindableBool BackgroundAudioPaused => audioController!.BackgroundAudioPaused;
 
     public new PassThroughInputManager KeyBindingInputManager => base.KeyBindingInputManager;
 
@@ -64,13 +75,10 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
     [Cached(typeof(IBmsGameplayEvents))]
     private readonly BmsGameplayEvents gameplayEvents = new();
 
-    private readonly BmsGameplayAudioController audioController;
+    private BmsGameplayAudioController? audioController;
     private BmsGameplayCompletionController? completionController;
     private BmsGameplaySettingsController? settingsController;
     private double previousVisualUpdateMs;
-
-    [Cached(typeof(BmsSamplePlayback))]
-    private readonly BmsSamplePlayback samplePlayback;
 
     // Resolved from Player's DI cache — available after Player.LoadComplete registers them.
     [Resolved(CanBeNull = true)]
@@ -110,7 +118,7 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
         if (gameplayClockContainer != null)
             gameplayClockContainer.OnSeek -= onReplaySeek;
         gameplayEvents.ReplaySeeked -= synchroniseReplayState;
-        audioController.Dispose(previewRestoreTime, restorePreview: practiceSession == null);
+        audioController?.Dispose(previewRestoreTime, restorePreview: practiceSession == null);
     }
 
     public static double ComputeScrollTime(double scrollSpeed) => BmsGameplayScrollController.ComputeScrollTime(scrollSpeed);
@@ -119,6 +127,8 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
 
     public override void SetReplayScore(Score? replayScore)
     {
+        if (IsLoaded && replayScore != null)
+            ((BmsPlayfield)Playfield).ResetReplayState();
         base.SetReplayScore(replayScore);
 
         updateJudgementAlgorithm();
@@ -141,7 +151,7 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
         if (ReplayScore != null && healthProcessor is BmsHealthProcessor health)
         {
             var mods = ReplayScore.ScoreInfo.Mods;
-            health.Mods = mods;
+            health.ApplyReplayMods(mods);
             if (mods.OfType<BmsModAutoGauge>().FirstOrDefault() is { } autoGauge)
                 autoGauge.ApplyToHealthProcessor(health);
             else
@@ -152,7 +162,8 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
 
     protected override Playfield CreatePlayfield()
     {
-        return new BmsPlayfield((BmsBeatmap)Beatmap);
+        // Replay setup can create the playfield before Player publishes its compiled chart.
+        return new BmsPlayfield((BmsBeatmap)Beatmap, () => Dependencies.Get<BmsEngineChart>());
     }
 
     protected override void LoadComplete()
@@ -163,7 +174,7 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
         if (gameplayClockContainer != null)
             gameplayClockContainer.OnSeek += onReplaySeek;
 
-        audioController.BindPauseSource(gameplayClockContainer?.IsPaused ?? IsPaused);
+        audioController!.BindPauseSource(gameplayClockContainer?.IsPaused ?? IsPaused);
 
         if (practiceSession == null && scoreProcessor != null && healthProcessor != null && gameplayState != null)
             completionController = new BmsGameplayCompletionController(
@@ -178,8 +189,12 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
     {
         base.Update();
 
-        audioController.Update();
-        samplePlayback.BeginGameplayFrame();
+        // Offset/source-clock changes can move live play backwards without raising OnSeek.
+        if (ReplayScore == null && gameplayState != null && gameplayClockContainer != null)
+            ((BmsPlayfield)Playfield).RewindLiveInputs(gameplayState.Score.Replay, Mods, gameplayClockContainer.CurrentTime);
+
+        audioController!.Update();
+        SamplePlayback.BeginGameplayFrame();
         ((BmsPlayfield)Playfield).BeginGameplayFrame();
     }
 
@@ -205,11 +220,11 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
         var visualStart = Stopwatch.GetTimestamp();
         ((BmsPlayfield)Playfield).EndGameplayFrame();
         previousVisualUpdateMs = Stopwatch.GetElapsedTime(visualStart).TotalMilliseconds;
-        samplePlayback.EndGameplayFrame();
+        SamplePlayback.EndGameplayFrame();
 
         // Columns receive input independently while the playfield updates. Submitting here preserves
         // one mixer target for every keysound produced by the same ruleset update.
-        audioController.SubmitLivePlayBatch();
+        audioController!.SubmitLivePlayBatch();
     }
 
     protected override PassThroughInputManager CreateInputManager() => new BmsInputManager(Ruleset.RulesetInfo, Variant);
@@ -229,11 +244,11 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
         ((BmsInputManager)KeyBindingInputManager).ConfigureInputMods(Mods);
 
         // Sample playback follows the gameplay clock to load PCM samples before their first use.
-        FrameStableComponents.Add(samplePlayback);
+        FrameStableComponents.Add(SamplePlayback);
 
         // This component also coordinates pause/seek blocking for KeySounds in the shared Track
         // playback component, so it must exist even when the chart has no background sample events.
-        FrameStableComponents.Add(audioController.CreateBackgroundAudioPlayer(beatmap));
+        FrameStableComponents.Add(audioController!.CreateBackgroundAudioPlayer(beatmap));
         settingsController = new BmsGameplaySettingsController(
             Config as BmsRulesetConfigManager,
             (BmsPlayfield)Playfield,

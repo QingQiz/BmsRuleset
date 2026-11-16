@@ -119,7 +119,7 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
         if (drawable is not DrawableBmsHitObject || result.HitObject is not BmsHitObject note || note is BmsLandmine)
             return;
 
-        if (BmsColumn.ShouldTriggerHitExplosion(result.Type))
+        if (column.Judgements.Profile.ShowHitEffect(result.Type))
             column.TriggerHitExplosion(note is BmsLongNote ? BmsHitLightStyle.Hold : BmsHitLightStyle.Note);
     }
 
@@ -221,12 +221,10 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
     }
 
     public void ApplyBodyTick(in BmsFrameContext frame)
-        => playfield.ApplyEngineHealth(frame.EngineResult!.Health);
+        => playfield.ApplyEngineResult(frame.EngineResult!);
 
-    public void ApplyNonConsumingBad(BmsHitObject note, in BmsFrameContext frame)
-    {
-        playfield.RegisterNonConsumingJudgement(HitResult.Ok, note.StartTime, note.Column, frame);
-    }
+    public void ApplyNonConsumingResult(BmsHitObject note, HitResult result, in BmsFrameContext frame)
+        => playfield.RegisterNonConsumingJudgement(result, note.StartTime, note.Column, frame);
 
     public void PlaySample(BmsHitObject note)
     {
@@ -250,9 +248,6 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
     {
         if (!playfield.IsRebuildingReplay) column.PlayKeySound();
     }
-
-    public void ApplyEmptyPoor(double expectedTime, int columnIndex, in BmsFrameContext frame)
-        => playfield.RegisterNonConsumingJudgement(HitResult.Miss, expectedTime, columnIndex, frame);
 
     public void PlayLandmineSample(BmsLandmine note)
     {

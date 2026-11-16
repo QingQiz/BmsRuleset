@@ -7,11 +7,12 @@
 using System;
 using osu.Framework.Allocation;
 using osu.Framework.Extensions.Color4Extensions;
-using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Effects;
 using osu.Framework.Graphics.Shapes;
+using osu.Framework.Graphics;
 using osu.Game.Graphics;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using osu.Game.Rulesets.BmsRuleset.UI.Ranking;
 using osu.Game.Scoring;
 using osuTK;
@@ -26,11 +27,14 @@ internal partial class BmsRankBadge : CompositeDrawable
 
     public readonly ScoreRank Rank;
 
+    private readonly GameplayProfile profile;
+
     private Drawable rankContainer = null!;
     private Drawable overlay = null!;
 
-    internal BmsRankBadge(double accuracy, double position, ScoreRank rank)
+    internal BmsRankBadge(double accuracy, double position, ScoreRank rank, GameplayProfile profile)
     {
+        this.profile = profile;
         Accuracy = accuracy;
         displayPosition = position;
         Rank = rank;
@@ -48,7 +52,7 @@ internal partial class BmsRankBadge : CompositeDrawable
             Size = new Vector2(28, 14),
             Children =
             [
-                new BmsDrawableRank(Rank),
+                new BmsDrawableRank(Rank, profile),
                 overlay = new CircularContainer
                 {
                     RelativeSizeAxes = Axes.Both,

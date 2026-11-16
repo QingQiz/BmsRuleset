@@ -245,7 +245,7 @@ public sealed partial class DrawableBmsLongNote : DrawableBmsHitObject
 
         if (HitObject != null)
         {
-            mapPresentation = BmsLongNotePresentation.SelectMapping(ln.EffectiveMode);
+            mapPresentation = ParentColumn!.Judgements.Profile.LongNotePresentation;
             ParentColumn!.JudgementBridge.ObserveLongNoteState(this, stateObserver);
             ParentColumn.JudgementBridge.ObserveVisualTime(this, visualTimeObserver);
             presentation = readPresentation(Time.Current);
@@ -308,15 +308,15 @@ public sealed partial class DrawableBmsLongNote : DrawableBmsHitObject
     }
 
     private BmsLongNotePresentation readPresentation(double time)
-        => mapPresentation(ln, BmsLongNoteState.From(ln, ParentColumn!.Judgements.GetNote(ln), time), presentationContext(time));
+        => mapPresentation(ln, ParentColumn!.Judgements.GetNote(ln), presentationContext(time));
 
     private BmsLongNotePresentationContext presentationContext(double time)
-        => new(time, ParentColumn?.Judgements.PressedDirections is > 0);
+        => new(time, ParentColumn!.Judgements.PressedDirections > 0, ParentColumn.Judgements.GetTiming(ln));
 
     private void applyPresentation(NoteSnapshot snapshot, in BmsFrameContext frame)
     {
         var previous = presentation;
-        presentation = mapPresentation(ln, BmsLongNoteState.From(ln, snapshot, frame.SimulationTime), new BmsLongNotePresentationContext(frame.SimulationTime, snapshot.Held));
+        presentation = mapPresentation(ln, snapshot, new BmsLongNotePresentationContext(frame.SimulationTime, snapshot.Held, ParentColumn!.Judgements.GetTiming(ln)));
         if (!previous.HeadJudged && presentation.PrepareHeadPin)
         {
             visualState.PrepareHeadPin();

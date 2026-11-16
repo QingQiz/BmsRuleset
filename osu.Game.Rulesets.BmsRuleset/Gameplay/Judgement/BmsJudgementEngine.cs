@@ -3,13 +3,10 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using RhythmEngine.Core;
-using RhythmEngine.Profiles.Bms;
 using RhythmEngine.Profiles.Common;
-using RhythmEngine.Profiles.Patterns;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
-using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 
 namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 
@@ -19,7 +16,7 @@ internal readonly record struct BmsJudgementColumnDefinition(int Index, IBmsJudg
 internal sealed class BmsJudgementEngine
 {
     private readonly BmsHitObject[] objects;
-    private readonly Dictionary<BmsHitObject, int> ids;
+    private readonly IReadOnlyDictionary<BmsHitObject, int> ids;
     private readonly Dictionary<int, BmsJudgementView> columns;
     private readonly Dictionary<int, IBmsJudgementOutput> outputs;
     private readonly List<InputEvent> pendingInputs = [];
@@ -29,32 +26,25 @@ internal sealed class BmsJudgementEngine
     private readonly ImmutableArray<NoteSnapshot> initialSnapshots;
     private readonly Dictionary<int, BmsLandmineState> mines = [];
     private readonly Dictionary<int, BmsLongNoteEndpointResult> heads = [];
-    private readonly BmsJudgementRules rules;
-    private readonly Func<BmsHitObject[], (ScoreConfiguration Score, HealthConfiguration Health)>? configurationFactory;
+    private readonly BmsEngineChart compiled;
+    private readonly Func<BmsEngineChart, HealthConfiguration>? healthFactory;
     private JudgementSession? session;
+    private readonly Action<JudgementSession>? stateChanged;
     private bool processing;
 
-    internal BmsJudgementEngine(BmsHitObject[] notes, BmsLayoutVariant layout, BmsJudgementColumnDefinition[] definitions,
-                                Func<BmsHitObject[], (ScoreConfiguration Score, HealthConfiguration Health)>? configurationFactory = null)
+    internal BmsJudgementEngine(BmsEngineChart compiled, BmsJudgementColumnDefinition[] definitions,
+                                Func<BmsEngineChart, HealthConfiguration>? healthFactory = null, Action<JudgementSession>? stateChanged = null)
     {
-        this.configurationFactory = configurationFactory;
+        this.compiled = compiled;
+        this.healthFactory = healthFactory;
+        this.stateChanged = stateChanged;
         if (definitions.Length == 0 || definitions.Any(d => d.Index < 0) || definitions.Select(d => d.Index).Distinct().Count() != definitions.Length)
             throw new ArgumentException(@"Each judgement column needs a unique non-negative index.", nameof(definitions));
 
-        rules = notes.Length > 0 ? BmsEngineRules.ForBeatmap(notes[0].Beatmap) : BmsEngineRules.ForLayout(layout);
-        var scratch = layout switch
-        {
-            BmsLayoutVariant.Bms5K or BmsLayoutVariant.Bms5K2P or BmsLayoutVariant.Bms5KDouble => 5,
-            BmsLayoutVariant.Bme7K or BmsLayoutVariant.Bme7K2P or BmsLayoutVariant.Bme7KDouble => 7,
-            _ => -1,
-        };
-        var notesByColumn = notes.Where(n => n is BmsNote or BmsLongNote or BmsLandmine).ToLookup(n => n.Column);
-        // The host's chart traversal order is observable when simultaneous results clip a gauge.
-        objects = definitions.OrderBy(d => scratch < 0 || d.Index > scratch ? d.Index : d.Index == 0 ? scratch : d.Index - 1)
-            .SelectMany(d => notesByColumn[d.Index].OrderBy(n => n.StartTime)).ToArray();
-        ids = objects.Select((note, id) => (note, id)).ToDictionary(pair => pair.note, pair => pair.id);
-        pressed = new int[definitions.Max(d => d.Index) + 1];
-        chart = BmsEngineChart.Compile(objects, pressed.Length);
+        objects = compiled.Objects;
+        ids = compiled.Ids;
+        chart = compiled.Chart;
+        pressed = new int[chart.LaneCount];
         initialSnapshots =
         [
             .. chart.Notes.Select(n => new NoteSnapshot(n.Id, n.Lane, false,
@@ -65,10 +55,13 @@ internal sealed class BmsJudgementEngine
         columns = definitions.ToDictionary(d => d.Index, d => new BmsJudgementView(this, d.Index));
     }
 
-    internal BmsJudgementEngine(BmsHitObject[] notes, BmsLayoutVariant layout, int column, IBmsJudgementOutput output)
-        : this(notes, layout, [new BmsJudgementColumnDefinition(column, output)])
-    {
-    }
+    internal GameplayProfile Profile => compiled.Profile;
+
+    internal NoteTiming GetTiming(BmsHitObject note) => compiled.TimingFor(note);
+
+    internal double EarliestInputTime => objects.Select(note => note.StartTime + GetTiming(note).EarliestInputOffset / 1000.0).DefaultIfEmpty(0).Min();
+
+    internal bool ScoresHead(BmsHitObject note) => chart.ScorePlan.OpportunitiesByPart.ContainsKey((ids[note], NoteParts.HEAD));
 
     internal bool HasPendingInputs => pendingInputs.Count > 0;
 
@@ -100,7 +93,8 @@ internal sealed class BmsJudgementEngine
     {
         if (processing) throw new InvalidOperationException("Result observers cannot recursively process a frame.");
 
-        if (frame.IsRewinding || elapsed < 0)
+        // A live seek rebuilds at the master clock's target before the frame-stable clock catches up.
+        if (frame.IsRewinding || elapsed < 0 || Time.FromMilliseconds(frame.SimulationTime) < session?.CurrentTime)
         {
             pendingInputs.Clear();
             return;
@@ -121,6 +115,7 @@ internal sealed class BmsJudgementEngine
             if (appended != null)
                 publishBatch(appended, frame, contextAtTime);
             publishBatch(advanced, frame, contextAtTime);
+            stateChanged?.Invoke(session);
         }
         finally
         {
@@ -133,6 +128,7 @@ internal sealed class BmsJudgementEngine
     {
         session ??= createSession(null);
         publish(session.EndAt(Time.FromMilliseconds(frame.SimulationTime)).Transitions.AsSpan(), frame, contextAtTime);
+        stateChanged?.Invoke(session);
     }
 
     private void publishBatch(JudgementBatch batch, BmsFrameContext frame, Func<double, BmsFrameContext>? contextAtTime)
@@ -163,17 +159,8 @@ internal sealed class BmsJudgementEngine
 
     private JudgementSession createSession(BmsJudgementAlgorithm? algorithm)
     {
-        var selection = rules.SelectionOverride ?? (algorithm switch
-        {
-            BmsJudgementAlgorithm.Duration => BmsSelection.Nearest,
-            BmsJudgementAlgorithm.Lowest => BmsSelection.Oldest,
-            BmsJudgementAlgorithm.Score => BmsSelection.Score,
-            _ => BmsSelection.Combo,
-        });
-        var configuration = configurationFactory?.Invoke(objects)
-                            ?? (BmsProfiles.CreateScore(rules.EmptyPoorBreaksCombo), BmsEngineGauge.CreateDefault(objects));
-        return new JudgementSession(chart, new SessionConfiguration("bms-ruleset-v1", configuration.Item1, configuration.Item2,
-            context => BmsProfiles.SelectCandidates(context, chart, selection)));
+        var health = healthFactory?.Invoke(compiled) ?? compiled.Configuration.Health;
+        return new JudgementSession(chart, compiled.Profile.ConfigureSession(compiled, algorithm, health));
     }
 
     private void publish(ReadOnlySpan<NoteTransition> transitions, BmsFrameContext frame, Func<double, BmsFrameContext>? contextAtTime)
@@ -191,26 +178,22 @@ internal sealed class BmsJudgementEngine
             {
                 step = step with { EngineResult = judgement };
                 var result = judgement.Event;
-                var type = BmsEngineChart.HitResultFor(result.Result);
+                var type = compiled.Profile.HitResultFor(result.Result);
 
-                if (result.Part == NoteParts.EMPTY)
+                var eventKind = compiled.Profile.EventKind(result);
+                if (eventKind is GameplayEventKind.EmptyInput or GameplayEventKind.NonConsumingHit)
                 {
-                    if (result.Result == BmsResults.BAD)
-                    {
-                        output.ApplyNonConsumingBad(note, step);
+                    output.ApplyNonConsumingResult(note, type, step);
+                    if (eventKind == GameplayEventKind.NonConsumingHit)
                         output.PlaySample(note);
-                    }
                     else
-                    {
-                        output.ApplyEmptyPoor(note.StartTime, note.Column, step);
                         output.PlayKeySound();
-                    }
                 }
                 else if (note is BmsLandmine mine)
                 {
-                    mines[result.NoteId] = new BmsLandmineState(step.SimulationTime, result.Result == BmsResults.MINE_HIT);
+                    mines[result.NoteId] = new BmsLandmineState(step.SimulationTime, eventKind == GameplayEventKind.MineHit);
 
-                    if (result.Result == BmsResults.MINE_HIT)
+                    if (eventKind == GameplayEventKind.MineHit)
                     {
                         output.PlayLandmineSample(mine);
                         output.ApplyMainResult(mine, type, step, false);
@@ -218,35 +201,33 @@ internal sealed class BmsJudgementEngine
 
                     output.PublishState(mine, mines[result.NoteId], step);
                 }
+                else if (eventKind == GameplayEventKind.Auxiliary)
+                    output.ApplyBodyTick(step);
                 else if (note is BmsLongNote hold)
                 {
-                    if (result.Part == NoteParts.BODY)
-                    {
-                        output.ApplyBodyTick(step);
-                        continue;
-                    }
 
                     var kind = result.Part == NoteParts.HEAD ? BmsLongNoteEndpointKind.Head : BmsLongNoteEndpointKind.Tail;
                     var part = transition.After.Parts.Single(p => p.Part == result.Part);
                     var expected = kind == BmsLongNoteEndpointKind.Head ? hold.StartTime : hold.EndTime;
                     var endpoint = new BmsLongNoteEndpointResult(hold, kind,
                         part.Offset is { } offset ? expected + offset / 1000.0 : step.SimulationTime,
-                        step.GameplayRate, BmsEngineChart.HitResultFor(part.Result), step.SimulationTime);
+                        step.GameplayRate, type, step.SimulationTime);
 
+                    var scoresHead = chart.ScorePlan.OpportunitiesByPart.ContainsKey((result.NoteId, NoteParts.HEAD));
                     if (kind == BmsLongNoteEndpointKind.Head)
                     {
-                        heads[result.NoteId] = endpoint;
-                        if (hold.EffectiveMode != BmsLongNoteMode.LongNote) output.ApplyMainResult(hold, type, [endpoint], step, result.SuppressPenalty);
+                        if (scoresHead) output.ApplyMainResult(hold, type, [endpoint], step, result.SuppressPenalty);
+                        else heads[result.NoteId] = endpoint;
                         if (transition.Input is { Pressed: true }) output.PlaySample(hold);
                     }
-                    else if (hold.EffectiveMode == BmsLongNoteMode.LongNote)
+                    else if (!scoresHead)
                     {
                         var head = heads[result.NoteId];
-                        output.ApplyMainResult(hold, type, (part.Reason == HoldReasons.MISSED_HEAD || part.Reason == HoldReasons.HEAD) ? [head] : [head, endpoint], step, result.SuppressPenalty);
+                        output.ApplyMainResult(hold, type, compiled.Profile.IncludeHeadOnly(part) ? [head] : [head, endpoint], step, result.SuppressPenalty);
                     }
                     else output.ApplySyntheticEndpoint(endpoint, step, result.SuppressPenalty);
 
-                    if (kind == BmsLongNoteEndpointKind.Tail && transition.Input != null && (part.Reason == HoldReasons.RELEASE || part.Reason == HoldReasons.DROP))
+                    if (kind == BmsLongNoteEndpointKind.Tail && compiled.Profile.PlayTailSample(part, transition.Input))
                         output.PlayTailSample(hold);
                 }
                 else

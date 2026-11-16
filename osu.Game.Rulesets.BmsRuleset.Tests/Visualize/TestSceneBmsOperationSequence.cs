@@ -43,9 +43,9 @@ public partial class TestSceneBmsOperationSequence : BmsPlayerTestScene
             LockedLongNoteMode = mode,
             HitObjects =
             [
-                new BmsLongNote { StartTime = 3000, Duration = 1000, Column = scratch ? 0 : 1 },
+                new BmsLongNote { Kind = mode.ToNoteKind(), StartTime = 3000, Duration = 1000, Column = scratch ? 0 : 1 },
                 new BmsNote { StartTime = 3250, Column = 2 },
-                new BmsLongNote { StartTime = 3300, Duration = 300, Column = 4 },
+                new BmsLongNote { Kind = mode.ToNoteKind(), StartTime = 3300, Duration = 300, Column = 4 },
                 new BmsLandmine { StartTime = 3500, Column = 3 },
                 new BmsLandmine { StartTime = 3600, Column = 3 },
                 new BmsNote { StartTime = 5000, Column = 5 },
@@ -119,7 +119,7 @@ public partial class TestSceneBmsOperationSequence : BmsPlayerTestScene
             }
             var score = (BmsScoreProcessor)Player.ScoreProcessor;
             Assert.That(JsonSerializer.Serialize(score.JudgementEvents), Is.EqualTo(JsonSerializer.Serialize(expected.Judgements)));
-            Assert.That(health.CurrentGaugeStates, Is.EqualTo(expected.Gauges[^1].States));
+            Assert.That(health.CurrentHealth.Layers, Is.EqualTo(expected.Gauges[^1].Health.Layers));
             var timings = score.JudgementEvents.SelectMany(item => item.TimingObservations).ToArray();
             Assert.That(timings.Single(item => item.Kind == BmsTimingObservationKind.LongNoteHead && item.ExpectedTime == 3000).ActualTime, Is.EqualTo(3000));
             Assert.That(score.JudgementEvents.Count(item => item.Source.Kind == BmsJudgementSourceKind.Landmine), Is.EqualTo(1));

@@ -79,6 +79,7 @@ public class BmsLongNoteModeModsTest
             {
                 new BmsLongNote
                 {
+                    Kind = lockedMode.ToNoteKind(),
                     StartTime = 1000,
                     Duration = 500,
                     Column = 1,

@@ -17,7 +17,7 @@ public class BmsGameplayDiagnosticCompletenessTest
         var head = new BmsLongNoteEndpointResult(ln, BmsLongNoteEndpointKind.Head, 1000, 1, HitResult.Perfect);
         var tail = new BmsLongNoteEndpointResult(ln, BmsLongNoteEndpointKind.Tail, 1500, 1, HitResult.Perfect);
         var parent = new BmsLongNoteJudgementResult(ln, ln.CreateJudgement(), separateTail ? [head] : [head, tail]);
-        var synthetic = ln.CreateSyntheticEndpoint(ln.EndTime);
+        var synthetic = BmsTestJudgements.CreateEndpoint(ln, ln.EndTime);
         var tailResult = new BmsLongNoteJudgementResult(synthetic, synthetic.CreateJudgement(), [tail]);
 
         Assert.That(BmsGameplayDiagnosticScene.CheckJudgementCompleteness([ln], separateTail ? [parent, tailResult] : [parent]), Is.Null);

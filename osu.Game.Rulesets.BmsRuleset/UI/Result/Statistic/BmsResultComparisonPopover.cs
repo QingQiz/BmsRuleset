@@ -1,22 +1,22 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
+using System;
 using osu.Framework.Allocation;
 using osu.Framework.Extensions;
-using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
+using osu.Framework.Graphics;
 using osu.Framework.Localisation;
 using osu.Game.Database;
-using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
+using osu.Game.Graphics;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Lamp;
 using osu.Game.Rulesets.Scoring;
@@ -112,8 +112,9 @@ internal partial class BmsResultComparisonPopover : OsuPopover
                 && (score.LegacyOnlineID <= 0 || candidate.LegacyOnlineID != score.LegacyOnlineID))
             .ToArray();
 
-        var maximum = Math.Max(BmsExScore.Calculate(score.MaximumStatistics),
-            candidates.Select(candidate => BmsExScore.Calculate(candidate.MaximumStatistics)).DefaultIfEmpty().Max());
+        var profile = GameplayProfile.FromMods(score.Mods);
+        var maximum = candidates.Where(candidate => BmsLampScoreSelector.MatchesSelectedMods(candidate, score.Mods))
+            .Select(profile.StoredMaximumScore).Append(profile.StoredMaximumScore(score)).Max();
         return BmsLampScoreSelector.SelectBest(candidates, score.Mods, maximum)?.DeepClone();
     });
 
@@ -143,11 +144,12 @@ internal partial class BmsResultComparisonPopover : OsuPopover
 
     private Drawable createComparison(ScoreInfo best)
     {
-        var maximum = Math.Max(BmsExScore.Calculate(score.MaximumStatistics), BmsExScore.Calculate(best.MaximumStatistics));
+        var profile = GameplayProfile.FromMods(score.Mods);
+        var maximum = new[] { profile.StoredMaximumScore(score), profile.StoredMaximumScore(best) }.Max();
         var maximumCombo = Math.Max(score.GetMaximumAchievableCombo(), best.GetMaximumAchievableCombo());
         var rows = new List<Drawable>
         {
-            new BmsResultComparisonRow(BmsStrings.ExScore, exScore(score), exScore(best), true, scaleMaximum: maximum),
+            new BmsResultComparisonRow(profile.ScoreLabel, profile.StoredScore(score, maximum), profile.StoredScore(best, maximum), true, scaleMaximum: maximum),
             new BmsResultComparisonRow(BmsStrings.ResultAccuracy, score.Accuracy, best.Accuracy, true, percentage: true, scaleMaximum: 1),
             new BmsResultComparisonRow(BmsStrings.ResultCombo, score.MaxCombo, best.MaxCombo, true, scaleMaximum: maximumCombo),
             new Container
@@ -172,7 +174,7 @@ internal partial class BmsResultComparisonPopover : OsuPopover
             // Missing historical statistics are unknown, rather than six zero-count judgements.
             int? currentCount = score.Statistics.Count > 0 ? score.Statistics.GetValueOrDefault(result) : null;
             int? bestCount = best.Statistics.Count > 0 ? best.Statistics.GetValueOrDefault(result) : null;
-            rows.Add(new BmsResultComparisonRow(BmsStrings.ResultJudgement(result), currentCount, bestCount,
+            rows.Add(new BmsResultComparisonRow(profile.JudgementLabel(result), currentCount, bestCount,
                 result == HitResult.Perfect ? true : result is HitResult.Ok or HitResult.Meh or HitResult.Miss ? false : null,
                 BmsHitResultColours.ForHitResult(result), scaleMaximum: judgementMaximum));
         }
@@ -231,8 +233,6 @@ internal partial class BmsResultComparisonPopover : OsuPopover
                 },
             ],
         };
-
-        int? exScore(ScoreInfo value) => value.Statistics.Count > 0 || maximum > 0 ? BmsExScore.Calculate(value, maximum) : null;
     }
 
     private static Drawable legend(LocalisableString text, Colour4 colour) => new BmsResultFittedContainer(new FillFlowContainer

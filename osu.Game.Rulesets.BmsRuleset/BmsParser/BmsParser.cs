@@ -4,9 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
-using RhythmEngine.Profiles.Bms;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 
 namespace osu.Game.Rulesets.BmsRuleset.BmsParser;
@@ -32,7 +30,7 @@ internal static partial class BmsChartParser
 
     private readonly record struct RawCell(long Tick, ushort Channel, ushort Value, int Sequence, int Column);
 
-    private readonly record struct BmsJudgementRateEvent(long Tick, double Rate, int Sequence);
+    private readonly record struct BmsExRankEvent(long Tick, double? ExRank, int Sequence);
 
     /// <summary>Extract the high 6-bit digit (the "tens" place).</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -49,8 +47,7 @@ internal static partial class BmsChartParser
     public static BmsParseResult Parse(
         IEnumerable<string> lines,
         string? path = null,
-        Func<int, int>? randomValueSelector = null,
-        BmsJudgementModifiers judgementModifiers = BmsJudgementModifiers.None)
+        Func<int, int>? randomValueSelector = null)
     {
         var state = new ParseState();
 
@@ -86,7 +83,7 @@ internal static partial class BmsChartParser
 
         // Long-note endpoints and source cells can disappear during materialisation.
         var mainBpm = BmsTimingMap.FindMainBpm(timingEvents, collectPlayableNoteTicks(state, measureStarts, totalColumns));
-        var judgementRateEvents = collectJudgementRateEvents(state, measureStarts, BmsEngineRules.ForLayout(layoutVariant, judgementModifiers));
+        var exRankEvents = collectExRankEvents(state, measureStarts);
 
         var timingMap = BmsTimingMap.FromSortedEvents(
             tickResolution,
@@ -110,7 +107,7 @@ internal static partial class BmsChartParser
         collectBackgroundSampleEvents(state, measureStarts, timingMap, bgSampleEvents);
         collectMidiFileBackgroundSampleEvent(state, bgSampleEvents);
 
-        applyJudgementRates(hitObjects, judgementRateEvents);
+        applyExRanks(hitObjects, exRankEvents);
 
         return new BmsParseResult(
             state.Title,
@@ -941,12 +938,12 @@ internal static partial class BmsChartParser
             .ToArray();
     }
 
-    private static List<BmsJudgementRateEvent> collectJudgementRateEvents(
-        ParseState state, IReadOnlyDictionary<int, long> measureStarts, BmsJudgementRules rules)
+    private static List<BmsExRankEvent> collectExRankEvents(
+        ParseState state, IReadOnlyDictionary<int, long> measureStarts)
     {
-        var events = new List<BmsJudgementRateEvent>
+        var events = new List<BmsExRankEvent>
         {
-            new(long.MinValue, rules.ResolveRate(state.Rank, state.DefaultExRank), -1),
+            new(long.MinValue, null, -1),
         };
 
         foreach (var line in state.ChannelLines)
@@ -957,29 +954,26 @@ internal static partial class BmsChartParser
             foreach (var cell in expandCells(line, measureStarts, false, state.UseBase62))
             {
                 if (state.ExRankDefinitions.TryGetValue(cell.Value, out var exRank))
-                    events.Add(new BmsJudgementRateEvent(cell.Tick, rules.ResolveRate(state.Rank, exRank), cell.Sequence));
+                    events.Add(new BmsExRankEvent(cell.Tick, exRank, cell.Sequence));
             }
         }
 
-        events.Sort(default(JudgementRateEventComparer));
+        events.Sort(default(ExRankEventComparer));
         return events;
     }
 
-    private static void applyJudgementRates(List<BmsParsedHitObject> hitObjects, IReadOnlyList<BmsJudgementRateEvent> judgementRateEvents)
+    private static void applyExRanks(List<BmsParsedHitObject> hitObjects, IReadOnlyList<BmsExRankEvent> exRankEvents)
     {
-        if (judgementRateEvents.Count == 0)
-            return;
-
         var eventIndex = 0;
 
         for (var i = 0; i < hitObjects.Count; i++)
         {
             var hitObject = hitObjects[i];
 
-            while (eventIndex + 1 < judgementRateEvents.Count && judgementRateEvents[eventIndex + 1].Tick <= hitObject.Tick)
+            while (eventIndex + 1 < exRankEvents.Count && exRankEvents[eventIndex + 1].Tick <= hitObject.Tick)
                 eventIndex++;
 
-            hitObjects[i] = hitObject with { JudgementRate = judgementRateEvents[eventIndex].Rate };
+            hitObjects[i] = hitObject with { ExRank = exRankEvents[eventIndex].ExRank };
         }
     }
 
@@ -1481,9 +1475,9 @@ internal static partial class BmsChartParser
         }
     }
 
-    private struct JudgementRateEventComparer : IComparer<BmsJudgementRateEvent>
+    private struct ExRankEventComparer : IComparer<BmsExRankEvent>
     {
-        public int Compare(BmsJudgementRateEvent a, BmsJudgementRateEvent b)
+        public int Compare(BmsExRankEvent a, BmsExRankEvent b)
         {
             var cmp = a.Tick.CompareTo(b.Tick);
             if (cmp != 0) return cmp;

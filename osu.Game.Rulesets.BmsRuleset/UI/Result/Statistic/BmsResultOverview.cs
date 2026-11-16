@@ -1,10 +1,10 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using osu.Framework.Graphics;
+using System;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics;
 using osu.Framework.Localisation;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
@@ -16,7 +16,7 @@ internal partial class BmsResultOverview : CompositeDrawable
 {
     private static readonly HitResult[] results = [HitResult.Perfect, HitResult.Great, HitResult.Good, HitResult.Ok, HitResult.Meh, HitResult.Miss];
     private readonly GridContainer layout;
-    private readonly Container exScoreContent;
+    private readonly Container scoreContent;
     private readonly Container accuracyComboContent;
     private readonly Container timingContent;
     private readonly Container judgementsContent;
@@ -39,7 +39,7 @@ internal partial class BmsResultOverview : CompositeDrawable
                 {
                     header == null ? soloHeader = new BmsResultSoloHeader(score) : new BmsResultSection(header),
                 },
-                new Drawable[] { new BmsResultSection(exScoreContent = new Container { RelativeSizeAxes = Axes.Both }) },
+                new Drawable[] { new BmsResultSection(scoreContent = new Container { RelativeSizeAxes = Axes.Both }) },
                 new Drawable[] { new BmsResultSection(accuracyComboContent = new Container { RelativeSizeAxes = Axes.Both }) },
                 new Drawable[] { new BmsResultSection(timingContent = new Container { RelativeSizeAxes = Axes.Both }, 2) },
                 new Drawable[] { new BmsResultSection(judgementsContent = new Container { RelativeSizeAxes = Axes.Both }) },
@@ -51,9 +51,10 @@ internal partial class BmsResultOverview : CompositeDrawable
     internal void SetScore(ScoreInfo score, IReadOnlyList<HitEvent>? hitEvents = null)
     {
         Score = score;
-        var maximum = BmsExScore.Calculate(score.MaximumStatistics);
+        var profile = GameplayProfile.FromMods(score.Mods);
+        var maximum = profile.StoredMaximumScore(score);
         var totalJudgements = results.Sum(result => score.Statistics.GetValueOrDefault(result));
-        exScoreContent.Child = createExScore(BmsExScore.Calculate(score, maximum), maximum);
+        scoreContent.Child = createScore(profile.ScoreLabel, profile.StoredScore(score), maximum);
         accuracyComboContent.Child = new GridContainer
         {
             RelativeSizeAxes = Axes.Both,
@@ -64,13 +65,13 @@ internal partial class BmsResultOverview : CompositeDrawable
                 new[] { createCombo(score.MaxCombo, score.GetMaximumAchievableCombo()) },
             },
         };
-        timingContent.Child = new BmsResultFastSlow(hitEvents ?? score.HitEvents);
+        timingContent.Child = new BmsResultFastSlow(profile, hitEvents ?? score.HitEvents);
         var judgements = new GridContainer
         {
             RelativeSizeAxes = Axes.Both,
             Content = results.Select(result => new Drawable[]
             {
-                new BmsResultJudgementRow(result, score.Statistics.GetValueOrDefault(result), totalJudgements),
+                new BmsResultJudgementRow(profile.JudgementLabel(result), result, score.Statistics.GetValueOrDefault(result), totalJudgements),
             }).ToArray(),
         };
         // Course and practice statistics cannot be compared against full-chart solo scores.
@@ -128,11 +129,11 @@ internal partial class BmsResultOverview : CompositeDrawable
         ];
     }
 
-    private static Drawable createExScore(int score, int maximum) => new GridContainer
+    private static Drawable createScore(LocalisableString label, double? score, double? maximum) => new GridContainer
     {
-        Name = "Result EXSCORE",
+        Name = "Result score",
         RelativeSizeAxes = Axes.Both,
-        RowDimensions = [new Dimension(), new Dimension(GridSizeMode.Absolute, 20)],
+        RowDimensions = [new Dimension(), new Dimension(GridSizeMode.Absolute, maximum is > 0 ? 20 : 0)],
         Content = new[]
         {
             new Drawable[]
@@ -151,7 +152,7 @@ internal partial class BmsResultOverview : CompositeDrawable
                                 Padding = new MarginPadding { Right = 6 },
                                 Child = new BmsResultFittedText(BmsStrings.ResultNumber(score), 76, Anchor.BottomLeft, useFullGlyphHeight: false)
                                 {
-                                    Name = "EXSCORE value",
+                                    Name = "Score value",
                                 },
                             },
                             new GridContainer
@@ -164,7 +165,9 @@ internal partial class BmsResultOverview : CompositeDrawable
                                     {
                                         new BmsResultFittedText(BmsStrings.ResultPerformance, 18, Anchor.TopRight, useFullGlyphHeight: false),
                                     },
-                                    new Drawable[] { new BmsResultTextGroup([(BmsStrings.ExScore, 28), (BmsStrings.ResultMaximum(maximum), 18)]) },
+                                    new Drawable[] { new BmsResultTextGroup(maximum.HasValue
+                                        ? [(label, 28), (BmsStrings.ResultMaximum(maximum.Value), 18)]
+                                        : [(label, 28)]) },
                                 },
                             },
                         },
@@ -176,8 +179,9 @@ internal partial class BmsResultOverview : CompositeDrawable
                 new Container
                 {
                     RelativeSizeAxes = Axes.Both,
-                    Padding = new MarginPadding { Top = 4 },
-                    Child = new BmsResultBar(maximum > 0 ? (double)score / maximum : 0, BmsResultColours.PROGRESS),
+                    Padding = new MarginPadding { Top = maximum is > 0 ? 4 : 0 },
+                    Alpha = maximum is > 0 ? 1 : 0,
+                    Child = new BmsResultBar(score.HasValue && maximum is > 0 ? score.Value / maximum.Value : 0, BmsResultColours.PROGRESS),
                 },
             },
         },

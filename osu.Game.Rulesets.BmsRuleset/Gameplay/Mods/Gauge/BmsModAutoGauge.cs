@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using RhythmEngine.Profiles.Bms;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
@@ -17,7 +18,6 @@ namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Gauge;
 
 public class BmsModAutoGauge : Mod, IApplicableToHealthProcessor, IApplicableToScorePopulation
 {
-
     public override string Name => "Auto Gauge";
 
     public override string Acronym => "AG";
@@ -67,11 +67,11 @@ public class BmsModAutoGauge : Mod, IApplicableToHealthProcessor, IApplicableToS
         BmsGaugeType.Class,
     ];
 
-    private BmsHealthProcessor? resolvedHealthProcessor;
+    private BmsGaugeController? resolvedHealthProcessor;
 
     public void ApplyToHealthProcessor(HealthProcessor healthProcessor)
     {
-        if (healthProcessor is BmsHealthProcessor bmsHp)
+        if (healthProcessor is BmsHealthProcessor { Model: BmsGaugeController bmsHp })
         {
             resolvedHealthProcessor = bmsHp;
             var initialStates = new[]

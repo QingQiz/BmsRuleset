@@ -55,7 +55,9 @@ internal partial class BmsCourseResultsScreen : BmsResultsScreen
         var aggregateScore = BmsCourseScoreAggregation.CreateScore(session);
         if (recordResult)
         {
-            var finalGaugeType = session.CurrentGaugeStates.FirstOrDefault(state => !state.Failed)?.GaugeType;
+            var finalGaugeType = session.CurrentHealth is { } health
+                ? session.GetGaugeStates(health).FirstOrDefault(state => !state.Failed)?.GaugeType
+                : null;
             var store = BmsRulesetRuntime.CourseResults;
             if (store != null)
                 _ = store.RecordAsync(session.Course.Id, session.Status, aggregateScore.Rank, aggregateScore, BmsCourseAttemptData.From(session), finalGaugeType);

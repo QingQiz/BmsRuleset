@@ -1,10 +1,12 @@
 using System;
+using System.Linq;
 using System.Collections.Generic;
 using NUnit.Framework;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Input;
@@ -144,12 +146,14 @@ public class BmsAutoScratchActionsTest
         var mod = new BmsModAutoScratch();
         var recorder = new ActionRecorder(mod);
         var beatmap = new BmsBeatmap { LayoutVariant = layout, LockedLongNoteMode = mode };
+        foreach (var note in notes.OfType<BmsLongNote>())
+            note.Kind = mode.ToNoteKind();
         foreach (var note in notes)
         {
             note.Beatmap = beatmap;
             beatmap.HitObjects.Add(note);
         }
-        mod.PrepareActions(beatmap,
+        mod.PrepareActions(beatmap, new BmsEngineChart(beatmap),
             action => recorder.Changes.Add(new ActionChange(action, true)),
             action => recorder.Changes.Add(new ActionChange(action, false)));
         return recorder;

@@ -3,12 +3,16 @@ using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using NUnit.Framework;
+using RhythmEngine.Core;
 using osu.Game.IO;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
+using RhythmEngine.Profiles.Common;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.Scoring;
@@ -17,10 +21,60 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay;
 
 public partial class BmsGameplayVirtualisationTest
 {
+    [TestCase(500, 1310, 3310)]
+    public void SelectedProfileControlsLifetimeBeforePlayfieldLoad(double start, double tapEnd, double holdEnd)
+    {
+        var tap = new BmsNote { StartTime = 1000, Column = 1 };
+        var hold = new BmsLongNote { StartTime = 2000, Duration = 1000, Column = 1, Kind = KeyNoteKind.ReleaseHold };
+        var beatmap = attachBeatmap(new BmsBeatmap { Rank = 2, TotalColumns = BmsLayout.BME7_KEY_COLUMNS, LayoutVariant = BmsLayoutVariant.Bme7K, HitObjects = [tap, hold] });
+        using var score = new BmsScoreProcessor();
+        score.ApplyBeatmap(beatmap);
+        var playfield = new BmsPlayfield(beatmap, () => score.EngineChart);
+        playfield.ScrollController.SetConfiguredScrollSpeed(1000);
+        playfield.ScrollController.ConstantScrollActive = true;
+        playfield.Add(tap);
+        playfield.Add(hold);
+        playfield.RefreshAllLifetimes();
+        var entries = playfield.Stage.Columns[1].HitObjectContainer.Entries.ToArray();
+        Assert.Multiple(() =>
+        {
+            Assert.That(playfield.IsLoaded, Is.False);
+            Assert.That(entries.Single(entry => entry.HitObject == tap).LifetimeStart, Is.EqualTo(start));
+            Assert.That(entries.Single(entry => entry.HitObject == tap).LifetimeEnd, Is.EqualTo(tapEnd));
+            Assert.That(entries.Single(entry => entry.HitObject == hold).LifetimeEnd, Is.EqualTo(holdEnd));
+            Assert.That(playfield.CreateNoteLifetimeEntry(tap).GetPracticeVisibilityStart(), Is.EqualTo(start));
+        });
+    }
+
+    [TestCase(0)]
+    [TestCase(34.4828448267217)]
+    [TestCase(1000)]
+    public void AutomaticHoldLifetimeCoversLateHeadAndTail(double duration)
+    {
+        var note = new BmsLongNote { StartTime = 1000, Duration = duration, Column = 1, Kind = KeyNoteKind.Hold };
+        var beatmap = attachBeatmap(new BmsBeatmap
+        {
+            Rank = 2, TotalColumns = BmsLayout.BME7_KEY_COLUMNS, LayoutVariant = BmsLayoutVariant.Bme7K, HitObjects = [note],
+        });
+        var compiled = new BmsEngineChart(beatmap);
+        var playfield = new BmsPlayfield(beatmap, () => compiled);
+        var entry = playfield.CreateNoteLifetimeEntry(note);
+        entry.RefreshLifetime();
+        Assert.That(entry.LifetimeEnd, Is.EqualTo(Math.Max(1210, note.EndTime + .001) + 100).Within(1e-9));
+        foreach (var press in new[] { false, true })
+        {
+            var session = new JudgementSession(compiled.Chart, compiled.Configuration);
+            var batch = session.AdvanceTo(Time.FromMilliseconds(entry.LifetimeEnd), press ? [new InputEvent(1_200_000, 1, true)] : []);
+            Assert.That(session.GetNote(0).Completed, Is.True);
+            Assert.That(batch.Transitions.SelectMany(transition => transition.Judgements).Select(result => result.Event.Time / 1000.0),
+                Is.All.LessThan(entry.LifetimeEnd));
+        }
+    }
+
     [Test]
     public void TestPlayfieldRoutesHitObjectsToPerColumnContainers()
     {
-        var playfield = new BmsPlayfield(attachBeatmap(new BmsBeatmap
+        var playfield = createPlayfield(attachBeatmap(new BmsBeatmap
         {
             TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
             LayoutVariant = BmsLayoutVariant.Bme7K,
@@ -44,7 +98,9 @@ public partial class BmsGameplayVirtualisationTest
     [TestCase(HitResult.Perfect, true)]
     [TestCase(HitResult.Miss, false)]
     public void TestHitExplosionResultFilter(HitResult result, bool expected)
-        => Assert.That(BmsColumn.ShouldTriggerHitExplosion(result), Is.EqualTo(expected));
+    {
+        Assert.That(BmsGameplayProfile.INSTANCE.ShowHitEffect(result), Is.EqualTo(expected));
+    }
 
     [Test]
     public void TestDecoderCreatesTypedHitObjects()
@@ -88,7 +144,7 @@ public partial class BmsGameplayVirtualisationTest
             StartTime = timingMap.ProjectTickToTime(192),
             Column = 1,
         };
-        var playfield = new BmsPlayfield(attachBeatmap(new BmsBeatmap
+        var playfield = createPlayfield(attachBeatmap(new BmsBeatmap
         {
             TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
             LayoutVariant = BmsLayoutVariant.Bme7K,
@@ -126,7 +182,7 @@ public partial class BmsGameplayVirtualisationTest
         };
         hitObject.ScrollPositionAtStartTime = timingMap.GetScrollPositionAtTime(hitObject.StartTime);
 
-        var playfield = new BmsPlayfield(attachBeatmap(new BmsBeatmap
+        var playfield = createPlayfield(attachBeatmap(new BmsBeatmap
         {
             TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
             LayoutVariant = BmsLayoutVariant.Bme7K,
@@ -152,7 +208,7 @@ public partial class BmsGameplayVirtualisationTest
             StartTime = 1000,
             Column = 1,
         };
-        var playfield = new BmsPlayfield(attachBeatmap(new BmsBeatmap
+        var playfield = createPlayfield(attachBeatmap(new BmsBeatmap
         {
             TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
             LayoutVariant = BmsLayoutVariant.Bme7K,
@@ -165,7 +221,7 @@ public partial class BmsGameplayVirtualisationTest
         playfield.RefreshAllLifetimes();
 
         var entry = playfield.Stage.Columns[hitObject.Column].HitObjectContainer.Entries.Single();
-        var table = BmsEngineRules.GetTiming(BmsLayoutVariant.Bme7K, hitObject.Column, hitObject.EffectiveJudgementRate, tail: false);
+        var table = BmsEngineRules.GetTiming(BmsLayoutVariant.Bme7K, hitObject.Column, BmsEngineRules.RateFor(hitObject), tail: false);
 
         Assert.That(entry.LifetimeStart, Is.LessThanOrEqualTo(hitObject.StartTime - table.FastWindowFor(HitResult.Miss)));
     }
@@ -178,7 +234,7 @@ public partial class BmsGameplayVirtualisationTest
             StartTime = 1000,
             Column = 1,
         };
-        var playfield = new BmsPlayfield(attachBeatmap(new BmsBeatmap
+        var playfield = createPlayfield(attachBeatmap(new BmsBeatmap
         {
             TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
             LayoutVariant = BmsLayoutVariant.Bme7K,
@@ -189,7 +245,7 @@ public partial class BmsGameplayVirtualisationTest
         playfield.RefreshAllLifetimes();
 
         var entry = playfield.Stage.Columns[hitObject.Column].HitObjectContainer.Entries.Single();
-        var table = BmsEngineRules.GetTiming(BmsLayoutVariant.Bme7K, hitObject.Column, hitObject.EffectiveJudgementRate, tail: false);
+        var table = BmsEngineRules.GetTiming(BmsLayoutVariant.Bme7K, hitObject.Column, BmsEngineRules.RateFor(hitObject), tail: false);
 
         Assert.That(entry.LifetimeEnd, Is.GreaterThan(hitObject.StartTime + table.SlowWindowFor(HitResult.Ok)));
     }
@@ -202,7 +258,7 @@ public partial class BmsGameplayVirtualisationTest
             StartTime = 1000,
             Column = 1,
         };
-        var playfield = new BmsPlayfield(attachBeatmap(new BmsBeatmap
+        var playfield = createPlayfield(attachBeatmap(new BmsBeatmap
         {
             TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
             LayoutVariant = BmsLayoutVariant.Bme7K,
@@ -232,7 +288,7 @@ public partial class BmsGameplayVirtualisationTest
             TimingMap = timingMap,
             HitObjects = { mine },
         });
-        var playfield = new BmsPlayfield(beatmap);
+        var playfield = createPlayfield(beatmap);
         playfield.Add(mine);
         playfield.RefreshAllLifetimes();
 
@@ -255,7 +311,7 @@ public partial class BmsGameplayVirtualisationTest
             StartTime = 3000,
             Column = 1,
         };
-        var playfield = new BmsPlayfield(attachBeatmap(new BmsBeatmap
+        var playfield = createPlayfield(attachBeatmap(new BmsBeatmap
         {
             TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
             LayoutVariant = BmsLayoutVariant.Bme7K,
@@ -280,7 +336,7 @@ public partial class BmsGameplayVirtualisationTest
             StartTime = 3000,
             Column = 1,
         };
-        var playfield = new BmsPlayfield(attachBeatmap(new BmsBeatmap
+        var playfield = createPlayfield(attachBeatmap(new BmsBeatmap
         {
             TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
             LayoutVariant = BmsLayoutVariant.Bme7K,
@@ -311,7 +367,7 @@ public partial class BmsGameplayVirtualisationTest
     {
         var beatmap = decodeFilesystemBeatmap(Path.Combine(findTestSongsRoot(), "Aleph-0 (by LeaF)", "_14ANOTHER.bms"));
         var hitObject = beatmap.HitObjects.Where(h => h is not BmsLandmine).OrderBy(h => h.StartTime).ElementAt(840);
-        var playfield = new BmsPlayfield(beatmap);
+        var playfield = createPlayfield(beatmap);
 
         playfield.Add(hitObject);
         playfield.RefreshAllLifetimes();
@@ -351,7 +407,7 @@ public partial class BmsGameplayVirtualisationTest
             TimingMap = timingMap,
             HitObjects = { hitObject },
         });
-        var playfield = new BmsPlayfield(beatmap);
+        var playfield = createPlayfield(beatmap);
 
         playfield.Add(hitObject);
         playfield.RefreshAllLifetimes();
@@ -367,7 +423,7 @@ public partial class BmsGameplayVirtualisationTest
     public void TestOutlawCautionNonMineNotesAreAliveBeforeAutoplayPress()
     {
         var beatmap = decodeFilesystemBeatmap(Path.Combine(findTestSongsRoot(), "103_outlaw_ogg", "99_outlaw_caution.bms"));
-        var playfield = new BmsPlayfield(beatmap);
+        var playfield = createPlayfield(beatmap);
 
         foreach (var hitObject in beatmap.HitObjects.Where(h => h is not BmsLandmine).Take(64))
             playfield.Add(hitObject);
@@ -389,7 +445,7 @@ public partial class BmsGameplayVirtualisationTest
     {
         var beatmap = decodeFilesystemBeatmap(Path.Combine(findTestSongsRoot(), "103_outlaw_ogg", "99_outlaw_scrollplus.bms"));
         var playableObjects = beatmap.HitObjects.Where(h => h is not BmsLandmine).OrderBy(h => h.StartTime).ThenBy(h => h.Column).ToArray();
-        var playfield = new BmsPlayfield(beatmap);
+        var playfield = createPlayfield(beatmap);
 
         foreach (var hitObject in playableObjects.Skip(300).Take(40))
             playfield.Add(hitObject);
@@ -415,12 +471,12 @@ public partial class BmsGameplayVirtualisationTest
         return (BmsBeatmap)new BmsBeatmapConverter(decoded, new BmsRuleset()).Convert();
     }
 
-    /// <summary>
-    ///     Attaches the beatmap to each of its hit objects. The decoder/converter does this for real
-    ///     charts, but synthetic beatmaps built inline in tests skip that step — and lifetime code
-    ///     (e.g. BmsHitObjectLifetimeEntry.getFastBadWindow) reads Beatmap.Rank/LayoutVariant, so
-    ///     leaving it null NREs. This mirrors BmsBeatmapConverter's attachment loop.
-    /// </summary>
+    private static BmsPlayfield createPlayfield(BmsBeatmap beatmap)
+    {
+        var compiled = new BmsEngineChart(beatmap);
+        return new BmsPlayfield(beatmap, () => compiled);
+    }
+
     private static BmsBeatmap attachBeatmap(BmsBeatmap beatmap)
     {
         foreach (BmsHitObject ho in beatmap.HitObjects)

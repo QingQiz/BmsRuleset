@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
+using RhythmEngine.Profiles.Common;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.Objects.Types;
 
@@ -6,7 +7,6 @@ namespace osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 
 public class BmsLongNote : BmsHitObject, IHasDuration
 {
-
     public double EndTime => StartTime + Duration;
 
     public double Duration { get; set; }
@@ -19,10 +19,7 @@ public class BmsLongNote : BmsHitObject, IHasDuration
     /// </summary>
     public double ScrollPositionAtEndTime { get; set; }
 
-    public BmsLongNoteMode Mode { get; set; }
-
-    public BmsLongNoteMode EffectiveMode => Mode != BmsLongNoteMode.Undefined ? Mode
-        : Beatmap.LockedLongNoteMode != BmsLongNoteMode.Undefined ? Beatmap.LockedLongNoteMode : BmsLongNoteMode.LongNote;
+    public KeyNoteKind Kind { get; set; } = KeyNoteKind.Hold;
 
     public int? TailSampleKey { get; set; }
 
@@ -38,20 +35,6 @@ public class BmsLongNote : BmsHitObject, IHasDuration
 
     public int TailSampleVolume { get; set; } = 100;
 
-    /// <summary>
-    ///     Creates a synthetic short-note endpoint for CN/HCN tail judgement
-    ///     as a separate scoring event from the head judgement.
-    /// </summary>
-    public BmsHitObject CreateSyntheticEndpoint(double endpointTime)
-    {
-        var endpoint = new BmsNote();
-        CopyTo(endpoint);
-
-        endpoint.StartTime = endpointTime;
-
-        return endpoint;
-    }
-
     protected override void CopyTo(BmsHitObject target)
     {
         base.CopyTo(target);
@@ -60,18 +43,10 @@ public class BmsLongNote : BmsHitObject, IHasDuration
             ln.Duration = Duration;
             ln.ScrollPositionAtEndTime = ScrollPositionAtEndTime;
             ln.VisualScrollPositionAtEndTime = VisualScrollPositionAtEndTime;
-            ln.Mode = Mode;
+            ln.Kind = Kind;
             ln.TailSampleKey = TailSampleKey;
             ln.AdditionalTailSampleKeys = AdditionalTailSampleKeys;
             ln.TailSampleVolume = TailSampleVolume;
         }
     }
-}
-
-public enum BmsLongNoteMode
-{
-    Undefined = 0,
-    LongNote = 1,
-    ChargeNote = 2,
-    HellChargeNote = 3,
 }

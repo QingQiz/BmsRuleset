@@ -1,14 +1,15 @@
 using System;
 using RhythmEngine.Profiles.Bms;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.UI.Icons;
 using osu.Game.Rulesets.Mods;
 
-namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
+namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Profiles;
 
-public class BmsModNoGreat : Mod, IApplicableToJudgement
+public class BmsModNoGreat : Mod, IApplicableToGameplayProfile
 {
     public override string Name => "No Great";
 
@@ -22,5 +23,6 @@ public class BmsModNoGreat : Mod, IApplicableToJudgement
 
     public override Type[] IncompatibleMods => [typeof(BmsModNoGood)];
 
-    public BmsJudgementModifiers JudgementModifier => BmsJudgementModifiers.NoGreat;
+    GameplayProfile IApplicableToGameplayProfile.ApplyToGameplayProfile(GameplayProfile profile)
+        => ((BmsGameplayProfile)profile).WithJudgementModifier(BmsJudgementModifiers.NoGreat);
 }

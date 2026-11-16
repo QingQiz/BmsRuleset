@@ -1,3 +1,4 @@
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using System.Linq;
 using NUnit.Framework;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
@@ -38,11 +39,11 @@ public class BmsPracticeAttemptResultTest
                 new BmsTimingObservation(BmsTimingObservationKind.LongNoteTail, origin + duration, origin + duration + 19, 1, HitResult.Great),
             ]),
         ];
-        BmsGaugeHistoryEvent[] gauges =
+        GameplayHealthHistoryEvent[] gauges =
         [
-            new(origin - 50, BmsGaugeType.Normal, [new(BmsGaugeType.Normal, 0.8, false)]),
-            new(origin + 500, BmsGaugeType.Normal, [new(BmsGaugeType.Normal, 0.6, false)]),
-            new(origin + 4000, BmsGaugeType.Normal, [new(BmsGaugeType.Normal, 0.4, false)]),
+            BmsTestHealth.History(origin - 50, [new(BmsGaugeType.Normal, 0.8, false)]),
+            BmsTestHealth.History(origin + 500, [new(BmsGaugeType.Normal, 0.6, false)]),
+            BmsTestHealth.History(origin + 4000, [new(BmsGaugeType.Normal, 0.4, false)]),
         ];
         var score = new ScoreInfo { HitEvents = BmsJudgementEventProjection.CreateTimingHitEvents(judgements) };
         var result = BmsPracticeAttemptResult.Create(1, score, gauges, beatmap,

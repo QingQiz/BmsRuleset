@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Reflection;
 using NUnit.Framework;
+using RhythmEngine.Profiles.Common;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Timing;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
@@ -221,8 +222,10 @@ public partial class BmsBgaPoorLayerTest
     [Test]
     public void TestSyntheticLongNotePoorTriggersLayer([Values] BmsLongNoteEndpointKind kind)
     {
+        var longNote = new BmsLongNote { StartTime = 2000, Duration = 500, Column = 1, Beatmap = beatmap, Kind = KeyNoteKind.ReleaseHold };
+        beatmap.HitObjects[1] = longNote;
+        scoreProcessor.ApplyBeatmap(beatmap);
         applyResult(0, HitResult.Perfect);
-        var longNote = new BmsLongNote { StartTime = 2000, Duration = 500, Column = 1, Beatmap = beatmap, Mode = BmsLongNoteMode.ChargeNote };
 
         scoreProcessor.ApplyTestSyntheticEndpoint(new BmsLongNoteEndpointResult(longNote, kind, 2000, 1, HitResult.Meh));
 
@@ -247,11 +250,10 @@ public partial class BmsBgaPoorLayerTest
         Assert.That(layer(BmsBgaLayer.Poor).Alpha, Is.EqualTo(1));
         advanceTo(1351);
         Assert.That(layer(BmsBgaLayer.Poor).Alpha, Is.Zero);
-        scoreProcessor.RevertResult(suppressed);
+        scoreProcessor.ResetReplayState();
         scoreProcessor.ApplyTestResult(suppressed);
         Assert.That(layer(BmsBgaLayer.Poor).Alpha, Is.Zero, "suppressed replay must not restart an expired poor layer");
         advanceTo(800);
-        scoreProcessor.RevertResult(suppressed);
         scoreProcessor.ResetReplayState();
         Assert.That(layer(BmsBgaLayer.Poor).Alpha, Is.Zero);
         advanceTo(850);

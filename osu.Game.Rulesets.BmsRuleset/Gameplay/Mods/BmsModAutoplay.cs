@@ -36,7 +36,7 @@ public class BmsModAutoplay : ModAutoplay
 
     public override ModReplayData CreateReplayData(IBeatmap beatmap, IReadOnlyList<Mod> mods)
     {
-        var replay = new BmsAutoGenerator((BmsBeatmap)beatmap).Generate();
+        var replay = new BmsAutoGenerator((BmsBeatmap)beatmap, mods).Generate();
 
         return new ModReplayData(replay, new ModCreatedUser { Username = "osu!topus" });
     }

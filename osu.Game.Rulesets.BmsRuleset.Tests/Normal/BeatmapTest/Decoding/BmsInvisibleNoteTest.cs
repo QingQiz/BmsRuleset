@@ -4,6 +4,7 @@ using NUnit.Framework;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Randomisation;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
@@ -79,7 +80,7 @@ public class BmsInvisibleNoteTest
         Assert.Multiple(() =>
         {
             Assert.That(invisible.StartTime, Is.Zero);
-            Assert.That(invisible.ScrollPositionAtStartTime, Is.EqualTo(converted.TimingMap.GetScrollPositionAtTime(0)));
+            Assert.That(invisible.ScrollPositionAtStartTime, Is.EqualTo(converted.TimingMap!.GetScrollPositionAtTime(0)));
             Assert.That(invisible.Beatmap, Is.SameAs(converted));
             Assert.That(invisible, Is.Not.SameAs(original));
             Assert.That(converted.HitObjects, Has.Count.EqualTo(1));
@@ -123,12 +124,15 @@ public class BmsInvisibleNoteTest
     {
         var beatmap = new BmsBeatmap
         {
-            InvisibleNotes = [new BmsInvisibleNote { StartTime = 1000, Column = 1, SampleKey = 1 },
-                              new BmsInvisibleNote { StartTime = 2000, Column = 2, SampleKey = 2 }],
+            InvisibleNotes =
+            [
+                new BmsInvisibleNote { StartTime = 1000, Column = 1, SampleKey = 1 },
+                new BmsInvisibleNote { StartTime = 2000, Column = 2, SampleKey = 2 },
+            ],
             HitObjects = [new BmsNote { StartTime = 2000, Column = 2, SampleKey = 3 }],
         };
         beatmap.HitObjects[0].Beatmap = beatmap;
-        var usages = BmsGameplayAudioController.GetSampleUsages(beatmap).ToArray();
+        var usages = BmsGameplayAudioController.GetSampleUsages(beatmap, new BmsEngineChart(beatmap)).ToArray();
         Assert.That(usages.Single(u => u.SampleKey == 1).LatestTriggerTime, Is.EqualTo(double.MaxValue));
         Assert.That(usages.Single(u => u.SampleKey == 2).LatestTriggerTime, Is.EqualTo(2000));
         Assert.That(usages.Any(u => u.SampleKey == 3 && u.LatestTriggerTime == double.MaxValue), Is.True);

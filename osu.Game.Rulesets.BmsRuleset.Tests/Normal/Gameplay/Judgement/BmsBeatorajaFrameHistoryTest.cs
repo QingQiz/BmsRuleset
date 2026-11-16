@@ -1,12 +1,12 @@
 using System;
 using NUnit.Framework;
+using RhythmEngine.Profiles.Common;
 using osu.Framework.Timing;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
-using RhythmEngine.Profiles.Bms;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
 
@@ -144,17 +144,18 @@ public class BmsBeatorajaFrameHistoryTest
         public Run()
         {
             framed = new FramedClock(clock);
-            var note = new BmsLongNote { StartTime = 1000, Duration = 2000, Column = 1 };
+            var note = new BmsLongNote { Kind = KeyNoteKind.SustainHold, StartTime = 1000, Duration = 2000, Column = 1 };
             var beatmap = new BmsBeatmap
             {
                 LayoutVariant = BmsLayoutVariant.Bme7K, TotalColumns = 8, Rank = 2,
                 Total = 12, LockedLongNoteMode = BmsLongNoteMode.HellChargeNote,
                 HitObjects = [note, new BmsNote { StartTime = 10000, Column = 1 }],
             };
-            note.Beatmap = beatmap;
+            foreach (var hitObject in beatmap.HitObjects)
+                hitObject.Beatmap = beatmap;
             health = new BmsHealthProcessor { Clock = framed };
             health.ApplyBeatmap(beatmap);
-            context = new BmsLongNoteTestContext(note, notes => (BmsProfiles.CreateScore(), health.CreateEngineHealth(notes)))
+            context = new BmsLongNoteTestContext(note, health.CreateEngineHealth, beatmap.HitObjects.ToArray())
             {
                 BeforeRebuild = health.ResetReplayState,
                 BeforeOperation = time,
@@ -163,9 +164,9 @@ public class BmsBeatorajaFrameHistoryTest
                 { Type = context.Output.GetMainResult(note).Type });
             context.Output.SyntheticEndpoint += (endpoint, applied) =>
             {
-                if (applied) health.ApplyTestResult(new BmsLongNoteJudgementResult(note.CreateSyntheticEndpoint(endpoint.ExpectedTime), note.CreateJudgement(), [endpoint]) { Type = endpoint.Result });
+                if (applied) health.ApplyTestResult(new BmsLongNoteJudgementResult(BmsTestJudgements.CreateEndpoint(note, endpoint.ExpectedTime), note.CreateJudgement(), [endpoint]) { Type = endpoint.Result });
             };
-            context.Output.BodyTick += frame => health.ApplyEngineTick(frame.EngineResult!.Health);
+            context.Output.BodyTick += frame => health.ApplyEngineTick(frame.EngineResult!);
         }
 
         private void time(double t)

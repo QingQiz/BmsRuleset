@@ -1,10 +1,10 @@
 #nullable enable
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
-using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.Presentation;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
 using RhythmEngine.Core;
@@ -63,7 +63,7 @@ internal sealed class BmsRecordingJudgementOutput : IBmsJudgementOutput
     }
 
     public void PublishState(BmsLongNote note, NoteSnapshot state, in BmsFrameContext frame)
-        => StatePublished?.Invoke(note, BmsLongNoteState.From(note, state, frame.SimulationTime), frame);
+        => StatePublished?.Invoke(note, BmsLongNoteState.From(note, state, frame.SimulationTime, BmsGameplayProfile.INSTANCE), frame);
 
     public void ApplySyntheticEndpoint(BmsLongNoteEndpointResult endpoint, in BmsFrameContext frame, bool suppressPenalty)
     {
@@ -79,22 +79,21 @@ internal sealed class BmsRecordingJudgementOutput : IBmsJudgementOutput
         BodyTick?.Invoke(frame);
     }
 
-    public void ApplyNonConsumingBad(BmsHitObject note, in BmsFrameContext frame)
+    public void ApplyNonConsumingResult(BmsHitObject note, HitResult result, in BmsFrameContext frame)
     {
-        NonConsumingResults++;
-        NonConsumingJudgement?.Invoke(note.StartTime, note.Column, HitResult.Ok);
-        Feedback?.Invoke($"bad:{note.StartTime}:{note.Column}");
+        NonConsumingJudgement?.Invoke(note.StartTime, note.Column, result);
+        if (BmsGameplayProfile.INSTANCE.EventKind(frame.EngineResult!.Event) == GameplayEventKind.NonConsumingHit)
+        {
+            NonConsumingResults++;
+            Feedback?.Invoke($"bad:{note.StartTime}:{note.Column}");
+        }
+        else
+            Feedback?.Invoke($"empty-poor:{note.StartTime}:{note.Column}");
     }
 
     public void PlaySample(BmsHitObject note) => Feedback?.Invoke($"sample:{note.SampleKey}:{note.SampleVolume}");
     public void PlayTailSample(BmsLongNote note) => Feedback?.Invoke($"sample:{note.TailSampleKey}:{note.TailSampleVolume}");
     public void PlayKeySound() => Feedback?.Invoke("keysound");
-
-    public void ApplyEmptyPoor(double expectedTime, int column, in BmsFrameContext frame)
-    {
-        NonConsumingJudgement?.Invoke(expectedTime, column, HitResult.Miss);
-        Feedback?.Invoke($"empty-poor:{expectedTime}:{column}");
-    }
 
     public void PlayLandmineSample(BmsLandmine note) => Feedback?.Invoke("landmine");
 

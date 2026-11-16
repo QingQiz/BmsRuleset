@@ -52,7 +52,7 @@ public readonly record struct BmsParsedHitObject(
     int? TailSampleKey,
     int SampleVolume = 100,
     int TailSampleVolume = 100,
-    double JudgementRate = 0.75)
+    double? ExRank = null)
 {
     public IReadOnlyList<int> AdditionalSampleKeys { get; init; } = [];
     public IReadOnlyList<int> AdditionalTailSampleKeys { get; init; } = [];

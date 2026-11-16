@@ -1,29 +1,30 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
+using System;
 using osu.Framework.Allocation;
-using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Primitives;
-using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Rendering.Vertices;
+using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Shaders;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Textures;
+using osu.Framework.Graphics;
 using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
-using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
-using osu.Game.Rulesets.BmsRuleset.Beatmaps;
+using osu.Game.Graphics;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
-using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
-using osuTK;
+using osu.Game.Scoring;
 using osuTK.Graphics;
+using osuTK;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
 
@@ -32,7 +33,15 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResu
 
     public override bool HandlePositionalInput => true;
 
-    internal readonly record struct ScatterPoint(double Time, double Offset, HitResult Result);
+    internal readonly record struct ScatterPoint(double Time, double Offset, HitResult Result, ResultTimingKind Kind)
+    {
+        internal double DisplayOffset(double offsetRange) => Kind switch
+        {
+            ResultTimingKind.EmptyInput => -offsetRange,
+            ResultTimingKind.Untimed => Math.Clamp(Offset, -offsetRange, offsetRange),
+            _ => Offset,
+        };
+    }
 
     private const float graph_height = 200;
     private const float key_graph_height = 140;
@@ -44,34 +53,37 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResu
     private const double maximum_offset_range = 300;
 
 
+    private readonly GameplayProfile profile;
     private readonly IReadOnlyList<HitEvent>? hitEvents;
     private readonly IBeatmap? playableBeatmap;
-    private HitScatterStatistics statistics = null!;
+    private HitScatterStatistics? statistics;
     private FillFlowContainer content = null!;
     private bool expanded;
     private Drawable legend = null!;
     private Drawable overallRow = null!;
     private float summaryHeight = graph_height;
 
-    internal BmsHitScatterStatistic(HitScatterStatistics statistics)
+    internal BmsHitScatterStatistic(HitScatterStatistics statistics, GameplayProfile profile)
     {
         RelativeSizeAxes = Axes.X;
         AutoSizeAxes = Axes.Y;
         this.statistics = statistics;
+        this.profile = profile;
     }
 
-    public BmsHitScatterStatistic(IReadOnlyList<HitEvent> hitEvents, IBeatmap playableBeatmap)
+    public BmsHitScatterStatistic(ScoreInfo score, IBeatmap playableBeatmap)
     {
         RelativeSizeAxes = Axes.X;
         AutoSizeAxes = Axes.Y;
 
-        this.hitEvents = hitEvents;
+        hitEvents = score.HitEvents;
+        profile = GameplayProfile.FromMods(score.Mods);
         this.playableBeatmap = playableBeatmap;
     }
 
-    internal static HitScatterStatistics CreateStatistics(IBeatmap playableBeatmap, IReadOnlyList<HitEvent> hitEvents, double minimumDuration = 0)
+    internal static HitScatterStatistics CreateStatistics(GameplayProfile profile, IBeatmap playableBeatmap, IReadOnlyList<HitEvent> hitEvents, double minimumDuration = 0)
     {
-        var scatterHits = hitEvents.Where(isScatterHit).ToArray();
+        var scatterHits = hitEvents.Where(profile.IsTimingEvent).ToArray();
         var bmsHitEvents = scatterHits.Where(e => e.HitObject is BmsHitObject).ToArray();
 
         var variant = playableBeatmap is BmsBeatmap bms ? bms.LayoutVariant : BmsLayoutVariant.Bms5K;
@@ -83,28 +95,27 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResu
         var keyIndex = 0;
 
         var keyGroups = Enumerable.Range(0, totalColumns)
-            .Select(column => new KeyHitScatterStatistics(labelFor(column, variant, ref keyIndex), CreateData(hitsByColumn[column].ToArray(), minimumDuration)))
+            .Select(column => new KeyHitScatterStatistics(labelFor(column, variant, ref keyIndex), CreateData(profile, hitsByColumn[column].ToArray(), minimumDuration)))
             .ToArray();
 
-        return new HitScatterStatistics(CreateData(scatterHits, minimumDuration), keyGroups);
+        return new HitScatterStatistics(CreateData(profile, scatterHits, minimumDuration), keyGroups);
     }
 
-    internal static ScatterData CreateData(IReadOnlyList<HitEvent> hitEvents, double minimumDuration = 0)
+    internal static ScatterData CreateData(GameplayProfile profile, IReadOnlyList<HitEvent> hitEvents, double minimumDuration = 0)
     {
         var points = hitEvents
-            .Where(isScatterHit)
-            .Select(e => new ScatterPoint(e.HitObject.StartTime, e.TimeOffset, e.Result))
+            .Where(profile.IsTimingEvent)
+            .Select(e => new ScatterPoint(e.HitObject.StartTime, e.TimeOffset, e.Result, profile.TimingKindFor(e.Result)))
             .OrderBy(p => p.Time)
             .ToArray();
 
         var duration = Math.Max(Math.Max(1, minimumDuration), points.Select(p => p.Time).DefaultIfEmpty(0).Max());
         var maxMagnitude = Math.Clamp(
-            points.Where(p => p.Result is not (HitResult.Meh or HitResult.Miss)).Select(p => Math.Abs(p.Offset)).DefaultIfEmpty(0).Max(),
+            points.Where(p => p.Kind == ResultTimingKind.Timed).Select(p => Math.Abs(p.Offset)).DefaultIfEmpty(0).Max(),
             minimum_offset_range,
             maximum_offset_range);
         var offsetRange = Math.Ceiling(maxMagnitude / 50) * 50;
         var ticks = new[] { -offsetRange, -offsetRange / 2, 0, offsetRange / 2, offsetRange };
-        points = [.. points.Select(p => p with { Offset = displayedOffsetFor(p, offsetRange) })];
 
         return new ScatterData(points, duration, offsetRange, ticks, []);
     }
@@ -146,7 +157,6 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResu
                 points.AddRange(stage.Data.Points.Select(point => point with
                 {
                     Time = elapsed + point.Time,
-                    Offset = displayedOffsetFor(point, offsetRange),
                 }));
             }
 
@@ -166,27 +176,7 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResu
         return BmsStrings.Key(++keyIndex);
     }
 
-    private static double displayedOffsetFor(ScatterPoint point, double offsetRange) => point.Result switch
-    {
-        HitResult.Miss => -offsetRange,
-        HitResult.Meh => Math.Clamp(point.Offset, -offsetRange, offsetRange),
-        _ => point.Offset,
-    };
-
-    private static bool isScatterHit(HitEvent e)
-    {
-        if (e.HitObject is BmsLandmine)
-            return false;
-
-        return e.Result switch
-        {
-            HitResult.Perfect or HitResult.Great or HitResult.Good or HitResult.Ok or HitResult.Meh => e.HitObject is BmsHitObject,
-            HitResult.Miss => e.HitObject is BmsHitObject or HitObject,
-            _ => false,
-        };
-    }
-
-    private static Drawable createLegend(ScatterData data)
+    private Drawable createLegend(ScatterData data)
     {
         var children = new List<Drawable>
         {
@@ -219,7 +209,7 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResu
                     },
                     new OsuSpriteText
                     {
-                        Text = BmsRuleset.HIT_RESULT_LABELS[result],
+                        Text = profile.JudgementLabel(result),
                         Font = OsuFont.GetFont(size: 11),
                         Anchor = Anchor.CentreLeft,
                         Origin = Anchor.CentreLeft,
@@ -449,7 +439,7 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResu
         Origin = Anchor.Centre,
         RelativePositionAxes = Axes.Both,
         X = (float)Math.Clamp(point.Time / data.Duration, 0, 1),
-        Y = yFor(data, point.Offset),
+        Y = yFor(data, point.DisplayOffset(data.OffsetRange)),
         Size = new Vector2(point.Result == HitResult.Miss ? 5.2f : 4.4f),
         Colour = BmsHitResultColours.ForHitResult(point.Result),
         Alpha = point.Result == HitResult.Miss ? 0.95f : 0.82f,
@@ -550,7 +540,7 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResu
                     var point = source.data.Points[i];
                     var size = point.Result == HitResult.Miss ? 5.2f : 4.4f;
                     var x = Math.Clamp((float)(point.Time / source.data.Duration), 0, 1) * drawSize.X;
-                    var y = yFor(source.data, point.Offset) * drawSize.Y;
+                    var y = yFor(source.data, point.DisplayOffset(source.data.OffsetRange)) * drawSize.Y;
                     var topLeft = new Vector2(x - size / 2, y - size / 2);
                     var topRight = topLeft + new Vector2(size, 0);
                     var bottomLeft = topLeft + new Vector2(0, size);
@@ -621,7 +611,7 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResu
     [BackgroundDependencyLoader]
     private void load()
     {
-        statistics ??= CreateStatistics(playableBeatmap!, hitEvents!);
+        statistics ??= CreateStatistics(profile, playableBeatmap!, hitEvents!);
 
         InternalChild = content = new FillFlowContainer
         {
@@ -645,12 +635,13 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResu
     {
         content.Clear();
 
-        content.Add(legend = createLegend(statistics.Overall));
-        content.Add(overallRow = createRow(BmsStrings.Overall, statistics.Overall, summaryHeight));
+        var data = statistics!;
+        content.Add(legend = createLegend(data.Overall));
+        content.Add(overallRow = createRow(BmsStrings.Overall, data.Overall, summaryHeight));
 
         if (expanded)
         {
-            foreach (var key in statistics.Keys)
+            foreach (var key in data.Keys)
                 content.Add(createRow(key.Label, key.Data, key_graph_height));
         }
     }

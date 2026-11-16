@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
+using RhythmEngine.Profiles.Common;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
@@ -11,9 +12,8 @@ using osu.Game.Rulesets.BmsRuleset.Gameplay.Difficulty;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Profiles;
 using osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
-using osu.Game.Rulesets.Difficulty;
-using osu.Game.Rulesets.Difficulty.Skills;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Tests.Beatmaps;
@@ -194,12 +194,22 @@ public class BmsStarRatingProcessorTest
         new(Math.Min(2, totalColumns - 1), 360, 720),
     ];
 
-    private static IEnumerable<BmsHitObject> createSimpleHitObjects() =>
-    [
-        new BmsNote { Column = 0, StartTime = 0 },
-        new BmsNote { Column = 1, StartTime = 180 },
-        new BmsLongNote { Column = 2, StartTime = 360, Duration = 360 },
-    ];
+    private static BmsBeatmap createSimpleBeatmap(int rank = 2, double? exRank = null)
+    {
+        var beatmap = new BmsBeatmap
+        {
+            BeatmapInfo = new BeatmapInfo(new BmsRuleset().RulesetInfo),
+            LayoutVariant = BmsLayoutVariant.Bme7K, TotalColumns = 8, Rank = rank, ExRank = exRank,
+        };
+        beatmap.HitObjects.AddRange([
+            new BmsNote { Beatmap = beatmap, Column = 0, StartTime = 0 },
+            new BmsNote { Beatmap = beatmap, Column = 1, StartTime = 180 },
+            new BmsLongNote { Beatmap = beatmap, Column = 2, StartTime = 360, Duration = 360 },
+        ]);
+        BmsTestBeatmaps.SetupBeatmapInfo(beatmap, beatmap.BeatmapInfo.Ruleset);
+        new BmsDifficultyInfo { Rank = rank, ExRank = exRank, LayoutVariant = beatmap.LayoutVariant }.WriteToOsuDifficulty(beatmap);
+        return beatmap;
+    }
 
     private static double computeExpectedAnchorValue(params double[] counts)
     {
@@ -246,12 +256,9 @@ public class BmsStarRatingProcessorTest
     [Test]
     public void TestDifficultyCalculatorUsesModRate()
     {
-        var beatmap = new Beatmap();
-        new BmsDifficultyInfo { Rank = 2, LayoutVariant = BmsLayoutVariant.Bme7K }.WriteToOsuDifficulty(beatmap);
-        beatmap.HitObjects.AddRange(createSimpleHitObjects());
+        var beatmap = createSimpleBeatmap();
 
         var calculator = new BmsDifficultyCalculator(new BmsRuleset().RulesetInfo, new TestWorkingBeatmap(beatmap));
-        var method = typeof(BmsDifficultyCalculator).GetMethod("CreateDifficultyAttributes", BindingFlags.NonPublic | BindingFlags.Instance);
         var doubleTime = new BmsModDoubleTime
         {
             SpeedChange =
@@ -260,26 +267,46 @@ public class BmsStarRatingProcessorTest
             },
         };
 
-        var attributes = (DifficultyAttributes)method!.Invoke(calculator, [beatmap, new Mod[] { doubleTime }, Array.Empty<Skill>()])!;
+        var attributes = calculator.Calculate([doubleTime]);
         var expected = new BmsStarRatingProcessor().ComputeStarRating(createSimpleNoteTimings(8), 8, 2, 1.75);
 
         Assert.That(attributes.StarRating, Is.EqualTo(expected).Within(1e-12));
     }
 
     [Test]
-    public void TestDifficultyCalculatorWrapperPathUsesEncodedExRank()
+    public void TestDifficultyCalculatorTimedPathUsesExRank()
     {
-        var beatmap = new Beatmap();
-        new BmsDifficultyInfo { Rank = 0, ExRank = 200, LayoutVariant = BmsLayoutVariant.Bme7K }.WriteToOsuDifficulty(beatmap);
-        beatmap.HitObjects.AddRange(createSimpleHitObjects());
+        var beatmap = createSimpleBeatmap(0, 200);
 
         var calculator = new BmsDifficultyCalculator(new BmsRuleset().RulesetInfo, new TestWorkingBeatmap(beatmap));
-        var method = typeof(BmsDifficultyCalculator).GetMethod("CreateDifficultyAttributes", BindingFlags.NonPublic | BindingFlags.Instance);
-
-        Assert.That(method, Is.Not.Null);
-        method!.Invoke(calculator, [beatmap, Array.Empty<Mod>(), Array.Empty<Skill>()]);
+        calculator.CalculateTimed();
 
         Assert.That(calculator.StarRatingProcessor.HitLeniencyX, Is.EqualTo(computeExpectedHitLeniency(90)).Within(1e-12));
+    }
+
+    [Test]
+    public void SelectedProfileControlsRatingAndScoringOpportunities([Values] bool timed)
+    {
+        var beatmap = createSimpleBeatmap();
+        beatmap.HitObjects =
+        [
+            new BmsNote { Beatmap = beatmap, Column = 1, StartTime = 0 },
+            new BmsLongNote { Beatmap = beatmap, Column = 2, StartTime = 500, Duration = 250, Kind = KeyNoteKind.ReleaseHold },
+            new BmsLongNote { Beatmap = beatmap, Column = 3, StartTime = 1000, Duration = 250 },
+            new BmsLandmine { Beatmap = beatmap, Column = 4, StartTime = 1500, LandmineDamagePercent = 10 },
+            new BmsNote { Beatmap = beatmap, Column = 5, StartTime = 2000 },
+        ];
+        var calculator = new BmsDifficultyCalculator(new BmsRuleset().RulesetInfo, new TestWorkingBeatmap(beatmap));
+
+        var attributes = timed
+            ? calculator.CalculateTimed().Select(result => result.Attributes).ToArray()
+            : [calculator.Calculate()];
+        int[] expectedCombos = timed ? [1, 3, 4, 4, 5] : [5];
+        Assert.That(attributes.Select(result => result.MaxCombo), Is.EqualTo(expectedCombos));
+        Assert.That(calculator.StarRatingProcessor.HitLeniencyX, Is.EqualTo(computeExpectedHitLeniency(45)).Within(1e-12));
+
+        Assert.That(((BmsLongNote)beatmap.HitObjects[1]).Kind, Is.EqualTo(KeyNoteKind.ReleaseHold));
+        Assert.That(beatmap.HitObjects.OfType<BmsLandmine>().Count(), Is.EqualTo(1));
     }
 
     [Test]

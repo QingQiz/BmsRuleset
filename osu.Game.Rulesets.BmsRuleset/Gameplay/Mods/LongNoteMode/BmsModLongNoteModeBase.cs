@@ -3,13 +3,13 @@ using System.Linq;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Profiles;
 using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.LongNoteMode;
 
 public abstract class BmsModLongNoteModeBase : Mod, IApplicableAfterBeatmapConversion
 {
-
     public override ModType Type => ModType.Fun;
 
     public override Type[] IncompatibleMods =>
@@ -29,6 +29,6 @@ public abstract class BmsModLongNoteModeBase : Mod, IApplicableAfterBeatmapConve
 
         bmsBeatmap.LockedLongNoteMode = TargetMode;
         foreach (var note in bmsBeatmap.HitObjects.OfType<BmsLongNote>())
-            note.Mode = BmsLongNoteMode.Undefined;
+            note.Kind = TargetMode.ToNoteKind();
     }
 }

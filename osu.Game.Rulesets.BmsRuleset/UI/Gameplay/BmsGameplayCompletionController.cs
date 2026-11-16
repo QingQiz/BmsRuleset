@@ -64,10 +64,7 @@ internal sealed class BmsGameplayCompletionController : IDisposable
             return;
         }
 
-        if (healthProcessor.Health.Value < 0.8)
-            scoreProcessor.FailScore(gameplayState.Score.ScoreInfo);
-
-        recordVisualOffsetSuggestion();
+        throw new InvalidOperationException("BMS gameplay requires its profile-aware health processor.");
     }
 
     private void recordVisualOffsetSuggestion()

@@ -7,6 +7,7 @@ using osu.Framework.Platform;
 using osu.Game.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Configuration;
 using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Embedded;
@@ -22,16 +23,17 @@ public sealed partial class BmsJudgementDisplay : BmsHudComponent
     [SettingSource(typeof(BmsStrings), nameof(BmsStrings.JudgementDisplayShowEmptyPoor), nameof(BmsStrings.JudgementDisplayShowEmptyPoorDescription))]
     public Bindable<bool> ShowEmptyPoor { get; } = new BindableBool(true);
 
-    private readonly Dictionary<HitResult, SkinnableDrawable> drawableCache = new();
+    private readonly Dictionary<HitResult, Drawable> drawableCache = new();
     private readonly Container drawablePool;
     private readonly Container displayArea;
     private HitResult? pendingJudgement;
-    private SkinnableDrawable? displayedDrawable;
+    private Drawable? displayedDrawable;
 
     [Cached(typeof(ISkinSource))]
     private readonly BmsEmbeddedSkinSource activeSkin = new();
 
     private IBmsGameplayEvents? gameplayEvents;
+    private GameplayProfile profile = null!;
 
     [Resolved]
     private DrawableRuleset drawableRuleset { get; set; } = null!;
@@ -102,6 +104,7 @@ public sealed partial class BmsJudgementDisplay : BmsHudComponent
     [BackgroundDependencyLoader]
     private void load()
     {
+        profile = GameplayProfile.FromMods(drawableRuleset.Mods);
         parentSkin.SourceChanged += updateEmbeddedSkinFallback;
         updateEmbeddedSkinFallback();
 
@@ -111,14 +114,11 @@ public sealed partial class BmsJudgementDisplay : BmsHudComponent
 
         foreach (var result in BmsRuleset.STATIC_VALID_HIT_RESULTS)
         {
-            var drawable = new SkinnableDrawable(
-                new SkinComponentLookup<HitResult>(result))
+            var drawable = profile.CreateJudgementDrawable(result).With(drawable =>
             {
-                RelativeSizeAxes = Axes.None,
-                AutoSizeAxes = Axes.Both,
-                Anchor = Anchor.TopCentre,
-                Origin = Anchor.TopCentre,
-            };
+                drawable.Anchor = Anchor.TopCentre;
+                drawable.Origin = Anchor.TopCentre;
+            });
 
             drawableCache[result] = drawable;
             drawablePool.Add(drawable);
@@ -133,7 +133,7 @@ public sealed partial class BmsJudgementDisplay : BmsHudComponent
 
     private void showJudgement(HitResult result)
     {
-        if (result == HitResult.Miss && !ShowEmptyPoor.Value)
+        if (!ShowEmptyPoor.Value && profile.TimingKindFor(result) == ResultTimingKind.EmptyInput)
             return;
 
         // Intermediate replay judgements cannot be displayed within the same HUD frame.
@@ -161,9 +161,10 @@ public sealed partial class BmsJudgementDisplay : BmsHudComponent
             displayArea.Add(displayedDrawable = drawable);
         }
 
-        if (drawable.Drawable is IAnimatableJudgement animatable)
+        var skinnable = drawable as SkinnableDrawable;
+        if ((skinnable?.Drawable ?? drawable) is IAnimatableJudgement animatable)
         {
-            drawable.ResetAnimation();
+            skinnable?.ResetAnimation();
             animatable.PlayAnimation();
         }
     }

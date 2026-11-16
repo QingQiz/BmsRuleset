@@ -1,6 +1,6 @@
 using NUnit.Framework;
+using RhythmEngine.Profiles.Bms;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
-using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Gauge;
 
@@ -13,9 +13,9 @@ public class BmsGaugeCalculatorTest
         var profile = BmsGaugeProfileFactory.Create(BmsGaugeType.Easy);
         var calculator = new BmsGaugeCalculator(profile, total: 80, noteCount: 100);
 
-        Assert.That(calculator.GetDeltaFor(HitResult.Perfect, 0.2), Is.EqualTo(0.008).Within(0.0001));
-        Assert.That(calculator.GetDeltaFor(HitResult.Great, 0.2), Is.EqualTo(0.008).Within(0.0001));
-        Assert.That(calculator.GetDeltaFor(HitResult.Good, 0.2), Is.EqualTo(0.004).Within(0.0001));
+        Assert.That(calculator.GetDeltaFor(BmsResults.PGREAT, 0.2), Is.EqualTo(0.008).Within(0.0001));
+        Assert.That(calculator.GetDeltaFor(BmsResults.GREAT, 0.2), Is.EqualTo(0.008).Within(0.0001));
+        Assert.That(calculator.GetDeltaFor(BmsResults.GOOD, 0.2), Is.EqualTo(0.004).Within(0.0001));
     }
 
     [Test]
@@ -25,7 +25,7 @@ public class BmsGaugeCalculatorTest
         var calculator = new BmsGaugeCalculator(profile, total: null, noteCount: 100);
 
         Assert.That(calculator.Total, Is.EqualTo(260).Within(0.0001));
-        Assert.That(calculator.GetDeltaFor(HitResult.Perfect, 0.2), Is.EqualTo(0.026).Within(0.0001));
+        Assert.That(calculator.GetDeltaFor(BmsResults.PGREAT, 0.2), Is.EqualTo(0.026).Within(0.0001));
     }
 
     [Test]
@@ -41,9 +41,9 @@ public class BmsGaugeCalculatorTest
         var profile = BmsGaugeProfileFactory.Create(BmsGaugeType.Hard);
         var calculator = new BmsGaugeCalculator(profile, total: 180, noteCount: 400);
 
-        Assert.That(calculator.GetDeltaFor(HitResult.Perfect, 0.5), Is.EqualTo(0.001).Within(0.0001));
-        Assert.That(calculator.GetDeltaFor(HitResult.Great, 0.5), Is.EqualTo(0.0008).Within(0.0001));
-        Assert.That(calculator.GetDeltaFor(HitResult.Good, 0.5), Is.EqualTo(0.0002).Within(0.0001));
+        Assert.That(calculator.GetDeltaFor(BmsResults.PGREAT, 0.5), Is.EqualTo(0.001).Within(0.0001));
+        Assert.That(calculator.GetDeltaFor(BmsResults.GREAT, 0.5), Is.EqualTo(0.0008).Within(0.0001));
+        Assert.That(calculator.GetDeltaFor(BmsResults.GOOD, 0.5), Is.EqualTo(0.0002).Within(0.0001));
     }
 
     [Test]
@@ -52,10 +52,10 @@ public class BmsGaugeCalculatorTest
         var profile = BmsGaugeProfileFactory.Create(BmsGaugeType.Hard);
         var calculator = new BmsGaugeCalculator(profile, total: 160, noteCount: 1000);
 
-        Assert.That(calculator.GetDeltaFor(HitResult.Ok, 0.51), Is.EqualTo(-0.05).Within(0.0001));
-        Assert.That(calculator.GetDeltaFor(HitResult.Ok, 0.50), Is.EqualTo(-0.05).Within(0.0001));
-        Assert.That(calculator.GetDeltaFor(HitResult.Ok, 0.499), Is.EqualTo(-0.04).Within(0.0001));
-        Assert.That(calculator.GetDeltaFor(HitResult.Meh, 0.10), Is.EqualTo(-0.05).Within(0.0001));
+        Assert.That(calculator.GetDeltaFor(BmsResults.BAD, 0.51), Is.EqualTo(-0.05).Within(0.0001));
+        Assert.That(calculator.GetDeltaFor(BmsResults.BAD, 0.50), Is.EqualTo(-0.05).Within(0.0001));
+        Assert.That(calculator.GetDeltaFor(BmsResults.BAD, 0.499), Is.EqualTo(-0.04).Within(0.0001));
+        Assert.That(calculator.GetDeltaFor(BmsResults.POOR, 0.10), Is.EqualTo(-0.05).Within(0.0001));
     }
 
     [Test]
@@ -64,9 +64,9 @@ public class BmsGaugeCalculatorTest
         var profile = BmsGaugeProfileFactory.Create(BmsGaugeType.Hazard);
         var calculator = new BmsGaugeCalculator(profile, total: 160, noteCount: 1000);
 
-        Assert.That(calculator.GetDeltaFor(HitResult.Ok, 1), Is.EqualTo(-1).Within(0.0001));
-        Assert.That(calculator.GetDeltaFor(HitResult.Meh, 1), Is.EqualTo(-1).Within(0.0001));
-        Assert.That(calculator.GetDeltaFor(HitResult.Miss, 1), Is.EqualTo(-0.10).Within(0.0001));
+        Assert.That(calculator.GetDeltaFor(BmsResults.BAD, 1), Is.EqualTo(-1).Within(0.0001));
+        Assert.That(calculator.GetDeltaFor(BmsResults.POOR, 1), Is.EqualTo(-1).Within(0.0001));
+        Assert.That(calculator.GetDeltaFor(BmsResults.EMPTY_POOR, 1), Is.EqualTo(-0.10).Within(0.0001));
     }
 
     [Test]
@@ -77,8 +77,8 @@ public class BmsGaugeCalculatorTest
 
         Assert.Multiple(() =>
         {
-            Assert.That(calculator.GetDeltaFor(HitResult.Perfect, 1), Is.Zero);
-            Assert.That(calculator.GetDeltaFor(HitResult.Ok, 1), Is.EqualTo(-0.20).Within(0.0001));
+            Assert.That(calculator.GetDeltaFor(BmsResults.PGREAT, 1), Is.Zero);
+            Assert.That(calculator.GetDeltaFor(BmsResults.BAD, 1), Is.EqualTo(-0.20).Within(0.0001));
         });
     }
 
@@ -90,6 +90,6 @@ public class BmsGaugeCalculatorTest
         var profile = BmsGaugeProfileFactory.Create(BmsGaugeType.ExHard, BmsGaugeProfileFamily.FiveKeys);
         var calculator = new BmsGaugeCalculator(profile, total, noteCount: 1000);
 
-        Assert.That(calculator.GetDeltaFor(HitResult.Ok, 1), Is.EqualTo(expectedDamage).Within(0.0001));
+        Assert.That(calculator.GetDeltaFor(BmsResults.BAD, 1), Is.EqualTo(expectedDamage).Within(0.0001));
     }
 }

@@ -1,9 +1,9 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
+using System;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Course;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
 
@@ -18,9 +18,9 @@ public static class BmsLampScoreSelector
         scores.Where(score => MatchesSelectedMods(score, selectedMods))
             .MaxBy(score => (lampPriority(BmsLampCalculator.Calculate(score)), score.TotalScore, -score.Date.UtcDateTime.Ticks));
 
-    public static ScoreInfo? SelectBest(IEnumerable<ScoreInfo> scores, IReadOnlyList<Mod> selectedMods, int maximumExScore) =>
+    public static ScoreInfo? SelectBest(IEnumerable<ScoreInfo> scores, IReadOnlyList<Mod> selectedMods, double? maximumScore) =>
         scores.Where(score => MatchesSelectedMods(score, selectedMods))
-            .MaxBy(score => (BmsExScore.Calculate(score, maximumExScore), -score.Date.UtcDateTime.Ticks));
+            .MaxBy(score => (GameplayProfile.FromMods(score.Mods).StoredScore(score, maximumScore), -score.Date.UtcDateTime.Ticks));
 
     internal static (BmsLamp Lamp, ScoreRank? Rank) SelectBestCourse(IReadOnlyList<BmsCourseResult> results, IReadOnlyList<Mod> selectedMods)
     {

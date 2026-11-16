@@ -1,3 +1,4 @@
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using System.Linq;
 using NUnit.Framework;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
@@ -64,7 +65,7 @@ public class BmsJudgementEventConsumerTest
     public void TestTimelineUsesCanonicalResultAndBothTimingObservations()
     {
         var score = createStandardLongNoteScore(HitResult.Great);
-        var data = BmsTimelineStatistic.CreateData(createBeatmap(), score.Score.HitEvents,
+        var data = BmsTimelineStatistic.CreateData(BmsGameplayProfile.INSTANCE, createBeatmap(), score.Score.HitEvents,
             BmsJudgementEventProjection.CreateScoringHitEvents(score.Events));
 
         Assert.Multiple(() =>

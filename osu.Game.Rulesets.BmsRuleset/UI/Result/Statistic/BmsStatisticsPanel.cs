@@ -1,15 +1,16 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
+using System;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
-using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics;
 using osu.Framework.Input.Events;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics.Containers;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.Scoring;
@@ -97,7 +98,7 @@ internal partial class BmsStatisticsPanel : VisibilityContainer
                 overview.Child = CreateOverview(score);
         }
 
-        content.Child = statistics = new BmsResultStatisticsGrid();
+        content.Child = statistics = new BmsResultStatisticsGrid(GameplayProfile.FromMods(score.Mods));
         var cancellation = loadCancellation = new CancellationTokenSource();
         _ = populateAsync(score, cancellation.Token);
     }

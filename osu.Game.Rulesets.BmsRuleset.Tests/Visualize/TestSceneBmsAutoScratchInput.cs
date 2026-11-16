@@ -41,13 +41,13 @@ public partial class TestSceneBmsAutoScratchInput : BmsPlayerTestScene
             LayoutVariant = BmsLayoutVariant.Bme7K, TotalColumns = 8, Rank = 2, Total = 240,
             LockedLongNoteMode = mode,
             HitObjects = [new BmsNote { StartTime = 3000, Column = 0 },
-                new BmsLongNote { StartTime = 3200, Duration = 600, Column = 0 },
+                new BmsLongNote { Kind = mode.ToNoteKind(), StartTime = 3200, Duration = 600, Column = 0 },
                 new BmsNote { StartTime = 3400, Column = 1 },
                 new BmsLandmine { StartTime = 4000, Column = 0, LandmineDamagePercent = 10 },
                 new BmsNote { StartTime = 10000, Column = 2 }],
         };
         if (adjacentHold)
-            beatmap.HitObjects.Insert(3, new BmsLongNote { StartTime = 3800, Duration = 100, Column = 0 });
+            beatmap.HitObjects.Insert(3, new BmsLongNote { Kind = mode.ToNoteKind(), StartTime = 3800, Duration = 100, Column = 0 });
         BmsTestBeatmaps.SetupBeatmapInfo(beatmap, ruleset);
         return beatmap;
     }
@@ -151,7 +151,13 @@ public partial class TestSceneBmsAutoScratchInput : BmsPlayerTestScene
 
     private void load(BmsLongNoteMode longNoteMode, bool recorded = false, bool adjacent = false)
     {
-        AddStep("load AS player", () => { mode = longNoteMode; recordedInputs = recorded; adjacentHold = adjacent; LoadPlayer([new BmsModAutoScratch()]); });
+        AddStep("load AS player", () =>
+        {
+            mode = longNoteMode;
+            recordedInputs = recorded;
+            adjacentHold = adjacent;
+            LoadPlayer([new BmsModAutoScratch()]);
+        });
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.LoadedBeatmapSuccessfully && Player.Alpha == 1);
         AddStep("freeze time and observe production input", () =>
         {
@@ -173,5 +179,4 @@ public partial class TestSceneBmsAutoScratchInput : BmsPlayerTestScene
     }
 
     private void keyboard(Key key, bool pressed) => new KeyboardKeyInput(key, pressed).Apply(input.CurrentState, input);
-
 }

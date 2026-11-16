@@ -1,3 +1,4 @@
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using System.Linq;
 using NUnit.Framework;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
@@ -22,7 +23,7 @@ public class BmsHitOffsetStatisticTest
     [TestCase(BmsLongNoteMode.HellChargeNote)]
     public void TestLongNoteEndpointsKeepRealOffsets(BmsLongNoteMode mode)
     {
-        var longNote = new BmsLongNote { Column = 1, StartTime = 1000, Duration = 500 };
+        var longNote = new BmsLongNote { Kind = mode.ToNoteKind(), Column = 1, StartTime = 1000, Duration = 500 };
         var beatmap = createBeatmap(BmsLayoutVariant.Bms5K);
         beatmap.LockedLongNoteMode = mode;
         beatmap.HitObjects.Add(longNote);
@@ -50,7 +51,7 @@ public class BmsHitOffsetStatisticTest
 
         var score = new ScoreInfo();
         processor.PopulateScore(score);
-        var statistics = BmsHitOffsetStatistic.CreateStatistics(beatmap, score.HitEvents);
+        var statistics = BmsHitOffsetStatistic.CreateStatistics(BmsGameplayProfile.INSTANCE, beatmap, score.HitEvents);
 
         Assert.Multiple(() =>
         {
@@ -71,7 +72,7 @@ public class BmsHitOffsetStatisticTest
     [Test]
     public void TestPmsStatisticsHaveNoScratch()
     {
-        var statistics = BmsHitOffsetStatistic.CreateStatistics(
+        var statistics = BmsHitOffsetStatistic.CreateStatistics(BmsGameplayProfile.INSTANCE,
             createBeatmap(BmsLayoutVariant.Popn9K),
             [
                 new HitEvent(12, 1, HitResult.Great, new BmsNote { Column = 0, StartTime = 1000 }, null, null),
@@ -87,7 +88,7 @@ public class BmsHitOffsetStatisticTest
     [Test]
     public void TestPoorUsesEdgeMatchingTimingDirection()
     {
-        var statistics = BmsHitOffsetStatistic.CreateStatistics(
+        var statistics = BmsHitOffsetStatistic.CreateStatistics(BmsGameplayProfile.INSTANCE,
             createBeatmap(BmsLayoutVariant.Bms5K),
             [
                 new HitEvent(-500, 1, HitResult.Meh, new BmsNote { Column = 0, StartTime = 1000 }, null, null),
@@ -132,7 +133,7 @@ public class BmsHitOffsetStatisticTest
     [Test]
     public void TestStatisticsAreGroupedByKey()
     {
-        var statistics = BmsHitOffsetStatistic.CreateStatistics(
+        var statistics = BmsHitOffsetStatistic.CreateStatistics(BmsGameplayProfile.INSTANCE,
             createBeatmap(BmsLayoutVariant.Bms5K),
             [
                 new HitEvent(-12, 1, HitResult.Great, new BmsNote { Column = 0, StartTime = 1000 }, null, null),

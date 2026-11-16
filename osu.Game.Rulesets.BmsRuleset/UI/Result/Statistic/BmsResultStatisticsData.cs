@@ -1,13 +1,17 @@
-using System;
+using RhythmEngine.Core;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
+using RhythmEngine.Profiles.Bms;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System;
 using osu.Game.Beatmaps;
 using osu.Game.Replays;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 
@@ -24,9 +28,9 @@ internal sealed record BmsResultStatisticsData(
 
     internal double GaugeDuration { get; init; }
 
-    internal IReadOnlyList<BmsGaugeStateSnapshot> EndingGaugeStates { get; init; } = [];
+    internal HealthState? EndingHealth { get; init; }
 
-    internal static BmsResultStatisticsData Create(ScoreInfo score, IBeatmap beatmap, IReadOnlyList<BmsGaugeHistoryEvent>? gauges = null)
+    internal static BmsResultStatisticsData Create(ScoreInfo score, IBeatmap beatmap, IReadOnlyList<GameplayHealthHistoryEvent>? gauges = null)
         => Create(score, beatmap, score.HitEvents, score.HitEvents, gauges ?? []);
 
     internal static BmsResultStatisticsData? Load(ScoreInfo score, IBeatmap beatmap, Replay replay, CancellationToken cancellationToken,
@@ -44,19 +48,20 @@ internal sealed record BmsResultStatisticsData(
     }
 
     internal static BmsResultStatisticsData Create(ScoreInfo score, IBeatmap beatmap, IReadOnlyList<HitEvent> hitEvents,
-        IReadOnlyList<HitEvent> scoringEvents, IReadOnlyList<BmsGaugeHistoryEvent> gauges, double minimumDuration = 0)
+        IReadOnlyList<HitEvent> scoringEvents, IReadOnlyList<GameplayHealthHistoryEvent> gauges, double minimumDuration = 0)
     {
-        var timeline = BmsTimelineStatistic.CreateData(beatmap, hitEvents, scoringEvents, minimumDuration);
+        var profile = GameplayProfile.FromMods(score.Mods);
+        var timeline = BmsTimelineStatistic.CreateData(profile, beatmap, hitEvents, scoringEvents, minimumDuration);
         return new BmsResultStatisticsData(
             BmsGaugeHistoryGraph.CreateSeries(score, beatmap, scoringEvents, gauges, minimumDuration),
             [],
             timeline,
-            BmsHitScatterStatistic.CreateStatistics(beatmap, hitEvents, minimumDuration),
-            BmsHitOffsetStatistic.CreateStatistics(beatmap, hitEvents))
+            BmsHitScatterStatistic.CreateStatistics(profile, beatmap, hitEvents, minimumDuration),
+            BmsHitOffsetStatistic.CreateStatistics(profile, beatmap, hitEvents))
         {
             HitEvents = hitEvents,
             GaugeDuration = Math.Max(timeline.Duration, gauges.Select(entry => entry.Time).DefaultIfEmpty(0).Max()),
-            EndingGaugeStates = gauges.LastOrDefault()?.States ?? [],
+            EndingHealth = gauges.LastOrDefault()?.Health,
         };
     }
 
@@ -65,12 +70,12 @@ internal sealed record BmsResultStatisticsData(
         var played = stages.Where(stage => stage.HitEvents.Count > 0).ToArray();
         return combine(stages,
             BmsHitScatterStatistic.CombineStatistics(played.Select(stage => stage.Scatter).ToArray()),
-            BmsHitOffsetStatistic.CombineStatistics(played.Select(stage => (stage.Offset, stage.HitEvents)).ToArray()));
+            BmsHitOffsetStatistic.CombineStatistics(played.Select(stage => stage.Offset).ToArray()));
     }
 
     internal static BmsResultStatisticsData Combine(IReadOnlyList<BmsResultStatisticsData> attempts)
         => combine(attempts, BmsHitScatterStatistic.CombineStatistics(attempts.Select(attempt => attempt.Scatter).ToArray()),
-            BmsHitOffsetStatistic.CombineStatistics(attempts.Select(attempt => (attempt.Offset, attempt.HitEvents)).ToArray()));
+            BmsHitOffsetStatistic.CombineStatistics(attempts.Select(attempt => attempt.Offset).ToArray()));
 
     private static BmsResultStatisticsData combine(IReadOnlyList<BmsResultStatisticsData> stages,
         BmsHitScatterStatistic.HitScatterStatistics scatter, BmsHitOffsetStatistic.HitOffsetStatistics offset)
