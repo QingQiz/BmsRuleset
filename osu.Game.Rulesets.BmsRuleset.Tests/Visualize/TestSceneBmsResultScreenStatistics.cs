@@ -3,6 +3,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
+using System.Threading.Tasks;
 using NUnit.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
@@ -28,6 +30,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Gauge;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.UI.Icons;
 using osu.Game.Rulesets.BmsRuleset.UI.Ranking;
@@ -427,7 +430,7 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
         AddAssert("ratio uses fast and slow hits", () => balance.FastProportion, () => Is.EqualTo(2.0 / 3));
         AddAssert("counts match timeline categories", () =>
         {
-            var timeline = BmsTimelineStatistic.CreateData(new ScoreInfo { HitEvents = hitEvents }, new BmsBeatmap()).FastSlow;
+            var timeline = BmsTimelineStatistic.CreateData(BmsGameplayProfile.INSTANCE, new BmsBeatmap(), hitEvents, hitEvents).FastSlow;
             return timeline.Categories.Single(category => category.Label == BmsStrings.Fast).Buckets.Sum() == balance.FastCount
                 && timeline.Categories.Single(category => category.Label == BmsStrings.Slow).Buckets.Sum() == balance.SlowCount;
         });
@@ -478,7 +481,7 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
     [TestCase(true)]
     public void TestOverviewWithoutReplay(bool empty)
     {
-        TestBmsSoloResultsScreen screen = null!;
+        BmsResultsScreen screen = null!;
         AddStep("load result without replay events", () =>
         {
             var score = createScore();
@@ -492,7 +495,7 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
 
             var stack = new OsuScreenStack { RelativeSizeAxes = Axes.Both };
             Child = stack;
-            stack.Push(screen = new TestBmsSoloResultsScreen(score));
+            stack.Push(screen = new BmsResultsScreen(score));
         });
         AddUntilStep("summary visible without replay", () => screen.ChildrenOfType<BmsResultJudgementRow>().Count() == 6);
         AddAssert("all progress bars remain valid", () => screen.ChildrenOfType<BmsResultBar>().All(bar => double.IsFinite(bar.Proportion)
@@ -564,8 +567,7 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
     {
         // 1000 hit events with normally-distributed offsets (mean 0, std 50ms) — a natural bell
         // that fills the hit-offset histogram. Result severity tracks offset magnitude (Perfect
-        // near the centre, Meh in the tails); Gauge History is unaffected because it ignores
-        // TimeOffset. The RNG is seeded so the visual is reproducible across runs.
+        // near the centre, Meh in the tails). The RNG is seeded so the visual is reproducible across runs.
         var rng = new Random(42991);
         var offsets = new double[1000];
 
@@ -658,34 +660,26 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
         return pathBounds.Bottom >= plot.Bottom + path.PathRadius - 0.5f;
     }
 
-    private static bool gaugePathEndsAtFailurePoint(BmsGaugeHistoryGraph graph, ScoreInfo score, BmsBeatmap beatmap)
+    private static bool gaugePathEndsAtFailurePoint(BmsGaugeHistoryGraph graph, BmsGaugeHistoryGraph.GaugePoint failurePoint)
     {
-        var failurePoint = BmsGaugeHistoryGraph.CreateSeries(score, beatmap).Single().FailurePoint;
-        if (failurePoint == null)
-            return false;
-
         var path = gaugePathFor(graph);
         var pathEnd = path.ToScreenSpace(path.Vertices[^1]);
         var plot = gaugePlotBackgroundFor(graph).ScreenSpaceDrawQuad.AABBFloat;
-        var expectedX = plot.Left + failurePoint.Value.Time * plot.Width;
-        var expectedY = plot.Top + (1 - failurePoint.Value.Health) * plot.Height;
+        var expectedX = plot.Left + failurePoint.Time * plot.Width;
+        var expectedY = plot.Top + (1 - failurePoint.Health) * plot.Height;
 
         return Math.Abs(pathEnd.X - expectedX) < 0.5f
                && Math.Abs(pathEnd.Y - expectedY) < 0.5f;
     }
 
-    private static bool failureMarkerCentreAlignsWithFailurePoint(BmsGaugeHistoryGraph graph, ScoreInfo score, BmsBeatmap beatmap)
+    private static bool failureMarkerCentreAlignsWithFailurePoint(BmsGaugeHistoryGraph graph, BmsGaugeHistoryGraph.GaugePoint failurePoint)
     {
-        var failurePoint = BmsGaugeHistoryGraph.CreateSeries(score, beatmap).Single().FailurePoint;
-        if (failurePoint == null)
-            return false;
-
         var plot = gaugePlotBackgroundFor(graph).ScreenSpaceDrawQuad.AABBFloat;
         var marker = failureMarkerFor(graph).ScreenSpaceDrawQuad.AABBFloat;
         var markerCentreX = (marker.Left + marker.Right) / 2;
         var markerCentreY = (marker.Top + marker.Bottom) / 2;
-        var expectedX = plot.Left + failurePoint.Value.Time * plot.Width;
-        var expectedY = plot.Top + (1 - failurePoint.Value.Health) * plot.Height;
+        var expectedX = plot.Left + failurePoint.Time * plot.Width;
+        var expectedY = plot.Top + (1 - failurePoint.Health) * plot.Height;
 
         return Math.Abs(markerCentreX - expectedX) < 0.5f
                && Math.Abs(markerCentreY - expectedY) < 0.5f;
@@ -697,6 +691,35 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
             : base(score)
         {
             AllowWatchingReplay = false;
+        }
+
+        protected override BmsStatisticsPanel CreateStatisticsPanel() => new TestStatisticsPanel();
+    }
+
+    private partial class TestStatisticsPanel : BmsStatisticsPanel
+    {
+        protected override Task<BmsResultStatisticsData> LoadStatisticsAsync(ScoreInfo score, CancellationToken cancellationToken)
+        {
+            var beatmap = new BmsBeatmap
+            {
+                LayoutVariant = BmsLayoutVariant.Bme7K,
+                TotalColumns = 8,
+                HitObjects = score.HitEvents.Select(hit => hit.HitObject).OfType<BmsHitObject>().ToList(),
+            };
+            return Task.FromResult(BmsResultStatisticsData.Create(score, beatmap,
+            [
+                BmsTestHealth.History(0, BmsModAutoGauge.AUTO_GAUGE_CHAIN.Select(type =>
+                    new BmsGaugeStateSnapshot(type, type is BmsGaugeType.Hazard or BmsGaugeType.ExHard or BmsGaugeType.Hard ? 1 : 0.2, false)).ToArray()),
+                BmsTestHealth.History(beatmap.HitObjects.Select(note => note.StartTime).DefaultIfEmpty().Max(),
+                [
+                    new BmsGaugeStateSnapshot(BmsGaugeType.Hazard, 0, true),
+                    new BmsGaugeStateSnapshot(BmsGaugeType.ExHard, 0, true),
+                    new BmsGaugeStateSnapshot(BmsGaugeType.Hard, 0.6, false),
+                    new BmsGaugeStateSnapshot(BmsGaugeType.Normal, 0.8, false),
+                    new BmsGaugeStateSnapshot(BmsGaugeType.Easy, 0.9, false),
+                    new BmsGaugeStateSnapshot(BmsGaugeType.AssistEasy, 1, false),
+                ]),
+            ]));
         }
     }
 
@@ -756,49 +779,27 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
     {
         BmsGaugeHistoryGraph normalGraph = null!;
         BmsGaugeHistoryGraph hardGraph = null!;
-        BmsBeatmap normalBeatmap = null!;
-        BmsBeatmap hardBeatmap = null!;
-        ScoreInfo normalScore = null!;
-        ScoreInfo hardScore = null!;
+        BmsGaugeHistoryGraph.GaugePoint normalFailure = default;
+        BmsGaugeHistoryGraph.GaugePoint hardFailure = default;
 
         AddStep("load gauge failure graphs", () =>
         {
-            normalScore = new ScoreInfo
+            var beatmap = new BmsBeatmap
             {
-                HitEvents = [new HitEvent(0, 1, HitResult.Good, new BmsNote { StartTime = 1000 }, null, null)],
+                HitObjects = [new BmsNote { StartTime = 1000 }, new BmsNote { StartTime = 2000 }],
             };
-
-            normalBeatmap = new BmsBeatmap
-            {
-                LayoutVariant = BmsLayoutVariant.Bme7K,
-                TotalColumns = BmsLayout.GetTotalColumns(BmsLayoutVariant.Bme7K),
-                Total = 200,
-                HitObjects =
-                {
-                    new BmsNote { StartTime = 1000 },
-                    new BmsNote { StartTime = 2000 },
-                },
-            };
-
-            var hardEvents = Enumerable.Range(0, 20)
-                .Select(i => new HitEvent(0, 1, HitResult.Meh, new BmsNote { StartTime = 1000 + i * 100 }, null, null))
-                .ToList();
-
-            hardScore = new ScoreInfo
-            {
-                Mods = [new BmsModHardGauge()],
-                HitEvents = hardEvents,
-            };
-
-            hardBeatmap = new BmsBeatmap
-            {
-                LayoutVariant = BmsLayoutVariant.Bme7K,
-                TotalColumns = BmsLayout.GetTotalColumns(BmsLayoutVariant.Bme7K),
-                Total = 200,
-            };
-
-            foreach (var hitEvent in hardEvents)
-                hardBeatmap.HitObjects.Add(new BmsNote { StartTime = hitEvent.HitObject.StartTime });
+            var normalSeries = BmsGaugeHistoryGraph.CreateSeries(beatmap,
+            [
+                BmsTestHealth.History(0, [new BmsGaugeStateSnapshot(BmsGaugeType.Normal, 0.2, false)]),
+                BmsTestHealth.History(1000, [new BmsGaugeStateSnapshot(BmsGaugeType.Normal, 0.4, false)]),
+            ]);
+            var hardSeries = BmsGaugeHistoryGraph.CreateSeries(beatmap,
+            [
+                BmsTestHealth.History(0, [new BmsGaugeStateSnapshot(BmsGaugeType.Hard, 1, false)]),
+                BmsTestHealth.History(1000, [new BmsGaugeStateSnapshot(BmsGaugeType.Hard, 0, true)]),
+            ]);
+            normalFailure = normalSeries.Single().FailurePoint!.Value;
+            hardFailure = hardSeries.Single().FailurePoint!.Value;
 
             Child = new FillFlowContainer
             {
@@ -810,8 +811,8 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
                 Spacing = new Vector2(0, 24),
                 Children =
                 [
-                    normalGraph = new BmsGaugeHistoryGraph(normalScore, normalBeatmap),
-                    hardGraph = new BmsGaugeHistoryGraph(hardScore, hardBeatmap),
+                    normalGraph = new BmsGaugeHistoryGraph(normalSeries, []),
+                    hardGraph = new BmsGaugeHistoryGraph(hardSeries, []),
                 ],
             };
         });
@@ -819,9 +820,9 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
         AddUntilStep("gauge graphs loaded", () => normalGraph.IsLoaded && normalGraph.DrawHeight > 0 && hardGraph.IsLoaded && hardGraph.DrawHeight > 0);
         AddUntilStep("gauge plots allow overflow", () => !gaugePlotFor(normalGraph).Masking && !gaugePlotFor(hardGraph).Masking);
         AddUntilStep("hard line has room below bottom", () => gaugePathExtendsBelowBottomEdge(hardGraph));
-        AddUntilStep("hard line stops at failure point", () => gaugePathEndsAtFailurePoint(hardGraph, hardScore, hardBeatmap));
-        AddUntilStep("normal failure marker centre aligns", () => failureMarkerCentreAlignsWithFailurePoint(normalGraph, normalScore, normalBeatmap));
-        AddUntilStep("hard failure marker centre aligns", () => failureMarkerCentreAlignsWithFailurePoint(hardGraph, hardScore, hardBeatmap));
+        AddUntilStep("hard line stops at failure point", () => gaugePathEndsAtFailurePoint(hardGraph, hardFailure));
+        AddUntilStep("normal failure marker centre aligns", () => failureMarkerCentreAlignsWithFailurePoint(normalGraph, normalFailure));
+        AddUntilStep("hard failure marker centre aligns", () => failureMarkerCentreAlignsWithFailurePoint(hardGraph, hardFailure));
     }
 
     [Test]
@@ -897,17 +898,19 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
 
         AddStep("load hit offset statistic", () =>
         {
+            var beatmap = new BmsBeatmap
+            {
+                LayoutVariant = BmsLayoutVariant.Bms5K,
+                TotalColumns = BmsLayout.GetTotalColumns(BmsLayoutVariant.Bms5K),
+            };
+
             Child = new Container
             {
                 Anchor = Anchor.Centre,
                 Origin = Anchor.Centre,
                 Width = 720,
                 AutoSizeAxes = Axes.Y,
-                Child = hitOffsetStatistic = new BmsHitOffsetStatistic(new ScoreInfo { HitEvents = createGaugeHitEvents() }, new BmsBeatmap
-                {
-                    LayoutVariant = BmsLayoutVariant.Bms5K,
-                    TotalColumns = BmsLayout.GetTotalColumns(BmsLayoutVariant.Bms5K),
-                }),
+                Child = hitOffsetStatistic = new BmsHitOffsetStatistic(BmsHitOffsetStatistic.CreateStatistics(BmsGameplayProfile.INSTANCE, beatmap, createGaugeHitEvents())),
             };
         });
 
@@ -953,7 +956,7 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
                 Origin = Anchor.Centre,
                 Width = 720,
                 AutoSizeAxes = Axes.Y,
-                Child = hitOffsetStatistic = new BmsHitOffsetStatistic(new ScoreInfo { HitEvents = createGaugeHitEvents() }, beatmap),
+                Child = hitOffsetStatistic = new BmsHitOffsetStatistic(BmsHitOffsetStatistic.CreateStatistics(BmsGameplayProfile.INSTANCE, beatmap, createGaugeHitEvents())),
             };
         });
 
@@ -973,17 +976,20 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
 
         AddStep("load hit scatter statistic", () =>
         {
+            var beatmap = new BmsBeatmap
+            {
+                LayoutVariant = BmsLayoutVariant.Bms5K,
+                TotalColumns = BmsLayout.GetTotalColumns(BmsLayoutVariant.Bms5K),
+            };
+
             Child = new Container
             {
                 Anchor = Anchor.Centre,
                 Origin = Anchor.Centre,
                 Width = 720,
                 AutoSizeAxes = Axes.Y,
-                Child = hitScatterStatistic = new BmsHitScatterStatistic(new ScoreInfo { HitEvents = createGaugeHitEvents() }, new BmsBeatmap
-                {
-                    LayoutVariant = BmsLayoutVariant.Bms5K,
-                    TotalColumns = BmsLayout.GetTotalColumns(BmsLayoutVariant.Bms5K),
-                }),
+                Child = hitScatterStatistic = new BmsHitScatterStatistic(
+                    BmsHitScatterStatistic.CreateStatistics(BmsGameplayProfile.INSTANCE, beatmap, createGaugeHitEvents()), BmsGameplayProfile.INSTANCE),
             };
         });
 
@@ -1046,6 +1052,11 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
 
         AddStep("load hit scatter statistic", () =>
         {
+            var beatmap = new BmsBeatmap
+            {
+                LayoutVariant = BmsLayoutVariant.Bms5K,
+                TotalColumns = BmsLayout.GetTotalColumns(BmsLayoutVariant.Bms5K),
+            };
             var hitEvents = Enumerable.Range(0, pointCount)
                 .Select(i => new HitEvent(i % 301 - 150, 1, HitResult.Great, new BmsNote { Column = 0, StartTime = i }, null, null))
                 .ToArray();
@@ -1054,11 +1065,8 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
             {
                 Width = 720,
                 AutoSizeAxes = Axes.Y,
-                Child = hitScatterStatistic = new BmsHitScatterStatistic(new ScoreInfo { HitEvents = [.. hitEvents] }, new BmsBeatmap
-                {
-                    LayoutVariant = BmsLayoutVariant.Bms5K,
-                    TotalColumns = BmsLayout.GetTotalColumns(BmsLayoutVariant.Bms5K),
-                }),
+                Child = hitScatterStatistic = new BmsHitScatterStatistic(
+                    BmsHitScatterStatistic.CreateStatistics(BmsGameplayProfile.INSTANCE, beatmap, hitEvents), BmsGameplayProfile.INSTANCE),
             };
         });
 
@@ -1104,17 +1112,20 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
 
         AddStep("load hit scatter statistic", () =>
         {
+            var beatmap = new BmsBeatmap
+            {
+                LayoutVariant = BmsLayoutVariant.Bms5K,
+                TotalColumns = BmsLayout.GetTotalColumns(BmsLayoutVariant.Bms5K),
+            };
+
             Child = new Container
             {
                 Anchor = Anchor.Centre,
                 Origin = Anchor.Centre,
                 Width = 720,
                 AutoSizeAxes = Axes.Y,
-                Child = hitScatterStatistic = new BmsHitScatterStatistic(new ScoreInfo { HitEvents = createGaugeHitEvents() }, new BmsBeatmap
-                {
-                    LayoutVariant = BmsLayoutVariant.Bms5K,
-                    TotalColumns = BmsLayout.GetTotalColumns(BmsLayoutVariant.Bms5K),
-                }),
+                Child = hitScatterStatistic = new BmsHitScatterStatistic(
+                    BmsHitScatterStatistic.CreateStatistics(BmsGameplayProfile.INSTANCE, beatmap, createGaugeHitEvents()), BmsGameplayProfile.INSTANCE),
             };
         });
 

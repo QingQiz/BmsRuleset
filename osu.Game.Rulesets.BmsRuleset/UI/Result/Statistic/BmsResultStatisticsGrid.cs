@@ -2,12 +2,12 @@ using System.Linq;
 using System;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics;
+using osu.Framework.Localisation;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
-using osu.Game.Screens.Ranking.Statistics;
 using osuTK;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
@@ -39,14 +39,13 @@ internal partial class BmsResultStatisticsGrid : CompositeDrawable
         timeline = new BmsTimelineStatistic(empty.Timeline);
         scatter = new BmsHitScatterStatistic(empty.Scatter, profile);
         offset = new BmsHitOffsetStatistic(empty.Offset);
-        StatisticItem[] items =
+        cells =
         [
-            new(BmsStrings.GaugeHistory, () => gauge),
-            new(BmsStrings.Timeline, () => timeline),
-            new(BmsStrings.HitScatter, () => scatter),
-            new(BmsStrings.HitOffset, () => offset),
+            new StatisticCell(BmsStrings.GaugeHistory, gauge),
+            new StatisticCell(BmsStrings.Timeline, timeline),
+            new StatisticCell(BmsStrings.HitScatter, scatter),
+            new StatisticCell(BmsStrings.HitOffset, offset),
         ];
-        cells = items.Select(item => new StatisticCell(item)).ToArray();
 
         InternalChild = new OsuScrollContainer
         {
@@ -96,8 +95,9 @@ internal partial class BmsResultStatisticsGrid : CompositeDrawable
         private readonly Drawable statistic;
         private readonly OsuSpriteText heading;
 
-        internal StatisticCell(StatisticItem item)
+        internal StatisticCell(LocalisableString name, Drawable statistic)
         {
+            this.statistic = statistic;
             RelativeSizeAxes = Axes.X;
             AutoSizeAxes = Axes.Y;
             Padding = new MarginPadding(gap / 2);
@@ -113,8 +113,8 @@ internal partial class BmsResultStatisticsGrid : CompositeDrawable
                     Spacing = new Vector2(0, heading_spacing),
                     Children =
                     [
-                        heading = new OsuSpriteText { Text = item.Name, Font = OsuFont.GetFont(size: 17, weight: FontWeight.SemiBold) },
-                        statistic = item.CreateContent(),
+                        heading = new OsuSpriteText { Text = name, Font = OsuFont.GetFont(size: 17, weight: FontWeight.SemiBold) },
+                        statistic,
                     ],
                 },
             ];

@@ -46,22 +46,6 @@ public class BmsJudgementEventConsumerTest
     };
 
     [Test]
-    public void TestGaugeFallbackAppliesCanonicalResultOnce()
-    {
-        var canonicalScore = createStandardLongNoteScore(HitResult.Ok);
-        var singleEventScore = new ScoreInfo
-        {
-            HitEvents = [new HitEvent(19, 1, HitResult.Ok, new BmsLongNote { StartTime = 1000, Duration = 500 }, null, null)],
-        };
-
-        var canonicalSeries = BmsGaugeHistoryGraph.CreateSeries(canonicalScore.Score, createBeatmap(),
-            BmsJudgementEventProjection.CreateScoringHitEvents(canonicalScore.Events), []).Single();
-        var singleEventSeries = BmsGaugeHistoryGraph.CreateSeries(singleEventScore, createBeatmap()).Single();
-
-        Assert.That(canonicalSeries.Points.Last().Health, Is.EqualTo(singleEventSeries.Points.Last().Health));
-    }
-
-    [Test]
     public void TestTimelineUsesCanonicalResultAndBothTimingObservations()
     {
         var score = createStandardLongNoteScore(HitResult.Great);

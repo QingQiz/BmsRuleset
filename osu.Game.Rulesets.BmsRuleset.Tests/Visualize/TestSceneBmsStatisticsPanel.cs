@@ -17,6 +17,7 @@ using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
@@ -314,7 +315,11 @@ public partial class TestSceneBmsStatisticsPanel : OsuTestScene
             score.HitEvents.Add(new HitEvent(10, 1, HitResult.Perfect, note, null, null));
         }
 
-        return BmsResultStatisticsData.Create(score, beatmap);
+        return BmsResultStatisticsData.Create(score, beatmap,
+        [
+            BmsTestHealth.History(0, [new BmsGaugeStateSnapshot(BmsGaugeType.Normal, 0.2, false)]),
+            BmsTestHealth.History(hits * 1000, [new BmsGaugeStateSnapshot(BmsGaugeType.Normal, 0.8, false)]),
+        ]);
     }
 
     private partial class DeferredStatisticsPanel : BmsStatisticsPanel

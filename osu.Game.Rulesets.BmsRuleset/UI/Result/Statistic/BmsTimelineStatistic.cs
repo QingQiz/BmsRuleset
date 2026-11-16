@@ -16,7 +16,6 @@ using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
-using osu.Game.Scoring;
 using osuTK;
 using osuTK.Graphics;
 
@@ -31,9 +30,7 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable, IBmsResult
     private static readonly Color4 note_colour = colours.Blue;
     private static readonly Color4 ln_colour = colours.GreenLight;
     private static readonly Color4 scratch_colour = colours.Yellow;
-    private readonly ScoreInfo? score;
-    private readonly IBeatmap? playableBeatmap;
-    private TimelineData? data;
+    private TimelineData data;
     private readonly List<Drawable> plots = [];
     private readonly List<Drawable> legends = [];
 
@@ -44,22 +41,8 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable, IBmsResult
         this.data = data;
     }
 
-    public BmsTimelineStatistic(ScoreInfo score, IBeatmap playableBeatmap)
-    {
-        RelativeSizeAxes = Axes.X;
-        AutoSizeAxes = Axes.Y;
-
-        this.score = score;
-        this.playableBeatmap = playableBeatmap;
-    }
-
     [BackgroundDependencyLoader]
-    private void load()
-    {
-        data ??= CreateData(score!, playableBeatmap!);
-
-        rebuild();
-    }
+    private void load() => rebuild();
 
     internal void SetData(TimelineData newData)
     {
@@ -70,7 +53,6 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable, IBmsResult
 
     private void rebuild()
     {
-        var current = data!;
         var height = plots.FirstOrDefault()?.Height ?? subplot_height;
         plots.Clear();
         legends.Clear();
@@ -82,17 +64,14 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable, IBmsResult
             Spacing = new Vector2(0, 8),
             Children =
             [
-                createSubplot(BmsStrings.Notes, current.Notes, current.StageBoundaries),
-                createSubplot(BmsStrings.Judgement, current.Judgements, current.StageBoundaries),
-                createSubplot(BmsStrings.FastSlow, current.FastSlow, current.StageBoundaries),
+                createSubplot(BmsStrings.Notes, data.Notes, data.StageBoundaries),
+                createSubplot(BmsStrings.Judgement, data.Judgements, data.StageBoundaries),
+                createSubplot(BmsStrings.FastSlow, data.FastSlow, data.StageBoundaries),
             ],
         };
         foreach (var plot in plots)
             plot.Height = height;
     }
-
-    internal static TimelineData CreateData(ScoreInfo score, IBeatmap playableBeatmap)
-        => CreateData(GameplayProfile.FromMods(score.Mods), playableBeatmap, score.HitEvents, score.HitEvents);
 
     internal static TimelineData CreateData(GameplayProfile profile, IBeatmap playableBeatmap, IReadOnlyList<HitEvent> timingEvents, IReadOnlyList<HitEvent> scoringEvents,
         double minimumDuration = 0)

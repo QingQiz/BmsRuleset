@@ -35,8 +35,6 @@ internal abstract partial class GameplayProfile
         => mods.OfType<IApplicableToGameplayProfile>().Aggregate((GameplayProfile)BmsGameplayProfile.INSTANCE,
             (profile, mod) => mod.ApplyToGameplayProfile(profile));
 
-    internal virtual IReadOnlyList<GameplayHealthHistoryEvent> ReconstructHealthHistory(ScoreInfo score, IBeatmap beatmap, IReadOnlyList<HitEvent> events) => [];
-
     internal abstract (Chart Chart, SessionConfiguration Configuration) Compile(BmsHitObject[] objects, KeyChart source, IBeatmapInfo beatmapInfo);
 
     internal virtual SessionConfiguration ConfigureSession(BmsEngineChart compiled, BmsJudgementAlgorithm? algorithm, HealthConfiguration health)

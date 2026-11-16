@@ -15,7 +15,6 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
-using osu.Game.Scoring;
 using osu.Game.Rulesets.Scoring;
 using osuTK;
 using osuTK.Graphics;
@@ -33,9 +32,7 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable, IBmsResul
     private const float minimum_bar_height = 0.02f;
     private const float label_width = 96;
 
-    private readonly ScoreInfo? score;
-    private readonly IBeatmap? playableBeatmap;
-    private HitOffsetStatistics? statistics;
+    private HitOffsetStatistics statistics;
 
     private FillFlowContainer content = null!;
     private bool expanded;
@@ -49,22 +46,11 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable, IBmsResul
         this.statistics = statistics;
     }
 
-    public BmsHitOffsetStatistic(ScoreInfo score, IBeatmap playableBeatmap)
-    {
-        RelativeSizeAxes = Axes.X;
-        AutoSizeAxes = Axes.Y;
-
-        this.score = score;
-        this.playableBeatmap = playableBeatmap;
-    }
-
     public override bool HandlePositionalInput => true;
 
     [BackgroundDependencyLoader]
     private void load()
     {
-        statistics ??= CreateStatistics(GameplayProfile.FromMods(score!.Mods), playableBeatmap!, score.HitEvents);
-
         InternalChild = content = new FillFlowContainer
         {
             RelativeSizeAxes = Axes.X,
@@ -128,13 +114,11 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable, IBmsResul
     private void rebuild()
     {
         content.Clear();
-        var current = statistics!;
-
-        content.Add(overallRow = createRow(BmsStrings.Overall, current.Overall, summaryHeight));
+        content.Add(overallRow = createRow(BmsStrings.Overall, statistics.Overall, summaryHeight));
 
         if (expanded)
         {
-            foreach (var key in current.Keys)
+            foreach (var key in statistics.Keys)
                 content.Add(createRow(key.Label, key.Summary, key_graph_height));
         }
     }

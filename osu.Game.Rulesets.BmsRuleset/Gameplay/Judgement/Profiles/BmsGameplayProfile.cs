@@ -59,9 +59,6 @@ internal sealed partial class BmsGameplayProfile : GameplayProfile
             AutoSizeAxes = Axes.Both,
         };
 
-    internal override IReadOnlyList<GameplayHealthHistoryEvent> ReconstructHealthHistory(ScoreInfo score, IBeatmap beatmap, IReadOnlyList<HitEvent> events)
-        => BmsLegacyGaugeHistory.Reconstruct(score, beatmap, events, this);
-
     internal override GameplayEventKind EventKind(JudgementEvent result) => result switch
     {
         { Part: var part } when part == NoteParts.EMPTY => result.Result == BmsResults.BAD ? GameplayEventKind.NonConsumingHit : GameplayEventKind.EmptyInput,

@@ -124,9 +124,8 @@ public partial class TestSceneBmsBeatorajaPmsConsumers : BmsPlayerTestScene
             Assert.That(BmsScoreGraph.ScoreAtProgress(4, BmsTestExScore.States(BmsTestExScore.CreateProgression(events)), 2, 3), Is.EqualTo(2));
             Assert.That(score.Accuracy.Value, Is.EqualTo(2d / 3).Within(1e-10));
             // GaugeProperty.NORMAL_PMS has a 120% ceiling; graph positions are normalised to it.
-            Assert.That(BmsGaugeHistoryGraph.CreateSeries(restored.ScoreInfo, Player.GameplayState.Beatmap,
-                    BmsJudgementEventProjection.CreateScoringHitEvents(events), []).Single().Points.Last().Health,
-                Is.EqualTo(44d / 120).Within(1e-8), "archive fallback gauge must not charge suppressed POOR again");
+            Assert.That(BmsGaugeHistoryGraph.CreateSeries(Player.GameplayState.Beatmap, SimulateGaugeHistory()).Single().Points.Last().Health,
+                Is.EqualTo(44d / 120).Within(1e-8), "replay gauge history must not charge suppressed POOR again");
         }
     }
 

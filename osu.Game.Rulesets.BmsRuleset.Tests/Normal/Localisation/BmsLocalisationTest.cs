@@ -18,7 +18,6 @@ using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Profiles;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
-using osu.Game.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Localisation;
 
@@ -55,7 +54,7 @@ public class BmsLocalisationTest
             TotalColumns = 6,
             HitObjects = [new BmsNote { StartTime = 1000, Column = 1 }],
         };
-        var first = BmsTimelineStatistic.CreateData(new ScoreInfo(), beatmap);
+        var first = BmsTimelineStatistic.CreateData(BmsGameplayProfile.INSTANCE, beatmap, [], []);
         var offset = BmsHitOffsetStatistic.CreateStatistics(BmsGameplayProfile.INSTANCE, beatmap, []);
         var scatter = BmsHitScatterStatistic.CreateStatistics(BmsGameplayProfile.INSTANCE, beatmap, []);
         var key = localisation.GetLocalisedBindableString(offset.Keys[1].Label);
@@ -65,7 +64,7 @@ public class BmsLocalisationTest
 
         config.SetValue(FrameworkSetting.Locale, "zh");
         Assert.That(new[] { key.Value, scratch.Value, note.Value }, Is.EqualTo(new[] { "按键 1", "皿", "单键" }));
-        var second = BmsTimelineStatistic.CreateData(new ScoreInfo(), beatmap);
+        var second = BmsTimelineStatistic.CreateData(BmsGameplayProfile.INSTANCE, beatmap, [], []);
         second = second with
         {
             Notes = second.Notes with { Categories = second.Notes.Categories.Where(category => category.Label != BmsStrings.Scratch).ToArray() },

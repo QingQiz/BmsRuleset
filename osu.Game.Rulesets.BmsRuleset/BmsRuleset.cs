@@ -25,7 +25,6 @@ using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.Icons;
 using osu.Game.Rulesets.BmsRuleset.UI.Result;
-using osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
 using osu.Game.Rulesets.BmsRuleset.UI.Settings;
 using osu.Game.Rulesets.BmsRuleset.UI.Skinning;
 using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Legacy;
@@ -38,8 +37,6 @@ using osu.Game.Rulesets.Filter;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
-using osu.Game.Scoring;
-using osu.Game.Screens.Ranking.Statistics;
 using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.BmsRuleset;
@@ -125,14 +122,6 @@ public partial class BmsRuleset : Ruleset
 
     public override HealthProcessor CreateHealthProcessor(double drainStartTime) =>
         new BmsHealthProcessor();
-
-    public override StatisticItem[] CreateStatisticsForScore(ScoreInfo score, IBeatmap playableBeatmap) =>
-    [
-        new(BmsStrings.GaugeHistory, () => new BmsGaugeHistoryGraph(score, playableBeatmap), requiresHitEvents: true),
-        new(BmsStrings.Timeline, () => new BmsTimelineStatistic(score, playableBeatmap), requiresHitEvents: true),
-        new(BmsStrings.HitScatter, () => new BmsHitScatterStatistic(score, playableBeatmap), requiresHitEvents: true),
-        new(BmsStrings.HitOffset, () => new BmsHitOffsetStatistic(score, playableBeatmap), requiresHitEvents: true),
-    ];
 
     public override IEnumerable<Mod> GetModsFor(ModType type) => type switch
     {

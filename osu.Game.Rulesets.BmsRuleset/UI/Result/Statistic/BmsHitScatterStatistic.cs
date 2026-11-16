@@ -22,7 +22,6 @@ using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.Scoring;
-using osu.Game.Scoring;
 using osuTK.Graphics;
 using osuTK;
 
@@ -54,9 +53,7 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResu
 
 
     private readonly GameplayProfile profile;
-    private readonly IReadOnlyList<HitEvent>? hitEvents;
-    private readonly IBeatmap? playableBeatmap;
-    private HitScatterStatistics? statistics;
+    private HitScatterStatistics statistics;
     private FillFlowContainer content = null!;
     private bool expanded;
     private Drawable legend = null!;
@@ -69,16 +66,6 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResu
         AutoSizeAxes = Axes.Y;
         this.statistics = statistics;
         this.profile = profile;
-    }
-
-    public BmsHitScatterStatistic(ScoreInfo score, IBeatmap playableBeatmap)
-    {
-        RelativeSizeAxes = Axes.X;
-        AutoSizeAxes = Axes.Y;
-
-        hitEvents = score.HitEvents;
-        profile = GameplayProfile.FromMods(score.Mods);
-        this.playableBeatmap = playableBeatmap;
     }
 
     internal static HitScatterStatistics CreateStatistics(GameplayProfile profile, IBeatmap playableBeatmap, IReadOnlyList<HitEvent> hitEvents, double minimumDuration = 0)
@@ -611,8 +598,6 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResu
     [BackgroundDependencyLoader]
     private void load()
     {
-        statistics ??= CreateStatistics(profile, playableBeatmap!, hitEvents!);
-
         InternalChild = content = new FillFlowContainer
         {
             RelativeSizeAxes = Axes.X,
@@ -635,13 +620,12 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResu
     {
         content.Clear();
 
-        var data = statistics!;
-        content.Add(legend = createLegend(data.Overall));
-        content.Add(overallRow = createRow(BmsStrings.Overall, data.Overall, summaryHeight));
+        content.Add(legend = createLegend(statistics.Overall));
+        content.Add(overallRow = createRow(BmsStrings.Overall, statistics.Overall, summaryHeight));
 
         if (expanded)
         {
-            foreach (var key in data.Keys)
+            foreach (var key in statistics.Keys)
                 content.Add(createRow(key.Label, key.Data, key_graph_height));
         }
     }

@@ -53,7 +53,7 @@ internal sealed record BmsResultStatisticsData(
         var profile = GameplayProfile.FromMods(score.Mods);
         var timeline = BmsTimelineStatistic.CreateData(profile, beatmap, hitEvents, scoringEvents, minimumDuration);
         return new BmsResultStatisticsData(
-            BmsGaugeHistoryGraph.CreateSeries(score, beatmap, scoringEvents, gauges, minimumDuration),
+            BmsGaugeHistoryGraph.CreateSeries(beatmap, gauges, minimumDuration),
             [],
             timeline,
             BmsHitScatterStatistic.CreateStatistics(profile, beatmap, hitEvents, minimumDuration),

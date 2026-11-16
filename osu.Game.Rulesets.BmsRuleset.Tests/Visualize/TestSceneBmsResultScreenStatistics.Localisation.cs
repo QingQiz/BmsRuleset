@@ -14,7 +14,6 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
-using osu.Game.Scoring;
 using osuTK.Input;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
@@ -47,7 +46,7 @@ public partial class TestSceneBmsResultScreenStatistics
             var hits = createGaugeHitEvents();
             offset = new BmsHitOffsetStatistic(BmsHitOffsetStatistic.CreateStatistics(BmsGameplayProfile.INSTANCE, beatmap, hits));
             scatter = new BmsHitScatterStatistic(BmsHitScatterStatistic.CreateStatistics(BmsGameplayProfile.INSTANCE, beatmap, hits), BmsGameplayProfile.INSTANCE);
-            timeline = new BmsTimelineStatistic(BmsTimelineStatistic.CreateData(new ScoreInfo { HitEvents = hits.ToList() }, beatmap));
+            timeline = new BmsTimelineStatistic(BmsTimelineStatistic.CreateData(BmsGameplayProfile.INSTANCE, beatmap, hits, hits));
             Child = new GridContainer
             {
                 RelativeSizeAxes = Axes.Both,

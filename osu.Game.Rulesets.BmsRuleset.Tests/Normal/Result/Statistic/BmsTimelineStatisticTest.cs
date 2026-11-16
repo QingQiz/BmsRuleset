@@ -3,6 +3,7 @@ using NUnit.Framework;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
 using osu.Game.Rulesets.Scoring;
@@ -88,7 +89,7 @@ public class BmsTimelineStatisticTest
             HitObjects = { new BmsLongNote { StartTime = 1000, Duration = 2000, Column = 1 } },
         };
 
-        var data = BmsTimelineStatistic.CreateData(new ScoreInfo { Passed = true }, beatmap);
+        var data = BmsTimelineStatistic.CreateData(BmsGameplayProfile.INSTANCE, beatmap, [], []);
 
         Assert.That(data.Duration, Is.EqualTo(3000));
     }
@@ -103,9 +104,8 @@ public class BmsTimelineStatisticTest
             LayoutVariant = BmsLayoutVariant.Bme7K,
             HitObjects = { note, mine },
         };
-        var score = new ScoreInfo { Passed = true };
 
-        var data = BmsTimelineStatistic.CreateData(score, beatmap);
+        var data = BmsTimelineStatistic.CreateData(BmsGameplayProfile.INSTANCE, beatmap, [], []);
 
         Assert.Multiple(() =>
         {

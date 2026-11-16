@@ -247,6 +247,27 @@ public class BmsReplaySimulationTest
     }
 
     [Test]
+    public void HitEventsWithoutCompleteReplayProvideTimingButNoGaugeHistory()
+    {
+        var beatmap = createBeatmap();
+        var note = new BmsNote { Beatmap = beatmap, Column = 1, StartTime = 1000 };
+        beatmap.HitObjects.Add(note);
+        note.ApplyDefaults(beatmap.ControlPointInfo, beatmap.Difficulty);
+        var source = new ScoreInfo { HitEvents = [new HitEvent(10, 1, HitResult.Perfect, note, null, null)] };
+
+        var missingReplay = BmsResultStatisticsData.Load(source, beatmap, new ReplayData(), default)!;
+        Assert.That(missingReplay.Gauges, Is.Empty);
+        Assert.That(missingReplay.HitEvents, Is.EqualTo(source.HitEvents));
+        var replay = createReplay(new BmsReplayFrame(1010, BmsAction.Key1));
+        replay.HasReceivedAllFrames = false;
+        var incompleteReplay = BmsResultStatisticsData.Load(source, beatmap, replay, default)!;
+        Assert.That(incompleteReplay.Gauges, Is.Empty);
+        Assert.That(incompleteReplay.HitEvents, Is.EqualTo(source.HitEvents));
+        Assert.That(BmsResultStatisticsData.Load(new ScoreInfo(), beatmap, new ReplayData(), default), Is.Null);
+        Assert.That(source.HitEvents, Has.Count.EqualTo(1));
+    }
+
+    [Test]
     public void RecalculatesTimingStatisticsWithoutMutatingSavedHitEvents()
     {
         var beatmap = createBeatmap();

@@ -11,12 +11,9 @@ using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.Objects;
-using osu.Game.Rulesets.Scoring;
-using osu.Game.Scoring;
 using osuTK.Graphics;
 using osuTK;
 
@@ -31,10 +28,8 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable, IBmsResult
     private const float final_line_depth = -1;
     internal const float FAILURE_MARKER_SIZE = 13;
 
-    private readonly ScoreInfo? score;
-    private readonly IBeatmap? playableBeatmap;
-    private IReadOnlyList<GaugeSeries>? series;
-    private IReadOnlyList<float> stageBoundaries = [];
+    private IReadOnlyList<GaugeSeries> series;
+    private IReadOnlyList<float> stageBoundaries;
     private Drawable? graph;
     private Drawable? legend;
 
@@ -46,22 +41,8 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable, IBmsResult
         this.stageBoundaries = stageBoundaries;
     }
 
-    public BmsGaugeHistoryGraph(ScoreInfo score, IBeatmap playableBeatmap)
-    {
-        RelativeSizeAxes = Axes.X;
-        AutoSizeAxes = Axes.Y;
-
-        this.score = score;
-        this.playableBeatmap = playableBeatmap;
-    }
-
     [BackgroundDependencyLoader]
-    private void load()
-    {
-        series ??= CreateSeries(score!, playableBeatmap!);
-
-        rebuild();
-    }
+    private void load() => rebuild();
 
     internal void SetData(IReadOnlyList<GaugeSeries> newSeries, IReadOnlyList<float> boundaries)
     {
@@ -73,7 +54,6 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable, IBmsResult
 
     private void rebuild()
     {
-        var currentSeries = series ?? throw new InvalidOperationException("Gauge data has not been initialised.");
         var height = graph?.Height ?? graph_height;
         InternalChild = new FillFlowContainer
         {
@@ -83,8 +63,8 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable, IBmsResult
             Spacing = new Vector2(0, 8),
             Children =
             [
-                graph = createGraph(currentSeries),
-                legend = createLegend(currentSeries),
+                graph = createGraph(series),
+                legend = createLegend(series),
             ],
         };
         graph.Height = height;
@@ -96,15 +76,9 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable, IBmsResult
             graph.Height = Math.Max(0, height - legend.DrawHeight - 8);
     }
 
-    internal static IReadOnlyList<GaugeSeries> CreateSeries(ScoreInfo score, IBeatmap playableBeatmap)
-        => CreateSeries(score, playableBeatmap, score.HitEvents, []);
-
-    internal static IReadOnlyList<GaugeSeries> CreateSeries(ScoreInfo score, IBeatmap playableBeatmap,
-                                                            IReadOnlyList<HitEvent> hitEvents, IReadOnlyList<GameplayHealthHistoryEvent> gaugeHistory,
+    internal static IReadOnlyList<GaugeSeries> CreateSeries(IBeatmap playableBeatmap, IReadOnlyList<GameplayHealthHistoryEvent> gaugeHistory,
                                                             double minimumDuration = 0)
     {
-        if (gaugeHistory.Count == 0)
-            gaugeHistory = GameplayProfile.FromMods(score.Mods).ReconstructHealthHistory(score, playableBeatmap, hitEvents);
         if (gaugeHistory.Count == 0)
             return [];
 
@@ -213,6 +187,7 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable, IBmsResult
                 failurePoint = point;
             points.Add(point);
         }
+
         if (points[^1].Time < 1)
             points.Add(new GaugePoint(1, points[^1].Health));
         var final = history[^1];
