@@ -4,9 +4,17 @@ using System.IO;
 using NUnit.Framework;
 using osu.Framework.Testing;
 using osu.Framework.Timing;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
+using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Profiles;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Mixing;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Native;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
+using osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Audio;
 
@@ -17,6 +25,73 @@ public partial class BmsSamplePlaybackTest : TestScene
 
     private string tempDir = null!;
     private BmsSamplePlayback playback = null!;
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void HoldHeadSampleStaysPreparedForRecoveryAndSeeking(bool useLazer)
+    {
+        var manualClock = new ManualClock { CurrentTime = 5000 };
+        var mod = new BmsModManiaProfile { OverallDifficulty = { Value = 5 }, DrainRate = { Value = 5 }, UseLazer = { Value = useLazer } };
+        var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, TotalColumns = 8 };
+        beatmap.HitObjects.Add(new BmsLongNote { Beatmap = beatmap, Column = 1, StartTime = 1000, Duration = 9000, SampleKey = 1 });
+        mod.ApplyToBeatmap(beatmap);
+        var compiled = new BmsEngineChart(beatmap, GameplayProfile.FromMods([mod]));
+        var output = new BmsRecordingJudgementOutput
+        {
+            Feedback = message =>
+            {
+                if (message == "sample:1:100")
+                    playback.QueueLivePlay(1);
+            },
+        };
+        var engine = new BmsJudgementEngine(compiled, [new(1, output)]);
+        AddStep("load in the middle of the hold", () =>
+        {
+            createWav("hold-head.wav", 1);
+            playback = new BmsSamplePlayback(new Dictionary<int, BmsSampleDefinition> { { 1, new("hold-head.wav") } }, tempDir,
+                sampleUsages: BmsGameplayAudioController.GetSampleUsages(beatmap, compiled))
+            {
+                Clock = new FramedClock(manualClock),
+            };
+            Add(playback);
+        });
+        AddUntilStep("wait for playback load", () => playback.IsLoaded);
+        AddAssert("head sample is prepared before recovery", () => isSampleReady(1));
+        AddStep("recover a missed head", () => input(true));
+        AddUntilStep("recovery plays the head sample", () => BmsAudioTestAccess.GetActiveVoiceCount(playback) > 0);
+        AddStep("release during the hold", () =>
+        {
+            manualClock.CurrentTime = 6000;
+            input(false);
+        });
+        AddStep("regrab during the hold", () =>
+        {
+            manualClock.CurrentTime = 7000;
+            Assert.That(isSampleReady(1), Is.True);
+            input(true);
+        });
+        AddUntilStep("regrab plays the head sample", () => BmsAudioTestAccess.GetActiveVoiceCount(playback) > 0);
+        AddStep("seek back into the hold", () =>
+        {
+            manualClock.CurrentTime = 3000;
+            playback.StopAll();
+            engine.Reset();
+            output.Reset();
+        });
+        AddAssert("head sample is prepared after seeking", () => isSampleReady(1));
+        AddStep("resume with a recovery press", () => input(true));
+        AddUntilStep("recovery after seek plays", () => BmsAudioTestAccess.GetActiveVoiceCount(playback) > 0);
+        AddStep("advance past all hold input windows", () => manualClock.CurrentTime = 60000);
+        AddUntilStep("head lease expires after the hold", () => !isSampleReady(1));
+        addCleanupSteps();
+
+        void input(bool pressed)
+        {
+            engine.QueueInput(manualClock.CurrentTime, 1, pressed, false);
+            engine.ProcessFrame(new BmsFrameContext(manualClock.CurrentTime, 1), 0);
+            playback.SubmitLivePlayBatch();
+        }
+    }
 
     [Test]
     public void NativeMixerPatchInstallsOnDesktopBassPlatforms()

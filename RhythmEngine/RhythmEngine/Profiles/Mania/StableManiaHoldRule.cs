@@ -39,7 +39,7 @@ internal sealed class StableManiaHoldRule(ImmutableArray<long> windows) : INoteR
             Early = Math.Max(-windows[4], window.Early * 2),
             Late = Math.Min(windows[4], window.Late * 2),
         }));
-        return new NoteTiming(head, windows[3], TailDeadline: windows[4], TailWindows: tail);
+        return new NoteTiming(head, windows[3], TailDeadline: windows[4], TailWindows: tail, HeadRetriggerDeadline: windows[3]);
     }
 
     public ImmutableArray<NotePartState> GetParts(NoteContext context)

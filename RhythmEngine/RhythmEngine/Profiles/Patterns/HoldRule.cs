@@ -36,7 +36,9 @@ public sealed class HoldRule : INoteRule, INoteTiming
         Configuration = configuration;
         Timing = new NoteTiming(configuration.HeadWindows, configuration.HeadDeadline, configuration.NonResolvingHeadResults,
             configuration.EndMode == HoldEndMode.Release ? configuration.TailDeadline : configuration.AutomaticEndOffset,
-            configuration.ResolvedHeadWindows?.Entries.Max(window => window.Late) ?? 0, configuration.TailWindows);
+            configuration.ResolvedHeadWindows?.Entries.Max(window => window.Late) ?? 0, configuration.TailWindows,
+            Math.Min(configuration.LatestRecoveryOffset ?? long.MaxValue,
+                configuration.EndMode == HoldEndMode.Release ? configuration.TailDeadline : configuration.AutomaticEndOffset));
     }
 
     public NoteState CreateState(ChartNote note)

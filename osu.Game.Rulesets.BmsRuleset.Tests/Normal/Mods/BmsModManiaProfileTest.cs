@@ -46,6 +46,7 @@ using osu.Game.Rulesets.BmsRuleset.IO.Input;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Playback;
 using osu.Game.Rulesets.BmsRuleset.Tests.Normal.BeatmapTest.Decoding;
+using osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
@@ -732,8 +733,36 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Audio
 {
     public partial class BmsKeySoundCursorTest
     {
-        [TestCase(false, 835, 2210, 3210)]
-        [TestCase(true, 826.5, 2136.5, 3204.75)]
+        [TestCase(0)]
+        [TestCase(.5)]
+        [Category("ManiaProfile")]
+        public void StableHeadSampleRangeCoversRecoveryUntilItsDeadline(double fractionalEnd)
+        {
+            var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, TotalColumns = 8 };
+            var hold = new BmsLongNote { Beatmap = beatmap, Column = 1, StartTime = 1000, Duration = 9000 + fractionalEnd, SampleKey = 1 };
+            beatmap.HitObjects.Add(hold);
+            var mod = new BmsModManiaProfile { OverallDifficulty = { Value = 5 }, DrainRate = { Value = 5 }, UseLazer = { Value = false } };
+            var compiled = new BmsEngineChart(beatmap, GameplayProfile.FromMods([mod]));
+            var feedback = new List<string>();
+            var output = new BmsRecordingJudgementOutput { Feedback = feedback.Add };
+            var engine = new BmsJudgementEngine(compiled, [new(1, output)]);
+            var deadline = hold.EndTime + 112;
+            var lastPress = deadline - .001;
+            engine.QueueInput(lastPress, 1, true, false);
+            engine.ProcessFrame(new BmsFrameContext(lastPress, 1), 0);
+            Assert.That(feedback, Does.Contain("sample:1:100"));
+            var usage = BmsGameplayAudioController.GetSampleUsages(beatmap, compiled).Single();
+            Assert.That(usage.LatestTriggerTime, Is.GreaterThanOrEqualTo(lastPress));
+            engine.Reset();
+            output.Reset();
+            feedback.Clear();
+            engine.QueueInput(deadline, 1, true, false);
+            engine.ProcessFrame(new BmsFrameContext(deadline, 1), 0);
+            Assert.That(feedback, Does.Not.Contain("sample:1:100"));
+        }
+
+        [TestCase(false, 835, 3210, 3210)]
+        [TestCase(true, 826.5, 3136.5, 3204.75)]
         [Category("ManiaProfile")]
         public void SelectedProfileControlsSamplePreparationAndExpiry(bool mania, double nextReady, double headExpiry, double tailExpiry)
         {
@@ -760,13 +789,14 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Audio
                 Assert.That(usages.Single(usage => usage.SampleKey == 2).LatestTriggerTime, Is.EqualTo(headExpiry));
                 Assert.That(usages.Single(usage => usage.SampleKey == 3).EarliestTriggerTime, Is.EqualTo(nextReady + 1000));
                 Assert.That(usages.Single(usage => usage.SampleKey == 3).LatestTriggerTime, Is.EqualTo(tailExpiry));
-                Assert.That(cursor.Next(headExpiry - 1000, _ => false), Is.SameAs(tap));
-                Assert.That(cursor.Next(headExpiry - 1000 + 0.001, _ => false), Is.SameAs(hold));
-                Assert.That(cursor.Next(headExpiry - 1000, _ => false), Is.SameAs(tap));
+                var tapExpiry = tap.StartTime + compiled.TimingFor(tap).HeadDeadline / 1000.0;
+                Assert.That(cursor.Next(tapExpiry, _ => false), Is.SameAs(tap));
+                Assert.That(cursor.Next(tapExpiry + 0.001, _ => false), Is.SameAs(hold));
+                Assert.That(cursor.Next(tapExpiry, _ => false), Is.SameAs(tap));
             });
 
             var session = new JudgementSession(compiled.Chart, compiled.Configuration);
-            session.AdvanceTo(Time.FromMilliseconds(headExpiry + 0.001));
+            session.AdvanceTo(Time.FromMilliseconds(hold.StartTime + compiled.TimingFor(hold).HeadDeadline / 1000.0 + 0.001));
             Assert.That(session.GetNote(compiled.Ids[hold]).Parts.Single(part => part.Part == NoteParts.HEAD).Resolved, Is.True);
         }
     }

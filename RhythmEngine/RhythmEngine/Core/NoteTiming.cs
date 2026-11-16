@@ -11,13 +11,17 @@ public interface INoteTiming
     NoteTiming Timing { get; }
 }
 
+/// <summary>
+/// Timing offsets in microseconds. Head deadlines use the note start; tail and head-retrigger deadlines use the note end.
+/// </summary>
 public readonly record struct NoteTiming(
     TimingWindows HeadWindows,
     long HeadDeadline,
     ImmutableHashSet<ResultId>? NonResolvingHeadResults = null,
     long TailDeadline = 0,
     long ResolvedHeadDeadline = 0,
-    TimingWindows? TailWindows = null)
+    TimingWindows? TailWindows = null,
+    long? HeadRetriggerDeadline = null)
 {
     public long EarliestInputOffset => HeadWindows.Entries.Min(window => window.Early);
 

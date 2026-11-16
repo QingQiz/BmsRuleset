@@ -132,7 +132,11 @@ internal sealed class BmsGameplayAudioController
                     var earliestTriggerTime = previousHitObject == null
                         ? 0
                         : Math.Max(0, previousHitObject.StartTime + compiled.TimingFor(previousHitObject).EarliestResolvingOffset / 1000.0);
-                    var latestTriggerTime = hitObject.StartTime + compiled.TimingFor(hitObject).HeadDeadline / 1000.0;
+                    var timing = compiled.TimingFor(hitObject);
+                    var latestTriggerTime = hitObject.StartTime + timing.HeadDeadline / 1000.0;
+                    // Recovering or regrabbing a hold can retrigger its head sample after the initial head window.
+                    if (hitObject is BmsLongNote hold && timing.HeadRetriggerDeadline is { } retriggerDeadline)
+                        latestTriggerTime = Math.Max(latestTriggerTime, hold.EndTime + retriggerDeadline / 1000.0);
 
                     foreach (var sample in hitObject.GetSamples())
                         yield return new BmsSampleUsage(sample.SampleKey, sample.Time, earliestTriggerTime, latestTriggerTime);
