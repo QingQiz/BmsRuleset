@@ -56,8 +56,6 @@
 ## 亮点
 
 支持 BPM/STOP 变化、长音符、地雷、随机分支、滚速变化、BGA 和 keysound。
-提供兼容 beatoraja 的判定窗口、[四种判定算法](./docs/gameplay.zh-CN.md#判定选择算法)和六种血量类型，
-同时显示传统 EX Score 与 osu! 标准化分数。
 
 ### osu!mania 皮肤支持
 
@@ -170,11 +168,21 @@ osu!mania 7K 谱面可使用 BMS 游玩，7 条轨道映射到 BME 键盘列，�
 开启后会显示**音符淡入时长**滑条：正值让音符更早开始淡入，负值让音符更晚完全显示，0 表示直接出现。
 详见[设置说明](./docs/gameplay.zh-CN.md#设置)。
 
+### 多种判定规则
+
+支持多套判定、血量与计分规则：
+
+- **[beatoraja](./docs/judgements.zh-CN.md#beatoraja)**：默认规则，提供[四种判定选择算法](./docs/judgements.zh-CN.md#beatoraja-note-selection)、
+  BMS 血条，同时显示传统 EX Score 与 osu! 标准化分数。
+- **[LR2（R2）](./docs/judgements.zh-CN.md#lr2)**：LR2 兼容判定与血量，使用经典 LN 长条。
+- **[osu!mania（OM）](./docs/judgements.zh-CN.md#osu-mania)**：可选择 lazer 或 stable 规则，并调整 OD 和 HP。
+
 ## 详细文档
 
 | 文档                                           | 内容                                                   |
 |----------------------------------------------|------------------------------------------------------|
-| [游玩机制与设置](./docs/gameplay.zh-CN.md)          | 练习、判定、计分、血量、Mods、键位与设置                         |
+| [游玩机制与设置](./docs/gameplay.zh-CN.md)          | 练习、Mods、键位与设置                         |
+| [判定、血量与计分](./docs/judgements.zh-CN.md)            | 判定窗口、血量、段位规则、长音符与计分                 |
 | [难度表](./docs/difficulty-tables.zh-CN.md)         | 导入和管理 LR2/beatoraja 难度表                            |
 | [皮肤系统](./docs/skin-system.zh-CN.md)             | `skin.ini` 参考、osu!mania 兼容与可编辑组件                   |
 | [BMS 格式支持（英文）](./docs/bms-format-support.md) | Parser 行为、支持的命令与通道、参考资料                           |

@@ -67,6 +67,8 @@
 | `cn`          | 强制 Charge Note（CN）模式       |
 | `hcn`         | 强制 Hell Charge Note（HCN）模式 |
 
+段位的判定约束、血量数值与跨曲继承见[判定与血量规则](./judgements.zh-CN.md#beatoraja-course-rules)。
+
 ## 标记
 
 导入后，MD5 匹配的谱面难度名后会自动追加标记：

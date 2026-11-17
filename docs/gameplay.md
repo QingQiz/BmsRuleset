@@ -30,7 +30,7 @@ Use **Up/Down** to temporarily increase/decrease scroll speed during play. Rebin
 Key presses play the keysounds assigned to their column.
 
 Scratch has two directions, bound to **Scratch** and **Reverse Scratch**. Either direction can hit a scratch note.
-For long scratches, press one direction at the head and follow the [long-note rules](#long-notes) at the tail.
+For long scratches, press one direction at the head and follow the [long-note rules](./judgements.md#beatoraja-long-notes) at the tail.
 
 | Layout / side | Scratch | Reverse Scratch |
 |---------------|---------|-----------------|
@@ -42,128 +42,16 @@ For long scratches, press one direction at the head and follow the [long-note ru
 For keyboard play, bind both directions to comfortable keys. In CN and HCN, press the opposite direction near the
 tail to complete a long scratch.
 
-## Judgements and Scoring
+## Judgements, Gauges, and Scoring
 
-**Judgement tiers:** timing windows follow beatoraja. The example below is for a **7K key lane at `#RANK 2` (Normal)**
-with default judgement settings.
-Negative offsets mean early presses; positive offsets mean late presses. Each press receives the best judgement
-whose window contains it.
+- [beatoraja (default rules)](./judgements.md#beatoraja) · [Gauges](./judgements.md#beatoraja-gauges) · [Courses](./judgements.md#beatoraja-course-rules)
+- [LR2 (R2)](./judgements.md#lr2) · [Gauges](./judgements.md#lr2-gauges)
+- [osu!mania (OM)](./judgements.md#osu-mania) · [Gauges](./judgements.md#osu-mania-gauges)
 
-| Name       | EX pts | Combo        | RANK 2 (Normal) window           |
-|------------|--------|--------------|----------------------------------|
-| **PGREAT** | 2      | kept         | ±15 ms                           |
-| **GREAT**  | 1      | kept         | ±45 ms                           |
-| **GOOD**   | 0      | kept         | ±112.5 ms                        |
-| **BAD**    | 0      | reset        | -165 ms / +210 ms                 |
-| **POOR**   | 0      | reset        | Missed past +210 ms               |
-| **E-POOR** | 0      | kept in 7K   | Empty presses near a note; see below |
-
-For 7K key lanes, `#RANK` 0 = Very Hard (±5/15/37.5 ms, BAD -55/+70 ms) → 4 = Very Easy
-(±25/75/187.5 ms, BAD -275/+350 ms). Scratch lanes, long-note tails, 5K, and PMS use their own windows.
-`#DEFEXRANK` and unnumbered `#EXRANK` set the initial window width as a percentage; `100` equals Normal (`#RANK 2`).
-Channel `A0` applies indexed `#EXRANKxx` values mid-chart.
-
-**E-POOR** is an empty-press penalty that reduces the gauge. An early empty press can trigger it between the early
-BAD boundary and just under 500 ms before a note. In 5K and 7K, extra presses near an already judged note can also
-trigger E-POOR. E-POOR keeps combo in 7K and resets combo in 5K and PMS.
-
-**PMS** records the first BAD or E-POOR associated with a note and keeps that note available for a GOOD, GREAT, or
-PGREAT rehit. The initial mistake remains in the result alongside a successful rehit. At `#RANK 2`, PMS key windows
-are PGREAT ±20 ms, GREAT ±35 ms, GOOD ±81.9 ms, and BAD ±183 ms.
-
-**Score:** `total EX score / max EX score × 1,000,000`
-
-**DJ LEVEL rank:** S (all PGREAT) · AAA ≥ 8/9 · AA ≥ 7/9 · A ≥ 6/9 · B ≥ 5/9 · C otherwise
-
-### Judgement Selection Algorithms
-
-Open **Settings → BMS → Judgement selection algorithm** to choose which note receives a press when judgement windows
-overlap in the same column. The four strategies follow beatoraja's `Combo`, `Duration`, `Lowest`, and `Score` algorithms:
-
-| Option | Selection rule |
-|--------|----------------|
-| **Combo priority (LR2)** — default | Switches to a later note when the current candidate is strictly past its late GOOD boundary and the press is at or after the later note's early GOOD boundary. |
-| **Time difference priority (AC)** | Chooses the eligible note closest to the press time. Equal time differences favour the earlier note. |
-| **Earliest note priority** | Chooses the earliest eligible note, even if a later note would receive a better judgement. |
-| **Score priority** | Uses the same switching rule as Combo priority, with GREAT boundaries instead of GOOD. |
-
-For example, on a 7K `#RANK 2` chart, two notes in the same key column occur at 1000 ms and 1100 ms. A press at 1100 ms
-gives the first note GOOD under Combo or Earliest note priority; Time difference or Score priority selects the second
-note for PGREAT.
-
-Selection applies to normal notes and long-note heads, including scratch. Each note uses the windows determined by
-its layout, RANK/EXRANK, and active judgement-window mods.
-
-The algorithm is fixed at play start; setting changes apply to the next play. Replays use the recorded algorithm.
-Replays recorded before this setting existed use the original selection behaviour.
-
-### Long Notes
-
-The chart and the **Long Note (L1)**, **Charge Note (L2)**, or **Hell Charge Note (L3)** mod determine the long-note mode.
-
-| Mode | How to play | Judgement |
-|------|-------------|-----------|
-| **LN** | Press at the head and hold through the tail. | One result per long note. While held, it settles with the head judgement once the tail has passed; an early release combines the head and release judgements, taking the worse result. A very early drop gives BAD. |
-| **CN** | Press at the head and release at the tail. | Head and tail each contribute their own judgement, EX score, combo, and gauge change. Missing the head gives POOR for both ends. |
-| **HCN** | Use CN timing, and keep holding through the body. | Head and tail are scored separately. During the body, holding builds recovery and releasing builds damage; reholding after a mistake can recover gauge. |
-
-For **CN and HCN long scratches**, the tail action is a new press in the direction opposite to the head. You can
-release the original direction within the tail window and then press the opposite direction; the opposite press's
-timing determines the tail judgement. You can also press the opposite direction while still holding the first key.
-An early reversal completes the tail immediately, so aim the reversal at the tail. Releasing the original direction
-before the tail window gives POOR. For an ordinary **LN long scratch**, hold the head's direction through the tail;
-an early release of that direction judges the drop.
-
-HCN recovery and damage build up over time, with held and released time cancelling each other. During a steady hold
-or release, gauge changes start after more than 200 ms and continue every 200 ms. Delayed updates apply all changes
-due during the elapsed time. A tail judged GOOD or
-better keeps recovery active through the remaining body. After a missed head, holding the body can still recover gauge.
-After a successful early tail judgement, the remaining HCN body stays anchored at the judgement line and shrinks
-until the tail reaches it, then disappears.
-
-PMS provides a **200 ms rehold grace period** for an early release that would give BAD or worse. Repress within that
-period to continue the hold. Once the period expires, the release is judged using its original timing.
-
-### Pausing and Resuming
+## Pausing and Resuming
 
 Resuming shows the same countdown as osu!mania, then continues from the pause point. Long notes retain their
 state while paused; hold the appropriate keys when play resumes. The saved score receives the **Paused (PA)** marker.
-
-## Gauge
-
-Choose from 6 regular gauges (Groove or Survival) and 3 course gauges through mods. Normal is the default:
-
-> [!NOTE]
-> Gauge recovery, damage, and clear thresholds follow **beatoraja**. The selected gauge determines how mistakes
-> affect your chance of clearing the chart.
-
-| Mod         | Acronym     | Type                 | Recovery        | Initial HP | Clear   | Bar              |
-|-------------|-------------|----------------------|-----------------|------------|---------|------------------|
-| Assist Easy | **E2**      | Difficulty Reduction | Chart's TOTAL   | 20%        | ≥ 60%   | Groove (dynamic) |
-| Easy        | **E1**      | Difficulty Reduction | Chart's TOTAL   | 20%        | ≥ 80%   | Groove (dynamic) |
-| Normal      | *(default)* | —                    | Chart's TOTAL   | 20%        | ≥ 80%   | Groove (dynamic) |
-| Hard        | **H1**      | Difficulty Increase  | Small, chart-dependent | 100% | Survive | Fixed red       |
-| EX Hard     | **H2**      | Difficulty Increase  | Small, chart-dependent | 100% | Survive | Fixed purple    |
-| Hazard      | **H3**      | Difficulty Increase  | Starting gauge  | 100%       | Survive | Fixed gold       |
-| Class       | **C1**      | Course               | Fixed per hit   | 100%       | Survive | Fixed red        |
-| EX Class    | **C2**      | Course               | Fixed per hit   | 100%       | Survive | Fixed purple     |
-| EX Hard Class | **C3**    | Course               | Fixed per hit   | 100%       | Survive | Fixed gold       |
-
-- **Groove gauges** (E2/E1/Normal): start at 20%, have a 2% minimum, and can recover throughout the song.
-  Reach the clear threshold by song end. Bar colour
-  transitions from red (< 20%) → amber (< clear) → green (≥ clear) based on the active gauge's threshold.
-- **Survival gauges** (H1/H2/H3): start at 100% and fail at 0%. Hard and EX Hard reward successful hits with recovery;
-  Hazard requires preserving the starting gauge. Each uses a fixed bar colour.
-- **Course gauges** (C1/C2/C3): Survival gauges that carry HP between stages; reaching 0% fails the course. Bars are
-  red, purple, or gold. The selected regular gauge maps to the corresponding Class tier.
-- Hard (H1) has **guts protection**: below each HP threshold, damage is reduced (below 50% → ×0.8, below 40% → ×0.7,
-  …, below 10% → ×0.4).
-- `#TOTAL` controls gauge recovery. The chart's recovery is shared across its scored notes: an LN counts once,
-  while CN and HCN count the head and tail separately. The game chooses a default recovery amount based on the
-  chart's layout and note count when `#TOTAL` is omitted.
-- Holding a lane as a landmine passes triggers its chart-defined damage. Scratch mines check either direction.
-  Damage respects the gauge's minimum: even a maximum-damage mine leaves a Groove gauge at 2%, while a Survival
-  gauge can reach 0% and fail.
 
 ## Lamps
 
@@ -230,6 +118,7 @@ matching the selected mods.
 | No Great (NE)            | Removes the GREAT and GOOD judgement windows                    |         |
 | No Bad (NB)              | Removes the BAD judgement window                           |         |
 | LR2 (R2)                 | Uses LR2 judgement and gauge rules, with classic LN holds       |         |
+| osu!mania (OM)           | Uses osu!mania judgements, health, and scoring                  | OD; HP; use lazer rules |
 | Long Note (L1)           | LN: hold from head to tail for one combined judgement           |         |
 | Charge Note (L2)         | CN: judges head and tail separately                            |         |
 | Hell Charge Note (L3)    | HCN: separate head/tail judgements, plus body recovery and damage |         |
@@ -240,7 +129,7 @@ matching the selected mods.
 |-------------------------------|----------|--------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Scroll speed | 8.0 | 1.0–50.0, step 0.1 | Note fall speed; in-game controls adjust it temporarily. |
 | Reference BPM                 | Main BPM | Start BPM, Max BPM, Main BPM, or Min BPM   | Scroll-speed reference used when a chart has no `#BASEBPM`. Main BPM uses the BPM containing the most playable notes; ties use the earliest occurrence.                                       |
-| Judgement selection algorithm | Combo priority (LR2) | Combo priority (LR2), Time difference priority (AC), Earliest note priority, Score priority | Selects which note receives a press when windows overlap. See [selection rules](#judgement-selection-algorithms). |
+| Judgement selection algorithm | Combo priority (LR2) | Combo priority (LR2), Time difference priority (AC), Earliest note priority, Score priority | Selects which note receives a press when windows overlap. See [selection rules](./judgements.md#beatoraja-note-selection). |
 | BGA dim | 70% | 0%–100% | 0% keeps full brightness; 100% fully darkens the BGA. |
 | Unlock frame rate limit       | Off      | On / off                                  | Removes osu!'s 1000 Hz frame and input polling cap during BMS gameplay. Higher GC and GPU pressure may cause extra stutters; disable this option if that happens. |
 | Use dedicated preview audio   | On       | On / off                                   | Uses `#PREVIEW` or `preview.*` when available. When disabled, song-select previews are synthesized only from BGM and keysound samples.                                                        |

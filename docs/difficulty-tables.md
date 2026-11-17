@@ -70,6 +70,8 @@ courses do not specify a tier. The `constraint` array defines rules shown in cou
 | `cn`          | Forces charge-note (CN) mode                            |
 | `hcn`         | Forces hell-charge-note (HCN) mode                      |
 
+See [judgement and gauge rules](./judgements.md#beatoraja-course-rules) for course constraints, gauge values, and HP carry-over.
+
 ## How Markers Work
 
 After import, every beatmap whose MD5 matches a table entry gets a **marker** appended to its difficulty name:

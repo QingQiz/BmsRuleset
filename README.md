@@ -57,9 +57,6 @@ You can also remove all imported BMS metadata without deleting the original file
 ## Highlights
 
 Supports BPM/STOP changes, long notes, mines, random branches, scroll changes, BGA, and keysounds.
-Judgements use beatoraja-compatible timing windows and
-[four selectable algorithms](./docs/gameplay.md#judgement-selection-algorithms), with six gauge types and
-traditional EX score alongside osu!'s normalized score.
 
 ### osu!mania Skin Support
 
@@ -179,11 +176,21 @@ line, keeping their visible time consistent with your reference scroll speed.
 Enabling it reveals a **Note fade-in duration** slider: positive values start the fade earlier, negative values
 make notes fully visible later, and 0 makes them appear instantly. See [settings](./docs/gameplay.md#settings).
 
+### Multiple Judgement Rules
+
+Choose from several judgement, gauge, and scoring rules:
+
+- **[beatoraja](./docs/judgements.md#beatoraja)** — default, with [four selectable algorithms](./docs/judgements.md#beatoraja-note-selection),
+  BMS gauges, and traditional EX score alongside osu!'s normalized score.
+- **[LR2 (R2)](./docs/judgements.md#lr2)** — LR2-compatible judgements and gauges, with classic LN holds.
+- **[osu!mania (OM)](./docs/judgements.md#osu-mania)** — choose lazer or stable rules, with adjustable OD and HP.
+
 ## Documentation
 
 | Guide                                              | Contents                                                               |
 |----------------------------------------------------|------------------------------------------------------------------------|
-| [Gameplay and settings](./docs/gameplay.md)        | Practice, judgements, scoring, gauges, mods, key bindings, and settings |
+| [Gameplay and settings](./docs/gameplay.md)        | Practice, mods, key bindings, and settings |
+| [Judgements, gauges, and scoring](./docs/judgements.md)     | Judgements, gauges, course rules, long notes, and scoring |
 | [Difficulty tables](./docs/difficulty-tables.md)   | Importing and managing LR2/beatoraja difficulty tables                 |
 | [Skin system](./docs/skin-system.md)               | `skin.ini` reference, osu!mania compatibility, and editable components |
 | [BMS format support](./docs/bms-format-support.md) | Parser behavior, supported commands and channels, and reference links  |
