@@ -229,13 +229,16 @@ public partial class BmsHitErrorMeter : HitErrorMeter
             return;
 
         var kind = profile.TimingKindFor(result);
+        var fastMiss = kind == ResultTimingKind.Untimed && result == HitResult.Miss && offset < 0;
         var displayOffset = GetDisplayOffset(offset, kind, fastUntimedDisplayOffset,
             slowUntimedDisplayOffset, ShowPoor.Value, ShowEmptyPoor.Value);
         if (displayOffset == null)
             return;
 
-        addJudgement(displayOffset.Value, result, kind == ResultTimingKind.Timed,
-            kind == ResultTimingKind.Untimed ? offset < 0 : null);
+        // An early Mania MISS comes from a press with a meaningful offset. Keep its position
+        // without including misses in the moving average or attaching it to a window boundary.
+        addJudgement(fastMiss ? offset : displayOffset.Value, result, kind == ResultTimingKind.Timed,
+            kind == ResultTimingKind.Untimed && !fastMiss ? offset < 0 : null);
     }
 
     private void onNonConsumingJudgementRegistered(BmsTimingObservation observation)

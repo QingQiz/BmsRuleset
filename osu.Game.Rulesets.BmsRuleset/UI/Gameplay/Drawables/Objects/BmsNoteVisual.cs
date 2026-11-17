@@ -6,7 +6,6 @@ using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Runtime;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Skinning;
-using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 
@@ -52,7 +51,7 @@ internal sealed partial class BmsNoteVisual : BmsCachedSkinnableDrawable
                 break;
 
             case ArmedState.Miss:
-                drawable.FadeColour(Color4.Red, 80).FadeOut(220).Expire();
+                drawable.FadeOut(220).Expire();
                 drawable.LifetimeEnd = time + 300;
                 break;
         }
