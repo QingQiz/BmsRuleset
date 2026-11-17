@@ -97,11 +97,11 @@ internal sealed partial class BmsLeaderboardScore : OsuClickableContainer, IHasC
 
     private Colour4 foregroundColour;
     private Colour4 backgroundColour;
-    private ColourInfo totalScoreBackgroundGradient;
+    private ColourInfo accuracyBackgroundGradient;
 
     private TruncatingSpriteText timestamp = null!;
     private TruncatingSpriteText username = null!;
-    private OsuSpriteText totalScoreText = null!;
+    private OsuSpriteText accuracyText = null!;
 
     private Box background = null!;
     private Box foreground = null!;
@@ -114,7 +114,7 @@ internal sealed partial class BmsLeaderboardScore : OsuClickableContainer, IHasC
 
     private FillFlowContainer<Drawable> modsContainer = null!;
 
-    private Box totalScoreBackground = null!;
+    private Box accuracyBackground = null!;
 
     private FillFlowContainer statisticsContainer = null!;
     private Container highlightGradient = null!;
@@ -146,7 +146,8 @@ internal sealed partial class BmsLeaderboardScore : OsuClickableContainer, IHasC
     {
         foregroundColour = colourProvider.Background5;
         backgroundColour = colourProvider.Background3;
-        totalScoreBackgroundGradient = ColourInfo.GradientHorizontal(backgroundColour.Opacity(0), backgroundColour);
+        accuracyBackgroundGradient = ColourInfo.GradientHorizontal(backgroundColour.Opacity(0), backgroundColour);
+        var profile = GameplayProfile.FromMods(Score.Mods);
 
         var nativeContent = new Container
         {
@@ -321,7 +322,7 @@ internal sealed partial class BmsLeaderboardScore : OsuClickableContainer, IHasC
                                                 [
                                                     new ScoreComponentLabel(BmsStrings.MaxCombo, BmsStrings.ResultNumber(Score.MaxCombo),
                                                         Score.MaxCombo == Score.GetMaximumAchievableCombo(), 60),
-                                                    new ScoreComponentLabel(BmsStrings.ResultAccuracy, BmsStrings.ResultPercentage(Score.Accuracy), Score.Accuracy == 1,
+                                                    new ScoreComponentLabel(profile.ScoreLabel, BmsStrings.ResultNumber(profile.StoredScore(Score)), Score.Accuracy == 1,
                                                         55),
                                                 ],
                                                 Alpha = 0,
@@ -389,7 +390,7 @@ internal sealed partial class BmsLeaderboardScore : OsuClickableContainer, IHasC
                                     Name = "Leaderboard grade",
                                     Colour = DrawableRank.GetRankLetterColour(Score.Rank),
                                     Font = OsuFont.Numeric.With(size: 14),
-                                    Text = BmsStrings.LeaderboardGrade(GameplayProfile.FromMods(Score.Mods).RankLabel(Score.Rank)),
+                                    Text = BmsStrings.LeaderboardGrade(profile.RankLabel(Score.Rank)),
                                     ShadowColour = Color4.Black.Opacity(0.3f),
                                     ShadowOffset = new Vector2(0, 0.08f),
                                     Shadow = true,
@@ -409,10 +410,10 @@ internal sealed partial class BmsLeaderboardScore : OsuClickableContainer, IHasC
                                     CornerRadius = corner_radius,
                                     Children =
                                     [
-                                        totalScoreBackground = new Box
+                                        accuracyBackground = new Box
                                         {
                                             RelativeSizeAxes = Axes.Both,
-                                            Colour = totalScoreBackgroundGradient,
+                                            Colour = accuracyBackgroundGradient,
                                         },
                                         new Box
                                         {
@@ -429,14 +430,15 @@ internal sealed partial class BmsLeaderboardScore : OsuClickableContainer, IHasC
                                             Spacing = new Vector2(0f, -2f),
                                             Children =
                                             [
-                                                totalScoreText = new OsuSpriteText
+                                                accuracyText = new OsuSpriteText
                                                 {
                                                     Anchor = Anchor.TopRight,
                                                     Origin = Anchor.TopRight,
                                                     UseFullGlyphHeight = false,
-                                                    Name = "Leaderboard score",
-                                                    Text = BmsStrings.ResultNumber(GameplayProfile.FromMods(Score.Mods).StoredScore(Score)),
+                                                    Name = "Leaderboard accuracy",
+                                                    Text = BmsStrings.ResultPercentage(Score.Accuracy),
                                                     Font = OsuFont.Style.Subtitle.With(weight: FontWeight.Light, fixedWidth: true),
+                                                    Colour = Score.Accuracy == 1 ? colours.Lime1 : Color4.White,
                                                     Shear = sheared ? -OsuGame.SHEAR : Vector2.Zero,
                                                 },
                                             ],
@@ -547,7 +549,7 @@ internal sealed partial class BmsLeaderboardScore : OsuClickableContainer, IHasC
 
         foreground.FadeColour(IsHovered ? foregroundColour.Lighten(0.2f) : foregroundColour, transition_duration, Easing.OutQuint);
         background.FadeColour(IsHovered ? backgroundColour.Lighten(0.2f) : backgroundColour, transition_duration, Easing.OutQuint);
-        totalScoreBackground.FadeColour(IsHovered ? lightenedGradient : totalScoreBackgroundGradient, transition_duration, Easing.OutQuint);
+        accuracyBackground.FadeColour(IsHovered ? lightenedGradient : accuracyBackgroundGradient, transition_duration, Easing.OutQuint);
         highlightGradient.FadeColour(getHighlightColour(Highlight, IsHovered ? 0.2f : 0), transition_duration, Easing.OutQuint);
     }
 
@@ -564,9 +566,10 @@ internal sealed partial class BmsLeaderboardScore : OsuClickableContainer, IHasC
 
         var mode = getCurrentDisplayMode();
 
-        totalScoreText.Scale = new Vector2(mode == DisplayMode.Minimal ? 0.8f : 1);
-        rightContent.Width = Math.Max(mode == DisplayMode.Minimal ? 120 : 150,
-            totalScoreText.DrawWidth * totalScoreText.Scale.X + grade_width + corner_radius * 2);
+        rightContent.Width = mode == DisplayMode.Minimal ? 120 : Math.Max(150, accuracyText.DrawWidth + grade_width + corner_radius * 2);
+        accuracyText.Scale = new Vector2(mode == DisplayMode.Minimal
+            ? Math.Min(0.8f, (rightContent.Width - grade_width - corner_radius * 2) / accuracyText.DrawWidth)
+            : 1);
 
         if (currentMode != mode)
             updateDisplayMode(mode);
@@ -601,9 +604,9 @@ internal sealed partial class BmsLeaderboardScore : OsuClickableContainer, IHasC
 
     private DisplayMode getCurrentDisplayMode()
     {
-        // Keep statistics aligned across scores with different mods, and avoid feedback from minimal score scaling.
+        // Keep statistics aligned across scores with different mods, and avoid feedback from minimal accuracy scaling.
         var availableWidth = DrawWidth - lamp_width - rank_label_width - HEIGHT - ModIcon.MOD_ICON_SIZE.X * mod_icon_scale
-                             - Math.Max(150, totalScoreText.DrawWidth + grade_width + corner_radius * 2);
+                             - Math.Max(150, accuracyText.DrawWidth + grade_width + corner_radius * 2);
         if (availableWidth >= username_min_width + statistics_regular_min_width)
             return DisplayMode.Regular;
 

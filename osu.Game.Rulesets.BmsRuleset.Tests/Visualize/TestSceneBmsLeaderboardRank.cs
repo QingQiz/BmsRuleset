@@ -54,14 +54,26 @@ public partial class TestSceneBmsLeaderboardRank : OsuManualInputManagerTestScen
             .Single(text => text.Name == "Leaderboard grade").Text.ToString(), () => Is.EqualTo(expectedRank));
         AddAssert("username unchanged", () => row.ChildrenOfType<TruncatingSpriteText>()
             .Single(text => text.Name == "Leaderboard username").Text.ToString(), () => Is.EqualTo(username));
-        AddAssert("EXSCORE uses judgements", () => row.ChildrenOfType<OsuSpriteText>()
-            .Single(text => text.Name == "Leaderboard score").Text.ToString(), () => Is.EqualTo("205"));
+        AddAssert("EXSCORE uses judgements", () => row.ChildrenOfType<FillFlowContainer>()
+            .Single(container => container.Name == "Statistics container").ChildrenOfType<OsuSpriteText>()
+            .Any(text => text.Text.ToString() == "205"));
+        AddUntilStep("accuracy stays visible beside grade", () =>
+        {
+            var accuracy = row.ChildrenOfType<OsuSpriteText>().Single(text => text.Name == "Leaderboard accuracy");
+            var grade = row.ChildrenOfType<Container>().Single(container => container.Name == "Leaderboard grade badge");
+            return accuracy.Text.ToString() == BmsStrings.ResultPercentage(row.Score.Accuracy).ToString()
+                   && accuracy.DrawColourInfo.Colour.TopLeft.Alpha == 1
+                   && accuracy.ScreenSpaceDrawQuad.AABBFloat.Right <= grade.ScreenSpaceDrawQuad.AABBFloat.Left;
+        });
         AddUntilStep("username fits before mods", () => row.ChildrenOfType<TruncatingSpriteText>()
             .Single(text => text.Name == "Leaderboard username").ScreenSpaceDrawQuad.AABBFloat.Right
             <= row.ChildrenOfType<ModIcon>().Min(icon => icon.ScreenSpaceDrawQuad.AABBFloat.Left));
-        AddUntilStep("timestamp fits before mods", () => row.ChildrenOfType<TruncatingSpriteText>()
-            .Single(text => text.Name == "Leaderboard timestamp").ScreenSpaceDrawQuad.AABBFloat.Right
-            <= row.ChildrenOfType<ModIcon>().Min(icon => icon.ScreenSpaceDrawQuad.AABBFloat.Left));
+        AddUntilStep("visible timestamp fits before mods", () =>
+        {
+            var timestamp = row.ChildrenOfType<TruncatingSpriteText>().Single(text => text.Name == "Leaderboard timestamp");
+            return timestamp.DrawColourInfo.Colour.TopLeft.Alpha == 0
+                   || timestamp.ScreenSpaceDrawQuad.AABBFloat.Right <= row.ChildrenOfType<ModIcon>().Min(icon => icon.ScreenSpaceDrawQuad.AABBFloat.Left);
+        });
         AddUntilStep("mods are vertically centred", () => row.ChildrenOfType<ModIcon>().All(icon =>
             Math.Abs(icon.ScreenSpaceDrawQuad.Centre.Y - row.ScreenSpaceDrawQuad.Centre.Y) < 1));
         AddAssert("grade has triangle background and right spacing", () =>
