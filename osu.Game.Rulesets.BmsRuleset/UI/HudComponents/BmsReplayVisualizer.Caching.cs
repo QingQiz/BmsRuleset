@@ -148,7 +148,7 @@ public sealed partial class BmsReplayVisualizer
                             var tail = note.Source is BmsLongNote ? observationFor(note, true, now) : null;
                             chunk.Block.Rectangles.Add(new TimelineRectangle((displayColumn(note.Column) + 0.1f) * columnWidth, columnWidth * 0.8f,
                                 note.EndTime, note.StartTime, 0, 0, note.Source is BmsLongNote ? TimelineKind.LongNote : TimelineKind.Note,
-                                ColourFor(NoteResult(head, tail))));
+                                ColourFor(NoteResult(head, tail), profile)));
                         }
 
                         chunk.Block.Commit();
@@ -221,7 +221,7 @@ public sealed partial class BmsReplayVisualizer
     {
         var x = (displayColumn(stroke.Column) + 0.5f) * columnWidth;
         var display = judgements.DescribeInput(stroke, now);
-        var colour = ColourFor(display.Result);
+        var colour = ColourFor(display.Result, profile);
         var held = double.IsPositiveInfinity(stroke.EndTime);
         block.Rectangles.Add(new TimelineRectangle(x - columnWidth * 0.22f, columnWidth * 0.44f,
             held ? stroke.StartTime : stroke.EndTime, stroke.StartTime, -1.5f, 1.5f, held ? TimelineKind.HeldInput : TimelineKind.Input, colour));

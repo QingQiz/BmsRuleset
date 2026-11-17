@@ -29,5 +29,7 @@ public static class BmsIcons
 
     public static IconUsage Lr2 => get(0xE009);
 
+    public static IconUsage Mania => get(0xE00A);
+
     private static IconUsage get(int codepoint) => new((char)codepoint, font_name);
 }

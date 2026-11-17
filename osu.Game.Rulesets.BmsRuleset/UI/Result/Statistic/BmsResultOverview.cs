@@ -71,7 +71,7 @@ internal partial class BmsResultOverview : CompositeDrawable
             RelativeSizeAxes = Axes.Both,
             Content = results.Select(result => new Drawable[]
             {
-                new BmsResultJudgementRow(profile.JudgementLabel(result), result, score.Statistics.GetValueOrDefault(result), totalJudgements),
+                new BmsResultJudgementRow(profile, result, score.Statistics.GetValueOrDefault(result), totalJudgements),
             }).ToArray(),
         };
         // Course and practice statistics cannot be compared against full-chart solo scores.

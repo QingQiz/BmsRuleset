@@ -84,6 +84,7 @@ public sealed class BmsEmbeddedSkinSource : ISkinSource, IDisposable, IBmsGamepl
         return lookup is
             BmsSkinComponentLookup or
             SkinComponentLookup<HitResult> or
+            SkinComponentLookup<LegacyManiaSkinConfigurationLookups> or
             GlobalSkinnableContainerLookup { Lookup: GlobalSkinnableContainers.MainHUDComponents, Ruleset: not null }
             ? parent?.GetDrawableComponent(lookup)
               ?? embeddedFallbacks?.GetDrawableComponent(lookup)

@@ -13,6 +13,9 @@ using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Skinning;
+using osu.Game.Scoring;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Profiles;
 using osuTK;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.SkinTest;
@@ -20,6 +23,37 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.SkinTest;
 [TestFixture]
 public class BmsReplayVisualizerTest
 {
+    [TestCase(false, false)]
+    [TestCase(false, true)]
+    [TestCase(true, false)]
+    [TestCase(true, true)]
+    public void FractionalReplayInputsMatchEngineJudgements(bool mania, bool longNote)
+    {
+        var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, TotalColumns = 8, Rank = 2 };
+        BmsHitObject note = longNote ? new BmsLongNote { Duration = 1000 } : new BmsNote();
+        note.StartTime = 1000.123456;
+        note.Column = 1;
+        note.Beatmap = beatmap;
+        beatmap.HitObjects.Add(note);
+        var replay = new osu.Game.Replays.Replay
+        {
+            Frames = [new BmsReplayFrame(0), new BmsReplayFrame(1010.3334, BmsAction.Key1), new BmsReplayFrame(1990.3334), new BmsReplayFrame(3000)],
+        };
+        var score = new ScoreInfo { Mods = mania ? [new BmsModManiaProfile()] : [] };
+        var simulated = BmsReplaySimulation.Run(beatmap, replay, score);
+        var cursor = new BmsReplayVisualizer.JudgementCursor();
+        cursor.Update(simulated.Judgements);
+        var stroke = new BmsReplayVisualizer.InputStroke(BmsAction.Key1, 1, 1010.3334, 1990.3334);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(cursor.ForInput(stroke, 3000), Is.EqualTo(HitResult.Perfect));
+            Assert.That(cursor.TimingForInput(stroke, false, 3000), Is.Not.Null);
+            if (longNote)
+                Assert.That(cursor.TimingForInput(stroke, true, 3000), Is.Not.Null);
+        });
+    }
+
     [Test]
     public void TestAvailableInSkinEditorAndSettingsSurviveRoundTrip()
     {

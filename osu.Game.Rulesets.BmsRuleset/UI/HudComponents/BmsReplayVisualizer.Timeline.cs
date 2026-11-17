@@ -271,8 +271,8 @@ public sealed partial class BmsReplayVisualizer
     internal sealed class JudgementCursor
     {
         private readonly Dictionary<(int Column, double Time), BmsTimingObservation> observations = [];
-        private readonly Dictionary<(int Column, double Time, bool Release), InputJudgement> inputObservations = [];
-        private readonly Dictionary<(int Column, double Time, bool Release), InputJudgement> longNoteInputs = [];
+        private readonly Dictionary<(int Column, long Time, bool Release), InputJudgement> inputObservations = [];
+        private readonly Dictionary<(int Column, long Time, bool Release), InputJudgement> longNoteInputs = [];
         private int processedCount;
         private BmsJudgementEvent? lastEvent;
 
@@ -310,7 +310,7 @@ public sealed partial class BmsReplayVisualizer
                     if (judgement.SuppressPenalty)
                         continue;
 
-                    var key = (column, observation.ActualTime, observation.Kind == BmsTimingObservationKind.LongNoteTail);
+                    var key = (column, RhythmEngine.Core.Time.FromMilliseconds(observation.ActualTime), observation.Kind == BmsTimingObservationKind.LongNoteTail);
                     if (!inputObservations.TryGetValue(key, out var previous) || scoring || !previous.IsScoring)
                     {
                         inputObservations[key] = new InputJudgement(observation.Result, scoring,
@@ -334,9 +334,9 @@ public sealed partial class BmsReplayVisualizer
             // A normal LN head has no score event until completion; use its current state
             // for the matching press, and let a failed tail recolour the entire hold.
             if (head is { } press)
-                longNoteInputs[(column, press.ActualTime, false)] = new InputJudgement(value, true, endTime, press);
+                longNoteInputs[(column, RhythmEngine.Core.Time.FromMilliseconds(press.ActualTime), false)] = new InputJudgement(value, true, endTime, press);
             if (tail is { } release)
-                longNoteInputs[(column, release.ActualTime, true)] = new InputJudgement(value, true, null, release);
+                longNoteInputs[(column, RhythmEngine.Core.Time.FromMilliseconds(release.ActualTime), true)] = new InputJudgement(value, true, null, release);
         }
 
         public HitResult? ForInput(InputStroke stroke, double now)
@@ -371,7 +371,8 @@ public sealed partial class BmsReplayVisualizer
             if (time > now)
                 return null;
 
-            var key = (column, time, release);
+            // Replay edges retain fractional microseconds; published judgements use the engine's integer clock.
+            var key = (column, RhythmEngine.Core.Time.FromMilliseconds(time), release);
             if (!longNoteInputs.TryGetValue(key, out var judgement) && !inputObservations.TryGetValue(key, out judgement))
                 return null;
 

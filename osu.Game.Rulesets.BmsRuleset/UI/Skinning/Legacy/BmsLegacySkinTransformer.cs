@@ -70,17 +70,6 @@ public partial class BmsLegacySkinTransformer : LegacySkinTransformer, IBmsGamep
     /// </remarks>
     private readonly Lazy<bool> hasBmsResources;
 
-    private static readonly (HitResult Result, LegacyManiaSkinConfigurationLookups Lookup, string Filename)[] hit_result_mappings =
-    [
-        // BMS → osu!mania legacy skin image mapping (matches LR2 / BMS convention):
-        (HitResult.Perfect, LegacyManiaSkinConfigurationLookups.Hit300g, "mania-hit300g"), // PGREAT
-        (HitResult.Great, LegacyManiaSkinConfigurationLookups.Hit300, "mania-hit300"),     // GREAT
-        (HitResult.Good, LegacyManiaSkinConfigurationLookups.Hit200, "mania-hit200"),      // GOOD
-        (HitResult.Ok, LegacyManiaSkinConfigurationLookups.Hit50, "mania-hit50"),          // BAD
-        (HitResult.Meh, LegacyManiaSkinConfigurationLookups.Hit0, "mania-hit0"),           // POOR (note consumed: passive miss or in-POOR-zone keypress)
-        (HitResult.Miss, LegacyManiaSkinConfigurationLookups.Hit0, "mania-hit0"),          // Empty POOR (keypress with no note) — same image as POOR
-    ];
-
     /// <param name="skin">
     /// The skin to wrap. Maybe a user skin, a third-party skin, or a
     /// BmsEmbeddedSkin when created directly by BmsEmbeddedSkinSource.
@@ -133,6 +122,9 @@ public partial class BmsLegacySkinTransformer : LegacySkinTransformer, IBmsGamep
         // to BMS judgement assets only when this transformer is actually active for legacy resources.
         if (lookup is SkinComponentLookup<HitResult> resultLookup && IsProvidingLegacyResources)
             return getResult(resultLookup.Component) ?? base.GetDrawableComponent(lookup);
+
+        if (lookup is SkinComponentLookup<LegacyManiaSkinConfigurationLookups> judgementLookup && IsProvidingLegacyResources)
+            return getJudgement(judgementLookup.Component);
 
         if (lookup is not BmsSkinComponentLookup bmsLookup)
             return base.GetDrawableComponent(lookup);
@@ -232,17 +224,37 @@ public partial class BmsLegacySkinTransformer : LegacySkinTransformer, IBmsGamep
     private bool hasAnimation(string name) => GetLegacyAnimation(name) != null;
 
     private Drawable? getResult(HitResult result)
-    {
-        foreach (var (mappedResult, lookup, filename) in hit_result_mappings)
+        => result switch
         {
-            if (mappedResult != result)
-                continue;
+            HitResult.Perfect => getJudgement(LegacyManiaSkinConfigurationLookups.Hit300g),
+            HitResult.Great => getJudgement(LegacyManiaSkinConfigurationLookups.Hit300),
+            HitResult.Good => getJudgement(LegacyManiaSkinConfigurationLookups.Hit200),
+            HitResult.Ok => getJudgement(LegacyManiaSkinConfigurationLookups.Hit50),
+            HitResult.Meh or HitResult.Miss => getJudgement(LegacyManiaSkinConfigurationLookups.Hit0),
+            _ => null,
+        };
 
-            var image = GetManiaConfig<string>(lookup)?.Value ?? filename;
-            var animation = this.GetAnimation(image, true, true, frameLength: 1000 / 20d);
-            return animation == null ? null : new BmsJudgementPiece(result is HitResult.Meh or HitResult.Miss, animation);
-        }
+    private Drawable? getJudgement(LegacyManiaSkinConfigurationLookups lookup)
+    {
+        var filename = lookup switch
+        {
+            LegacyManiaSkinConfigurationLookups.Hit300g => "mania-hit300g",
+            LegacyManiaSkinConfigurationLookups.Hit300 => "mania-hit300",
+            LegacyManiaSkinConfigurationLookups.Hit200 => "mania-hit200",
+            LegacyManiaSkinConfigurationLookups.Hit100 => "mania-hit100",
+            LegacyManiaSkinConfigurationLookups.Hit50 => "mania-hit50",
+            LegacyManiaSkinConfigurationLookups.Hit0 => "mania-hit0",
+            _ => null,
+        };
+        if (filename == null)
+            return null;
 
-        return null;
+        var image = GetManiaConfig<string>(lookup)?.Value ?? filename;
+        var animation = this.GetAnimation(image, true, true, frameLength: 1000 / 20d);
+        // Five-grade BMS skins reuse BAD when they do not provide mania's extra 100 image.
+        if (animation == null && lookup == LegacyManiaSkinConfigurationLookups.Hit100)
+            return getJudgement(LegacyManiaSkinConfigurationLookups.Hit50);
+
+        return animation == null ? null : new BmsJudgementPiece(lookup == LegacyManiaSkinConfigurationLookups.Hit0, animation);
     }
 }

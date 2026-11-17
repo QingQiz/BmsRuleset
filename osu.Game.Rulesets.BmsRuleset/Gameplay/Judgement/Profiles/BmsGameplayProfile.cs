@@ -18,6 +18,8 @@ using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 using osu.Game.Skinning;
+using osu.Game.Rulesets.BmsRuleset.UI;
+using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 
@@ -51,6 +53,8 @@ internal sealed partial class BmsGameplayProfile : GameplayProfile
     }
 
     internal override bool ShowHitEffect(HitResult result) => result != HitResult.Meh && result.IsHit();
+
+    internal override Color4 JudgementColour(HitResult result) => BmsHitResultColours.ForHitResult(result);
 
     internal override Drawable CreateJudgementDrawable(HitResult result)
         => new SkinnableDrawable(new SkinComponentLookup<HitResult>(result))

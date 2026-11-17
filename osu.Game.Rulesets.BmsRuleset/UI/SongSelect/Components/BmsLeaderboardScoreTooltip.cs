@@ -114,7 +114,7 @@ internal sealed partial class BmsLeaderboardScoreTooltip(OverlayColourProvider c
                 var maximum = profile.StoredMaximumScore(value);
                 statistics.Children =
                 [
-                    .. results.Select(result => new JudgementRow(profile.JudgementLabel(result), result, value.Statistics.GetValueOrDefault(result))),
+                    .. results.Select(result => new JudgementRow(profile, result, value.Statistics.GetValueOrDefault(result))),
                     Empty().With(drawable => drawable.Height = 8),
                     new StatisticRow(BmsStrings.LeaderboardClearStatus, BmsStrings.LeaderboardLamp(BmsLampCalculator.Calculate(value))),
                     new StatisticRow(profile.ScoreLabel, maximum is > 0
@@ -266,8 +266,8 @@ internal sealed partial class BmsLeaderboardScoreTooltip(OverlayColourProvider c
 
         internal int Count { get; }
 
-        internal JudgementRow(LocalisableString label, HitResult result, int count)
-            : base(label, BmsStrings.ResultNumber(count), BmsHitResultColours.ForHitResult(result))
+        internal JudgementRow(GameplayProfile profile, HitResult result, int count)
+            : base(profile.JudgementLabel(result), BmsStrings.ResultNumber(count), profile.JudgementColour(result))
         {
             Result = result;
             Count = count;

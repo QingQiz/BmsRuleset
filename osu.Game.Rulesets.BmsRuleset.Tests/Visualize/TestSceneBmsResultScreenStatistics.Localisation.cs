@@ -44,7 +44,7 @@ public partial class TestSceneBmsResultScreenStatistics
             config.SetValue(FrameworkSetting.Locale, "en");
             var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bms5K, TotalColumns = 6 };
             var hits = createGaugeHitEvents();
-            offset = new BmsHitOffsetStatistic(BmsHitOffsetStatistic.CreateStatistics(BmsGameplayProfile.INSTANCE, beatmap, hits));
+            offset = new BmsHitOffsetStatistic(BmsHitOffsetStatistic.CreateStatistics(BmsGameplayProfile.INSTANCE, beatmap, hits), BmsGameplayProfile.INSTANCE);
             scatter = new BmsHitScatterStatistic(BmsHitScatterStatistic.CreateStatistics(BmsGameplayProfile.INSTANCE, beatmap, hits), BmsGameplayProfile.INSTANCE);
             timeline = new BmsTimelineStatistic(BmsTimelineStatistic.CreateData(BmsGameplayProfile.INSTANCE, beatmap, hits, hits));
             Child = new GridContainer

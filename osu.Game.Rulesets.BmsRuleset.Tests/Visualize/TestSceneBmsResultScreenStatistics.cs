@@ -910,7 +910,7 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
                 Origin = Anchor.Centre,
                 Width = 720,
                 AutoSizeAxes = Axes.Y,
-                Child = hitOffsetStatistic = new BmsHitOffsetStatistic(BmsHitOffsetStatistic.CreateStatistics(BmsGameplayProfile.INSTANCE, beatmap, createGaugeHitEvents())),
+                Child = hitOffsetStatistic = new BmsHitOffsetStatistic(BmsHitOffsetStatistic.CreateStatistics(BmsGameplayProfile.INSTANCE, beatmap, createGaugeHitEvents()), BmsGameplayProfile.INSTANCE),
             };
         });
 
@@ -956,7 +956,7 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
                 Origin = Anchor.Centre,
                 Width = 720,
                 AutoSizeAxes = Axes.Y,
-                Child = hitOffsetStatistic = new BmsHitOffsetStatistic(BmsHitOffsetStatistic.CreateStatistics(BmsGameplayProfile.INSTANCE, beatmap, createGaugeHitEvents())),
+                Child = hitOffsetStatistic = new BmsHitOffsetStatistic(BmsHitOffsetStatistic.CreateStatistics(BmsGameplayProfile.INSTANCE, beatmap, createGaugeHitEvents()), BmsGameplayProfile.INSTANCE),
             };
         });
 

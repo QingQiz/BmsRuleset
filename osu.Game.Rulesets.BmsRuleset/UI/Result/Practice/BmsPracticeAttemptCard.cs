@@ -64,7 +64,7 @@ internal partial class BmsPracticeAttemptCard : OsuClickableContainer
                                 RelativeSizeAxes = Axes.Both,
                                 Content = new Drawable[][]
                                 {
-                                    [new BmsResultFittedText(profile.JudgementLabel(judgement), 9, Anchor.Centre, BmsHitResultColours.ForHitResult(judgement))],
+                                    [new BmsResultFittedText(profile.JudgementLabel(judgement), 9, Anchor.Centre, profile.JudgementColour(judgement))],
                                     [new BmsResultFittedText(BmsStrings.ResultNumber(result.Score.Statistics.GetValueOrDefault(judgement)), 14, Anchor.Centre)],
                                 },
                             }).ToArray() },

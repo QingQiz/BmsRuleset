@@ -20,6 +20,10 @@ public static class BmsStrings
 
     public static LocalisableString ManiaDifficultyDescription => get("mania_difficulty_description");
 
+    public static LocalisableString ManiaOverallDifficultyDescription => get("mania_overall_difficulty_description");
+
+    public static LocalisableString ManiaDrainRateDescription => get("mania_drain_rate_description");
+
     public static LocalisableString ManiaUseLazer => get("mania_use_lazer");
 
     public static LocalisableString ManiaUseLazerDescription => get("mania_use_lazer_description");

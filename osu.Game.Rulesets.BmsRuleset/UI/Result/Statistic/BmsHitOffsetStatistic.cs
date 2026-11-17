@@ -39,11 +39,14 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable, IBmsResul
     private Drawable overallRow = null!;
     private float summaryHeight = graph_height;
 
-    internal BmsHitOffsetStatistic(HitOffsetStatistics statistics)
+    private readonly GameplayProfile profile;
+
+    internal BmsHitOffsetStatistic(HitOffsetStatistics statistics, GameplayProfile profile)
     {
         RelativeSizeAxes = Axes.X;
         AutoSizeAxes = Axes.Y;
         this.statistics = statistics;
+        this.profile = profile;
     }
 
     public override bool HandlePositionalInput => true;
@@ -138,7 +141,7 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable, IBmsResul
         return true;
     }
 
-    private static Drawable createRow(LocalisableString label, HitOffsetSummary summary, float height) => new GridContainer
+    private Drawable createRow(LocalisableString label, HitOffsetSummary summary, float height) => new GridContainer
     {
         RelativeSizeAxes = Axes.X,
         Height = height,
@@ -152,7 +155,7 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable, IBmsResul
             new[]
             {
                 createLabel(label, summary),
-                new OffsetHistogram(summary),
+                new OffsetHistogram(summary, profile),
             },
         },
     };
@@ -266,9 +269,12 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable, IBmsResul
         private readonly List<(OsuSpriteText Fast, OsuSpriteText Slow, float Alpha)> axisTicks = [];
         private OsuSpriteText zeroLabel = null!;
 
-        public OffsetHistogram(HitOffsetSummary summary)
+        private readonly GameplayProfile profile;
+
+        public OffsetHistogram(HitOffsetSummary summary, GameplayProfile profile)
         {
             this.summary = summary;
+            this.profile = profile;
 
             RelativeSizeAxes = Axes.Both;
         }
@@ -429,7 +435,7 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable, IBmsResul
                     Height = height,
                     Colour = binIndex == centre_bin_index && i == 0
                         ? Color4.White
-                        : BmsHitResultColours.ForHitResult(result),
+                        : profile.JudgementColour(result),
                 });
                 cumulativeBelow += count;
             }

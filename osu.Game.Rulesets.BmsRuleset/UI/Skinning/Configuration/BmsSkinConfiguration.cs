@@ -51,7 +51,9 @@ public sealed class BmsSkinConfiguration(BmsSkinConfigurationSection section)
             LegacyManiaSkinConfigurationLookups.HoldNoteHeadImage => getColumnImage("NoteImage", column, "H") ?? getColumnImage("NoteImage", column),
             LegacyManiaSkinConfigurationLookups.HoldNoteTailImage => getColumnImage("NoteImage", column, "T") ?? getColumnImage("NoteImage", column),
             LegacyManiaSkinConfigurationLookups.HoldNoteBodyImage => getColumnImage("NoteImage", column, "L") ?? getColumnImage("NoteImage", column),
-            LegacyManiaSkinConfigurationLookups.Hit100 => getColumnImage("MineImage", column) ?? getImageValue("MineImage"),
+            LegacyManiaSkinConfigurationLookups.Hit100 => column == null
+                ? getImageValue("Hit100")
+                : getColumnImage("MineImage", column) ?? getImageValue("MineImage"),
             LegacyManiaSkinConfigurationLookups.HoldNoteLightImage => getImageValue("LightingL"),
             LegacyManiaSkinConfigurationLookups.KeyImage => getColumnImage("KeyImage", column),
             LegacyManiaSkinConfigurationLookups.KeyImageDown => getColumnImage("KeyImage", column, "D"),

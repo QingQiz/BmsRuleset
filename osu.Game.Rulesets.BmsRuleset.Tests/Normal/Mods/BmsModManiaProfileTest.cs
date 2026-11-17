@@ -47,7 +47,6 @@ using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Playback;
 using osu.Game.Rulesets.BmsRuleset.Tests.Normal.BeatmapTest.Decoding;
 using osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
-using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables;
@@ -63,6 +62,7 @@ using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 using osu.Game.Screens;
 using osu.Game.Screens.Play;
+using osu.Game.Skinning;
 using osu.Game.Screens.Ranking.Expanded.Statistics;
 using osu.Game.Tests.Beatmaps;
 using osu.Game.Tests.Visual;
@@ -248,6 +248,25 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Mods
                 new BmsNote { StartTime = 1000, Column = 1 });
             play.Advance(2000);
             Assert.That(play.Health.CurrentHealth.Value, Is.EqualTo(1 - (hp + 1) * 0.0075).Within(0.000001));
+            Assert.That(play.Health.DisplayProfile.Value.FillColour, Is.EqualTo((osuTK.Graphics.Color4)Colour4.White));
+            Assert.That(play.Health.CaptureHistory(2000)!.Layers.Single().Colour, Is.EqualTo((osuTK.Graphics.Color4)Colour4.White));
+        }
+
+        [TestCase(-164.501, HitResult.None)]
+        [TestCase(-164.5, HitResult.Miss)]
+        [TestCase(-127.501, HitResult.Miss)]
+        [TestCase(-127.5, HitResult.Meh)]
+        [TestCase(127.5, HitResult.Meh)]
+        [TestCase(127.501, HitResult.Miss)]
+        public void LazerTapDistinguishesEarlyMissWindowFromLateExpiry(double offset, HitResult expected)
+        {
+            using var play = new Play([new BmsModManiaProfile { OverallDifficulty = { Value = 8 } }],
+                new BmsNote { StartTime = 1000, Column = 1 });
+            play.Press(1000 + offset);
+
+            Assert.That(play.Score.JudgementEvents.LastOrDefault()?.Result ?? HitResult.None, Is.EqualTo(expected));
+            if (expected != HitResult.None)
+                Assert.That(play.Score.JudgementEvents, Has.Count.EqualTo(1));
         }
 
         [TestCase(true)]
@@ -311,7 +330,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Mods
         }
 
         [Test]
-        public void ProfileSnapshotsAndScoreFiltersIncludeSettings()
+        public void ProfileSnapshotsIncludeSettings()
         {
             var mod = new BmsModManiaProfile();
             var initial = GameplayProfile.FromMods([mod]);
@@ -322,12 +341,68 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Mods
             beatmap.HitObjects.Add(new BmsNote { Beatmap = beatmap, StartTime = 1000, Column = 1 });
             Assert.That(new BmsEngineChart(beatmap, initial).Configuration.ProfileId, Is.EqualTo("osu-lazer-mania-standardised"));
             Assert.That(new BmsEngineChart(beatmap, selected).Configuration.ProfileId, Is.EqualTo("osu-stable-mania-score-v1"));
-            Assert.That(mod.ScoreSelectionRule.IsScoreEligible([mod.DeepClone()], [mod]), Is.True);
-            Assert.That(mod.ScoreSelectionRule.IsScoreEligible([new BmsModManiaProfile()], [mod]), Is.False);
-            Assert.That(mod.ScoreSelectionRule.IsScoreEligible([], [mod]), Is.False);
-            var changedHp = (BmsModManiaProfile)mod.DeepClone();
-            changedHp.DrainRate.Value = 4;
-            Assert.That(mod.ScoreSelectionRule.IsScoreEligible([changedHp], [mod]), Is.False);
+        }
+
+        [TestCase(true)]
+        [TestCase(false)]
+        public void ManiaScoreSelectionAcceptsUnreducedScoresAndIgnoresSettings(bool lazer)
+        {
+            var mod = new BmsModManiaProfile();
+            var native = new ScoreInfo { Rank = ScoreRank.A, TotalScore = 2000, Statistics = new Dictionary<HitResult, int> { [HitResult.Perfect] = 1000 } };
+            var mania = new ScoreInfo { Rank = ScoreRank.A, TotalScore = 900000, TotalScoreWithoutMods = 900000,
+                Mods = [new BmsModManiaProfile { OverallDifficulty = { Value = 6 }, DrainRate = { Value = 4 }, UseLazer = { Value = lazer } }],
+                Statistics = new Dictionary<HitResult, int> { [HitResult.Great] = 1000, [HitResult.Miss] = 1 } };
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(BmsLampScoreSelector.SelectBest([native, mania], [mod]), Is.SameAs(native));
+                Assert.That(BmsLampScoreSelector.SelectBest([mania], []), Is.Null);
+                Assert.That(BmsLampScoreSelector.SelectBest([native, mania], [mod], 1000000), Is.SameAs(mania));
+                Assert.That(BmsLampScoreSelector.SelectBest([native], [mod], 1000000), Is.SameAs(native));
+                Assert.That(BmsLampScoreSelector.SelectBest([native, mania], [], 2000), Is.SameAs(native));
+            });
+        }
+
+        [TestCase(false, 1.5, true)]
+        [TestCase(true, 1.0, true)]
+        [TestCase(true, 1.5, true)]
+        [TestCase(true, 1.6, false)]
+        public void ManiaReductionMatchingKeepsFasterScores(bool scoreHasMania, double selectedRate, bool expectedMatch)
+        {
+            var scoreMods = new List<Mod> { new BmsModDoubleTime() };
+            if (scoreHasMania)
+                scoreMods.Add(new BmsModManiaProfile { OverallDifficulty = { Value = 6 }, DrainRate = { Value = 4 }, UseLazer = { Value = false } });
+
+            var selectedMods = new List<Mod> { new BmsModManiaProfile() };
+            if (selectedRate > 1)
+                selectedMods.Add(new BmsModDoubleTime { SpeedChange = { Value = selectedRate } });
+
+            var score = new ScoreInfo { Rank = ScoreRank.A, TotalScore = 900000, TotalScoreWithoutMods = 900000, Mods = scoreMods.ToArray(),
+                Statistics = new Dictionary<HitResult, int> { [HitResult.Great] = 1000, [HitResult.Miss] = 1 } };
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(BmsLampScoreSelector.SelectBest([score], selectedMods), Is.SameAs(expectedMatch ? score : null));
+                Assert.That(BmsLampScoreSelector.SelectBest([score], selectedMods, 1000000), Is.SameAs(expectedMatch ? score : null));
+            });
+        }
+
+        [TestCase(HitResult.Perfect, LegacyManiaSkinConfigurationLookups.Hit300g)]
+        [TestCase(HitResult.Great, LegacyManiaSkinConfigurationLookups.Hit300)]
+        [TestCase(HitResult.Good, LegacyManiaSkinConfigurationLookups.Hit200)]
+        [TestCase(HitResult.Ok, LegacyManiaSkinConfigurationLookups.Hit100)]
+        [TestCase(HitResult.Meh, LegacyManiaSkinConfigurationLookups.Hit50)]
+        [TestCase(HitResult.Miss, LegacyManiaSkinConfigurationLookups.Hit0)]
+        public void ManiaPresentationUsesProfileColoursAndImages(HitResult result, LegacyManiaSkinConfigurationLookups image)
+        {
+            var profile = GameplayProfile.FromMods([new BmsModManiaProfile()]);
+            Assert.Multiple(() =>
+            {
+                Assert.That(profile.JudgementColour(result), Is.EqualTo(new osu.Game.Graphics.OsuColour().ForHitResult(result)));
+                Assert.That(profile.JudgementImage(result), Is.EqualTo(image));
+                Assert.That(BmsReplayVisualizer.ColourFor(result, profile), Is.EqualTo((Colour4)profile.JudgementColour(result)));
+                Assert.That(profile.CreateJudgementDrawable(result), Is.TypeOf<SkinnableDrawable>());
+            });
         }
 
         private static Beatmap createManiaSource() => new()
@@ -460,6 +535,8 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Mods
             {
                 Assert.That(windows.Single(window => window.Result == HitResult.Perfect).SlowOffset, Is.EqualTo(29.25));
                 Assert.That(windows.Single(window => window.Result == HitResult.Meh).SlowOffset, Is.EqualTo(204.75));
+                Assert.That(windows.Single(window => window.Result == HitResult.Miss).FastOffset, Is.EqualTo(-260.25));
+                Assert.That(windows.Single(window => window.Result == HitResult.Miss).SlowOffset, Is.EqualTo(204.75));
                 Assert.That(windows.Any(window => window.Kind == ResultTimingKind.EmptyInput), Is.False);
                 Assert.That(domain.SlowOffset, Is.EqualTo(260.25));
                 Assert.That(domain.FastOffset, Is.EqualTo(-260.25));
@@ -468,6 +545,23 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Mods
                 Assert.That(BmsHitErrorMeter.GetDisplayOffset(136.5, profile.TimingKindFor(HitResult.Miss), -204.75, 204.75,
                     showUntimed: true, showEmptyInput: false), Is.EqualTo(204.75));
             }
+        }
+
+        [TestCase(true, false, -164.5, 127.5)]
+        [TestCase(true, true, -246.75, 191.25)]
+        [TestCase(false, false, -164.5, 102.999)]
+        [TestCase(false, true, -164, 127)]
+        public void MeterMissRegionStopsAtThePassiveDeadline(bool lazer, bool hold, double early, double late)
+        {
+            using var play = new Play([new BmsModManiaProfile { OverallDifficulty = { Value = 8 }, UseLazer = { Value = lazer } }],
+                hold ? new BmsLongNote { StartTime = 1000, Duration = 1000, Column = 1 } : new BmsNote { StartTime = 1000, Column = 1 });
+            var windows = BmsHitErrorMeter.CreateWindows(play.Score.EngineChart);
+            var miss = windows.Single(window => window.Result == HitResult.Miss);
+            var meh = windows.Single(window => window.Result == HitResult.Meh);
+
+            Assert.That(miss.FastOffset, Is.EqualTo(early));
+            Assert.That(miss.SlowOffset, Is.EqualTo(late));
+            Assert.That(miss.SlowOffset, Is.LessThanOrEqualTo(meh.SlowOffset));
         }
 
         [TestCase(false, 15, 210, 15, 210)]
@@ -876,6 +970,8 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal
             {
                 Assert.That(attributes.Select(attribute => attribute.Acronym), Is.EqualTo((string[])["OD", "HP"]));
                 Assert.That(attributes.Select(attribute => attribute.AdjustedValue), Is.EqualTo((float[])[5, 5]));
+                Assert.That(attributes.All(attribute => attribute.Description.HasValue), Is.True);
+                Assert.That(attributes[0].AdditionalMetrics, Has.Length.EqualTo(6));
                 Assert.That(adjusted.OverallDifficulty, Is.EqualTo(5));
                 Assert.That(adjusted.DrainRate, Is.EqualTo(5));
                 Assert.That(original.Rank, Is.Zero);
@@ -1356,17 +1452,19 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize
                 var expected = BmsStrings.ScoreGraphScore(score.EngineChart.Profile.ScoreLabel, score.EngineScore.Score).ToString();
                 return graph.ChildrenOfType<OsuSpriteText>().Any(text => text.Text.ToString() == expected);
             });
-            AddAssert("HUD uses Mania judgement and target labels", () =>
+            AddAssert("HUD uses Mania judgement labels without a target", () =>
             {
                 var texts = Player.ChildrenOfType<BmsScoreGraph>().Single().ChildrenOfType<OsuSpriteText>()
                     .Select(text => text.Text.ToString()).ToArray();
-                return texts.Contains("MISS") && texts.Contains(BmsStrings.ScoreGraphMaximumTarget.ToString()) && !texts.Contains("E-POOR");
+                return texts.Contains("MISS") && !texts.Contains("E-POOR")
+                    && Player.ChildrenOfType<BmsScoreGraph>().Single().ChildrenOfType<Drawable>()
+                        .Where(drawable => drawable.Name is "Target score bar" or "Target score row").All(drawable => !drawable.IsPresent);
             });
-            AddAssert("judgement display uses profile labels", () =>
+            AddAssert("judgement display uses skin images", () =>
             {
-                var texts = Player.ChildrenOfType<BmsJudgementDisplay>().Single().ChildrenOfType<OsuSpriteText>()
-                    .Select(text => text.Text.ToString()).ToArray();
-                return texts.Contains("50") && texts.Contains("MISS") && !texts.Contains("POOR");
+                var drawables = Player.ChildrenOfType<BmsJudgementDisplay>().Single().ChildrenOfType<SkinnableDrawable>().ToArray();
+                return drawables.Length == 6 && drawables.All(drawable => drawable.Drawable is BmsJudgementPiece
+                    && drawable.Drawable.ChildrenOfType<Sprite>().Any());
             });
             seek(2990);
             AddStep("hide empty inputs and untimed misses", () =>
@@ -1379,7 +1477,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize
                 .ChildrenOfType<Box>().Single(box => box.Name == $"{HitResult.Miss} window").Alpha == 1);
             AddStep("play through the broken hold release", () => Player.GameplayClockContainer.Start());
             AddUntilStep("timed Mania MEH reaches the meter", () => Player.ChildrenOfType<BmsHitErrorMeter>().Single().Judgements.Lines
-                .Any(line => line.Colour == BmsHitResultColours.ForHitResult(HitResult.Meh) && line.BoundaryIsFast == null));
+                .Any(line => line.Colour == ((BmsScoreProcessor)Player.ScoreProcessor).EngineChart.Profile.JudgementColour(HitResult.Meh) && line.BoundaryIsFast == null));
             AddStep("stop after the release", () => Player.GameplayClockContainer.Stop());
             seek(2990);
             AddAssert("rebuild clears timing markers", () => Player.ChildrenOfType<BmsHitErrorMeter>().Single().Judgements.Lines.Count == 0);
@@ -1407,7 +1505,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize
             AddUntilStep("consuming miss is displayed", () =>
             {
                 var pieces = Player.ChildrenOfType<BmsJudgementDisplay>().Single().ChildrenOfType<BmsJudgementPiece>();
-                return pieces.Any(piece => piece.Parent?.Alpha > 0 && piece.Alpha > 0 && piece.ChildrenOfType<OsuSpriteText>().Any(text => text.Text.ToString() == "MISS"));
+                return pieces.Any(piece => piece.Parent?.Alpha > 0 && piece.Alpha > 0 && piece.ChildrenOfType<Sprite>().Any());
             });
             AddStep("stop playback", () => Player.GameplayClockContainer.Stop());
         }
@@ -1447,12 +1545,12 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize
                 {
                     return cachedRectangles().Where(rectangle => rectangle.Kind is BmsReplayVisualizer.TimelineKind.Note or BmsReplayVisualizer.TimelineKind.LongNote)
                         .Where(rectangle => rectangle.X >= column * width && rectangle.X + rectangle.Width <= (column + 1) * width)
-                        .Any(rectangle => rectangle.Colour == (Colour4)BmsHitResultColours.ForHitResult(result));
+                        .Any(rectangle => rectangle.Colour == (Colour4)((BmsScoreProcessor)Player.ScoreProcessor).EngineChart.Profile.JudgementColour(result));
                 }
 
                 return primitives().Where(rectangle => rectangle.Kind == BmsReplayVisualizer.PlotElementKind.Note)
                     .Where(rectangle => rectangle.Bounds.X >= column * width && rectangle.Bounds.Right <= (column + 1) * width)
-                    .Any(rectangle => rectangle.Colour == (Colour4)BmsHitResultColours.ForHitResult(result));
+                    .Any(rectangle => rectangle.Colour == (Colour4)((BmsScoreProcessor)Player.ScoreProcessor).EngineChart.Profile.JudgementColour(result));
             }
         }
     }

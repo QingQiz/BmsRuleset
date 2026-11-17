@@ -14,7 +14,7 @@ internal class GameplayHealth(BindableDouble health)
 {
     protected BindableDouble Health { get; } = health;
 
-    internal Bindable<BmsGaugeDisplayProfile> DisplayProfile { get; } = new(new BmsGaugeDisplayProfile(null, false, BmsGaugeColourMode.Fixed, Color4.Green));
+    internal Bindable<BmsGaugeDisplayProfile> DisplayProfile { get; } = new(new BmsGaugeDisplayProfile(null, false, BmsGaugeColourMode.Fixed, Color4.White));
 
     private HealthState initialState;
     private HealthState state;

@@ -1,11 +1,11 @@
 using System;
-using osu.Framework.Localisation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.Scoring;
 using osuTK.Graphics;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
 
@@ -17,14 +17,14 @@ internal partial class BmsResultJudgementRow : CompositeDrawable
 
     internal int Count { get; }
 
-    internal BmsResultJudgementRow(LocalisableString label, HitResult result, int count, int total)
+    internal BmsResultJudgementRow(GameplayProfile profile, HitResult result, int count, int total)
     {
         Result = result;
         Count = count;
         RelativeSizeAxes = Axes.Both;
         Padding = new MarginPadding { Vertical = 1 };
-        var colour = BmsHitResultColours.ForHitResult(result);
-        var labelColour = result == HitResult.Perfect
+        var colour = profile.JudgementColour(result);
+        var labelColour = result == HitResult.Perfect && profile is BmsGameplayProfile
             ? ColourInfo.GradientVertical(new Color4(102, 255, 204, 255), new Color4(255, 154, 215, 255))
             : ColourInfo.SingleColour(colour);
         InternalChild = new GridContainer
@@ -35,7 +35,7 @@ internal partial class BmsResultJudgementRow : CompositeDrawable
             {
                 new Drawable[]
                 {
-                    new BmsResultFittedText(label, 22, colour: labelColour, useFullGlyphHeight: false),
+                    new BmsResultFittedText(profile.JudgementLabel(result), 22, colour: labelColour, useFullGlyphHeight: false),
                     new Container
                     {
                         RelativeSizeAxes = Axes.Both,

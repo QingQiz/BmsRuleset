@@ -8,7 +8,6 @@ using osu.Framework.Graphics;
 using osu.Framework.Localisation;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
-using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Lamp;
 using osu.Game.Beatmaps;
@@ -23,12 +22,16 @@ using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Difficulty;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
+using osu.Game.Skinning;
+using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 
 /// <summary>The host boundary for a complete engine profile and its osu! result representation.</summary>
 internal abstract partial class GameplayProfile
 {
+    private static readonly OsuColour result_colours = new();
+
     internal virtual GameplayHealth CreateHealthModel(BindableDouble health) => new(health);
 
     internal static GameplayProfile FromMods(IEnumerable<Mod> mods)
@@ -127,15 +130,27 @@ internal abstract partial class GameplayProfile
 
     internal abstract LocalisableString JudgementLabel(HitResult result);
 
+    internal virtual Color4 JudgementColour(HitResult result) => result_colours.ForHitResult(result);
+
+    internal LegacyManiaSkinConfigurationLookups JudgementImage(HitResult result) => result switch
+    {
+        HitResult.Perfect => LegacyManiaSkinConfigurationLookups.Hit300g,
+        HitResult.Great => LegacyManiaSkinConfigurationLookups.Hit300,
+        HitResult.Good => LegacyManiaSkinConfigurationLookups.Hit200,
+        HitResult.Ok => LegacyManiaSkinConfigurationLookups.Hit100,
+        HitResult.Meh => LegacyManiaSkinConfigurationLookups.Hit50,
+        _ => LegacyManiaSkinConfigurationLookups.Hit0,
+    };
+
     internal virtual bool ShowHitEffect(HitResult result) => result.IsHit();
 
     internal virtual Drawable CreateJudgementDrawable(HitResult result)
-        => new BmsJudgementPiece(!result.IsHit(), new OsuSpriteText
+        => new SkinnableDrawable(new SkinComponentLookup<LegacyManiaSkinConfigurationLookups>(JudgementImage(result)), _ => new BmsJudgementPiece(!result.IsHit(), new OsuSpriteText
         {
             Text = JudgementLabel(result),
             Font = OsuFont.Default.With(size: 32, weight: FontWeight.Bold),
-            Colour = BmsHitResultColours.ForHitResult(result),
-        });
+            Colour = JudgementColour(result),
+        })) { RelativeSizeAxes = Axes.None, AutoSizeAxes = Axes.Both };
 
     internal abstract BmsLamp LampFor(ScoreInfo score);
 

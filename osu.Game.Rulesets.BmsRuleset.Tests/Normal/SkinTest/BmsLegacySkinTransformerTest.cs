@@ -1049,6 +1049,86 @@ public class BmsLegacySkinTransformerTest
         Assert.That(skin.GetDrawableComponent(new BmsSkinComponentLookup(BmsSkinComponents.Mine, BmsLayoutVariant.Bme7K, 1)), Is.Not.Null);
     }
 
+    [TestCase("BMS", LegacyManiaSkinConfigurationLookups.Hit300g, "HitPGreat")]
+    [TestCase("BMS", LegacyManiaSkinConfigurationLookups.Hit300, "HitGreat")]
+    [TestCase("BMS", LegacyManiaSkinConfigurationLookups.Hit200, "HitGood")]
+    [TestCase("BMS", LegacyManiaSkinConfigurationLookups.Hit100, "Hit100")]
+    [TestCase("BMS", LegacyManiaSkinConfigurationLookups.Hit50, "HitBad")]
+    [TestCase("BMS", LegacyManiaSkinConfigurationLookups.Hit0, "HitPoor")]
+    [TestCase("Mania", LegacyManiaSkinConfigurationLookups.Hit300g, "Hit300g")]
+    [TestCase("Mania", LegacyManiaSkinConfigurationLookups.Hit300, "Hit300")]
+    [TestCase("Mania", LegacyManiaSkinConfigurationLookups.Hit200, "Hit200")]
+    [TestCase("Mania", LegacyManiaSkinConfigurationLookups.Hit100, "Hit100")]
+    [TestCase("Mania", LegacyManiaSkinConfigurationLookups.Hit50, "Hit50")]
+    [TestCase("Mania", LegacyManiaSkinConfigurationLookups.Hit0, "Hit0")]
+    public void ManiaJudgementsUseConfiguredSkinImages(string section, LegacyManiaSkinConfigurationLookups lookup, string setting)
+    {
+        var layout = section == "BMS" ? "Layout: 7K" : "Keys: 7";
+        var skin = new BmsLegacySkinTransformer(new TestSkinIniSkin($"""
+                                                                  [{section}]
+                                                                  {layout}
+                                                                  {setting}: custom-judgement
+                                                                  MineImage: mine
+                                                                  """, ["custom-judgement"]), (BmsBeatmap)createBeatmap());
+
+        Assert.That(skin.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(lookup))?.Value,
+            Is.EqualTo("custom-judgement"));
+        Assert.That(skin.GetDrawableComponent(new SkinComponentLookup<LegacyManiaSkinConfigurationLookups>(lookup)), Is.TypeOf<BmsJudgementPiece>());
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void Mania100UsesTheSkinImageBeforeBad(bool configured)
+    {
+        var image = configured ? "custom-100" : "mania-hit100";
+        var setting = configured ? "Hit100: custom-100" : string.Empty;
+        var skin = createConfiguredSkin($"""
+                                         [BMS]
+                                         Layout: 7K
+                                         HitBad: bms-bad
+                                         MineImage: mine
+
+                                         [Mania]
+                                         Keys: 7
+                                         {setting}
+                                         """, [image]);
+
+        Assert.That(skin.GetDrawableComponent(new SkinComponentLookup<LegacyManiaSkinConfigurationLookups>(LegacyManiaSkinConfigurationLookups.Hit100)),
+            Is.TypeOf<BmsJudgementPiece>());
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void Mania100SharesBadWhenItsImageIsMissing(bool configured)
+    {
+        var setting = configured ? "Hit100: missing-100" : string.Empty;
+        var skin = createConfiguredSkin($"""
+                                         [BMS]
+                                         Layout: 7K
+                                         HitBad: custom-bad
+
+                                         [Mania]
+                                         Keys: 7
+                                         {setting}
+                                         """, ["custom-bad"]);
+
+        Assert.That(skin.GetDrawableComponent(new SkinComponentLookup<LegacyManiaSkinConfigurationLookups>(LegacyManiaSkinConfigurationLookups.Hit100)),
+            Is.TypeOf<BmsJudgementPiece>());
+    }
+
+    [Test]
+    public void ManiaJudgementsUseTheEmbeddedFallbackWhenTheSkinHasNoImage()
+    {
+        var beatmap = (BmsBeatmap)createBeatmap();
+        var current = new BmsLegacySkinTransformer(new TestResourceSkin([]), beatmap);
+        var fallback = new BmsLegacySkinTransformer(new TestResourceSkin(["mania-key1", "mania-hit100"]), beatmap);
+        using var source = new BmsEmbeddedSkinSource();
+        source.SetSources(new TestSkinSource(current), new BmsEmbeddedSkinFallbackChain(fallback, null));
+
+        Assert.That(source.GetDrawableComponent(new SkinComponentLookup<LegacyManiaSkinConfigurationLookups>(LegacyManiaSkinConfigurationLookups.Hit100)),
+            Is.TypeOf<BmsJudgementPiece>());
+    }
+
     [Test]
     public void TestBmsSkinIniOverridesManiaSkinIni()
     {

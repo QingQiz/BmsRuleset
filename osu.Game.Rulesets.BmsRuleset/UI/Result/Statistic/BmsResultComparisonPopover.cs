@@ -176,7 +176,7 @@ internal partial class BmsResultComparisonPopover : OsuPopover
             int? bestCount = best.Statistics.Count > 0 ? best.Statistics.GetValueOrDefault(result) : null;
             rows.Add(new BmsResultComparisonRow(profile.JudgementLabel(result), currentCount, bestCount,
                 result == HitResult.Perfect ? true : result is HitResult.Ok or HitResult.Meh or HitResult.Miss ? false : null,
-                BmsHitResultColours.ForHitResult(result), scaleMaximum: judgementMaximum));
+                profile.JudgementColour(result), scaleMaximum: judgementMaximum));
         }
 
         return new FillFlowContainer

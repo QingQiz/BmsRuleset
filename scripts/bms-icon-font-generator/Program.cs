@@ -21,6 +21,7 @@ Action<float, float>[] glyphs =
     drawBranchReplay,
     drawNoBad,
     drawLR2,
+    drawMania,
 ];
 
 width = glyphs.Length * glyph_size;
@@ -40,6 +41,16 @@ void drawScratch(float cx, float cy)
 {
     drawRing(cx, cy, 24, 21);
     drawRing(cx, cy, 19.5f, 9);
+}
+
+void drawMania(float cx, float cy)
+{
+    // Preserve the official RulesetMania silhouette while leaving room inside the mod hexagon.
+    const float scale = 48f / 90;
+    drawRing(cx, cy, 45 * scale, 37 * scale);
+    drawRoundedBar(cx - 20 * scale, cy - 15 * scale, 9 * scale, 30 * scale, 4.5f * scale);
+    drawRoundedBar(cx - 5 * scale, cy - 29 * scale, 10 * scale, 58 * scale, 5 * scale);
+    drawRoundedBar(cx + 11 * scale, cy - 15 * scale, 9 * scale, 30 * scale, 4.5f * scale);
 }
 
 void drawHideScratch(float cx, float cy)

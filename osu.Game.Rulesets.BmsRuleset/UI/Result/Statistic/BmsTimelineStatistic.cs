@@ -164,7 +164,7 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable, IBmsResult
         var categories = BmsRuleset.STATIC_VALID_HIT_RESULTS
             .Where(result => profile.TimingKindFor(result) != ResultTimingKind.EmptyInput)
             .OrderByDescending(result => result.GetIndexForOrderedDisplay())
-            .ToDictionary(result => result, result => new CategoryData(profile.JudgementLabel(result), BmsHitResultColours.ForHitResult(result), new int[bucket_count]));
+            .ToDictionary(result => result, result => new CategoryData(profile.JudgementLabel(result), profile.JudgementColour(result), new int[bucket_count]));
         foreach (var hit in hitEvents.Where(profile.IsTimingEvent))
         {
             if (categories.TryGetValue(hit.Result, out var category))

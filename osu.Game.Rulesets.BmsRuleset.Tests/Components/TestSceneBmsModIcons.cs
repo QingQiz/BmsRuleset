@@ -52,6 +52,7 @@ public partial class TestSceneBmsModIcons : OsuTestScene
                             createIcon(new BmsModAutoGauge()),
                             createIcon(new BmsModBranchReplay()),
                             createIcon(new BmsModLr2()),
+                            createIcon(new BmsModManiaProfile()),
                         ],
                     },
                 ],

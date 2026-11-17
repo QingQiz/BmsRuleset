@@ -38,7 +38,7 @@ internal partial class BmsResultStatisticsGrid : CompositeDrawable
         gauge = new BmsGaugeHistoryGraph(empty.Gauges, empty.StageBoundaries);
         timeline = new BmsTimelineStatistic(empty.Timeline);
         scatter = new BmsHitScatterStatistic(empty.Scatter, profile);
-        offset = new BmsHitOffsetStatistic(empty.Offset);
+        offset = new BmsHitOffsetStatistic(empty.Offset, profile);
         cells =
         [
             new StatisticCell(BmsStrings.GaugeHistory, gauge),

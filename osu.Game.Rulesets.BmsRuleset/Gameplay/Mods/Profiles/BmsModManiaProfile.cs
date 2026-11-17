@@ -10,7 +10,6 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
-using osu.Game.Graphics;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
@@ -25,6 +24,7 @@ using osu.Game.Rulesets.Difficulty;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
+using osu.Game.Rulesets.BmsRuleset.UI.Icons;
 
 namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Profiles;
 
@@ -40,7 +40,7 @@ public partial class BmsModManiaProfile : Mod, IApplicableToGameplayProfile, IAp
 
     public override ModType Type => ModType.Fun;
 
-    public override IconUsage? Icon => OsuIcon.RulesetMania;
+    public override IconUsage? Icon => BmsIcons.Mania;
 
     [SettingSource(typeof(BmsStrings), nameof(BmsStrings.ManiaOverallDifficulty), nameof(BmsStrings.ManiaDifficultyDescription), SettingControlType = typeof(ManiaDifficultySettingsControl))]
     public DifficultyBindable OverallDifficulty { get; } = new()
@@ -61,19 +61,12 @@ public partial class BmsModManiaProfile : Mod, IApplicableToGameplayProfile, IAp
 
     public override Type[] IncompatibleMods =>
     [
-        typeof(BmsModGauge), typeof(BmsModAutoGauge), typeof(BmsModLr2), typeof(BmsModNoBad),
+        typeof(BmsModAssistEasyGauge), typeof(BmsModEasyGauge), typeof(BmsModHardGauge),
+        typeof(BmsModExHardGauge), typeof(BmsModHazardGauge), typeof(BmsModAutoGauge), typeof(BmsModLr2), typeof(BmsModNoBad),
         typeof(BmsModNoGood), typeof(BmsModNoGreat), typeof(BmsModLongNoteModeBase),
     ];
 
-    private static readonly IScoreSelectionRule score_selection_rule = new ManiaScoreSelectionRule();
-
-    public IScoreSelectionRule ScoreSelectionRule => score_selection_rule;
-
-    private sealed class ManiaScoreSelectionRule : IScoreSelectionRule
-    {
-        public bool IsScoreEligible(IReadOnlyList<Mod> scoreMods, IReadOnlyList<Mod> selectedMods)
-            => EqualityComparer<Mod?>.Default.Equals(scoreMods.OfType<BmsModManiaProfile>().SingleOrDefault(), selectedMods.OfType<BmsModManiaProfile>().SingleOrDefault());
-    }
+    public IScoreSelectionRule ScoreSelectionRule => BmsModTypeScoreSelectionRule<BmsModManiaProfile>.REDUCTION;
 
     GameplayProfile IApplicableToGameplayProfile.ApplyToGameplayProfile(GameplayProfile profile)
         => new ManiaGameplayProfile(OverallDifficulty.Value, DrainRate.Value, UseLazer.Value);
@@ -151,9 +144,18 @@ public partial class BmsModManiaProfile : Mod, IApplicableToGameplayProfile, IAp
         internal override IEnumerable<RulesetBeatmapAttribute> BeatmapAttributes(IBeatmapInfo beatmapInfo, IReadOnlyCollection<Mod> mods, BeatmapDifficulty adjustedDifficulty)
         {
             yield return new RulesetBeatmapAttribute(BmsStrings.DifficultyAttributeLabel("od"), BmsStrings.DifficultyAttributeAcronym("od").ToString(),
-                originalOd(beatmapInfo), adjustedDifficulty.OverallDifficulty, 10);
+                originalOd(beatmapInfo), adjustedDifficulty.OverallDifficulty, 10)
+            {
+                Description = BmsStrings.ManiaOverallDifficultyDescription,
+                AdditionalMetrics = ManiaProfiles.CreateHitWindows(new ManiaOptions(adjustedDifficulty.OverallDifficulty), !useLazer).Entries
+                    .Select(window => new RulesetBeatmapAttribute.AdditionalMetric(JudgementLabel(HitResultFor(window.Result)),
+                        BmsStrings.TimingWindow(window.Early / 1000.0, window.Late / 1000.0), JudgementColour(HitResultFor(window.Result)))).ToArray(),
+            };
             yield return new RulesetBeatmapAttribute(BmsStrings.DifficultyAttributeLabel("hp"), BmsStrings.DifficultyAttributeAcronym("hp").ToString(),
-                originalHp(beatmapInfo), adjustedDifficulty.DrainRate, 10);
+                originalHp(beatmapInfo), adjustedDifficulty.DrainRate, 10)
+            {
+                Description = BmsStrings.ManiaDrainRateDescription,
+            };
         }
 
         internal override INoteRule AutoplayRule(INoteRule rule) => useLazer ? ((OrderedNoteRule)rule).Inner : rule;

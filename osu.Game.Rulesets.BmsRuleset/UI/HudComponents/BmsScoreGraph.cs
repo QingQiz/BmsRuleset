@@ -286,6 +286,8 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
         ];
 
         sectionBackgrounds.AddRange([plotBackground, judgementBackground]);
+        targetBar.Name = "Target score bar";
+        targetScoreRow.Name = "Target score row";
         BackgroundColour.BindValueChanged(colour => background.Colour = colour.NewValue, true);
         BackgroundOpacity.BindValueChanged(opacity => background.Alpha = opacity.NewValue, true);
         SectionBackgroundColour.BindValueChanged(colour =>
@@ -339,7 +341,10 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
         maximumScore = scoreProcessor.EngineChart.MaximumScore;
         totalScoringEvents = scoreProcessor.EngineChart.Chart.ScorePlan.Opportunities.Length;
         foreach (var (result, texts) in judgementCountTexts)
+        {
             texts.Label.Text = profile.JudgementLabel(result);
+            texts.Label.Colour = texts.Current.Colour = texts.PersonalBest.Colour = profile.JudgementColour(result);
+        }
         personalBestFinalScore = 0;
         personalBestProgression.Clear();
         personalBestJudgementProgress.SetProgression([]);
@@ -347,6 +352,7 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
         updateRankLines();
         loadPersonalBest();
         updateTarget();
+        updateSectionVisibility(ShowScoreDifference, ShowScoreDifference.Value);
     }
 
     protected override void LoadComplete()
@@ -450,6 +456,10 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
 
     private void updateTarget()
     {
+        var showTarget = profile.ScoreForRank(ScoreRank.X, maximumScore).HasValue;
+        targetBar.Alpha = showTarget ? 1 : 0;
+        currentBar.SetColumn(0, showTarget ? 3 : 2);
+        personalBestBar.SetColumn(1, showTarget ? 3 : 2);
         targetRank = displayed_ranks.Reverse().FirstOrDefault(rank => profile.ScoreForRank(rank, maximumScore) > personalBestFinalScore, ScoreRank.X);
         var rankTarget = profile.ScoreForRank(targetRank, maximumScore);
         targetFinalScore = rankTarget ?? maximumScore;
@@ -465,7 +475,9 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
         }
 
         plotContainer.Alpha = ShowBars.Value ? 1 : 0;
-        currentScoreRow.Alpha = personalBestScoreRow.Alpha = targetScoreRow.Alpha = ShowScoreDifference.Value ? 1 : 0;
+        currentScoreRow.Alpha = personalBestScoreRow.Alpha = ShowScoreDifference.Value ? 1 : 0;
+        var showTarget = profile.ScoreForRank(ScoreRank.X, maximumScore).HasValue;
+        targetScoreRow.Alpha = ShowScoreDifference.Value && showTarget ? 1 : 0;
         judgementComparison.Alpha = ShowJudgementComparison.Value ? 1 : 0;
 
         var nextBottom = footer_bottom_padding;
@@ -481,8 +493,11 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
             if (ShowJudgementComparison.Value)
                 nextBottom += footer_gap;
 
-            targetScoreRow.Y = -nextBottom;
-            nextBottom += score_row_height + footer_gap;
+            if (showTarget)
+            {
+                targetScoreRow.Y = -nextBottom;
+                nextBottom += score_row_height + footer_gap;
+            }
             personalBestScoreRow.Y = -nextBottom;
             nextBottom += score_row_height + footer_gap;
             currentScoreRow.Y = -nextBottom;
@@ -695,7 +710,7 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
                 Position = new Vector2(4, 0),
                 Text = profile.JudgementLabel(result),
                 Font = OsuFont.GetFont(size: 8, weight: FontWeight.SemiBold),
-                Colour = BmsHitResultColours.ForHitResult(result),
+                Colour = profile.JudgementColour(result),
             },
             current = new OsuSpriteText
             {
@@ -703,7 +718,7 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
                 Origin = Anchor.TopRight,
                 Position = new Vector2(-54, 0),
                 Font = OsuFont.GetFont(size: 9, weight: FontWeight.SemiBold, fixedWidth: true),
-                Colour = BmsHitResultColours.ForHitResult(result),
+                Colour = profile.JudgementColour(result),
             },
             personalBest = new OsuSpriteText
             {
@@ -711,7 +726,7 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
                 Origin = Anchor.TopRight,
                 Position = new Vector2(-4, 0),
                 Font = OsuFont.GetFont(size: 9, weight: FontWeight.SemiBold, fixedWidth: true),
-                Colour = BmsHitResultColours.ForHitResult(result),
+                Colour = profile.JudgementColour(result),
             },
         ],
     };
@@ -881,6 +896,12 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
         {
             ghost.Colour = colour;
             fill.Colour = colour;
+        }
+
+        public void SetColumn(int column, int count)
+        {
+            X = (float)column / count;
+            Width = 1f / count;
         }
 
         public void SetScores(double score, double finalScore, double maximumScore)

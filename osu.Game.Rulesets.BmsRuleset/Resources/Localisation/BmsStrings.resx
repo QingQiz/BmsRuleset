@@ -2,9 +2,11 @@
 <root>
   <data name="mania_overall_difficulty" xml:space="preserve"><value>Overall difficulty (OD)</value></data>
   <data name="mania_drain_rate" xml:space="preserve"><value>HP drain</value></data>
-  <data name="mania_difficulty_description" xml:space="preserve"><value>Defaults to 8, or the original value for osu!mania beatmaps. Adjust to override.</value></data>
+  <data name="mania_difficulty_description" xml:space="preserve"><value>Default: source value for mania, 8 otherwise.</value></data>
+  <data name="mania_overall_difficulty_description" xml:space="preserve"><value>Higher OD makes timing windows tighter.</value></data>
+  <data name="mania_drain_rate_description" xml:space="preserve"><value>Higher HP makes health harder to maintain.</value></data>
   <data name="mania_use_lazer" xml:space="preserve"><value>Use lazer rules</value></data>
-  <data name="mania_use_lazer_description" xml:space="preserve"><value>Enable for lazer judgement, scoring and health; disable for stable rules.</value></data>
+  <data name="mania_use_lazer_description" xml:space="preserve"><value>Switch off for stable rules.</value></data>
   <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
   <resheader name="version"><value>2.0</value></resheader>
   <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
@@ -618,10 +620,10 @@ Click to open the BMS log for the complete list and error details.</value>
     <value>BMS difficulty update finished with {0} failed charts.</value>
   </data>
   <data name="mod_mania_profile_name" xml:space="preserve">
-    <value>osu!mania Profile</value>
+    <value>osu!mania</value>
   </data>
   <data name="mod_mania_profile" xml:space="preserve">
-    <value>Use osu!mania judgement, scoring and health. Choose lazer or stable rules and adjust OD and HP in the mod settings. All long notes require a release; mines are removed.</value>
+    <value>Use osu!mania judgement, scoring and health.</value>
   </data>
   <data name="health" xml:space="preserve">
     <value>Health</value>

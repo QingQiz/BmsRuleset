@@ -367,6 +367,35 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
         }
     }
 
+    [TestCase(true)]
+    [TestCase(false)]
+    public void TestManiaMeterOnlyShowsTheEarlyMissRegion(bool lazer)
+    {
+        AddStep("load Mania player", () => LoadPlayer([new BmsModManiaProfile { UseLazer = { Value = lazer } }]));
+        AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
+        AddStep("stop playback", () => Player.GameplayClockContainer.Stop());
+        AddAssert("one colour bar shows early MISS and a hit at the late edge", () =>
+        {
+            var meter = Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter>().Single();
+            var bar = meter.ChildrenOfType<Container>().Single(child => child.Name == "judgement windows");
+            var windows = BmsHitErrorMeter.CreateWindows(Playfield.EngineChart);
+            var domain = BmsHitErrorMeter.CreateDomain(windows);
+            var miss = windows.Single(window => window.Result == HitResult.Miss);
+            var meh = windows.Single(window => window.Result == HitResult.Meh);
+            var boxes = bar.Children.OfType<Box>().ToArray();
+            var early = domain.RelativePosition(miss.FastOffset + .001);
+            var late = domain.RelativePosition(meh.SlowOffset - .001);
+            var profile = Playfield.EngineChart.Profile;
+            Assert.That(bar.DrawHeight, Is.EqualTo(3 * LegacySkin.STABLE_MAGIC_SCALE_FACTOR));
+            Assert.That(boxes, Has.Length.EqualTo(6));
+            Assert.That(boxes.Last(box => box.X <= early && box.X + box.Width >= early).Colour,
+                Is.EqualTo((SRGBColour)profile.JudgementColour(HitResult.Miss)));
+            Assert.That(boxes.Last(box => box.X <= late && box.X + box.Width >= late).Colour,
+                Is.EqualTo((SRGBColour)profile.JudgementColour(HitResult.Meh)));
+            return true;
+        });
+    }
+
     [Test]
     public void TestHitErrorMeterLayout()
     {

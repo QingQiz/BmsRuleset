@@ -196,7 +196,7 @@ public partial class BmsHitErrorMeter : HitErrorMeter
                 RelativeSizeAxes = Axes.Both,
                 X = start,
                 Width = Math.Max(0, end - start),
-                Colour = BmsHitResultColours.ForHitResult(window.Result),
+                Colour = profile!.JudgementColour(window.Result),
             };
             target.Add(bar);
             if (window.Kind == ResultTimingKind.EmptyInput)
@@ -245,7 +245,7 @@ public partial class BmsHitErrorMeter : HitErrorMeter
     {
         var relativePosition = domain.RelativePosition(timeOffset);
 
-        Judgements.AddJudgement(relativePosition, BmsHitResultColours.ForHitResult(result), boundaryIsFast);
+        Judgements.AddJudgement(relativePosition, profile!.JudgementColour(result), boundaryIsFast);
 
         if (affectMovingAverage)
         {
@@ -287,11 +287,20 @@ public partial class BmsHitErrorMeter : HitErrorMeter
         => chart.Objects.Where(note => note is not BmsLandmine)
             .Select(chart.TimingFor)
             .Distinct()
-            .SelectMany(timing => timing.TailWindows is { } tail ? new[] { timing.HeadWindows, tail } : [timing.HeadWindows])
-            .SelectMany(table => table.Entries)
-            .GroupBy(window => chart.Profile.HitResultFor(window.Result))
+            .SelectMany(timing => timing.TailWindows is { } tail
+                ? new[] { (Windows: timing.HeadWindows, Deadline: timing.HeadDeadline), (Windows: tail, Deadline: timing.TailDeadline) }
+                : [(Windows: timing.HeadWindows, Deadline: timing.HeadDeadline)])
+            .SelectMany(table => table.Windows.Entries.Select(window =>
+            {
+                var result = chart.Profile.HitResultFor(window.Result);
+                var kind = chart.Profile.TimingKindFor(result);
+                // A consuming MISS can be pressed early, but its late side expires at the passive deadline.
+                var late = result == HitResult.Miss && kind == ResultTimingKind.Untimed ? Math.Min(window.Late, table.Deadline) : window.Late;
+                return new BmsHitErrorWindow(result, kind, window.Early / 1000.0, late / 1000.0);
+            }))
+            .GroupBy(window => window.Result)
             .Select(group => new BmsHitErrorWindow(group.Key, chart.Profile.TimingKindFor(group.Key),
-                group.Min(window => window.Early) / 1000.0, group.Max(window => window.Late) / 1000.0))
+                group.Min(window => window.FastOffset), group.Max(window => window.SlowOffset)))
             .ToArray();
 
     internal static BmsHitErrorMeterDomain CreateDomain(IReadOnlyList<BmsHitErrorWindow> windows)

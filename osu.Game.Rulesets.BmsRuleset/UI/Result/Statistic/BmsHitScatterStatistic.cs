@@ -190,7 +190,7 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResu
                     new Circle
                     {
                         Size = new Vector2(8),
-                        Colour = BmsHitResultColours.ForHitResult(result),
+                        Colour = profile.JudgementColour(result),
                         Anchor = Anchor.CentreLeft,
                         Origin = Anchor.CentreLeft,
                     },
@@ -215,7 +215,7 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResu
         };
     }
 
-    private static Drawable createRow(LocalisableString label, ScatterData data, float height) => new GridContainer
+    private Drawable createRow(LocalisableString label, ScatterData data, float height) => new GridContainer
     {
         RelativeSizeAxes = Axes.X,
         Height = height + x_axis_height,
@@ -259,7 +259,7 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResu
         ],
     };
 
-    private static Drawable createGraph(ScatterData data) => new Container
+    private Drawable createGraph(ScatterData data) => new Container
     {
         RelativeSizeAxes = Axes.Both,
         Children =
@@ -328,7 +328,7 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResu
         Alpha = tick == 0 ? 0.45f : 0.25f,
     };
 
-    private static Drawable createPlot(ScatterData data)
+    private Drawable createPlot(ScatterData data)
     {
         var dataAreaChildren = new List<Drawable>();
 
@@ -365,7 +365,7 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResu
         };
     }
 
-    private static Drawable[] createPointDrawables(ScatterData data)
+    private Drawable[] createPointDrawables(ScatterData data)
     {
         if (data.Points.Count == 0)
             return [];
@@ -377,7 +377,7 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResu
         // The renderer limits quads by their six indices, not their four vertices.
         const int max_points_per_batch = IRenderer.MAX_QUADS;
         for (var start = 1; start < data.Points.Count; start += max_points_per_batch)
-            drawables.Add(new ScatterPointBatch(data, start, Math.Min(start + max_points_per_batch, data.Points.Count)));
+            drawables.Add(new ScatterPointBatch(data, start, Math.Min(start + max_points_per_batch, data.Points.Count), profile));
 
         return drawables.ToArray();
     }
@@ -421,14 +421,14 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResu
         Font = OsuFont.GetFont(size: 11, weight: FontWeight.Bold),
     };
 
-    private static Drawable createPoint(ScatterData data, ScatterPoint point) => new Circle
+    private Drawable createPoint(ScatterData data, ScatterPoint point) => new Circle
     {
         Origin = Anchor.Centre,
         RelativePositionAxes = Axes.Both,
         X = (float)Math.Clamp(point.Time / data.Duration, 0, 1),
         Y = yFor(data, point.DisplayOffset(data.OffsetRange)),
         Size = new Vector2(point.Result == HitResult.Miss ? 5.2f : 4.4f),
-        Colour = BmsHitResultColours.ForHitResult(point.Result),
+        Colour = profile.JudgementColour(point.Result),
         Alpha = point.Result == HitResult.Miss ? 0.95f : 0.82f,
     };
 
@@ -477,8 +477,11 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResu
         private Texture texture = null!;
         private IShader shader = null!;
 
-        public ScatterPointBatch(ScatterData data, int startIndex, int endIndex)
+        private readonly GameplayProfile profile;
+
+        public ScatterPointBatch(ScatterData data, int startIndex, int endIndex, GameplayProfile profile)
         {
+            this.profile = profile;
             this.data = data;
             this.startIndex = startIndex;
             this.endIndex = endIndex;
@@ -538,7 +541,7 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResu
                         Vector2Extensions.Transform(bottomLeft, DrawInfo.Matrix),
                         Vector2Extensions.Transform(bottomRight, DrawInfo.Matrix));
                     var colour = DrawColourInfo.Colour;
-                    colour.ApplyChild(ColourInfo.SingleColour(BmsHitResultColours.ForHitResult(point.Result)));
+                    colour.ApplyChild(ColourInfo.SingleColour(source.profile.JudgementColour(point.Result)));
                     colour = colour.MultiplyAlpha(point.Result == HitResult.Miss ? 0.95f : 0.82f);
 
                     var drawRectangle = new Vector4(0, 0, size, size);

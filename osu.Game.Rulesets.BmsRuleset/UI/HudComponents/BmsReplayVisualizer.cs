@@ -24,6 +24,7 @@ using osu.Game.Rulesets.UI;
 using osu.Game.Screens.Play.HUD;
 using osuTK;
 using RhythmEngine.Profiles.Common;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 
@@ -72,6 +73,7 @@ public sealed partial class BmsReplayVisualizer : BmsHudComponent
     private InputLane[]? replayInputs;
     private BmsLayoutVariant layout = BmsLayoutVariant.Bme7K;
     private int columnCount = 8;
+    private GameplayProfile profile = BmsGameplayProfile.INSTANCE;
     private GeometryState? requestedGeometry;
     private GeometryState? preparedGeometry;
 
@@ -103,6 +105,8 @@ public sealed partial class BmsReplayVisualizer : BmsHudComponent
     [BackgroundDependencyLoader]
     private void load()
     {
+        if (scoreProcessor is BmsScoreProcessor bmsProcessor)
+            profile = bmsProcessor.EngineChart.Profile;
         if (drawableRuleset is BmsDrawableRuleset { Beatmap: BmsBeatmap beatmap })
         {
             layout = beatmap.LayoutVariant;
@@ -234,7 +238,7 @@ public sealed partial class BmsReplayVisualizer : BmsHudComponent
                     var x = (displayColumn(note.Column) + 0.1f) * columnWidth;
                     var top = positionAt(note.EndTime, now, range);
                     var bottom = positionAt(note.StartTime, now, range);
-                    var colour = ColourFor(NoteResult(head, tail));
+                    var colour = ColourFor(NoteResult(head, tail), profile);
                     rectangle(x, top, columnWidth * 0.8f, Math.Max(5, bottom - top), colour, kind: PlotElementKind.Note, outline: true);
                 }
 
@@ -272,7 +276,7 @@ public sealed partial class BmsReplayVisualizer : BmsHudComponent
         var start = positionAt(stroke.StartTime, now, range);
         var end = positionAt(Math.Min(now, stroke.EndTime), now, range);
         var display = judgements.DescribeInput(stroke, now);
-        var colour = ColourFor(display.Result);
+        var colour = ColourFor(display.Result, profile);
         rectangle(x - columnWidth * 0.22f, end - 1.5f, columnWidth * 0.44f, Math.Max(3, start - end + 3), colour);
         if (!ShowNotes.Value)
             return;
@@ -345,9 +349,9 @@ public sealed partial class BmsReplayVisualizer : BmsHudComponent
 
     private int displayColumn(int column) => BmsLayout.Is2P(layout) ? column == 0 ? columnCount - 1 : column - 1 : column;
 
-    internal static Colour4 ColourFor(HitResult? result) => result is null or HitResult.None
+    internal static Colour4 ColourFor(HitResult? result, GameplayProfile? profile = null) => result is null or HitResult.None
         ? Colour4.White
-        : BmsHitResultColours.ForHitResult(result.Value);
+        : (profile ?? BmsGameplayProfile.INSTANCE).JudgementColour(result.Value);
 
     internal static HitResult? NoteResult(BmsTimingObservation? head, BmsTimingObservation? tail)
         => worseResult(head?.Result, tail?.Result);
