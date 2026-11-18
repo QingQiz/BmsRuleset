@@ -99,7 +99,6 @@ public partial class BmsHitErrorMeter : HitErrorMeter
     {
         this.scoreProcessor = scoreProcessor as BmsScoreProcessor;
         gameplayEvents = (drawableRuleset as BmsDrawableRuleset)?.GameplayEvents;
-        if (gameplayEvents != null) gameplayEvents.ReplaySeeked += resetReplayDisplay;
         var engineChart = this.scoreProcessor?.EngineChart;
         profile = engineChart?.Profile;
         windows = engineChart == null ? [] : CreateWindows(engineChart);
@@ -156,6 +155,9 @@ public partial class BmsHitErrorMeter : HitErrorMeter
     protected override void LoadComplete()
     {
         base.LoadComplete();
+
+        if (gameplayEvents != null)
+            gameplayEvents.ReplaySeeked += resetReplayDisplay;
 
         if (scoreProcessor != null)
             scoreProcessor.NonConsumingJudgementRegistered += onNonConsumingJudgementRegistered;
