@@ -161,6 +161,21 @@ public class EngineContractTest
     }
 
     [Test]
+    public void UnsortedLaneKeepsCandidatesAtTheEarlyBoundaryInSourceOrder()
+    {
+        var chart = new Chart(1,
+        [
+            new ChartNote(3, 0, 2_000_000, 2_000_000, tapRule()),
+            new ChartNote(7, 0, 1_000_000, 1_000_000, tapRule()),
+            new ChartNote(5, 0, 1_000_000, 1_000_000, tapRule()),
+        ], []);
+        var session = new JudgementSession(chart, configuration() with { SelectCandidates = context => context.Candidates });
+        var batch = session.AdvanceTo(970_000, [new InputEvent(970_000, 0, true)]);
+
+        Assert.That(batch.Transitions.Select(t => t.After.Id), Is.EqualTo([7, 5]));
+    }
+
+    [Test]
     public void ScoringPlanDoesNotChangeJudgementRules()
     {
         var note = new ChartNote(7, 0, 1_000_000, 1_000_000, tapRule());
@@ -363,7 +378,7 @@ public class EngineContractTest
         var body = snapshot.Parts.Single(p => p.Part == NoteParts.BODY);
         Assert.That(snapshot.Completed, Is.True);
         Assert.That(body.Active, Is.False);
-        Assert.That(body.Reason, Is.EqualTo(hostEnd ? HoldReasons.HOST_END : null));
+        Assert.That(body.Reason, Is.EqualTo(hostEnd ? HoldReasons.HOST_END : time < 1900 ? HoldReasons.DROP : null));
         Assert.That(tail.Reason, Is.EqualTo(time < 1900 ? HoldReasons.DROP : HoldReasons.RELEASE));
         Assert.That(tail.Result, Is.EqualTo(time < 1900 ? drop : hit));
         Assert.That(session.GetEventsSince(0).Single(e => e.Part == NoteParts.TAIL).Result, Is.EqualTo(tail.Result));

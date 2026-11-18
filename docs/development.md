@@ -2,6 +2,8 @@
 
 [Back to README](../README.md)
 
+See [Behaviour differences (中文)](behaviour-differences.zh-CN.md) for gameplay comparisons and reference client versions.
+
 ## Design Plans
 
 - [Online leaderboard (中文)](plans/online-leaderboard-plan.zh-CN.md): osu! OAuth, replay uploads, and SQLite storage.

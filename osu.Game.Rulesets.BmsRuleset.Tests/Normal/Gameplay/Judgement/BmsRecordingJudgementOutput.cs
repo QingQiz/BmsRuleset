@@ -9,6 +9,7 @@ using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
 using RhythmEngine.Core;
 using RhythmEngine.Profiles.Bms;
+using RhythmEngine.Profiles.Common;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
 
@@ -91,9 +92,13 @@ internal sealed class BmsRecordingJudgementOutput : IBmsJudgementOutput
             Feedback?.Invoke($"empty-poor:{note.StartTime}:{note.Column}");
     }
 
-    public void PlaySample(BmsHitObject note) => Feedback?.Invoke($"sample:{note.SampleKey}:{note.SampleVolume}");
-    public void PlayTailSample(BmsLongNote note) => Feedback?.Invoke($"sample:{note.TailSampleKey}:{note.TailSampleVolume}");
-    public void PlayKeySound() => Feedback?.Invoke("keysound");
+    public void PlayKeySound(BmsHitObject note, KeySound sound)
+    {
+        if (sound.Action != KeySoundAction.Play) return;
+        var samples = sound.Part == NoteParts.TAIL || sound.Part == KeySoundPolicies.STABLE_TAIL ? ((BmsLongNote)note).GetTailSamples() : note.GetSamples();
+        foreach (var sample in samples)
+            Feedback?.Invoke($"{(sound.Part == NoteParts.TAIL ? "sample" : "keysound")}:{sample.SampleKey}:{sample.Volume}");
+    }
 
     public void PlayLandmineSample(BmsLandmine note) => Feedback?.Invoke("landmine");
 

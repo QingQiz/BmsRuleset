@@ -30,6 +30,7 @@ public abstract record NoteState
 {
     public abstract NoteTimer? NextTimer { get; }
 
+    /// <summary>Completion is permanent within an attempt.</summary>
     public abstract bool Completed { get; }
 }
 
@@ -62,6 +63,12 @@ public interface INoteRule
     /// Time-dependent changes must be scheduled by the rule, not inferred by this projection.
     /// </summary>
     ImmutableArray<NotePartState> GetParts(NoteContext context);
+
+    /// <summary>
+    /// Inclusive lower bound on candidate input time relative to the note start, in session-clock microseconds.
+    /// Applies to every reachable state and both input edges. Null indicates no known bound.
+    /// </summary>
+    long? EarliestCandidateOffset => null;
 
     InputCandidate? GetCandidate(NoteContext context, InputEvent input, int noteIndex);
 

@@ -177,15 +177,17 @@ internal sealed class BmsPcmPlaybackController : IDisposable
 
     internal void PrepareSample(int sampleKey) => ensureLease(sampleKey);
 
-    internal void QueueLivePlay(int sampleKey, int volume) => QueuePlay(sampleKey, volume, 0);
+    internal void QueueLivePlay(int sampleKey, int volume, int? owner = null) => queuePlay(sampleKey, volume, 0, owner);
 
-    internal void QueuePlay(int sampleKey, int volume, double offset)
+    internal void QueuePlay(int sampleKey, int volume, double offset) => queuePlay(sampleKey, volume, offset, null);
+
+    private void queuePlay(int sampleKey, int volume, double offset, int? owner)
     {
         if (playbackBlocked || !HasSampleDefinition(sampleKey))
             return;
 
         ensureLease(sampleKey);
-        var play = new PendingLivePlay(sampleKey, volume, Math.Max(0, offset));
+        var play = new PendingLivePlay(sampleKey, volume, Math.Max(0, offset), owner);
         // All live events in a game frame share one mixer target. Keep only the last
         // trigger per sample definition before allocating the command batch.
         if (livePlayIndices.TryGetValue(sampleKey, out var index))
@@ -214,16 +216,18 @@ internal sealed class BmsPcmPlaybackController : IDisposable
 
         foreach (var pending in livePlays)
         {
+            if (pending.Stopped) continue;
+
             if (!tryGetReadyAsset(pending.SampleKey, pending.Offset, out var asset))
             {
                 // Decoder contention must not turn a live key/BGM event into permanent silence.
                 // Keep only the newest trigger for a definition, just as the mixer retriggers it.
-                pendingPlays[pending.SampleKey] = new PendingPlay(pending.Volume, pending.Offset, currentTime());
+                pendingPlays[pending.SampleKey] = new PendingPlay(pending.Volume, pending.Offset, currentTime(), pending.Owner, pending.Muted);
                 continue;
             }
 
             pendingPlays.Remove(pending.SampleKey);
-            var play = createPlay(asset, pending.SampleKey, pending.Volume, targetFrame, pending.Offset);
+            var play = createPlay(asset, pending.SampleKey, pending.Volume, targetFrame, pending.Offset, pending.Owner, pending.Muted);
             if (asset.TotalFrameCount >= 0 && play.SourceOffsetFrame >= asset.TotalFrameCount)
                 continue;
 
@@ -238,6 +242,30 @@ internal sealed class BmsPcmPlaybackController : IDisposable
             // can be submitted directly.
             mixer.SubmitPlayBatch(CollectionsMarshal.AsSpan(plays));
         }
+    }
+
+    internal void ControlLiveVoice(int owner, bool stop, bool muted)
+    {
+        // Mutate queued starts in place so a release in the same gameplay frame cannot leak a new attack.
+        for (var i = 0; i < livePlays.Count; i++)
+        {
+            var pending = livePlays[i];
+            if (pending.Owner == owner && !pending.Stopped)
+                livePlays[i] = pending with { Stopped = stop, Muted = muted };
+        }
+
+        foreach (var (sampleKey, pending) in pendingPlays)
+        {
+            if (pending.Owner != owner)
+                continue;
+
+            if (stop)
+                pendingPlays.Remove(sampleKey);
+            else
+                pendingPlays[sampleKey] = pending with { Muted = muted };
+        }
+
+        mixer.SubmitVoiceControl(owner, epoch, stop, muted);
     }
 
     internal void Play(int sampleKey, int volume, double offset)
@@ -340,7 +368,7 @@ internal sealed class BmsPcmPlaybackController : IDisposable
                 continue;
 
             pendingPlays.Remove(sampleKey);
-            submitSingle(asset, sampleKey, pending.Volume, offset);
+            submitSingle(asset, sampleKey, pending.Volume, offset, pending.Owner, pending.Muted);
         }
 
         maintainLeases(chartTime);
@@ -403,9 +431,9 @@ internal sealed class BmsPcmPlaybackController : IDisposable
         resourceStore = null;
     }
 
-    private void submitSingle(BmsPcmAsset asset, int sampleKey, int volume, double offset)
+    private void submitSingle(BmsPcmAsset asset, int sampleKey, int volume, double offset, int? owner = null, bool muted = false)
     {
-        var play = createPlay(asset, sampleKey, volume, mixer.RenderedFrames, offset);
+        var play = createPlay(asset, sampleKey, volume, mixer.RenderedFrames, offset, owner, muted);
         var totalFrames = asset.TotalFrameCount;
 
         if (totalFrames >= 0 && play.SourceOffsetFrame >= totalFrames)
@@ -420,12 +448,12 @@ internal sealed class BmsPcmPlaybackController : IDisposable
         livePlayIndices.Clear();
     }
 
-    private BmsVoicePlay createPlay(BmsPcmAsset asset, int sampleKey, int volume, long targetFrame, double offset)
+    private BmsVoicePlay createPlay(BmsPcmAsset asset, int sampleKey, int volume, long targetFrame, double offset, int? owner = null, bool muted = false)
     {
         var definition = sampleDefinitions[sampleKey];
         return new BmsVoicePlay(asset, sampleKey, targetFrame, sanitiseVolume(volume),
             clockMapper.MapSourceOffset(definition.StartOffset + offset), epoch,
-            definition.EndOffset is { } end ? clockMapper.MapSourceOffset(end) : null);
+            definition.EndOffset is { } end ? clockMapper.MapSourceOffset(end) : null, owner, muted);
     }
 
     private bool tryGetReadyAsset(int sampleKey, double offset, [NotNullWhen(true)] out BmsPcmAsset? asset)
@@ -537,7 +565,7 @@ internal sealed class BmsPcmPlaybackController : IDisposable
 
     private readonly record struct SampleLifetime(int SampleKey, double StartTime);
 
-    private readonly record struct PendingPlay(int Volume, double Offset, double RequestedAt);
+    private readonly record struct PendingPlay(int Volume, double Offset, double RequestedAt, int? Owner = null, bool Muted = false);
 
-    private readonly record struct PendingLivePlay(int SampleKey, int Volume, double Offset);
+    private readonly record struct PendingLivePlay(int SampleKey, int Volume, double Offset, int? Owner, bool Muted = false, bool Stopped = false);
 }

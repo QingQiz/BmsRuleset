@@ -67,7 +67,11 @@ public static class ManiaProfiles
         var endTime = source.EndTime;
         return new CompiledProfile(chart, new SessionConfiguration(id, score, health, context =>
                 !stable && context.State.Held == context.State.PreviouslyHeld ? [] : ProfileSupport.Oldest(context),
-            context => context.Time >= endTime && context.NotesRetired), descriptor);
+            context => context.Time >= endTime && context.NotesRetired)
+        {
+            KeySounds = stable ? KeySoundPolicies.ManiaStable : KeySoundPolicies.ManiaLazer,
+            RetireNotesEndingBeforeHit = stable ? null : OrderedNoteRule.RetirementAfterHit,
+        }, descriptor);
     }
 
     /// <summary>Base press windows shared by rule compilation and chart rating.</summary>
@@ -103,10 +107,12 @@ public static class ManiaProfiles
         {
             if (!rules.TryGetValue(note.Kind, out var rule))
                 rules.Add(note.Kind, rule = createRule(note.Kind, windows, tail, stableWindows, stable));
-            return stable
-                ? rule
-                : new OrderedNoteRule(rule,
-                    laneStarts![note.Lane], laneStarts[note.Lane].BinarySearch(note.StartTime) + 1, windows);
+            if (stable)
+                return rule;
+
+            var starts = laneStarts![note.Lane];
+            var next = starts.BinarySearch(note.StartTime) + 1;
+            return new OrderedNoteRule(rule, next < starts.Length ? starts[next] : null);
         }, note => scoringOpportunities(note, stable));
     }
 
@@ -131,6 +137,7 @@ public static class ManiaProfiles
             evaluation => new NoteEmission(NoteParts.TAIL, resolveGrade(evaluation), evaluation.Note.EndTime, evaluation.TailOffset))
         {
             RecoverMissedHead = true,
+            ObserveActiveInput = true, // A resolved head can resume the hold without consuming the press.
             LatestRecoveryOffset = late,
             BreakResult = ManiaResults.COMBO_BREAK,
         };

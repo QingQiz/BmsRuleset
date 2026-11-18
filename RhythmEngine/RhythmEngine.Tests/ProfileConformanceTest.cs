@@ -176,7 +176,7 @@ public class ProfileConformanceTest
         var source = new KeyChart(1, [note(0, 1000), note(1, 1050)]);
         var session = ManiaProfiles.CreateLazer(source).CreateRecordingSession();
         session.AdvanceTo(ms(1050), [press(1050)]);
-        Assert.That(session.GetEventsSince(0).Select(e => (e.NoteId, e.Result.Value)), Is.EqualTo([(0, "miss"), (1, "perfect")]));
+        Assert.That(session.GetEventsSince(0).Select(e => (e.NoteId, e.Result.Value)), Is.EqualTo([(1, "perfect"), (0, "miss")]));
     }
 
     [TestCase(5)]

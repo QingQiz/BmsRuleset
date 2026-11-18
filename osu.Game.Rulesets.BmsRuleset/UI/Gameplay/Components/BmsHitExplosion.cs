@@ -1,6 +1,7 @@
 using System;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Pooling;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Runtime;
 
@@ -13,6 +14,8 @@ public sealed partial class BmsHitExplosion : PoolableDrawable
 
     private readonly BmsCachedSkinnableDrawable skinnableExplosion;
     private double? inheritedStartTime;
+
+    internal BmsLongNote? Owner { get; set; }
 
     internal void InheritStartTime(double? startTime) => inheritedStartTime = startTime;
 
@@ -60,6 +63,7 @@ public sealed partial class BmsHitExplosion : PoolableDrawable
     {
         ClearTransforms();
         inheritedStartTime = null;
+        Owner = null;
         base.FreeAfterUse();
     }
 }

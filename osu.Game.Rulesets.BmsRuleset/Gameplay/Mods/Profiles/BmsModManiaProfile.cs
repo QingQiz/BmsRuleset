@@ -4,6 +4,7 @@ using System.Linq;
 using RhythmEngine.Core;
 using RhythmEngine.Profiles.Common;
 using RhythmEngine.Profiles.Mania;
+using RhythmEngine.Profiles.Patterns;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics.Sprites;
@@ -19,6 +20,7 @@ using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.LongNoteMode;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.Presentation;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Lamp;
 using osu.Game.Rulesets.Difficulty;
 using osu.Game.Rulesets.Mods;
@@ -160,6 +162,23 @@ public partial class BmsModManiaProfile : Mod, IApplicableToGameplayProfile, IAp
 
         internal override INoteRule AutoplayRule(INoteRule rule) => useLazer ? ((OrderedNoteRule)rule).Inner : rule;
 
+        private static readonly HoldFeedbackPolicy hold_feedback = new(HoldFeedback.All, HoldFeedback.None, HoldFeedback.AnimateBody | HoldFeedback.HoldLight);
+
+        internal override BmsLongNotePresentation LongNotePresentation(BmsLongNote note, NoteSnapshot snapshot, in BmsLongNotePresentationContext context)
+        {
+            var head = snapshot.Parts.Single(part => part.Part == NoteParts.HEAD);
+            var tail = snapshot.Parts.Single(part => part.Part == NoteParts.TAIL);
+            var body = snapshot.Parts.Single(part => part.Part == NoteParts.BODY);
+            var feedback = hold_feedback.Resolve(body.Active && context.Held, body.Reason == HoldReasons.DROP);
+            return new BmsLongNotePresentation(head.Resolved, true, !tail.Resolved,
+                tail.Resolved, true, note.EndTime + context.Timing.TailDeadline / 1000.0 + 100)
+            {
+                PrepareHeadPin = head.Resolved && !tail.Resolved,
+                HeadReached = context.Time >= note.StartTime,
+                KeepVisibleAfterHit = !tail.Resolved,
+            }.WithHoldFeedback(feedback, head.Resolved);
+        }
+
         internal override IEnumerable<KeyValuePair<HitResult, int>> MaximumAuxiliaryResults(ChartNote note)
             => !useLazer && ManiaProfiles.GetStableHoldTicks(note) is > 0 and var ticks ? [new(HitResult.LargeTickHit, ticks)] : [];
 
@@ -167,7 +186,8 @@ public partial class BmsModManiaProfile : Mod, IApplicableToGameplayProfile, IAp
             => ManiaProfiles.CreateHitWindows(new ManiaOptions(overallDifficulty ?? originalOd(beatmap.BeatmapInfo)), !useLazer)
                 .Entries.Single(window => window.Result == ManiaResults.GREAT).Late / 1000.0;
 
-        internal override (Chart Chart, SessionConfiguration Configuration) Compile(BmsHitObject[] objects, KeyChart source, IBeatmapInfo beatmapInfo)
+        internal override (Chart Chart, SessionConfiguration Configuration) Compile(BmsHitObject[] objects, KeyChart source, IBeatmapInfo beatmapInfo,
+                                                                                    Func<IEnumerable<KeySoundMarker>> collectKeySoundMarkers)
         {
             var options = new ManiaOptions(overallDifficulty ?? originalOd(beatmapInfo), drainRate ?? originalHp(beatmapInfo));
             var profile = useLazer ? ManiaProfiles.CreateLazer(source, options) : ManiaProfiles.CreateStable(source, options);

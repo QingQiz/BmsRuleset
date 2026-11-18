@@ -1,13 +1,15 @@
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using System;
 using System.Collections.Generic;
+using RhythmEngine.Core;
+using RhythmEngine.Profiles.Common;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Audio;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
-using osu.Game.Rulesets.BmsRuleset.Media.Audio.Playback;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
+using osu.Game.Rulesets.Objects.Drawables;
+using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 
@@ -15,19 +17,10 @@ internal sealed partial class BmsColumnKeySound : CompositeDrawable
 {
     public override bool IsPresent => false;
 
-    private readonly BmsKeySoundCursor cursor;
-    internal BmsJudgementView Judgements { get; set; }
-    private readonly Func<BmsHitObject, bool> isFinished;
-
-    internal BmsColumnKeySound(IReadOnlyList<BmsHitObject> hitObjects, BmsJudgementView judgements,
-                               IReadOnlyList<BmsInvisibleNote>? invisibleNotes = null)
-    {
-        Judgements = judgements;
-        cursor = new BmsKeySoundCursor(hitObjects, note => note.StartTime + Judgements.GetTiming(note).HeadDeadline / 1000.0, invisibleNotes);
-        isFinished = hasNoteFinished;
-    }
-
     private readonly IBindable<bool> samplePlaybackDisabled = new Bindable<bool>();
+
+    [Resolved]
+    private ISkinSource skin { get; set; } = null!;
 
     [Resolved]
     private BmsSamplePlayback samplePlayback { get; set; } = null!;
@@ -39,20 +32,50 @@ internal sealed partial class BmsColumnKeySound : CompositeDrawable
             samplePlayback.QueueLivePlay(key, volume);
     }
 
-    /// <summary>
-    /// Plays the next pending note's key-sound on an empty press. Returns false (no sound) when
-    /// sample playback is disabled (replay/autoplay) or no pending note has a sample.
-    /// </summary>
-    public void PlayKeySound()
+    internal void PlayKeySound(BmsHitObject note, KeySound sound)
     {
+        if (sound.Action != KeySoundAction.Play)
+        {
+            samplePlayback.ControlLiveVoice(sound.SourceId, sound.Action == KeySoundAction.Stop, sound.Action == KeySoundAction.Mute);
+            return;
+        }
+
         if (samplePlaybackDisabled.Value)
             return;
 
-        if (cursor.Next(Time.Current, isFinished) is not { } hitObject)
-            return;
+        var tail = sound.Part == NoteParts.TAIL || sound.Part == KeySoundPolicies.STABLE_TAIL;
+        if (tail)
+        {
+            var hold = (BmsLongNote)note;
+            foreach (var sample in hold.GetTailSamples())
+                PlaySample(sample.SampleKey, sample.Volume);
 
-        foreach (var sample in hitObject.GetSamples())
-            PlaySample(sample.SampleKey, sample.Volume);
+            if (hold.ManiaTailSamples is { } tailSamples)
+                playSkinSamples(tailSamples);
+            else if (sound.Part == KeySoundPolicies.STABLE_TAIL)
+                playSkinSamples(note.Samples);
+        }
+        else
+        {
+            // Only the head's chart sample can be muted or stopped by a long note transition.
+            int? owner = note is BmsLongNote ? sound.SourceId : null;
+            foreach (var sample in note.GetSamples())
+                samplePlayback.QueueLivePlay(sample.SampleKey, sample.Volume, owner);
+
+            playSkinSamples(note.Samples);
+        }
+    }
+
+    private void playSkinSamples(IEnumerable<HitSampleInfo> samples)
+    {
+        foreach (var info in samples)
+        {
+            if (skin.GetSample(info) is not { } sample) continue;
+
+            var channel = sample.GetChannel();
+            channel.Volume.Value = Math.Max(info.Volume, DrawableHitObject.MINIMUM_SAMPLE_VOLUME) / 100.0;
+            channel.Play();
+        }
     }
 
     [BackgroundDependencyLoader(true)]
@@ -63,6 +86,4 @@ internal sealed partial class BmsColumnKeySound : CompositeDrawable
 
         samplePlaybackDisabled.BindTo(samplePlaybackDisabler.SamplePlaybackDisabled);
     }
-
-    private bool hasNoteFinished(BmsHitObject note) => Judgements.IsKeySoundFinished(note, Time.Current);
 }

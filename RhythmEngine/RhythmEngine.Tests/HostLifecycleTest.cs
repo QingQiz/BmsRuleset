@@ -246,7 +246,9 @@ public class HostLifecycleTest
         var retired = session.AdvanceTo(1_550_000, [new(1_550_000, 0, true)]);
         host.Present(retired);
         var transition = retired.Transitions.Last(t => t.After.Id == 10);
-        Assert.That(transition.Input, Is.EqualTo(new InputEvent(1_550_000, 0, true)));
+        Assert.That(retired.Transitions.Single(t => t.After.Id == 11).Input, Is.EqualTo(new InputEvent(1_550_000, 0, true)));
+        Assert.That(transition.Input, Is.Null);
+        Assert.That(transition.Time, Is.EqualTo(1_550_000));
         Assert.That(transition.Before.Completed, Is.False);
         Assert.That(transition.After.Completed, Is.True);
         Assert.That(host.Notes[10].Parts.Select(p => p.Part), Is.EqualTo([NoteParts.HEAD, NoteParts.BODY, NoteParts.TAIL]));

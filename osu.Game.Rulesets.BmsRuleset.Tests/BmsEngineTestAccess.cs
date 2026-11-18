@@ -36,7 +36,9 @@ internal static class BmsEngineTestAccess
             .GetValue(column.Engine())!).Objects.Where(n => n.Column == column.Index && n is BmsNote or BmsLongNote);
 
     internal static IEnumerable<BmsHitObject> GetNoteCandidates(this BmsJudgementView column)
-        => column.Notes().Where(n => !column.IsKeySoundFinished(n, 0));
+        => column.Notes().Where(n => !column.GetNote(n).Parts.Single(part => part.Part == (n is BmsLongNote
+            ? column.Engine().ScoresHead(n) ? NoteParts.HEAD : NoteParts.TAIL
+            : NoteParts.TAP)).Resolved);
 
     internal static BmsHitObject? FirstPendingNote(this BmsJudgementView column)
         => column.Notes().FirstOrDefault(n => !column.GetNote(n).Parts[0].Resolved);
@@ -62,7 +64,7 @@ internal static class BmsEngineTestAccess
         var outcome = PressOutcome.Empty;
         var inputTime = press.InputTime;
         output.NonConsumingJudgement += nonConsuming;
-        output.Feedback += feedback;
+        output.ResultApplied += resultApplied;
         output.StatePublished += statePublished;
 
         try
@@ -74,17 +76,17 @@ internal static class BmsEngineTestAccess
         finally
         {
             output.NonConsumingJudgement -= nonConsuming;
-            output.Feedback -= feedback;
+            output.ResultApplied -= resultApplied;
             output.StatePublished -= statePublished;
         }
 
         void nonConsuming(double expected, int lane, HitResult result)
             => outcome = result == HitResult.Miss ? PressOutcome.ForEmptyPoor(expected, lane) : PressOutcome.Hit;
 
-        void feedback(string value)
+        void resultApplied(BmsHitObject note, BmsFrameContext frame)
         {
-            if (value.StartsWith("sample:", StringComparison.Ordinal)) outcome = PressOutcome.Hit;
-            else if (value == "keysound" && outcome.Kind != PressOutcomeKind.EmptyPoor) outcome = PressOutcome.Empty;
+            if (frame.SimulationTime == inputTime && frame.EngineResult?.Event.Offset != null)
+                outcome = PressOutcome.Hit;
         }
 
         void statePublished(BmsLongNote note, BmsLongNoteState state, BmsFrameContext frame)

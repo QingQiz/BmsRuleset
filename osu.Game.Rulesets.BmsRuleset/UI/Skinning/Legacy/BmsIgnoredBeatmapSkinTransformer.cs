@@ -8,7 +8,7 @@ using osu.Game.Skinning;
 namespace osu.Game.Rulesets.BmsRuleset.UI.Skinning.Legacy;
 
 /// <summary>
-/// Prevents osu! beatmap skin resources from participating in BMS gameplay lookups.
+/// Keeps beatmap visuals out of BMS gameplay while allowing imported mania hitsounds.
 /// </summary>
 internal sealed class BmsIgnoredBeatmapSkinTransformer(ISkin skin) : SkinTransformer(skin)
 {
@@ -16,7 +16,8 @@ internal sealed class BmsIgnoredBeatmapSkinTransformer(ISkin skin) : SkinTransfo
 
     public override Texture? GetTexture(string componentName, WrapMode wrapModeS, WrapMode wrapModeT) => null;
 
-    public override ISample? GetSample(ISampleInfo sampleInfo) => null;
+    public override ISample? GetSample(ISampleInfo sampleInfo) => sampleInfo is HitSampleInfo { UseBeatmapSamples: true }
+        ? base.GetSample(sampleInfo) : null;
 
     public override IBindable<TValue>? GetConfig<TLookup, TValue>(TLookup lookup) => null;
 }

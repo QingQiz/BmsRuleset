@@ -13,11 +13,15 @@ public sealed class TimingWindows
 {
     public ImmutableArray<TimingWindow> Entries { get; }
 
+    internal long EarliestOffset { get; }
+
     public TimingWindows(IEnumerable<TimingWindow> entries)
     {
         Entries = [..entries];
         if (Entries.IsEmpty || Entries.Any(w => w.Result == null || w.Early > w.Late))
             throw new ArgumentException("Nonempty, named, ordered time ranges are required.", nameof(entries));
+
+        EarliestOffset = Entries.Min(window => window.Early);
     }
 
     public ResultId? ResultFor(long offset)

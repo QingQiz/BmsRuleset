@@ -50,7 +50,7 @@ public static class Lr2Beta3Profile
                 .. shared, .. context.Candidates.Where(c => !c.Shared && (shared.IsEmpty || Math.Abs(c.Offset) <= 200_000))
                     .OrderBy(c => c.Priority).ThenBy(c => c.StartTime).ThenBy(c => c.NoteIndex).Take(1),
             ];
-        }), descriptor);
+        }) { KeySounds = KeySoundPolicies.Lr2 }, descriptor);
     }
 
     private static HealthConfiguration createHealth(int count, Lr2Beta3Options options)
@@ -105,20 +105,27 @@ internal sealed record Lr2Beta3NoteState(NoteTimer? Timer, ResultId? Head, long?
     public override NoteTimer? NextTimer => Timer;
 
     public override bool Completed => Done;
+
+    public bool Dropped { get; init; }
 }
 
 internal sealed class Lr2Beta3NoteRule(ImmutableArray<int> bounds, bool hold) : INoteRule
 {
+    private const long early_search_limit = -1_000_000;
+
     public ImmutableArray<NotePartState> GetParts(NoteContext context)
     {
         var current = (Lr2Beta3NoteState)context.State;
         return hold
-            ? [new NotePartState(NoteParts.HEAD, current.Head != null || current.Done), new(NoteParts.BODY, current.Done, current.Head != null && !current.Done), new(NoteParts.NOTE, current.Done)]
+            ? [new NotePartState(NoteParts.HEAD, current.Head != null || current.Done), new(NoteParts.BODY, current.Done, current.Head != null && !current.Done, Reason: current.Dropped ? HoldReasons.DROP : null), new(NoteParts.NOTE, current.Done)]
             : [new NotePartState(NoteParts.NOTE, current.Done)];
     }
 
     public NoteState CreateState(ChartNote note) => new Lr2Beta3NoteState(
         new NoteTimer(note.StartTime + (hold ? bounds[2] : 200) * 1000L + 1000, TimerOrder.BeforeInput), null, null, false);
+
+    // Millisecond truncation can move a negative session timestamp forward.
+    long? INoteRule.EarliestCandidateOffset => early_search_limit - 999;
 
     public InputCandidate? GetCandidate(NoteContext context, InputEvent input, int noteIndex)
     {
@@ -129,7 +136,7 @@ internal sealed class Lr2Beta3NoteRule(ImmutableArray<int> bounds, bool hold) : 
             return null;
 
         var offset = clockTime(input.Time) - context.Note.StartTime;
-        if (offset <= -1_000_000)
+        if (offset <= early_search_limit)
             return null;
 
         // A late BAD can recurse into the next cell on the same press.
@@ -143,8 +150,8 @@ internal sealed class Lr2Beta3NoteRule(ImmutableArray<int> bounds, bool hold) : 
 
         if (state.Head is { } head && !input.Pressed)
         {
-            var result = clockTime(context.Time) < context.Note.EndTime - bounds[2] * 1000L ? BmsResults.BAD : head;
-            return resolve(context, state, result, state.Offset);
+            var dropped = clockTime(context.Time) < context.Note.EndTime - bounds[2] * 1000L;
+            return resolve(context, state with { Dropped = dropped }, dropped ? BmsResults.BAD : head, state.Offset);
         }
 
         var offset = clockTime(context.Time) - context.Note.StartTime;

@@ -85,6 +85,11 @@ public sealed record SessionConfiguration(
     ScoreConfiguration Score,
     HealthConfiguration Health,
     Func<InputArbitrationContext, ImmutableArray<InputCandidate>> SelectCandidates,
-    Func<SessionCompletionContext, bool>? IsComplete = null);
+    Func<SessionCompletionContext, bool>? IsComplete = null)
+{
+    public KeySoundPolicy? KeySounds { get; init; }
+
+    internal Func<NoteUpdate, Func<NoteContext, NoteUpdate>?>? RetireNotesEndingBeforeHit { get; init; }
+}
 
 public readonly record struct SessionCompletionContext(long? Time, bool NotesRetired, ScoreState Score, ScorePlan Plan);

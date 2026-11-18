@@ -62,13 +62,19 @@ internal static class Mania7KBeatmapConverter
         if (maniaColumn is < 0 or >= key_count)
             throw new InvalidOperationException($"Invalid mania 7K column for {original.GetType().FullName}.");
 
+        var nodes = (original as IHasRepeats)?.NodeSamples;
         BmsHitObject converted = original is IHasDuration hasDuration
-            ? new BmsLongNote { Duration = hasDuration.Duration, Kind = KeyNoteKind.ReleaseHold }
+            ? new BmsLongNote
+            {
+                Duration = hasDuration.Duration,
+                Kind = KeyNoteKind.ReleaseHold,
+                ManiaTailSamples = nodes is { Count: > 1 } ? nodes[^1].ToArray() : null,
+            }
             : new BmsNote();
 
         converted.StartTime = original.StartTime;
         converted.Column = maniaColumn + 1;
-        converted.Samples = original.Samples.ToList();
+        converted.Samples = nodes is { Count: > 0 } ? nodes[0] : original.Samples;
         return converted;
     }
 

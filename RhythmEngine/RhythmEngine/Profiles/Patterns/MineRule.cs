@@ -34,6 +34,8 @@ public sealed class MineRule(
         return new MineState(new NoteTimer(note.StartTime, order), false, false);
     }
 
+    long? INoteRule.EarliestCandidateOffset => -earlyWindow;
+
     public InputCandidate? GetCandidate(NoteContext context, InputEvent input, int noteIndex)
         => acceptsInput && input.Pressed && context.Time >= context.Note.StartTime - earlyWindow && context.Time <= context.Note.StartTime + lateWindow
             ? new InputCandidate(noteIndex, context.Note.StartTime, context.Time - context.Note.StartTime, shareInput ? 0 : 1, shareInput)

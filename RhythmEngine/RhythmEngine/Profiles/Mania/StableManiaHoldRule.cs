@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using RhythmEngine.Core;
 using RhythmEngine.Profiles.Common;
+using RhythmEngine.Profiles.Patterns;
 
 namespace RhythmEngine.Profiles.Mania;
 
@@ -48,13 +49,17 @@ internal sealed class StableManiaHoldRule(ImmutableArray<long> windows) : INoteR
         return
         [
             new NotePartState(NoteParts.HEAD, hold.PressTime != null || hold.Completed, Result: hold.Result),
-            new(NoteParts.BODY, hold.Completed, hold.Held && !hold.Completed),
+            new(NoteParts.BODY, hold.Completed, hold.Held && !hold.Completed,
+                Reason: hold.Broken || hold.PressTime > context.Note.StartTime + windows[3] ? HoldReasons.DROP : null),
             new(NoteParts.TAIL, hold.Completed, Offset: hold.ReleaseTime - context.Note.EndTime, Result: hold.Result)
         ];
     }
 
     public NoteState CreateState(ChartNote note) => new StableManiaHoldState(new NoteTimer(note.EndTime + windows[3], TimerOrder.BeforeInput),
         null, null, null, false, false, null);
+
+    // Millisecond truncation can move a negative session timestamp forward.
+    long? INoteRule.EarliestCandidateOffset => -windows[^1] - 999;
 
     public InputCandidate? GetCandidate(NoteContext context, InputEvent input, int noteIndex)
     {

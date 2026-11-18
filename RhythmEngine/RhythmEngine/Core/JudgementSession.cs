@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Runtime.InteropServices;
 
 namespace RhythmEngine.Core;
 
@@ -13,6 +14,8 @@ public sealed class JudgementSession
     private readonly SessionConfiguration configuration;
     private readonly NoteState[] states;
     private readonly int[] revisions;
+    private readonly int[] laneStarts;
+    private readonly int?[]? keySoundMemory;
     private readonly HashSet<int>[] heldControls;
     private readonly PriorityQueue<(int Index, int Revision), (long Time, TimerOrder Order, int Index)> timers = new();
     private int remainingNotes;
@@ -46,8 +49,10 @@ public sealed class JudgementSession
 
         this.chart = chart;
         this.configuration = configuration;
+        keySoundMemory = configuration.KeySounds == null ? null : new int?[chart.LaneCount];
         states = new NoteState[chart.Notes.Length];
         revisions = new int[states.Length];
+        laneStarts = new int[chart.LaneCount];
         heldControls = Enumerable.Range(0, chart.LaneCount).Select(_ => new HashSet<int>()).ToArray();
         Score = configuration.Score.InitialState;
         MaximumScore = configuration.Score.MaximumScore(chart.ScorePlan);
@@ -63,6 +68,8 @@ public sealed class JudgementSession
         configuration = source.configuration;
         states = (NoteState[])source.states.Clone();
         revisions = new int[states.Length];
+        laneStarts = (int[])source.laneStarts.Clone();
+        keySoundMemory = source.keySoundMemory?.ToArray();
         heldControls = source.heldControls.Select(c => new HashSet<int>(c)).ToArray();
         TransitionCount = source.TransitionCount;
         EventCount = source.EventCount;
@@ -88,6 +95,9 @@ public sealed class JudgementSession
         TransitionCount = 0;
         EventCount = 0;
         Array.Clear(revisions);
+        Array.Clear(laneStarts);
+        if (keySoundMemory != null)
+            Array.Clear(keySoundMemory);
         foreach (var controls in heldControls)
             controls.Clear();
 
@@ -212,28 +222,77 @@ public sealed class JudgementSession
     private InputDispatch applyInput(InputEvent input, LaneInput laneInput, List<NoteTransition> transitions)
     {
         var firstTransition = transitions.Count;
-        var candidates = ImmutableArray.CreateBuilder<InputCandidate>();
+        ImmutableArray<InputCandidate>.Builder? candidates = null;
 
-        foreach (var index in chart.LaneNotes[input.Lane])
+        var lane = chart.LaneNotes[input.Lane];
+        var timeOrdered = lane == chart.LaneNotesByTime[input.Lane];
+        ref var firstIncomplete = ref laneStarts[input.Lane];
+        while (firstIncomplete < lane.Length && states[lane[firstIncomplete]].Completed)
+            firstIncomplete++;
+
+        var earliestOffset = chart.LaneCandidateOffsets[input.Lane];
+        var latestStart = earliestOffset == long.MinValue || input.Time >= long.MaxValue + earliestOffset
+            ? long.MaxValue
+            : input.Time - earliestOffset;
+        for (var i = firstIncomplete; i < lane.Length; i++)
         {
-            if (states[index].Completed)
+            var index = lane[i];
+            var note = chart.Notes[index];
+            if (note.StartTime > latestStart)
+            {
+                if (timeOrdered)
+                    break;
+
+                continue;
+            }
+
+            var state = states[index];
+            if (state.Completed)
                 continue;
 
-            var context = new NoteContext(chart.Notes[index], states[index], input.Time, laneInput);
-            if (chart.Notes[index].Rule.GetCandidate(context, input, index) is { } candidate)
-                candidates.Add(candidate);
+            if (note.Rule.GetCandidate(new NoteContext(note, state, input.Time, laneInput), input, index) is { } candidate)
+                (candidates ??= ImmutableArray.CreateBuilder<InputCandidate>()).Add(candidate);
         }
 
-        foreach (var candidate in configuration.SelectCandidates(new InputArbitrationContext(input, candidates.ToImmutable(), laneInput)))
-            applyCandidate(candidate.NoteIndex, input, laneInput, transitions);
-        return new InputDispatch(input, firstTransition, transitions.Count - firstTransition);
+        foreach (var candidate in configuration.SelectCandidates(new InputArbitrationContext(input, candidates?.ToImmutable() ?? [], laneInput)))
+            applyCandidate(candidate.NoteIndex, input, laneInput, firstIncomplete, transitions);
+        var count = transitions.Count - firstTransition;
+        if (!input.Pressed || configuration.KeySounds is not { } keySounds)
+            return new InputDispatch(input, firstTransition, count);
+
+        var soundContext = new KeySoundContext(input, chart, CollectionsMarshal.AsSpan(transitions).Slice(firstTransition, count),
+            this, timeOrdered ? firstIncomplete : 0);
+        var decision = keySounds.Select(soundContext, keySoundMemory![input.Lane]);
+        keySoundMemory[input.Lane] = decision.Remember;
+        return new InputDispatch(input, firstTransition, count, decision.Playback);
     }
 
-    private void applyCandidate(int index, InputEvent input, LaneInput laneInput, List<NoteTransition> transitions)
+    private void applyCandidate(int index, InputEvent input, LaneInput laneInput, int firstIncomplete, List<NoteTransition> transitions)
     {
         var note = chart.Notes[index];
         var context = new NoteContext(note, states[index], input.Time, laneInput);
-        applyUpdate(index, context, input, note.Rule.ApplyInput(context, input), transitions);
+        var update = note.Rule.ApplyInput(context, input);
+        applyUpdate(index, context, input, update, transitions);
+
+        if (!input.Pressed || update.Emissions.IsEmpty || configuration.RetireNotesEndingBeforeHit?.Invoke(update) is not { } retire)
+            return;
+
+        var lane = chart.LaneNotes[note.Lane];
+        var timeOrdered = lane == chart.LaneNotesByTime[note.Lane];
+        for (var i = firstIncomplete; i < lane.Length; i++)
+        {
+            var earlierIndex = lane[i];
+            var earlier = chart.Notes[earlierIndex];
+            if (timeOrdered && earlier.StartTime >= note.StartTime)
+                break;
+
+            // A tail at the same chart time as the new head can still be released.
+            if (earlier.EndTime >= note.StartTime || states[earlierIndex].Completed)
+                continue;
+
+            var earlierContext = new NoteContext(earlier, states[earlierIndex], input.Time, laneInput);
+            applyUpdate(earlierIndex, earlierContext, null, retire(earlierContext), transitions);
+        }
     }
 
     private void runTimers(long time, TimerOrder throughOrder, List<NoteTransition> transitions)
@@ -291,15 +350,32 @@ public sealed class JudgementSession
             EventCount++;
         }
 
-        transitions.Add(new NoteTransition(TransitionCount++, time, input, before, snapshot(context with { State = update.State }),
-            judgements.MoveToImmutable(), outcomeAt(time)));
+        var transition = new NoteTransition(TransitionCount++, time, input, before, snapshot(context with { State = update.State }),
+            judgements.MoveToImmutable(), outcomeAt(time));
+        if (configuration.KeySounds?.TransitionSounds?.Invoke(transition) is { IsDefaultOrEmpty: false } sounds)
+            transition = transition with { KeySounds = sounds };
+        transitions.Add(transition);
+        if (configuration.KeySounds?.Observe is { } observe)
+            keySoundMemory![note.Lane] = observe(transition, keySoundMemory[note.Lane]);
     }
 
-    private NoteSnapshot snapshot(int index)
+    private NoteSnapshot snapshot(int index) => SnapshotAt(index, CurrentTime ?? 0);
+
+    internal bool IsNoteCompleted(int index) => states[index].Completed;
+
+    internal ImmutableArray<NotePartState> GetPartsAt(int index, long time)
+    {
+        var context = contextAt(index, time);
+        return context.Note.Rule.GetParts(context);
+    }
+
+    internal NoteSnapshot SnapshotAt(int index, long time) => snapshot(contextAt(index, time));
+
+    private NoteContext contextAt(int index, long time)
     {
         var note = chart.Notes[index];
         var held = heldControls[note.Lane].Count > 0;
-        return snapshot(new NoteContext(note, states[index], CurrentTime ?? 0, new LaneInput(held, held)));
+        return new NoteContext(note, states[index], time, new LaneInput(held, held));
     }
 
     private static NoteSnapshot snapshot(NoteContext context)

@@ -73,9 +73,6 @@ internal sealed partial class BmsGameplayProfile : GameplayProfile
 
     internal override bool IncludeHeadOnly(NotePartState tail) => tail.Reason == HoldReasons.MISSED_HEAD || tail.Reason == HoldReasons.HEAD;
 
-    internal override bool PlayTailSample(NotePartState tail, InputEvent? input)
-        => input != null && (tail.Reason == HoldReasons.RELEASE || tail.Reason == HoldReasons.DROP);
-
     internal override ResultTimingKind TimingKindFor(HitResult result) => result switch
     {
         HitResult.Meh => ResultTimingKind.Untimed,
@@ -86,7 +83,8 @@ internal sealed partial class BmsGameplayProfile : GameplayProfile
     // Historical BMS fast/slow totals include POOR's direction, although averages exclude it.
     internal override bool CountsForFastSlow(HitResult result) => result.IsHit();
 
-    internal override (Chart Chart, SessionConfiguration Configuration) Compile(BmsHitObject[] objects, KeyChart source, IBeatmapInfo beatmapInfo)
+    internal override (Chart Chart, SessionConfiguration Configuration) Compile(BmsHitObject[] objects, KeyChart source, IBeatmapInfo beatmapInfo,
+                                                                                Func<IEnumerable<KeySoundMarker>> collectKeySoundMarkers)
     {
         var chart = new Chart(source.LaneCount, source.Notes.Select(note => new ChartNote(note.Id, note.Lane, note.StartTime, note.EndTime,
                 BmsEngineRules.ForBeatmap(objects[note.Id].Beatmap, modifiers).GetProfile(BmsEngineRules.RateFor(objects[note.Id], modifiers)).CreateRule(note))),
@@ -94,7 +92,11 @@ internal sealed partial class BmsGameplayProfile : GameplayProfile
         var rules = objects.Length == 0 ? BmsJudgementRules.For(BmsJudgementMode.SevenKey, modifiers) : BmsEngineRules.ForBeatmap(objects[0].Beatmap, modifiers);
         return (chart, new SessionConfiguration("bms-ruleset-v1", BmsProfiles.CreateScore(rules.EmptyPoorBreaksCombo),
             BmsEngineGauge.CreateDefault(objects, chart.ScorePlan, this), context => BmsProfiles.SelectCandidates(context, chart, rules.SelectionOverride ?? BmsSelection.Combo),
-            BmsProfiles.CreateCompletion(source, objects.Select(note => BmsEngineRules.GetTiming(note, false, modifiers).PassiveDeadline))));
+            BmsProfiles.CreateCompletion(source, objects.Select(note => BmsEngineRules.GetTiming(note, false, modifiers).PassiveDeadline)))
+        {
+            KeySounds = modifiers.HasFlag(BmsJudgementModifiers.Lr2oraja)
+                ? KeySoundPolicies.Lr2 : KeySoundPolicies.Beatoraja(chart, collectKeySoundMarkers()),
+        });
     }
 
     internal override SessionConfiguration ConfigureSession(BmsEngineChart compiled, BmsJudgementAlgorithm? algorithm, HealthConfiguration health)

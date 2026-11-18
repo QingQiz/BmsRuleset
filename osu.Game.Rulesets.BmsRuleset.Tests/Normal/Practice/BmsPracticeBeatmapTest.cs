@@ -20,7 +20,7 @@ using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Randomisation;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Practice;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
-using osu.Game.Rulesets.BmsRuleset.Media.Audio.Playback;
+using RhythmEngine.Core;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Skinning;
@@ -135,13 +135,14 @@ public partial class BmsPracticeBeatmapTest
         ];
         var practice = BmsPracticeBeatmap.Create(full, new BmsPracticeSettings { StartTime = 1000, EndTime = 1501 });
         var compiled = new BmsEngineChart(practice);
-        var cursor = new BmsKeySoundCursor(practice.HitObjects, note => note.StartTime + compiled.TimingFor(note).HeadDeadline / 1000.0,
-            practice.PracticeInitialKeySounds.Concat(practice.InvisibleNotes).OrderBy(note => note.StartTime).ToArray());
+        var session = new JudgementSession(compiled.Chart, compiled.Configuration);
+        var first = session.AdvanceTo(1_000_000, [new InputEvent(1_000_000, 1, true)]).Inputs.Single().KeySound;
+        var second = session.AdvanceTo(1_350_000, [new InputEvent(1_100_000, 1, false), new InputEvent(1_350_000, 1, true)]).Inputs.Last().KeySound;
 
         Assert.That(practice.InvisibleNotes.Select(note => note.SampleKey), Is.EqualTo(new ushort?[] { 5 }));
         Assert.That(practice.PracticeInitialKeySounds.Single().SampleKey, Is.EqualTo(3));
-        Assert.That(cursor.Next(1000, _ => false)?.SampleKey, Is.EqualTo(3));
-        Assert.That(cursor.Next(1450, _ => false)?.SampleKey, Is.EqualTo(5));
+        Assert.That(compiled.KeySoundSource(first!.Value.SourceId).SampleKey, Is.EqualTo(3));
+        Assert.That(compiled.KeySoundSource(second!.Value.SourceId).SampleKey, Is.EqualTo(4), "Empty POOR uses the selected visible note.");
         Assert.That(practice.CountScoringNotes(), Is.EqualTo(1));
     }
 

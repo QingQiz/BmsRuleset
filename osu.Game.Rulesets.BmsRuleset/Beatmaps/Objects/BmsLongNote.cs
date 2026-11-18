@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using RhythmEngine.Profiles.Common;
+using osu.Game.Audio;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.Objects.Types;
 
@@ -33,6 +34,9 @@ public class BmsLongNote : BmsHitObject, IHasDuration
             yield return new BmsSampleEvent(EndTime, additional, TailSampleVolume);
     }
 
+    // Native mania LNs omit the tail node. Stable reuses the head's sample set in that case.
+    internal IReadOnlyList<HitSampleInfo>? ManiaTailSamples { get; set; }
+
     public int TailSampleVolume { get; set; } = 100;
 
     protected override void CopyTo(BmsHitObject target)
@@ -47,6 +51,7 @@ public class BmsLongNote : BmsHitObject, IHasDuration
             ln.TailSampleKey = TailSampleKey;
             ln.AdditionalTailSampleKeys = AdditionalTailSampleKeys;
             ln.TailSampleVolume = TailSampleVolume;
+            ln.ManiaTailSamples = ManiaTailSamples;
         }
     }
 }

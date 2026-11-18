@@ -141,7 +141,8 @@ public sealed record HoldState(
     long? PendingRelease = null,
     bool Mistake = false,
     HoldResolution? Resolution = null,
-    bool Ended = false) : NoteState
+    bool Ended = false,
+    bool BodyBreakLatched = false) : NoteState
 {
     public override NoteTimer? NextTimer => Timer;
 

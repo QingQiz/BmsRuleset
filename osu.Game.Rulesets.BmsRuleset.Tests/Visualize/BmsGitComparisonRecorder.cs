@@ -89,7 +89,7 @@ internal sealed class BmsGitComparisonRecorder : IDisposable
 
         if (source is BmsColumnKeySound)
         {
-            columnIndex = Array.FindIndex(playfield.Stage.Columns, c => ReferenceEquals(typeof(BmsColumn).GetField("keySound", instance)!.GetValue(c), source));
+            columnIndex = Array.FindIndex(playfield.Stage.Columns, c => ReferenceEquals(((BmsColumn)c).KeySound, source));
             if (columnIndex < 0) return;
         }
 

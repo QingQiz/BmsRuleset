@@ -44,7 +44,6 @@ using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
-using osu.Game.Rulesets.BmsRuleset.Media.Audio.Playback;
 using osu.Game.Rulesets.BmsRuleset.Tests.Normal.BeatmapTest.Decoding;
 using osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
@@ -601,6 +600,184 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Mods
             }
         }
 
+        [TestCase(true)]
+        [TestCase(false)]
+        public void BrokenLongNoteCannotRestorePinOrBrightness(bool useLazer)
+        {
+            var note = new BmsLongNote { Column = 1, StartTime = 1000, Duration = 1000, Kind = KeyNoteKind.Hold };
+            using var play = new Play([
+                new BmsModManiaProfile
+                {
+                    OverallDifficulty = { Value = 5 },
+                    DrainRate = { Value = 5 },
+                    UseLazer = { Value = useLazer },
+                }
+            ], note);
+            var profile = play.Score.EngineChart.Profile;
+
+            play.Press(1000);
+            play.Release(1200);
+
+            var broken = play.Engine.GetColumn(1).GetNote(note);
+            var brokenBody = broken.Parts.Single(part => part.Part == NoteParts.BODY);
+            Assert.That(brokenBody.Active, Is.False);
+            var releasedPresentation = profile.LongNotePresentation(note, broken,
+                new BmsLongNotePresentationContext(1200, broken.Held, play.Score.EngineChart.TimingFor(note)));
+            Assert.That(releasedPresentation.ReleasedStyle, Is.True);
+            Assert.That(releasedPresentation.HoldLightActive || releasedPresentation.AnimateBody, Is.False);
+
+            play.Press(1600);
+
+            var recovered = play.Engine.GetColumn(1).GetNote(note);
+            var recoveredBody = recovered.Parts.Single(part => part.Part == NoteParts.BODY);
+            Assert.That(recoveredBody.Active, Is.True);
+            var recoveredPresentation = profile.LongNotePresentation(note, recovered,
+                new BmsLongNotePresentationContext(1600, recovered.Held, play.Score.EngineChart.TimingFor(note)));
+            Assert.That(recoveredPresentation.HoldingBody, Is.False);
+            Assert.That(recoveredPresentation.ReleasedStyle, Is.True);
+            Assert.That(recoveredPresentation.HoldLightActive, Is.True);
+            Assert.That(recoveredPresentation.AnimateBody, Is.True);
+
+            play.Release(1700);
+            play.Press(1800);
+            var repeated = play.Engine.GetColumn(1).GetNote(note);
+            var repeatedPresentation = profile.LongNotePresentation(note, repeated,
+                new BmsLongNotePresentationContext(1800, repeated.Held, play.Score.EngineChart.TimingFor(note)));
+            Assert.That(repeatedPresentation.HoldingBody, Is.False);
+            Assert.That(repeatedPresentation.ReleasedStyle, Is.True);
+
+            play.Engine.Reset();
+            play.Score.ResetReplayState();
+            play.Health.ResetReplayState();
+            play.Press(1000);
+            var restarted = play.Engine.GetColumn(1).GetNote(note);
+            var restartedPresentation = profile.LongNotePresentation(note, restarted,
+                new BmsLongNotePresentationContext(1000, restarted.Held, play.Score.EngineChart.TimingFor(note)));
+            Assert.That(restartedPresentation.HoldingBody, Is.True);
+            Assert.That(restartedPresentation.ReleasedStyle, Is.False);
+        }
+
+        [TestCase(true, 0, 1999.999, true, true, HitResult.None)]
+        [TestCase(true, 0, 2000, true, false, HitResult.None)]
+        [TestCase(true, 0, 2000.001, true, false, HitResult.None)]
+        [TestCase(true, 50, 1876.499, false, true, HitResult.None)]
+        [TestCase(true, 50, 1876.5, true, true, HitResult.None)] // Early Miss on the next note keeps the old tail.
+        [TestCase(true, 50, 1913.5, true, false, HitResult.Miss)]
+        [TestCase(true, 50, 2000, true, false, HitResult.Miss)]
+        [TestCase(true, 50, 2049.999, true, false, HitResult.Miss)]
+        [TestCase(true, 50, 2050, true, false, HitResult.Miss)]
+        [TestCase(false, 0, 1999.999, false, true, HitResult.None)]
+        [TestCase(false, 0, 2000, false, true, HitResult.None)]
+        [TestCase(false, 0, 2000.001, false, true, HitResult.None)]
+        [TestCase(false, 50, 2050, false, true, HitResult.None)]
+        [TestCase(false, 100, 2111.999, false, true, HitResult.None)]
+        [TestCase(false, 100, 2112, true, false, HitResult.Miss)]
+        public void ManiaEarlyReleaseInputPriority(bool useLazer, double nextOffset, double pressTime, bool nextJudged, bool oldHolding, HitResult expectedTail)
+        {
+            var note = new BmsLongNote { Column = 1, StartTime = 1000, Duration = 1000 };
+            var next = new BmsNote { Column = 1, StartTime = 2000 + nextOffset };
+            using var play = new Play([new BmsModManiaProfile { OverallDifficulty = { Value = 5 }, UseLazer = { Value = useLazer } }], note, next);
+            play.Press(1000);
+            play.Release(1200);
+            Assert.That(play.Engine.GetColumn(1).GetNote(note).Completed, Is.False);
+
+            play.Press(pressTime);
+
+            var column = play.Engine.GetColumn(1);
+            var old = column.GetNote(note);
+            var tail = old.Parts.Single(part => part.Part == NoteParts.TAIL);
+            var profile = play.Score.EngineChart.Profile;
+            Assert.That(column.GetNote(next).Parts.Single(part => part.Part == NoteParts.TAP).Resolved, Is.EqualTo(nextJudged));
+            Assert.That(old.Parts.Single(part => part.Part == NoteParts.BODY).Active, Is.EqualTo(oldHolding));
+            Assert.That(profile.HitResultFor(tail.Result), Is.EqualTo(expectedTail));
+
+            if (useLazer && oldHolding)
+            {
+                play.Release(Math.Max(note.EndTime, pressTime + 1));
+                Assert.That(play.Score.Statistics.GetValueOrDefault(HitResult.Meh), Is.EqualTo(1));
+            }
+        }
+
+        [TestCase(true, 1739.749, false, HitResult.None)]
+        [TestCase(true, 1739.75, true, HitResult.Miss)]
+        [TestCase(true, 1795.249, true, HitResult.Miss)]
+        [TestCase(true, 1795.25, true, HitResult.Meh)]
+        [TestCase(true, 1831.25, true, HitResult.Ok)]
+        [TestCase(true, 1900, true, HitResult.Good)]
+        [TestCase(true, 1970.75, true, HitResult.Perfect)]
+        [TestCase(false, 1863.999, false, HitResult.None)]
+        [TestCase(false, 1864, true, HitResult.Good)]
+        [TestCase(false, 1900, true, HitResult.Great)]
+        [TestCase(false, 1946.1, true, HitResult.Great)]
+        [TestCase(false, 1962, true, HitResult.Perfect)]
+        [TestCase(false, 2000, true, HitResult.Perfect)]
+        public void ManiaEarlyTailWindowVisibility(bool useLazer, double releaseTime, bool resolved, HitResult expected)
+        {
+            var note = new BmsLongNote { Column = 1, StartTime = 1000, Duration = 1000 };
+            using var play = new Play([new BmsModManiaProfile { OverallDifficulty = { Value = 5 }, UseLazer = { Value = useLazer } }], note);
+            play.Press(1000);
+            play.Release(releaseTime);
+
+            var snapshot = play.Engine.GetColumn(1).GetNote(note);
+            var tail = snapshot.Parts.Single(part => part.Part == NoteParts.TAIL);
+            var profile = play.Score.EngineChart.Profile;
+            var presentation = profile.LongNotePresentation(note, snapshot,
+                new BmsLongNotePresentationContext(releaseTime, false, play.Score.EngineChart.TimingFor(note)));
+            Assert.That(tail.Resolved, Is.EqualTo(resolved));
+            Assert.That(profile.HitResultFor(tail.Result), Is.EqualTo(expected));
+            Assert.That(presentation.KeepAlive && presentation.KeepVisibleAfterHit, Is.EqualTo(!resolved));
+            Assert.That(presentation.Retired, Is.EqualTo(resolved));
+            Assert.That(presentation.HoldingBody, Is.False);
+        }
+
+        [TestCase(true, 1739.75)]
+        [TestCase(true, 1795.25)]
+        [TestCase(true, 1900)]
+        [TestCase(false, 1864)]
+        [TestCase(false, 1962)]
+        public void ManiaSettledTailDoesNotBlockTheNextNote(bool useLazer, double releaseTime)
+        {
+            var note = new BmsLongNote { Column = 1, StartTime = 1000, Duration = 1000 };
+            var next = new BmsNote { Column = 1, StartTime = 2050 };
+            using var play = new Play([new BmsModManiaProfile { OverallDifficulty = { Value = 5 }, UseLazer = { Value = useLazer } }], note, next);
+            play.Press(1000);
+            play.Release(releaseTime);
+            Assert.That(play.Engine.GetColumn(1).GetNote(note).Completed, Is.True);
+
+            play.Press(2000);
+
+            Assert.That(play.Engine.GetColumn(1).GetNote(next).Parts.Single(part => part.Part == NoteParts.TAP).Resolved, Is.True);
+        }
+
+        [TestCase(true)]
+        [TestCase(false)]
+        public void MissedHeadCannotRestorePinOrBrightness(bool useLazer)
+        {
+            var note = new BmsLongNote { Column = 1, StartTime = 1000, Duration = 2000, Kind = KeyNoteKind.Hold };
+            using var play = new Play([
+                new BmsModManiaProfile
+                {
+                    OverallDifficulty = { Value = 5 },
+                    DrainRate = { Value = 5 },
+                    UseLazer = { Value = useLazer },
+                }
+            ], note);
+            var profile = play.Score.EngineChart.Profile;
+
+            play.Advance(1200);
+
+            play.Press(1500);
+
+            var recovered = play.Engine.GetColumn(1).GetNote(note);
+            var recoveredBody = recovered.Parts.Single(part => part.Part == NoteParts.BODY);
+            Assert.That(recoveredBody.Active, Is.True);
+            var recoveredPresentation = profile.LongNotePresentation(note, recovered,
+                new BmsLongNotePresentationContext(1500, recovered.Held, play.Score.EngineChart.TimingFor(note)));
+            Assert.That(recoveredPresentation.HoldingBody, Is.False);
+            Assert.That(recoveredPresentation.ReleasedStyle, Is.True);
+            Assert.That(recoveredPresentation.HoldLightActive, Is.True);
+        }
+
         [TestCase(false, 1, "bms-ruleset-v1")]
         [TestCase(true, 2, "osu-lazer-mania-standardised")]
         public void TestOneModSelectsWholeProfile(bool mania, int scoringOpportunities, string profileId)
@@ -840,7 +1017,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Mods
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Audio
 {
-    public partial class BmsKeySoundCursorTest
+    public partial class BmsKeySoundPolicyTest
     {
         [TestCase(0)]
         [TestCase(.5)]
@@ -859,7 +1036,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Audio
             var lastPress = deadline - .001;
             engine.QueueInput(lastPress, 1, true, false);
             engine.ProcessFrame(new BmsFrameContext(lastPress, 1), 0);
-            Assert.That(feedback, Does.Contain("sample:1:100"));
+            Assert.That(feedback, Does.Contain("keysound:1:100"));
             var usage = BmsGameplayAudioController.GetSampleUsages(beatmap, compiled).Single();
             Assert.That(usage.LatestTriggerTime, Is.GreaterThanOrEqualTo(lastPress));
             engine.Reset();
@@ -867,7 +1044,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Audio
             feedback.Clear();
             engine.QueueInput(deadline, 1, true, false);
             engine.ProcessFrame(new BmsFrameContext(deadline, 1), 0);
-            Assert.That(feedback, Does.Not.Contain("sample:1:100"));
+            Assert.That(feedback, Does.Not.Contain("keysound:1:100"));
         }
 
         [TestCase(false, 835, 3210, 3210)]
@@ -891,17 +1068,12 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Audio
             score.ApplyBeatmap(beatmap);
             var compiled = score.EngineChart;
             var usages = BmsGameplayAudioController.GetSampleUsages(beatmap, compiled).ToArray();
-            var cursor = new BmsKeySoundCursor(beatmap.HitObjects, note => note.StartTime + compiled.TimingFor(note).HeadDeadline / 1000.0);
             Assert.Multiple(() =>
             {
                 Assert.That(usages.Single(usage => usage.SampleKey == 2).EarliestTriggerTime, Is.EqualTo(nextReady));
                 Assert.That(usages.Single(usage => usage.SampleKey == 2).LatestTriggerTime, Is.EqualTo(headExpiry));
                 Assert.That(usages.Single(usage => usage.SampleKey == 3).EarliestTriggerTime, Is.EqualTo(nextReady + 1000));
                 Assert.That(usages.Single(usage => usage.SampleKey == 3).LatestTriggerTime, Is.EqualTo(tailExpiry));
-                var tapExpiry = tap.StartTime + compiled.TimingFor(tap).HeadDeadline / 1000.0;
-                Assert.That(cursor.Next(tapExpiry, _ => false), Is.SameAs(tap));
-                Assert.That(cursor.Next(tapExpiry + 0.001, _ => false), Is.SameAs(hold));
-                Assert.That(cursor.Next(tapExpiry, _ => false), Is.SameAs(tap));
             });
 
             var session = new JudgementSession(compiled.Chart, compiled.Configuration);

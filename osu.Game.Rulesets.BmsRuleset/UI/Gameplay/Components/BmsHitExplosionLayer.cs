@@ -7,6 +7,7 @@ using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Shaders;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables;
 using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Components;
@@ -17,7 +18,7 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 
 internal sealed partial class BmsHitExplosionLayer : Container
 {
-    internal readonly record struct Pulse(double StartTime, BmsHitLightStyle Style, float Offset);
+    internal readonly record struct Pulse(double StartTime, BmsHitLightStyle Style, float Offset, BmsLongNote? Owner = null);
 
     private readonly List<Pulse> pulses = [];
 
@@ -27,16 +28,40 @@ internal sealed partial class BmsHitExplosionLayer : Container
     {
         pulses.Clear();
         foreach (var child in InternalChildren)
-            if (child is BmsHitExplosion) child.Expire();
+            if (child is BmsHitExplosion)
+                child.Expire();
         previousCount = 0;
         Invalidate(Invalidation.DrawNode);
     }
 
+    internal void StopHoldLight(BmsLongNote owner)
+    {
+        var count = 0;
+        for (var i = 0; i < pulses.Count; i++)
+        {
+            var pulse = pulses[i];
+            if (!ReferenceEquals(pulse.Owner, owner))
+                pulses[count++] = pulse;
+        }
+
+        if (count < pulses.Count)
+        {
+            pulses.RemoveRange(count, pulses.Count - count);
+            Invalidate(Invalidation.DrawNode);
+        }
+
+        foreach (var child in InternalChildren)
+        {
+            if (child is BmsHitExplosion explosion && ReferenceEquals(explosion.Owner, owner))
+                explosion.Expire();
+        }
+    }
+
     private readonly SkinTemplate normal;
     private readonly SkinTemplate hold;
-    private readonly Action<BmsHitLightStyle, float, double?> spawnNative;
+    private readonly Action<BmsHitLightStyle, float, double?, BmsLongNote?> spawnNative;
 
-    internal BmsHitExplosionLayer(BmsLayoutVariant layout, int column, Action<BmsHitLightStyle, float, double?> spawnNative)
+    internal BmsHitExplosionLayer(BmsLayoutVariant layout, int column, Action<BmsHitLightStyle, float, double?, BmsLongNote?> spawnNative)
     {
         this.spawnNative = spawnNative;
         RelativeSizeAxes = Axes.Y;
@@ -49,7 +74,7 @@ internal sealed partial class BmsHitExplosionLayer : Container
 
     protected override bool CanBeFlattened => false;
 
-    internal bool TryTrigger(BmsHitLightStyle style, float offset)
+    internal bool TryTrigger(BmsHitLightStyle style, float offset, BmsLongNote? owner)
     {
         if (!canBatch())
         {
@@ -59,7 +84,7 @@ internal sealed partial class BmsHitExplosionLayer : Container
 
         // Native pool preparation starts the envelope at its first traversal, which
         // can be one frame after the judgement callback that requested this pulse.
-        pulses.Add(new Pulse(double.NaN, style, offset));
+        pulses.Add(new Pulse(double.NaN, style, offset, owner));
         return true;
     }
 
@@ -83,9 +108,9 @@ internal sealed partial class BmsHitExplosionLayer : Container
     {
         foreach (var pulse in pulses)
         {
-            if (double.IsNaN(pulse.StartTime)) spawnNative(pulse.Style, pulse.Offset, null);
+            if (double.IsNaN(pulse.StartTime)) spawnNative(pulse.Style, pulse.Offset, null, pulse.Owner);
             else if (Time.Current >= pulse.StartTime && Time.Current < pulse.StartTime + 200)
-                spawnNative(pulse.Style, pulse.Offset, pulse.StartTime);
+                spawnNative(pulse.Style, pulse.Offset, pulse.StartTime, pulse.Owner);
         }
 
         pulses.Clear();

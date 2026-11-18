@@ -14,6 +14,8 @@ internal sealed class BmsEngineChart
 {
     internal BmsHitObject[] Objects { get; }
 
+    private readonly BmsInvisibleNote[] extraKeySoundSources;
+
     internal IReadOnlyDictionary<BmsHitObject, int> Ids { get; }
 
     internal Chart Chart { get; }
@@ -41,10 +43,22 @@ internal sealed class BmsEngineChart
             .SelectMany(column => notesByColumn[column].OrderBy(n => n.StartTime)).ToArray();
         Ids = Objects.Select((note, id) => (note, id)).ToDictionary(pair => pair.note, pair => pair.id);
         Profile = profile ?? BmsGameplayProfile.INSTANCE;
+        BmsInvisibleNote[] extraSources = [];
         (Chart, Configuration) = Profile.Compile(Objects, new KeyChart(columnCount, Objects.Select(createKeyNote),
-            endTime: beatmap.PracticeEndTime is { } practiceEndTime ? Time.FromMilliseconds(practiceEndTime) : null), beatmap.BeatmapInfo);
+            endTime: beatmap.PracticeEndTime is { } practiceEndTime ? Time.FromMilliseconds(practiceEndTime) : null), beatmap.BeatmapInfo, collectMarkers);
+        extraKeySoundSources = extraSources;
         MaximumScore = Score.MaximumScore(Chart.ScorePlan);
+
+        IEnumerable<KeySoundMarker> collectMarkers()
+        {
+            extraSources = [.. beatmap.InvisibleNotes, .. beatmap.PracticeInitialKeySounds];
+            return extraSources.Select((note, i) => (Note: note, Id: Objects.Length + i))
+                .OrderBy(entry => entry.Note.StartTime)
+                .Select(entry => new KeySoundMarker(entry.Id, entry.Note.Column, Time.FromMilliseconds(entry.Note.StartTime)));
+        }
     }
+
+    internal BmsHitObject KeySoundSource(int id) => id < Objects.Length ? Objects[id] : extraKeySoundSources[id - Objects.Length];
 
     internal NoteTiming TimingFor(BmsHitObject note) => ((INoteTiming)Chart.Notes[Ids[note]].Rule).Timing;
 

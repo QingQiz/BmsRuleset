@@ -139,10 +139,10 @@ internal sealed class BmsJudgementEngine
             else pressed[input.Lane] &= ~(1 << input.Control);
             publish(transitions.Slice(first, dispatch.TransitionCount), frame, contextAtTime);
 
-            if (input.Pressed && dispatch.TransitionCount == 0)
+            if (dispatch.KeySound is { } sound)
             {
                 contextAtTime?.Invoke(input.Time / 1000.0);
-                outputs[input.Lane].PlayKeySound();
+                outputs[input.Lane].PlayKeySound(compiled.KeySoundSource(sound.SourceId), sound);
             }
 
             cursor = first + dispatch.TransitionCount;
@@ -168,10 +168,6 @@ internal sealed class BmsJudgementEngine
             var step = contextAtTime?.Invoke(eventTime) ?? frame with { SimulationTime = eventTime };
             snapshots[transition.After.Id] = transition.After;
 
-            // Stable holds accept head and recovery presses without producing a judgement.
-            if (note is BmsLongNote && transition.Input is { Pressed: true } && transition.Judgements.IsEmpty)
-                output.PlaySample(note);
-
             foreach (var judgement in transition.Judgements)
             {
                 step = step with { EngineResult = judgement };
@@ -180,13 +176,7 @@ internal sealed class BmsJudgementEngine
 
                 var eventKind = compiled.Profile.EventKind(result);
                 if (eventKind is GameplayEventKind.EmptyInput or GameplayEventKind.NonConsumingHit)
-                {
                     output.ApplyNonConsumingResult(note, type, step);
-                    if (eventKind == GameplayEventKind.NonConsumingHit)
-                        output.PlaySample(note);
-                    else
-                        output.PlayKeySound();
-                }
                 else if (note is BmsLandmine mine)
                 {
                     mines[result.NoteId] = new BmsLandmineState(step.SimulationTime, eventKind == GameplayEventKind.MineHit);
@@ -216,7 +206,6 @@ internal sealed class BmsJudgementEngine
                     {
                         if (scoresHead) output.ApplyMainResult(hold, type, [endpoint], step, result.SuppressPenalty);
                         else heads[result.NoteId] = endpoint;
-                        if (transition.Input is { Pressed: true }) output.PlaySample(hold);
                     }
                     else if (!scoresHead)
                     {
@@ -227,16 +216,13 @@ internal sealed class BmsJudgementEngine
                         output.ApplyMainResult(hold, type, endpoints, step, result.SuppressPenalty);
                     }
                     else output.ApplySyntheticEndpoint(endpoint, step, result.SuppressPenalty);
-
-                    if (kind == BmsLongNoteEndpointKind.Tail && compiled.Profile.PlayTailSample(part, transition.Input))
-                        output.PlayTailSample(hold);
                 }
                 else
-                {
                     output.ApplyMainResult(note, type, step, result.SuppressPenalty);
-                    if (transition.Input is { Pressed: true }) output.PlaySample(note);
-                }
             }
+
+            foreach (var sound in transition.KeySounds)
+                output.PlayKeySound(compiled.KeySoundSource(sound.SourceId), sound);
 
             if (note is BmsLongNote longNote) output.PublishState(longNote, transition.After, step);
         }

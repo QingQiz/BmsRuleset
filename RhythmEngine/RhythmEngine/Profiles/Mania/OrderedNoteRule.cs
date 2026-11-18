@@ -13,7 +13,7 @@ public sealed record OrderedNoteState(NoteState Inner, bool Retired = false) : N
 }
 
 /// <summary>Time-ordered note lock: a successful later input retires earlier finished objects.</summary>
-public sealed class OrderedNoteRule(INoteRule inner, ImmutableArray<long> laneStarts, int nextIndex, TimingWindows windows) : INoteRule, INoteTiming
+public sealed class OrderedNoteRule(INoteRule inner, long? nextStart) : INoteRule, INoteTiming
 {
     public INoteRule Inner => inner;
 
@@ -28,46 +28,57 @@ public sealed class OrderedNoteRule(INoteRule inner, ImmutableArray<long> laneSt
         return ordered.Retired ? [.. parts.Select(p => p with { Resolved = true, Active = false })] : parts;
     }
 
+    long? INoteRule.EarliestCandidateOffset => inner.EarliestCandidateOffset;
+
     public InputCandidate? GetCandidate(NoteContext context, InputEvent input, int noteIndex)
     {
-        if (input.Pressed && nextIndex < laneStarts.Length && context.Time >= laneStarts[nextIndex])
-        {
-            var index = laneStarts.BinarySearch(context.Time);
-            var successor = laneStarts[index < 0 ? ~index - 1 : index];
-            if (context.Note.EndTime < successor && windows.ResultFor(context.Time - successor) != null)
-                return new InputCandidate(noteIndex, context.Note.StartTime, 0, 0, true);
-
+        if (input.Pressed && context.Time >= nextStart)
             return null;
-        }
 
         return inner.GetCandidate(unwrap(context), input, noteIndex);
     }
 
     public NoteUpdate ApplyInput(NoteContext context, InputEvent input)
-    {
-        if (input.Pressed && nextIndex < laneStarts.Length && context.Time >= laneStarts[nextIndex])
-        {
-            var state = ((OrderedNoteState)context.State).Inner;
-            var emissions = ImmutableArray.CreateBuilder<NoteEmission>();
-            if (state is TapState { Resolved: false })
-                emissions.Add(new NoteEmission(NoteParts.TAP, ManiaResults.MISS, context.Note.StartTime));
-            if (state is HoldState hold)
-            {
-                if (hold.HeadResult == null)
-                    emissions.Add(new NoteEmission(NoteParts.HEAD, ManiaResults.MISS, context.Note.StartTime));
-                if (!hold.TailResolved)
-                    emissions.Add(new NoteEmission(NoteParts.TAIL, ManiaResults.MISS, context.Note.EndTime));
-                if (!hold.Broken)
-                    emissions.Add(new NoteEmission(NoteParts.BODY, ManiaResults.COMBO_BREAK, context.Note.EndTime));
-            }
-
-            return new NoteUpdate(new OrderedNoteState(state, true), emissions.ToImmutable());
-        }
-
-        return wrap(inner.ApplyInput(unwrap(context), input));
-    }
+        => wrap(inner.ApplyInput(unwrap(context), input));
 
     public NoteUpdate ApplyTimer(NoteContext context) => wrap(inner.ApplyTimer(unwrap(context)));
+
+    internal static Func<NoteContext, NoteUpdate>? RetirementAfterHit(NoteUpdate update)
+    {
+        foreach (var emission in update.Emissions)
+        {
+            if ((emission.Part == NoteParts.TAP || emission.Part == NoteParts.HEAD) && emission.Result != ManiaResults.MISS)
+                return retire;
+        }
+
+        return null;
+    }
+
+    private static NoteUpdate retire(NoteContext context)
+    {
+        var state = ((OrderedNoteState)context.State).Inner;
+        var emissions = ImmutableArray.CreateBuilder<NoteEmission>();
+        if (state is TapState { Resolved: false })
+            emissions.Add(new NoteEmission(NoteParts.TAP, ManiaResults.MISS, context.Note.StartTime));
+        if (state is HoldState { TailResolved: false } hold)
+        {
+            if (hold.HeadResult == null)
+                emissions.Add(new NoteEmission(NoteParts.HEAD, ManiaResults.MISS, context.Note.StartTime));
+            emissions.Add(new NoteEmission(NoteParts.TAIL, ManiaResults.MISS, context.Note.EndTime));
+            if (!hold.Broken)
+                emissions.Add(new NoteEmission(NoteParts.BODY, ManiaResults.COMBO_BREAK, context.Note.EndTime));
+
+            state = hold with
+            {
+                HeadResult = hold.HeadResult ?? ManiaResults.MISS,
+                HeadTime = hold.HeadTime ?? context.Time,
+                TailResult = ManiaResults.MISS,
+                TailTime = context.Time,
+            };
+        }
+
+        return new NoteUpdate(new OrderedNoteState(state, true), emissions.ToImmutable());
+    }
 
     private static NoteContext unwrap(NoteContext context) => context with { State = ((OrderedNoteState)context.State).Inner };
 

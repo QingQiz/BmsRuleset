@@ -38,7 +38,8 @@ internal abstract partial class GameplayProfile
         => mods.OfType<IApplicableToGameplayProfile>().Aggregate((GameplayProfile)BmsGameplayProfile.INSTANCE,
             (profile, mod) => mod.ApplyToGameplayProfile(profile));
 
-    internal abstract (Chart Chart, SessionConfiguration Configuration) Compile(BmsHitObject[] objects, KeyChart source, IBeatmapInfo beatmapInfo);
+    internal abstract (Chart Chart, SessionConfiguration Configuration) Compile(BmsHitObject[] objects, KeyChart source, IBeatmapInfo beatmapInfo,
+                                                                                Func<IEnumerable<KeySoundMarker>> collectKeySoundMarkers);
 
     internal virtual SessionConfiguration ConfigureSession(BmsEngineChart compiled, BmsJudgementAlgorithm? algorithm, HealthConfiguration health)
         => compiled.Configuration with { Health = health };
@@ -88,24 +89,7 @@ internal abstract partial class GameplayProfile
 
     internal virtual bool IncludeHeadOnly(NotePartState tail) => false;
 
-    internal virtual bool PlayTailSample(NotePartState tail, InputEvent? input) => input is { Pressed: false };
-
-    internal virtual BmsLongNotePresentation LongNotePresentation(BmsLongNote note, NoteSnapshot snapshot, in BmsLongNotePresentationContext context)
-    {
-        var head = snapshot.Parts.Single(part => part.Part == NoteParts.HEAD);
-        var tail = snapshot.Parts.Single(part => part.Part == NoteParts.TAIL);
-        var body = snapshot.Parts.Single(part => part.Part == NoteParts.BODY);
-        return new BmsLongNotePresentation(head.Resolved, body.Active && context.Held, true, !tail.Resolved,
-            tail.Resolved, true, note.EndTime + context.Timing.TailDeadline / 1000.0 + 100, body.Active && context.Held)
-        {
-            AnimateBody = body.Active,
-            ReleasedStyle = head.Resolved && !body.Active,
-            PrepareHeadPin = head.Resolved && !tail.Resolved,
-            RestoreHeadPin = body.Active,
-            HeadReached = context.Time >= note.StartTime,
-            KeepVisibleAfterHit = !tail.Resolved,
-        };
-    }
+    internal abstract BmsLongNotePresentation LongNotePresentation(BmsLongNote note, NoteSnapshot snapshot, in BmsLongNotePresentationContext context);
 
     internal abstract int AccuracyValue(HitResult result);
 

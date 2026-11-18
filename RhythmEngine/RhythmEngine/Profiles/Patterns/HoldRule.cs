@@ -15,10 +15,11 @@ public sealed class HoldRule : INoteRule, INoteTiming
             ? hold.HeadResult != null && hold.BalanceTime < context.Note.EndTime && (hold.TailSustains || context.Input.Held)
             : !hold.TailResolved && hold.Holding);
         var resolved = Configuration.Balance == null ? hold.TailResolved : hold.Done || hold.BalanceTime >= context.Note.EndTime;
+        var bodyReason = hold.Ended ? HoldReasons.HOST_END : hold.Broken || hold.BodyBreakLatched ? HoldReasons.DROP : null;
         return
         [
             new NotePartState(NoteParts.HEAD, hold.HeadResult != null, Time: hold.HeadTime, Offset: hold.HeadOffset, Result: hold.HeadResult),
-            new NotePartState(NoteParts.BODY, resolved || hold.Ended, active && !hold.Ended, Reason: hold.Ended ? HoldReasons.HOST_END : null),
+            new NotePartState(NoteParts.BODY, resolved || hold.Ended, active && !hold.Ended, Reason: bodyReason),
             new NotePartState(NoteParts.TAIL, hold.TailResolved, Time: hold.TailTime, Offset: hold.TailOffset, Result: hold.TailResult,
                 PendingTime: hold.PendingRelease, Reason: hold.Resolution is { } resolution ? HoldReasons.FromResolution(resolution) : null),
         ];
@@ -46,6 +47,8 @@ public sealed class HoldRule : INoteRule, INoteTiming
         var state = new HoldState(null, false, null, null, false, false, 0, null, 0, note.StartTime);
         return schedule(note, state, long.MinValue, false);
     }
+
+    long? INoteRule.EarliestCandidateOffset => Math.Min(0, Timing.EarliestInputOffset);
 
     public InputCandidate? GetCandidate(NoteContext context, InputEvent input, int noteIndex)
     {
@@ -140,15 +143,22 @@ public sealed class HoldRule : INoteRule, INoteTiming
             var offset = context.Time - context.Note.EndTime;
             var result = Configuration.TailWindows.ResultFor(offset);
             if (Configuration.TailOnOppositeControl && result != null)
-                return new NoteUpdate(schedule(context.Note, state with { Holding = false }, context.Time, context.Input.Held), emissions.ToImmutable());
+                return new NoteUpdate(schedule(context.Note, state with
+                {
+                    Holding = false,
+                    BodyBreakLatched = offset < 0 || state.BodyBreakLatched,
+                }, context.Time, context.Input.Held), emissions.ToImmutable());
 
             if (offset < 0 && Configuration.ReleaseGrace > 0 && (result == null || Configuration.DeferredReleaseResults.Contains(result)))
-                return new NoteUpdate(schedule(context.Note, state with { PendingRelease = context.Time }, context.Time, context.Input.Held), emissions.ToImmutable());
+            {
+                // A scoring rescue within release grace must not erase the body's interruption.
+                return new NoteUpdate(schedule(context.Note, state with { PendingRelease = context.Time, BodyBreakLatched = true }, context.Time, context.Input.Held), emissions.ToImmutable());
+            }
 
             if (Configuration.EndMode != HoldEndMode.Automatic && !Configuration.TailOnOppositeControl && result != null)
                 return resolve(context, state, result, offset, HoldResolution.Release, emissions);
 
-            state = state with { Holding = false };
+            state = state with { Holding = false, BodyBreakLatched = true };
 
             switch (Configuration.DropMode)
             {
@@ -198,7 +208,7 @@ public sealed class HoldRule : INoteRule, INoteTiming
 
         if (state.HeadResult == null && context.Time > context.Note.StartTime + Configuration.HeadDeadline)
         {
-            state = state with { HeadResult = Configuration.MissResult, HeadTime = context.Time, Holding = false };
+            state = state with { HeadResult = Configuration.MissResult, HeadTime = context.Time, Holding = false, BodyBreakLatched = true };
             emissions.Add(new NoteEmission(NoteParts.HEAD, Configuration.MissResult, context.Note.StartTime,
                 SuppressPenalty: state.Mistake && Configuration.SuppressRepeatedMistakes));
             if (!Configuration.ContinueAfterMissedHead && !Configuration.RecoverMissedHead)

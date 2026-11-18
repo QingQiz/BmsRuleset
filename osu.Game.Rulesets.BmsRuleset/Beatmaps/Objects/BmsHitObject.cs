@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Linq;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 using osu.Game.Rulesets.Judgements;
@@ -59,7 +58,7 @@ public class BmsHitObject : HitObject
             _ => new BmsNote(),
         };
         CopyTo(clone);
-        clone.Samples = Samples.ToList();
+        clone.Samples = Samples;
         return clone;
     }
 

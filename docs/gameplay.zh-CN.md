@@ -1,6 +1,6 @@
 # 游玩机制与设置
 
-[返回 README](../README.zh-CN.md) | [English](./gameplay.md)
+[返回 README](../README.zh-CN.md) | [行为差异](./behaviour-differences.zh-CN.md) | [English](./gameplay.md)
 
 ## 练习
 

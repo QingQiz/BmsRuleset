@@ -267,8 +267,9 @@ public class BmsJudgementEngineTest
     {
         var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Popn9K, Rank = 2 };
         var note = new BmsNote { Beatmap = beatmap, Column = 1, StartTime = 1000, SampleKey = 7 };
+        beatmap.InvisibleNotes = [new BmsInvisibleNote { Beatmap = beatmap, Column = 1, StartTime = 500, SampleKey = 8 }];
         var feedback = new List<string>();
-        var output = new BmsRecordingJudgementOutput { Feedback = feedback.Add };
+        var output = new BmsRecordingJudgementOutput { Feedback = feedback.Add, ResultApplied = (_, _) => feedback.Add("judged") };
         beatmap.HitObjects.AddRange([note]);
         var engine = BmsEngineTestAccess.CreateEngine(beatmap, 1, output);
         engine.QueueInput(0, 1, true, false);
@@ -278,7 +279,7 @@ public class BmsJudgementEngineTest
         engine.QueueInput(1000, 1, true, false);
         engine.QueueInput(1000, 1, true, false);
         engine.ProcessFrame(new BmsFrameContext(2000, 1), 2000);
-        Assert.That(feedback, Is.EqualTo(new[] { "keysound", "sample:7:100", "keysound" }));
+        Assert.That(feedback, Is.EqualTo(new[] { "keysound:7:100", "judged", "keysound:7:100", "keysound:8:100" }));
         Assert.That(output.MainResults, Is.EqualTo(1));
     }
 

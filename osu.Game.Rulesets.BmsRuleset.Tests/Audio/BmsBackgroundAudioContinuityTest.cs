@@ -94,6 +94,21 @@ public class BmsBackgroundAudioContinuityTest
     }
 
     [Test]
+    public void SameFrameStopDoesNotStartTheReleasedHeadOrDiscardItsReplacement()
+    {
+        controller.QueueLivePlay(0, 100, owner: 1);
+        controller.ControlLiveVoice(1, stop: true, muted: false);
+        controller.SubmitLivePlayBatch();
+        Assert.That(BmsPcmTestHelpers.RenderFrames(mixer, 150), Is.All.Zero);
+
+        controller.QueueLivePlay(0, 100, owner: 1);
+        controller.ControlLiveVoice(1, stop: true, muted: false);
+        controller.QueueLivePlay(0, 100, owner: 2);
+        controller.SubmitLivePlayBatch();
+        Assert.That(BmsPcmTestHelpers.RenderFrames(mixer, 150)[^1], Is.EqualTo(.1f).Within(1e-6));
+    }
+
+    [Test]
     public void LateBackgroundEventDoesNotCutAnUnrelatedKeysound()
     {
         createBackground([new BmsSampleEvent(100, 1, 100)]);

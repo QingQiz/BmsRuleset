@@ -14,6 +14,7 @@ using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
+using KeySound = RhythmEngine.Core.KeySound;
 using NoteSnapshot = RhythmEngine.Core.NoteSnapshot;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Judgement;
@@ -226,27 +227,10 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
     public void ApplyNonConsumingResult(BmsHitObject note, HitResult result, in BmsFrameContext frame)
         => playfield.RegisterNonConsumingJudgement(result, note.StartTime, note.Column, frame);
 
-    public void PlaySample(BmsHitObject note)
+    public void PlayKeySound(BmsHitObject note, KeySound sound)
     {
-        if (playfield.IsRebuildingReplay)
-            return;
-
-        foreach (var sample in note.GetSamples())
-            column.PlaySample(sample.SampleKey, sample.Volume);
-    }
-
-    public void PlayTailSample(BmsLongNote note)
-    {
-        if (playfield.IsRebuildingReplay)
-            return;
-
-        foreach (var tail in note.GetTailSamples())
-            column.PlaySample(tail.SampleKey, tail.Volume);
-    }
-
-    public void PlayKeySound()
-    {
-        if (!playfield.IsRebuildingReplay) column.PlayKeySound();
+        if (!playfield.IsRebuildingReplay)
+            column.KeySound.PlayKeySound(note, sound);
     }
 
     public void PlayLandmineSample(BmsLandmine note)

@@ -9,6 +9,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Profiles;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 using osu.Game.Rulesets.Replays;
@@ -26,9 +27,16 @@ public partial class TestSceneBmsLongNoteBodyTint : BmsPlayerTestScene
     private const double repress_offset = -200;
 
     private BmsLongNoteMode mode = BmsLongNoteMode.ChargeNote;
+    private bool? useLazer;
+    private double secondReleaseOffset;
 
     protected override TestPlayer CreatePlayer(Ruleset ruleset)
         => CreateBmsPlayer(createReplayFrames);
+
+    private void loadPlayer()
+        => LoadPlayer(useLazer.HasValue
+            ? [new BmsModManiaProfile { OverallDifficulty = { Value = 8 }, UseLazer = { Value = useLazer.Value } }]
+            : []);
 
     protected override IBeatmap CreateBeatmap(RulesetInfo ruleset)
     {
@@ -62,7 +70,7 @@ public partial class TestSceneBmsLongNoteBodyTint : BmsPlayerTestScene
         return beatmap;
     }
 
-    private static IList<ReplayFrame> createReplayFrames(BmsBeatmap beatmap)
+    private IList<ReplayFrame> createReplayFrames(BmsBeatmap beatmap)
     {
         var action = BmsKeyBindingConfiguration.ActionForColumn(beatmap.LayoutVariant, 1)!.Value;
 
@@ -74,7 +82,8 @@ public partial class TestSceneBmsLongNoteBodyTint : BmsPlayerTestScene
             new BmsReplayFrame(start_time + duration + repress_offset, action),
             new BmsReplayFrame(start_time + duration + 100),
             new BmsReplayFrame(second_start_time, action),
-            new BmsReplayFrame(second_start_time + duration),
+            new BmsReplayFrame(second_start_time + duration + secondReleaseOffset),
+            new BmsReplayFrame(second_start_time + duration + 1000),
         ];
     }
 
@@ -99,15 +108,25 @@ public partial class TestSceneBmsLongNoteBodyTint : BmsPlayerTestScene
     private static Drawable noteHeadDrawableOf(DrawableBmsHitObject longNote)
         => ((BmsNoteVisual)noteHeadOf(longNote)).Drawable;
 
-    [TestCase(BmsLongNoteMode.ChargeNote, 0.4f, false)]
-    [TestCase(BmsLongNoteMode.HellChargeNote, 1f, true)]
-    public void TestFailedBodyRepressVisual(BmsLongNoteMode mode, float expectedAlpha, bool expectedPinned)
+    [TestCase(BmsLongNoteMode.LongNote, 0.4f, false, null)]
+    [TestCase(BmsLongNoteMode.ChargeNote, 0.4f, false, null)]
+    [TestCase(BmsLongNoteMode.HellChargeNote, 1f, true, null)]
+    [TestCase(BmsLongNoteMode.LongNote, 0.4f, false, true)]
+    [TestCase(BmsLongNoteMode.LongNote, 0.4f, false, false)]
+    public void TestFailedBodyRepressVisual(BmsLongNoteMode mode, float expectedAlpha, bool expectedPinned, bool? useLazer)
     {
-        AddStep("set long note mode", () => this.mode = mode);
-        AddStep("load player", LoadPlayer);
+        AddStep("set long note mode", () =>
+        {
+            this.mode = mode;
+            this.useLazer = useLazer;
+            secondReleaseOffset = 0;
+        });
+        AddStep("load player", loadPlayer);
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
         AddAssert("beatmap loaded", () => Player.LoadedBeatmapSuccessfully);
         AddUntilStep("bms stage loaded", () => Playfield.Stage.IsLoaded);
+        AddAssert("selected gameplay profile is active", () => Playfield.EngineChart.Configuration.ProfileId,
+            () => Is.EqualTo(useLazer.HasValue ? useLazer.Value ? "osu-lazer-mania-standardised" : "osu-stable-mania-score-v1" : "bms-ruleset-v1"));
         seek(start_time - 100);
         seek(start_time + 300);
         AddUntilStep("held body and tail are fully opaque", () =>
@@ -170,13 +189,60 @@ public partial class TestSceneBmsLongNoteBodyTint : BmsPlayerTestScene
     [Test]
     public void TestTailNonPoorReleaseClearsBody()
     {
-        AddStep("load player", LoadPlayer);
+        AddStep("set ordinary CN release", () =>
+        {
+            mode = BmsLongNoteMode.ChargeNote;
+            useLazer = null;
+            secondReleaseOffset = 0;
+        });
+        AddStep("load player", loadPlayer);
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
         AddAssert("beatmap loaded", () => Player.LoadedBeatmapSuccessfully);
         AddUntilStep("bms stage loaded", () => Playfield.Stage.IsLoaded);
         seek(second_start_time - 100);
         seek(second_start_time + duration + 20);
         AddUntilStep("tail non-poor clears long note", () => Playfield.GetAliveObjectAtTime(second_start_time) == null);
+    }
+
+    [TestCase(BmsLongNoteMode.LongNote, -165, false, 0f, null)]
+    [TestCase(BmsLongNoteMode.ChargeNote, -165, false, 0f, null)]
+    [TestCase(BmsLongNoteMode.LongNote, -120, false, 0f, null)]
+    [TestCase(BmsLongNoteMode.ChargeNote, -120, false, 0f, null)]
+    [TestCase(BmsLongNoteMode.LongNote, -90, false, 0f, null)]
+    [TestCase(BmsLongNoteMode.ChargeNote, -90, false, 0f, null)]
+    [TestCase(BmsLongNoteMode.HellChargeNote, -165, true, 0.4f, null)]
+    [TestCase(BmsLongNoteMode.HellChargeNote, -120, true, 1f, null)]
+    [TestCase(BmsLongNoteMode.HellChargeNote, -90, true, 1f, null)]
+    [TestCase(BmsLongNoteMode.LongNote, -246.751, true, 0.4f, true)]
+    [TestCase(BmsLongNoteMode.LongNote, -246.75, false, 0f, true)]
+    [TestCase(BmsLongNoteMode.LongNote, -191.25, false, 0f, true)]
+    [TestCase(BmsLongNoteMode.LongNote, -29.25, false, 0f, true)]
+    [TestCase(BmsLongNoteMode.LongNote, -127.001, true, 0.4f, false)]
+    [TestCase(BmsLongNoteMode.LongNote, -127, false, 0f, false)]
+    [TestCase(BmsLongNoteMode.LongNote, -30, false, 0f, false)]
+    public void TestEarlyTailWindowBodyVisibility(BmsLongNoteMode noteMode, double releaseOffset, bool visible, float alpha, bool? useLazer)
+    {
+        AddStep("set release inside tail window", () =>
+        {
+            mode = noteMode;
+            this.useLazer = useLazer;
+            secondReleaseOffset = releaseOffset;
+        });
+        AddStep("load player", loadPlayer);
+        AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
+        AddUntilStep("bms stage loaded", () => Playfield.Stage.IsLoaded);
+        AddAssert("selected gameplay profile is active", () => Playfield.EngineChart.Configuration.ProfileId,
+            () => Is.EqualTo(useLazer.HasValue ? useLazer.Value ? "osu-lazer-mania-standardised" : "osu-stable-mania-score-v1" : "bms-ruleset-v1"));
+        seek(second_start_time + duration + releaseOffset - 1);
+        AddUntilStep("held long note is visible", () => Playfield.GetAliveObjectAtTime(second_start_time) != null);
+        seek(second_start_time + duration + releaseOffset + 1);
+        AddUntilStep("released body visibility matches presentation", () =>
+        {
+            var drawable = Playfield.GetAliveObjectAtTime(second_start_time);
+            return visible
+                ? drawable != null && longNoteBodyOf(drawable).Alpha == alpha && longNoteTailOf(drawable).Alpha == alpha
+                : drawable == null;
+        });
     }
 
     private void seek(double time)

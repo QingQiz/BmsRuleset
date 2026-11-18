@@ -261,6 +261,27 @@ public class ProfileBehaviourTest
 
     [TestCase("lazer")]
     [TestCase("stable")]
+    public void ManiaBodyBreakSurvivesRecoveryAndCloneUntilReset(string profile)
+    {
+        var compiled = compile(profile, new KeyChart(1, [hold(0, 1000, 2000)]));
+        var session = new JudgementSession(compiled.Chart, compiled.Configuration);
+        session.AdvanceTo(ms(1000), [press(1000)]);
+        var beforeBreak = session.Clone();
+        session.AdvanceTo(ms(1600), [release(1400), press(1600)]);
+        var body = session.GetNote(0).Parts.Single(part => part.Part == NoteParts.BODY);
+        Assert.That(body.Active, Is.True);
+        Assert.That(body.Reason, Is.EqualTo(HoldReasons.DROP));
+        Assert.That(beforeBreak.GetNote(0).Parts.Single(part => part.Part == NoteParts.BODY).Reason, Is.Null);
+
+        var afterBreak = session.Clone();
+        session.Reset();
+        session.AdvanceTo(ms(1000), [press(1000)]);
+        Assert.That(session.GetNote(0).Parts.Single(part => part.Part == NoteParts.BODY).Reason, Is.Null);
+        Assert.That(afterBreak.GetNote(0).Parts.Single(part => part.Part == NoteParts.BODY), Is.EqualTo(body));
+    }
+
+    [TestCase("lazer")]
+    [TestCase("stable")]
     public void BrokenManiaHoldCanRecoverButTailIsCapped(string profile)
     {
         var session = compile(profile, new KeyChart(1, [hold(0, 1000, 2000)])).CreateRecordingSession();

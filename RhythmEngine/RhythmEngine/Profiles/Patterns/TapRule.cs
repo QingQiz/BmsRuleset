@@ -46,6 +46,8 @@ public sealed class TapRule : INoteRule, INoteTiming
 
     public NoteState CreateState(ChartNote note) => new TapState(new NoteTimer(checked(note.StartTime + Configuration.LateDeadline + 1), Configuration.PassiveOrder), false, false);
 
+    long? INoteRule.EarliestCandidateOffset => Math.Min(0, Timing.EarliestInputOffset);
+
     public InputCandidate? GetCandidate(NoteContext context, InputEvent input, int noteIndex)
     {
         if (input.Pressed == Configuration.OnRelease)

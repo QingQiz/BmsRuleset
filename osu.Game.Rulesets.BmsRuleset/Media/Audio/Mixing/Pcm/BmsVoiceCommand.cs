@@ -9,7 +9,9 @@ internal readonly record struct BmsVoicePlay(
     float Gain = 1,
     long SourceOffsetFrame = 0,
     int Epoch = 0,
-    long? SourceEndFrame = null);
+    long? SourceEndFrame = null,
+    int? Owner = null,
+    bool Muted = false);
 
 internal enum BmsVoiceCommandType : byte
 {
@@ -18,6 +20,8 @@ internal enum BmsVoiceCommandType : byte
     Resume,
     SetMasterGain,
     ReplaceEpoch,
+    StopVoice,
+    SetVoiceMuted,
 }
 
 internal readonly record struct BmsVoiceCommand(
@@ -25,4 +29,5 @@ internal readonly record struct BmsVoiceCommand(
     long TargetFrame,
     int Epoch,
     BmsVoicePlay Play = default,
-    float Value = 0);
+    float Value = 0,
+    int? Owner = null);

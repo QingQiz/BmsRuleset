@@ -58,6 +58,40 @@ public class BmsLongNoteRuleTest
         Assert.That(mode == BmsLongNoteMode.LongNote ? run.Results.Last() : run.Output.SyntheticEndpoints.Last().Result, Is.EqualTo(HitResult.Perfect));
     }
 
+    [TestCase(BmsLongNoteMode.LongNote)]
+    [TestCase(BmsLongNoteMode.ChargeNote)]
+    [TestCase(BmsLongNoteMode.HellChargeNote)]
+    public void TestPmsEarlyRegrabRestoresFeedbackByHoldType(BmsLongNoteMode mode)
+    {
+        var run = new BmsLongNoteTestContext(mode, 1000, 1000, layout: BmsLayoutVariant.Popn9K);
+        run.Press(1000);
+        run.Release(1500);
+        run.Frame(1699, 199, false);
+        Assert.That(run.State.TailJudged, Is.False);
+        Assert.That(run.Presentation(false, 1699).ReleasedStyle, Is.True);
+
+        Assert.That(run.Repress(1699), Is.True);
+        run.Frame(1701, 2, true);
+
+        var body = run.Column.GetNote(run.Note).Parts.Single(part => part.Part == NoteParts.BODY);
+        Assert.That(body.Active, Is.True);
+        Assert.That(run.State.LongNoteStarted, Is.True);
+        var presentation = run.Presentation(true, 1701);
+        var canRecover = mode == BmsLongNoteMode.HellChargeNote;
+        Assert.That(presentation.HoldingBody, Is.EqualTo(canRecover));
+        Assert.That(presentation.HoldLightActive && presentation.AnimateBody, Is.True);
+        Assert.That(presentation.ReleasedStyle, Is.EqualTo(!canRecover));
+
+        run.Rewind(1400);
+        var beforeBreak = run.Presentation(true, 1400);
+        Assert.That(beforeBreak.HoldingBody, Is.True);
+        Assert.That(beforeBreak.ReleasedStyle, Is.False);
+        run.Release(1500);
+        run.Repress(1699);
+        Assert.That(run.Presentation(true, 1699).HoldingBody, Is.EqualTo(canRecover));
+        Assert.That(run.Presentation(true, 1699).ReleasedStyle, Is.EqualTo(!canRecover));
+    }
+
     [Test]
     public void TestPmsReleaseMarginRestoresAfterRewind()
     {

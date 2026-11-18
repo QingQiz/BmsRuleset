@@ -13,6 +13,27 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Audio;
 public class BmsPcmVoiceMixerTest
 {
     [Test]
+    public void MutedHeadAdvancesAndDoesNotAffectUnownedAudio()
+    {
+        var mixer = createMixer();
+        const int head = 42;
+        var frames = new float[6000];
+        for (var i = 0; i < frames.Length; i++)
+            frames[i] = i < 300 ? .1f : i < 600 ? float.NaN : .3f;
+        var headAsset = BmsPcmTestHelpers.CreateAsset([new BmsPcmChunk(0, 3000, frames)]);
+        mixer.SubmitPlayBatch([new(headAsset, 1, 0, Owner: head), new(createConstantAsset(3000, .2f), 2, 0)]);
+        Assert.That(BmsPcmTestHelpers.RenderFrames(mixer, 150)[^1], Is.EqualTo(.3f).Within(1e-6));
+        mixer.SubmitVoiceControl(head, 0, stop: false, muted: true);
+        Assert.That(BmsPcmTestHelpers.RenderFrames(mixer, 150)[^1], Is.EqualTo(.2f).Within(1e-6));
+        mixer.SubmitVoiceControl(head, 0, stop: false, muted: false);
+        Assert.That(BmsPcmTestHelpers.RenderFrames(mixer, 150)[^1], Is.EqualTo(.5f).Within(1e-6));
+        mixer.SubmitVoiceControl(head, 0, stop: true, muted: false);
+        Assert.That(BmsPcmTestHelpers.RenderFrames(mixer, 150)[^1], Is.EqualTo(.2f).Within(1e-6));
+        mixer.SubmitVoiceControl(head, 0, stop: false, muted: false);
+        Assert.That(BmsPcmTestHelpers.RenderFrames(mixer, 150)[^1], Is.EqualTo(.2f).Within(1e-6));
+    }
+
+    [Test]
     public void RenderingIndexDropsEmptyCapacityAndKeepsReuseOrder()
     {
         var mixer = createMixer();

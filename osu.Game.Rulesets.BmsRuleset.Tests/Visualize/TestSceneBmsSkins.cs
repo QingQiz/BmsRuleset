@@ -83,15 +83,6 @@ public partial class TestSceneBmsSkins : BmsPlayerTestScene
 
         this.AddSetupUntilStep("legacy LN skin coverage held", () =>
             Player.GameplayClockContainer.CurrentTime >= BmsTestBeatmaps.LN_SKIN_COVERAGE_START_TIME + 95);
-        this.AddSetupUntilStep("animated LN body uses first frame when not held", () =>
-        {
-            var body = longNoteBodyOf(liveSkinCoverageLongNote(animated_body_column));
-            if (body == null)
-                return false;
-
-            body.UpdateBody(Math.Max(1, body.DrawHeight), false, false);
-            return bodyAnimationFrameCount(body) == 2 && currentBodyAnimationFrame(body) == 0;
-        });
         this.AddSetupAssert("held LN body uses normal tint", () =>
             longNoteBodyOf(liveSkinCoverageLongNote(animated_body_column)) is { } body
             && body.Colour == Color4.White
@@ -102,6 +93,14 @@ public partial class TestSceneBmsSkins : BmsPlayerTestScene
         this.AddSetupUntilStep("animated LN body advances frames while held", () =>
             bodyAnimationFrameCount(longNoteBodyOf(liveSkinCoverageLongNote(animated_body_column))) == 2
             && currentBodyAnimationFrame(longNoteBodyOf(liveSkinCoverageLongNote(animated_body_column))) == 1);
+        this.AddSetupAssert("pausing body animation preserves its frame during geometry updates", () =>
+        {
+            var body = longNoteBodyOf(liveSkinCoverageLongNote(animated_body_column));
+            var frame = currentBodyAnimationFrame(body);
+            body.UpdateAnimation(false);
+            body.UpdateBody(Math.Max(1, body.DrawHeight), false, false);
+            return currentBodyAnimationFrame(body) == frame;
+        });
         this.AddSetupAssert("animated LN tail renders multi-frame drawable", () =>
             liveSkinCoverageLongNote(animated_tail_column)?.ChildrenOfType<BmsResolvedTextureAnimation>().Any() == true);
         this.AddSetupStep("capture LN body sprites", () =>

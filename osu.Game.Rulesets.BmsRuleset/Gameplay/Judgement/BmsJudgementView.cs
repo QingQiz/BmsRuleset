@@ -1,6 +1,4 @@
-using System.Linq;
 using RhythmEngine.Core;
-using RhythmEngine.Profiles.Common;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 
@@ -20,13 +18,4 @@ internal sealed class BmsJudgementView(BmsJudgementEngine engine, int index)
     internal NoteSnapshot GetNote(BmsHitObject note) => engine.GetNote(note);
 
     internal BmsLandmineState GetLandmineState(BmsLandmine note) => engine.GetLandmineState(note);
-
-    internal bool IsKeySoundFinished(BmsHitObject note, double time)
-        => note is BmsNote or BmsLongNote
-            ? GetNote(note).Parts.Single(p => p.Part == (note is BmsLongNote && !engine.ScoresHead(note)
-                ? NoteParts.TAIL
-                : note is BmsLongNote
-                    ? NoteParts.HEAD
-                    : NoteParts.TAP)).Resolved
-            : time > note.StartTime;
 }

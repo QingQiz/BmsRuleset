@@ -33,7 +33,29 @@ public sealed class Chart
 
     internal ImmutableArray<ImmutableArray<int>> LaneNotes { get; }
 
+    internal ImmutableArray<ImmutableArray<int>> LaneNotesByTime { get; }
+
+    internal ImmutableArray<long> LaneCandidateOffsets { get; }
+
     internal FrozenDictionary<int, int> NoteIndices { get; }
+
+    internal int FirstLaneNoteAfter(int lane, long time)
+    {
+        var indices = LaneNotesByTime[lane];
+        var low = 0;
+        var high = indices.Length;
+        while (low < high)
+        {
+            var middle = low + (high - low) / 2;
+            var start = Notes[indices[middle]].StartTime;
+            if (start <= time)
+                low = middle + 1;
+            else
+                high = middle;
+        }
+
+        return low;
+    }
 
     public Chart(int laneCount, IEnumerable<ChartNote> notes, IEnumerable<ScoringOpportunity> scoringOpportunities)
     {
@@ -58,5 +80,33 @@ public sealed class Chart
         ScorePlan = new ScorePlan(opportunities);
         var laneNotes = Notes.Select((n, i) => (n.Lane, Index: i)).ToLookup(n => n.Lane, n => n.Index);
         LaneNotes = [.. Enumerable.Range(0, laneCount).Select(lane => laneNotes[lane].ToImmutableArray())];
+        LaneNotesByTime = [.. LaneNotes.Select(orderByTime)];
+        LaneCandidateOffsets = [.. LaneNotes.Select(earliestCandidateOffset)];
+    }
+
+    private long earliestCandidateOffset(ImmutableArray<int> indices)
+    {
+        var earliest = 0L;
+        foreach (var index in indices)
+        {
+            if (Notes[index].Rule.EarliestCandidateOffset is not { } offset)
+                return long.MinValue;
+
+            earliest = Math.Min(earliest, offset);
+        }
+
+        return earliest;
+    }
+
+    private ImmutableArray<int> orderByTime(ImmutableArray<int> indices)
+    {
+        // Keep the original lane indices for already sorted charts and preserve source order at ties.
+        for (var i = 1; i < indices.Length; i++)
+        {
+            if (Notes[indices[i - 1]].StartTime > Notes[indices[i]].StartTime)
+                return [.. indices.OrderBy(index => Notes[index].StartTime)];
+        }
+
+        return indices;
     }
 }

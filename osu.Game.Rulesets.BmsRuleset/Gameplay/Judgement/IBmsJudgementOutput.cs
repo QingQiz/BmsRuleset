@@ -27,11 +27,7 @@ internal interface IBmsJudgementOutput
 
     void ApplyNonConsumingResult(BmsHitObject note, HitResult result, in BmsFrameContext frame);
 
-    void PlaySample(BmsHitObject note);
-
-    void PlayTailSample(BmsLongNote note);
-
-    void PlayKeySound();
+    void PlayKeySound(BmsHitObject note, KeySound sound);
 
     void PlayLandmineSample(BmsLandmine note);
 }

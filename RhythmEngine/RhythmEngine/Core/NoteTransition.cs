@@ -26,7 +26,7 @@ public sealed record JudgementResult(JudgementEvent Event, ScoreState Score, Hea
 /// A physical input edge and the range of transitions it produced. Empty ranges retain unmatched
 /// inputs in event order, including repeated edges with identical timestamps and values.
 /// </summary>
-public readonly record struct InputDispatch(InputEvent Input, int FirstTransitionIndex, int TransitionCount);
+public readonly record struct InputDispatch(InputEvent Input, int FirstTransitionIndex, int TransitionCount, KeySound? KeySound = null);
 
 /// <summary>
 /// Ordered output owned by the caller. Input dispatch ranges index this batch's transitions;
@@ -35,7 +35,7 @@ public readonly record struct InputDispatch(InputEvent Input, int FirstTransitio
 public sealed record JudgementBatch(ImmutableArray<NoteTransition> Transitions, ImmutableArray<InputDispatch> Inputs);
 
 /// <summary>
-/// One rule invocation, including silent input and timer transitions. Input is null for a timer.
+/// One note update. Input is set when the note handles the edge directly.
 /// Ordered transitions preserve release/regrab edges within a single host frame.
 /// </summary>
 public sealed record NoteTransition(
@@ -45,4 +45,7 @@ public sealed record NoteTransition(
     NoteSnapshot Before,
     NoteSnapshot After,
     ImmutableArray<JudgementResult> Judgements,
-    SessionOutcome Outcome);
+    SessionOutcome Outcome)
+{
+    public ImmutableArray<KeySound> KeySounds { get; init; } = [];
+}

@@ -89,21 +89,14 @@ public partial class BmsColumn : Playfield, IBmsColumn
                                              * scroll.ScrollCoordinateScale(HitObjectContainer.DrawHeight, HitTargetPosition)));
     }
 
-    private BmsColumnKeySound? keySound;
+    internal BmsColumnKeySound KeySound { get; } = new();
+
     private readonly Bindable<bool> showInvisibleNotes = new();
     private BmsInvisibleNote[] invisibleNotes = [];
 
     internal BmsInvisibleNoteLayer? InvisibleNoteLayer { get; private set; }
 
-    internal BmsJudgementView Judgements
-    {
-        get;
-        set
-        {
-            field = value;
-            if (keySound != null) keySound.Judgements = value;
-        }
-    } = null!;
+    internal BmsJudgementView Judgements { get; set; } = null!;
 
     internal BmsJudgementBridge JudgementBridge { get; set; } = null!;
 
@@ -135,6 +128,7 @@ public partial class BmsColumn : Playfield, IBmsColumn
             normalHitExplosionPool,
             longNoteHitExplosionPool,
             KeyAreaUnderNotesLayer,
+            KeySound,
         ];
 
         KeyArea = new SkinnableDrawable(new BmsSkinComponentLookup(BmsSkinComponents.KeyArea, LayoutVariant, index))
@@ -171,24 +165,10 @@ public partial class BmsColumn : Playfield, IBmsColumn
     {
         base.LoadComplete();
 
-        // Build the keysound cursor from this column's own hit-object slice so the per-column
-        // player only ever scans notes it actually owns. The slice mirrors the playfield's global
-        // ordering ( StartTime, then Column ) so cursor reset/seek behaviour stays consistent.
-        var columnHitObjects = ParentPlayfield.Beatmap.HitObjects
-            .Where(h => h.Column == Index)
-            .OrderBy(h => h.StartTime)
-            .ThenBy(h => h.Column)
-            .ToArray();
-
         invisibleNotes = ParentPlayfield.Beatmap.InvisibleNotes
             .Where(n => n.Column == Index).OrderBy(n => n.StartTime).ToArray();
         showInvisibleNotes.BindValueChanged(_ => updateInvisibleNotes(), true);
         ((BmsColumnHitObjectContainer)HitObjectContainer).InitializeMineBatch(this);
-
-        var keySoundNotes = invisibleNotes.Concat(ParentPlayfield.Beatmap.PracticeInitialKeySounds.Where(note => note.Column == Index))
-            .OrderBy(note => note.StartTime).ToArray();
-        keySound = new BmsColumnKeySound(columnHitObjects, Judgements, keySoundNotes);
-        AddInternal(keySound);
 
         NewResult += JudgementBridge.OnFrameworkNewResult;
     }
@@ -279,20 +259,27 @@ public partial class BmsColumn : Playfield, IBmsColumn
     /// own NewResult), LN head/tail endpoints, and the repeating hit light fired throughout an
     /// LN hold. Moved here from BmsPlayfield so the column owns its lane's hit-light visuals.
     /// </summary>
-    public void TriggerHitExplosion(BmsHitLightStyle style)
+    public void TriggerHitExplosion(BmsHitLightStyle style) => triggerHitExplosion(style, null);
+
+    internal void TriggerHoldLight(BmsLongNote owner) => triggerHitExplosion(BmsHitLightStyle.Hold, owner);
+
+    internal void StopHoldLight(BmsLongNote owner) => ((BmsHitExplosionLayer)HitExplosionArea).StopHoldLight(owner);
+
+    private void triggerHitExplosion(BmsHitLightStyle style, BmsLongNote? owner)
     {
         var offset = ParentPlayfield.Stage.HitTargetPositionOffset;
-        if (((BmsHitExplosionLayer)HitExplosionArea).TryTrigger(style, offset)) return;
+        if (((BmsHitExplosionLayer)HitExplosionArea).TryTrigger(style, offset, owner)) return;
 
-        spawnHitExplosion(style, offset, null);
+        spawnHitExplosion(style, offset, null, owner);
     }
 
-    private void spawnHitExplosion(BmsHitLightStyle style, float offset, double? startTime)
+    private void spawnHitExplosion(BmsHitLightStyle style, float offset, double? startTime, BmsLongNote? owner)
     {
         var pool = style == BmsHitLightStyle.Hold ? longNoteHitExplosionPool : normalHitExplosionPool;
         var explosion = pool.Get();
         explosion.ApplyPositionOffset(offset);
         explosion.InheritStartTime(startTime);
+        explosion.Owner = owner;
         HitExplosionArea.Add(explosion);
     }
 
@@ -306,7 +293,7 @@ public partial class BmsColumn : Playfield, IBmsColumn
     /// Triggers a note-hit / LN-tail definition key. All columns and automation route through the
     /// shared key Track, so retriggering the definition has the same truncation behaviour.
     /// </summary>
-    public void PlaySample(int? sampleKey, int volume) => keySound?.PlaySample(sampleKey, volume);
+    public void PlaySample(int? sampleKey, int volume) => KeySound.PlaySample(sampleKey, volume);
 
     /// <summary>
     /// Plays the landmine's assigned samples when it detonates.
@@ -314,7 +301,7 @@ public partial class BmsColumn : Playfield, IBmsColumn
     public void DetonateLandmine(BmsHitObject hitObject)
     {
         foreach (var sample in hitObject.GetSamples())
-            keySound?.PlaySample(sample.SampleKey, sample.Volume);
+            KeySound.PlaySample(sample.SampleKey, sample.Volume);
     }
 
     #endregion
@@ -322,8 +309,6 @@ public partial class BmsColumn : Playfield, IBmsColumn
     #region Input
 
     public bool IsPressed => Judgements.PressedDirections != 0;
-
-    internal void PlayKeySound() => keySound?.PlayKeySound();
 
     #endregion
 

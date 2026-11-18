@@ -12,25 +12,32 @@ internal delegate BmsLongNotePresentation BmsLongNotePresentationMapping(BmsLong
 
 internal readonly record struct BmsLongNotePresentation(
     bool HeadJudged,
-    bool HoldingBody,
     bool KeepAfterHeadResult,
     bool KeepAlive,
     bool Retired,
     bool ClearBodyOnRetire,
-    double LifetimeEnd,
-    bool HoldLightActive)
+    double LifetimeEnd)
 {
-    internal bool AnimateBody { get; init; }
+    private HoldFeedback feedback { get; init; }
 
-    internal bool ReleasedStyle { get; init; }
+    internal bool HoldingBody => feedback.HasFlag(HoldFeedback.PinHead);
+
+    internal bool AnimateBody => feedback.HasFlag(HoldFeedback.AnimateBody);
+
+    internal bool HoldLightActive => feedback.HasFlag(HoldFeedback.HoldLight);
+
+    internal bool ReleasedStyle { get; private init; }
 
     internal bool PrepareHeadPin { get; init; }
-
-    internal bool RestoreHeadPin { get; init; }
 
     internal bool HeadReached { get; init; }
 
     internal bool KeepVisibleAfterHit { get; init; }
 
-    internal BmsHitLightStyle HitLightStyle => BmsHitLightStyle.Hold;
+    internal BmsLongNotePresentation WithHoldFeedback(HoldFeedback effects, bool showReleasedStyle, bool lightInRange = true)
+        => this with
+        {
+            feedback = lightInRange ? effects : effects & ~HoldFeedback.HoldLight,
+            ReleasedStyle = showReleasedStyle && !effects.HasFlag(HoldFeedback.BrightBody),
+        };
 }

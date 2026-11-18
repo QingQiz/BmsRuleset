@@ -56,7 +56,7 @@ public partial class TestSceneBmsDrawableTraversal
             observedPulseColumn = column;
             using var readProbe = new ScopedMethodProbe(drawable.GetType().GetMethod("readPresentation", flags)!,
                 GetType().GetMethod(nameof(countPresentation), statics)!);
-            using var pulseProbe = new ScopedMethodProbe(typeof(BmsColumn).GetMethod(nameof(BmsColumn.TriggerHitExplosion))!,
+            using var pulseProbe = new ScopedMethodProbe(typeof(BmsColumn).GetMethod(nameof(BmsColumn.TriggerHoldLight), flags)!,
                 GetType().GetMethod(nameof(countHoldPulse), statics)!);
             try
             {
@@ -79,6 +79,7 @@ public partial class TestSceneBmsDrawableTraversal
                 observedLongNote = null;
                 observedPulseColumn = null;
                 hold_pulse_times.Clear();
+                Playfield.ResetReplayState();
                 Playfield.Clock = previousClock;
                 Playfield.ProcessCustomClock = previousProcessClock;
             }
@@ -135,9 +136,9 @@ public partial class TestSceneBmsDrawableTraversal
         });
     }
 
-    private static void countHoldPulse(BmsColumn __instance, BmsHitLightStyle style)
+    private static void countHoldPulse(BmsColumn __instance)
     {
-        if (ReferenceEquals(__instance, observedPulseColumn) && style == BmsHitLightStyle.Hold)
+        if (ReferenceEquals(__instance, observedPulseColumn))
             hold_pulse_times.Add(pulseSimulationTime);
     }
 }

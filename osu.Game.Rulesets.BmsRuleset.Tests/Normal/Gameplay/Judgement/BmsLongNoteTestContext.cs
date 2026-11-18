@@ -4,6 +4,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using RhythmEngine.Core;
+using RhythmEngine.Profiles.Common;
+using RhythmEngine.Profiles.Patterns;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
@@ -35,7 +37,6 @@ internal sealed class BmsLongNoteTestContext
     internal int HeadPublications { get; private set; }
     internal int FinishedPublications => Publications.Count(p => !p.Frame.IsRewinding && p.State.TailJudged && !p.State.LongNoteStarted);
     private BmsLongNoteState lastState;
-    private int sampleCount;
     private readonly List<Operation> operations = [];
     private bool replaying;
     private double currentTime = double.NegativeInfinity;
@@ -73,10 +74,6 @@ internal sealed class BmsLongNoteTestContext
                 HeadPublications++;
             lastState = state;
         };
-        Output.Feedback = feedback =>
-        {
-            if (feedback.StartsWith("sample:", StringComparison.Ordinal)) sampleCount++;
-        };
     }
 
     internal bool Press(double time, double rate = 1)
@@ -96,9 +93,10 @@ internal sealed class BmsLongNoteTestContext
     internal bool Release(double inputTime, double? simulationTime = null)
     {
         record(simulationTime ?? inputTime, () => Release(inputTime, simulationTime));
-        var before = sampleCount;
+        var wasJudged = State.TailJudged;
         Column.HandleExecutionRelease(inputTime, new BmsFrameContext(simulationTime ?? inputTime, 1));
-        return sampleCount != before;
+        var tail = Column.GetNote(Note).Parts.Single(part => part.Part == NoteParts.TAIL);
+        return !wasJudged && (tail.Reason == HoldReasons.RELEASE || tail.Reason == HoldReasons.DROP);
     }
 
     internal void Frame(double time, double elapsed, bool holding)
@@ -135,7 +133,7 @@ internal sealed class BmsLongNoteTestContext
         Output.Reset();
         MainResults.Clear();
         Publications.Clear();
-        HeadPublications = sampleCount = 0;
+        HeadPublications = 0;
         lastState = default;
         currentTime = double.NegativeInfinity;
         Column.Engine().Reset();

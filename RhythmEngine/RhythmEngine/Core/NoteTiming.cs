@@ -23,7 +23,7 @@ public readonly record struct NoteTiming(
     TimingWindows? TailWindows = null,
     long? HeadRetriggerDeadline = null)
 {
-    public long EarliestInputOffset => HeadWindows.Entries.Min(window => window.Early);
+    public long EarliestInputOffset => HeadWindows.EarliestOffset;
 
     public long EarliestResolvingOffset
     {

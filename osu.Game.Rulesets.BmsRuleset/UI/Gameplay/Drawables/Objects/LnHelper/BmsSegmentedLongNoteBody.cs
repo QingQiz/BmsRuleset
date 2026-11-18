@@ -119,18 +119,21 @@ public sealed partial class BmsSegmentedLongNoteBody : CompositeDrawable
         lastBodyHeight = -1;
         contentHeight = -1;
         contentOffset = 0;
+        if (currentFrameIndex != 0)
+        {
+            currentFrameIndex = 0;
+            updateAnimationFrameTexture();
+        }
     }
 
-    public void UpdateAnimation(bool isHolding)
+    public void UpdateAnimation(bool animate)
     {
         ensureSlicesLoaded();
 
-        if (bodyFrames.Length <= 1 || (!isHolding && currentFrameIndex == 0))
+        if (bodyFrames.Length <= 1 || !animate)
             return;
 
-        var nextFrameIndex = isHolding
-            ? (int)(Time.Current / body_animation_frame_length) % bodyFrames.Length
-            : 0;
+        var nextFrameIndex = animationFrameAtCurrentTime();
 
         if (currentFrameIndex == nextFrameIndex)
             return;
@@ -139,7 +142,9 @@ public sealed partial class BmsSegmentedLongNoteBody : CompositeDrawable
         updateAnimationFrameTexture();
     }
 
-    public void UpdateBody(float bodyHeight, bool newTailAtTop, bool isHolding)
+    private int animationFrameAtCurrentTime() => (int)(Math.Max(0, Time.Current) / body_animation_frame_length) % bodyFrames.Length;
+
+    public void UpdateBody(float bodyHeight, bool newTailAtTop, bool animate)
     {
         ensureSlicesLoaded();
 
@@ -150,9 +155,9 @@ public sealed partial class BmsSegmentedLongNoteBody : CompositeDrawable
         var width = Math.Max(1, DrawWidth);
         var widthChanged = Math.Abs(lastDrawWidth - width) >= 1;
         var directionChanged = tailAtTop != newTailAtTop;
-        var nextFrameIndex = isHolding && bodyFrames.Length > 1
-            ? (int)(Time.Current / body_animation_frame_length) % bodyFrames.Length
-            : 0;
+        var nextFrameIndex = animate && bodyFrames.Length > 1
+            ? animationFrameAtCurrentTime()
+            : currentFrameIndex;
         var frameChanged = currentFrameIndex != nextFrameIndex;
         var capacityExceeded = bodyHeight > contentHeight;
 

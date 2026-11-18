@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using NUnit.Framework;
 using osu.Framework.Testing;
 using osu.Framework.Timing;
@@ -40,7 +41,7 @@ public partial class BmsSamplePlaybackTest : TestScene
         {
             Feedback = message =>
             {
-                if (message == "sample:1:100")
+                if (message == "keysound:1:100")
                     playback.QueueLivePlay(1);
             },
         };
@@ -58,7 +59,7 @@ public partial class BmsSamplePlaybackTest : TestScene
         AddUntilStep("wait for playback load", () => playback.IsLoaded);
         AddAssert("head sample is prepared before recovery", () => isSampleReady(1));
         AddStep("recover a missed head", () => input(true));
-        AddUntilStep("recovery plays the head sample", () => BmsAudioTestAccess.GetActiveVoiceCount(playback) > 0);
+        assertRecoveryAudio("recovery");
         AddStep("release during the hold", () =>
         {
             manualClock.CurrentTime = 6000;
@@ -70,7 +71,7 @@ public partial class BmsSamplePlaybackTest : TestScene
             Assert.That(isSampleReady(1), Is.True);
             input(true);
         });
-        AddUntilStep("regrab plays the head sample", () => BmsAudioTestAccess.GetActiveVoiceCount(playback) > 0);
+        assertRecoveryAudio("regrab");
         AddStep("seek back into the hold", () =>
         {
             manualClock.CurrentTime = 3000;
@@ -80,10 +81,18 @@ public partial class BmsSamplePlaybackTest : TestScene
         });
         AddAssert("head sample is prepared after seeking", () => isSampleReady(1));
         AddStep("resume with a recovery press", () => input(true));
-        AddUntilStep("recovery after seek plays", () => BmsAudioTestAccess.GetActiveVoiceCount(playback) > 0);
+        assertRecoveryAudio("recovery after seek");
         AddStep("advance past all hold input windows", () => manualClock.CurrentTime = 60000);
         AddUntilStep("head lease expires after the hold", () => !isSampleReady(1));
         addCleanupSteps();
+
+        void assertRecoveryAudio(string action)
+        {
+            if (useLazer)
+                AddAssert($"{action} is silent during the body", () => BmsAudioTestAccess.GetActiveVoiceCount(playback) == 0);
+            else
+                AddUntilStep($"{action} plays the head sample", () => BmsAudioTestAccess.GetActiveVoiceCount(playback) > 0);
+        }
 
         void input(bool pressed)
         {
@@ -143,7 +152,10 @@ public partial class BmsSamplePlaybackTest : TestScene
             playback = new BmsSamplePlayback(
                 new Dictionary<int, BmsSampleDefinition> { { 1, new("early-candidate.wav") } },
                 tempDir,
-                sampleUsages: [new BmsSampleUsage(1, 100_000, CandidateStartTime: 1_000, CandidateEndTime: 100_280)]);
+                sampleUsages: [new BmsSampleUsage(1, 100_000, CandidateStartTime: 1_000, CandidateEndTime: 100_280)])
+            {
+                Clock = new FramedClock(new ManualClock()),
+            };
             Add(playback);
         });
         AddUntilStep("wait for playback load", () => playback.IsLoaded);

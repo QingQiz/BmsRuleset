@@ -237,15 +237,7 @@ internal static class BmsReplaySimulation
         {
         }
 
-        public void PlaySample(BmsHitObject note)
-        {
-        }
-
-        public void PlayTailSample(BmsLongNote note)
-        {
-        }
-
-        public void PlayKeySound()
+        public void PlayKeySound(BmsHitObject note, KeySound sound)
         {
         }
 

@@ -58,7 +58,9 @@ public partial class BmsSamplePlayback(
     internal Task WaitForPreparedSamplesAsync(CancellationToken cancellationToken)
         => controller?.WaitForPreparedSamplesAsync(cancellationToken) ?? Task.CompletedTask;
 
-    internal void QueueLivePlay(int sampleKey, int volume = 100) => controller?.QueueLivePlay(sampleKey, volume);
+    internal void QueueLivePlay(int sampleKey, int volume = 100, int? owner = null) => controller?.QueueLivePlay(sampleKey, volume, owner);
+
+    internal void ControlLiveVoice(int owner, bool stop, bool muted) => controller?.ControlLiveVoice(owner, stop, muted);
 
     internal void SubmitLivePlayBatch() => controller?.SubmitLivePlayBatch();
 

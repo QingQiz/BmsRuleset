@@ -100,6 +100,10 @@ internal sealed class BmsPcmVoiceMixer
         commands.Enqueue(new BmsVoiceCommand(type, Math.Max(targetFrame, RenderedFrames), epoch, Value: value));
     }
 
+    internal void SubmitVoiceControl(int owner, int epoch, bool stop, bool muted)
+        => commands.Enqueue(new BmsVoiceCommand(stop ? BmsVoiceCommandType.StopVoice : BmsVoiceCommandType.SetVoiceMuted,
+            RenderedFrames, epoch, Value: muted ? 1 : 0, Owner: owner));
+
     internal void Render(Span<float> output)
     {
         if (output.Length % 2 != 0)
@@ -135,12 +139,28 @@ internal sealed class BmsPcmVoiceMixer
                             continue;
                         }
 
-                        var gain = voice.BaseGain * getEnvelopeGain(ref voice, absoluteFrame);
-                        left += voiceLeft * gain;
-                        right += voiceRight * gain;
-                        voice.SourceFrame++;
+                        var envelope = getEnvelopeGain(ref voice, absoluteFrame);
+                        var gain = voice.Gain * envelope;
+                        if (gain > 0)
+                        {
+                            left += voiceLeft * gain;
+                            right += voiceRight * gain;
+                        }
+                        // Muted voices contribute no PCM, but still advance for a later unmute.
+                        else if (voice.GainBeforeMute is not { } unmutedGain)
+                        {
+                            left += voiceLeft * gain;
+                            right += voiceRight * gain;
+                            releaseVoice(segment, voiceIndex);
+                            continue;
+                        }
+                        else if (unmutedGain * envelope <= 0)
+                        {
+                            releaseVoice(segment, voiceIndex);
+                            continue;
+                        }
 
-                        if (voice.SourceFrame >= voice.EndFrame || gain <= 0)
+                        if (++voice.SourceFrame >= voice.EndFrame)
                         {
                             releaseVoice(segment, voiceIndex);
                             continue;
@@ -199,6 +219,12 @@ internal sealed class BmsPcmVoiceMixer
                         masterGain = sanitiseGain(command.Value);
                     break;
 
+                case BmsVoiceCommandType.StopVoice:
+                case BmsVoiceCommandType.SetVoiceMuted:
+                    if (command.Epoch == currentEpoch)
+                        applyVoiceControl(command, frame);
+                    break;
+
                 case BmsVoiceCommandType.ReplaceEpoch:
                     currentEpoch = command.Epoch;
                     drainAll(frame, epochReplacementFadeFrames);
@@ -208,6 +234,32 @@ internal sealed class BmsPcmVoiceMixer
                     throw new ArgumentOutOfRangeException();
             }
         } while (commands.HasDueCommand(frame));
+    }
+
+    private void applyVoiceControl(BmsVoiceCommand command, long frame)
+    {
+        for (var segment = firstRenderingSegment; segment != null; segment = segment.NextRendering)
+        {
+            for (var i = 0; i < segment.ActiveCount; i++)
+            {
+                ref var voice = ref segment.Voices[i];
+                if (voice.Owner != command.Owner || voice.State != BmsPcmVoiceState.Active)
+                    continue;
+
+                if (command.Type == BmsVoiceCommandType.StopVoice)
+                    beginFade(ref voice, frame, retriggerFadeFrames);
+                else if (command.Value != 0)
+                {
+                    voice.GainBeforeMute ??= voice.Gain;
+                    voice.Gain = 0;
+                }
+                else if (voice.GainBeforeMute is { } gain)
+                {
+                    voice.Gain = gain;
+                    voice.GainBeforeMute = null;
+                }
+            }
+        }
     }
 
     private void startVoice(BmsVoicePlay play, long frame)
@@ -274,9 +326,11 @@ internal sealed class BmsPcmVoiceMixer
             State = BmsPcmVoiceState.Active,
             Asset = play.Asset,
             SampleKey = play.SampleKey,
+            Owner = play.Owner,
             SourceFrame = sourceStart,
             EndFrame = assetEnd,
-            BaseGain = sanitiseGain(play.Gain),
+            Gain = play.Muted ? 0 : play.Gain,
+            GainBeforeMute = play.Muted ? play.Gain : null,
             StartFrame = frame,
             FadeStartGain = 1,
         };
@@ -443,9 +497,11 @@ internal sealed class BmsPcmVoiceMixer
         public BmsPcmAsset? Asset;
         public BmsPcmAsset.ReadCursor ReadCursor;
         public int SampleKey;
+        public int? Owner;
         public long SourceFrame;
         public long EndFrame;
-        public float BaseGain;
+        public float Gain;
+        public float? GainBeforeMute;
         public long StartFrame;
         public long FadeStartFrame;
         public long FadeEndFrame;

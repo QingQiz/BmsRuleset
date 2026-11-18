@@ -53,7 +53,10 @@ public static partial class BmsProfiles
                 : ["Seven-key judgement and gauge rules; five-key and PMS tables are separate modes and are not selected implicitly."]);
 
         return new CompiledProfile(chart, new SessionConfiguration(id, score, health,
-            context => SelectCandidates(context, chart, options.Selection)), descriptor);
+            context => SelectCandidates(context, chart, options.Selection))
+        {
+            KeySounds = lr2 ? KeySoundPolicies.Lr2 : KeySoundPolicies.Beatoraja(chart),
+        }, descriptor);
     }
 
     // Compilation lookups must not be retained by the runtime arbitration closure.

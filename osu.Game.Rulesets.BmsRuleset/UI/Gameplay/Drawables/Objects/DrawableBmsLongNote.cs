@@ -93,7 +93,7 @@ public sealed partial class DrawableBmsLongNote : DrawableBmsHitObject
         if (Time.Current >= ln.StartTime && Time.Current <= ln.EndTime && current.HoldLightActive
             && Time.Current - lastHoldExplosionTime >= hold_explosion_interval)
         {
-            ParentColumn?.TriggerHitExplosion(current.HitLightStyle);
+            ParentColumn?.TriggerHoldLight(ln);
             lastHoldExplosionTime = Time.Current;
         }
 
@@ -249,7 +249,7 @@ public sealed partial class DrawableBmsLongNote : DrawableBmsHitObject
             ParentColumn!.JudgementBridge.ObserveLongNoteState(this, stateObserver);
             ParentColumn.JudgementBridge.ObserveVisualTime(this, visualTimeObserver);
             presentation = readPresentation(Time.Current);
-            restoreHeadPin = presentation.RestoreHeadPin;
+            restoreHeadPin = presentation.HoldingBody;
 
             longNoteBody.SetSkinLookup(LayoutVariant, Column);
             ParentColumn.JudgementBridge.RefreshNoteRepresentation(this);
@@ -287,9 +287,10 @@ public sealed partial class DrawableBmsLongNote : DrawableBmsHitObject
         lastVisualObservation = null;
         visualState.Reset();
         bodyGeometryValid = false;
+        longNoteBody.ResetBody();
         lastHoldExplosionTime = Time.Current;
         presentation = readPresentation(Time.Current);
-        restoreHeadPin = presentation.RestoreHeadPin;
+        restoreHeadPin = presentation.HoldingBody;
         RefreshStateTransforms();
     }
 
@@ -317,6 +318,11 @@ public sealed partial class DrawableBmsLongNote : DrawableBmsHitObject
     {
         var previous = presentation;
         presentation = mapPresentation(ln, snapshot, new BmsLongNotePresentationContext(frame.SimulationTime, snapshot.Held, ParentColumn!.Judgements.GetTiming(ln)));
+        if (previous.HoldLightActive && !presentation.HoldLightActive)
+            ParentColumn.StopHoldLight(ln);
+        else if (!previous.HoldLightActive && presentation.HoldLightActive)
+            lastHoldExplosionTime = frame.SimulationTime - hold_explosion_interval;
+
         if (!previous.HeadJudged && presentation.PrepareHeadPin)
         {
             visualState.PrepareHeadPin();

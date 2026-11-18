@@ -43,6 +43,19 @@ public class StableNativeConformanceTest
         Assert.That(session.Completed, Is.EqualTo(release >= ms(2000) && session.GetNote(0).Completed));
     }
 
+    [TestCase(-164_000, false)]
+    [TestCase(-163_999, true)]
+    public void EarlyHoldInputUsesTheTruncatedSongClock(long inputTime, bool held)
+    {
+        var source = new KeyChart(1, [new KeyNote(0, 0, ms(1), ms(1000), KeyNoteKind.Hold)]);
+        var profile = ManiaProfiles.CreateStable(source);
+        var session = new JudgementSession(profile.Chart, profile.Configuration);
+        var batch = session.AdvanceTo(inputTime, [new InputEvent(inputTime, 0, true)]);
+
+        Assert.That(batch.Inputs.Single().TransitionCount, Is.EqualTo(held ? 1 : 0));
+        Assert.That(session.GetNote(0).Parts.Single(part => part.Part == NoteParts.BODY).Active, Is.EqualTo(held));
+    }
+
     [Test]
     public void BodyTicksRecoverHealthAndIncrementComboWithoutAccuracyCredit()
     {
