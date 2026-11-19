@@ -19,12 +19,8 @@ internal sealed class BmsRateScoreSelection : IScoreSelectionRule
         var rate = 1.0;
         foreach (var mod in mods)
         {
-            rate *= mod switch
-            {
-                BmsModDoubleTime doubleTime => doubleTime.SpeedChange.Value,
-                BmsModHalfTime halfTime => halfTime.SpeedChange.Value,
-                _ => 1.0,
-            };
+            if (mod is ModRateAdjust rateAdjust)
+                rate *= rateAdjust.SpeedChange.Value;
         }
 
         return rate;

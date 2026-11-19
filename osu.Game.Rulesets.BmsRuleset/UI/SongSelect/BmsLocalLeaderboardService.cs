@@ -3,7 +3,7 @@ using System.Linq;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.Online.Leaderboards;
-using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Lamp;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
 using osu.Game.Screens.Play.Leaderboards;
@@ -20,14 +20,13 @@ internal static class BmsLocalLeaderboardService
         LeaderboardSortMode sorting,
         BeatmapInfo? fallbackBeatmap = null)
     {
-        var filteredScores = scores.Where(score => score.BeatmapHash == beatmapHash
-                                                   && score.Ruleset.ShortName == rulesetShortName
-                                                   && !score.DeletePending);
+        var filteredScores = scores.Where(score => score.BeatmapHash == beatmapHash && !score.DeletePending)
+            .ForRuleset(rulesetShortName, fallbackBeatmap);
 
         if (exactMods != null)
         {
-            var filterableExactMods = exactMods.Where(isFilterableMod).ToArray();
-            filteredScores = filteredScores.Where(score => BmsLampScoreSelector.MatchesExactMods(score.Mods, filterableExactMods, isFilterableMod));
+            var types = exactMods.Where(isFilterableMod).Select(mod => mod.GetType()).ToHashSet();
+            filteredScores = filteredScores.Where(score => types.SetEquals(score.Mods.Where(isFilterableMod).Select(mod => mod.GetType())));
         }
 
         var selectedScores = filteredScores.Detach().OrderByCriteria(sorting).ToArray();

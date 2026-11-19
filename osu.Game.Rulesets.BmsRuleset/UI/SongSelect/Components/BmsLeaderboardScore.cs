@@ -31,6 +31,8 @@ using osu.Game.Online.Leaderboards;
 using osu.Game.Overlays.Dialog;
 using osu.Game.Overlays;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Lamp;
 using osu.Game.Rulesets.Mods;
@@ -625,7 +627,9 @@ internal sealed partial class BmsLeaderboardScore : OsuClickableContainer, IHasC
         get
         {
             var items = new List<MenuItem>();
-            var copyableMods = Score.Mods.Where(mod => mod.Type != ModType.System).ToArray();
+            var scoreMods = Score.Mods;
+            var maniaConvert = Score.Ruleset.OnlineID == 3 && scoreMods.Any(mod => mod is BmsModHideScratch);
+            var copyableMods = (maniaConvert ? BmsLocalScores.PlayableMods(scoreMods) : scoreMods).Where(mod => mod.Type != ModType.System).ToArray();
             if (copyableMods.Length > 0)
                 items.Add(new OsuMenuItem(BmsStrings.LeaderboardUseMods, MenuItemType.Highlighted,
                     () => SelectedMods.Value = copyableMods.Select(mod => mod.DeepClone()).ToArray()));

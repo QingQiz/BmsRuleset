@@ -53,16 +53,10 @@ public static class BmsLampScoreSelector
 
     private static bool matchesSelectedMods(IReadOnlyList<Mod> scoreMods, IReadOnlyList<Mod> selectedMods) =>
         scoreMods.Concat(selectedMods)
-            .OfType<IApplicableToScoreSelection>()
-            .Select(mod => mod.ScoreSelectionRule)
+            .Select(mod => mod is ModRateAdjust ? BmsRateScoreSelection.INSTANCE : (mod as IApplicableToScoreSelection)?.ScoreSelectionRule)
+            .OfType<IScoreSelectionRule>()
             .Distinct<IScoreSelectionRule>(ReferenceEqualityComparer.Instance)
             .All(rule => rule.IsScoreEligible(scoreMods, selectedMods));
-
-    internal static bool MatchesExactMods(
-        IEnumerable<Mod> scoreMods,
-        IEnumerable<Mod> selectedMods,
-        Func<Mod, bool> isFilterableMod)
-        => MatchesExactAcronyms(scoreMods, selectedMods.Where(isFilterableMod).Select(mod => mod.Acronym), isFilterableMod);
 
     internal static bool MatchesExactAcronyms(
         IEnumerable<Mod> scoreMods,

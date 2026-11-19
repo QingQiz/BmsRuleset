@@ -4,7 +4,10 @@ using NUnit.Framework;
 using osu.Game.Beatmaps;
 using osu.Game.Online.Leaderboards;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Profiles;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect;
+using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Lamp;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
 
@@ -101,6 +104,75 @@ public class BmsLocalLeaderboardServiceTest
 
         Assert.That(selected.Single(), Is.SameAs(scoreWithOldBeatmapLink));
     }
+
+    [TestCase(7, true)]
+    [TestCase(4, false)]
+    public void TestManiaScoresOnConvertibleBeatmaps(int keys, bool convertible)
+    {
+        var mania = new RulesetInfo { ShortName = "mania", OnlineID = 3 };
+        var beatmap = new BeatmapInfo(mania, new BeatmapDifficulty { CircleSize = keys }) { Hash = "target-hash" };
+        var native = new ScoreInfo(beatmap, mania) { TotalScore = 900_000 };
+        var bms = score(beatmap.Hash, Constant.SHORT_NAME, 800_000, beatmap);
+        Mod[] mods = [new BmsModHideScratch(), new BmsModManiaProfile()];
+
+        ScoreInfo[] select(Mod[] exactMods) => BmsLocalLeaderboardService.SelectScores([native, bms], beatmap.Hash, Constant.SHORT_NAME,
+            exactMods, LeaderboardSortMode.Score, beatmap);
+
+        Assert.That(select(null), Is.EqualTo(convertible ? new[] { native, bms } : [bms]));
+        Assert.That(select([]), Is.EqualTo([bms]));
+        var selected = select(mods);
+        if (convertible)
+        {
+            var display = selected.Single();
+            Assert.That(display.ID, Is.EqualTo(native.ID));
+            Assert.That(display.Ruleset, Is.EqualTo(mania));
+            Assert.That(display.Mods, Is.EqualTo(mods));
+            Assert.That(BmsLampScoreSelector.MatchesSelectedMods(display, mods), Is.True);
+            Assert.That(BmsLampScoreSelector.MatchesSelectedMods(display, [mods[1]]), Is.False);
+        }
+        else
+            Assert.That(selected, Is.Empty);
+
+        Assert.That(native.Mods, Is.Empty);
+        Assert.That(bms.Mods, Is.Empty);
+    }
+
+    [Test]
+    public void TestManiaModSettingsAndAcronymCollision()
+    {
+        var mania = new RulesetInfo { ShortName = "mania", OnlineID = 3 };
+        var beatmap = new BeatmapInfo(mania, new BeatmapDifficulty { CircleSize = 7 }) { Hash = "target-hash" };
+        var native = new ScoreInfo(beatmap, mania) { Mods = [new ModCinema(), new TestDoubleTime { SpeedChange = { Value = 1.3 } }] };
+        var originalJson = native.ModsJson;
+        var projected = BmsLocalLeaderboardService.SelectScores([native], beatmap.Hash, Constant.SHORT_NAME, null, LeaderboardSortMode.Score, beatmap).Single();
+        Assert.That(projected.Mods.OfType<BmsModDoubleTime>().Single().SpeedChange.Value, Is.EqualTo(1.3).Within(0.001));
+        Assert.That(projected.Mods, Has.One.TypeOf<ModCinema>());
+        var target = new BmsRuleset().RulesetInfo;
+        var playback = BmsLocalScores.ForPlayback(projected, target);
+        Assert.That(playback.Ruleset, Is.EqualTo(target));
+        Assert.That(playback.ID, Is.EqualTo(native.ID));
+        Assert.That(playback.DeepClone().Mods.Select(mod => mod.GetType()), Is.EqualTo(new[] { typeof(BmsModDoubleTime), typeof(BmsModHideScratch), typeof(BmsModManiaProfile) }));
+        Assert.That(projected.Ruleset, Is.EqualTo(mania));
+        Assert.That(native.ModsJson, Is.EqualTo(originalJson));
+        Assert.That(BmsLocalLeaderboardService.SelectScores([native], beatmap.Hash, Constant.SHORT_NAME,
+            [new BmsModHideScratch(), new BmsModManiaProfile(), new BmsModDoubleTime(), new BmsModConstant()], LeaderboardSortMode.Score, beatmap), Is.Empty);
+    }
+
+    [Test]
+    public void TestNativeDaycoreRequiresMatchingSpeedForPersonalBest()
+    {
+        var mania = new RulesetInfo { ShortName = "mania", OnlineID = 3 };
+        var beatmap = new BeatmapInfo(mania, new BeatmapDifficulty { CircleSize = 7 }) { Hash = "target-hash" };
+        var native = new ScoreInfo(beatmap, mania) { Mods = [new TestDaycore()], IsLegacyScore = false };
+        var display = BmsLocalLeaderboardService.SelectScores([native], beatmap.Hash, Constant.SHORT_NAME, null, LeaderboardSortMode.Score, beatmap).Single();
+        Mod[] mods = [new BmsModHideScratch(), new BmsModManiaProfile()];
+        Assert.That(BmsLampScoreSelector.MatchesSelectedMods(display, mods), Is.False);
+        Assert.That(BmsLampScoreSelector.MatchesSelectedMods(display, [.. mods, new BmsModHalfTime()]), Is.True);
+    }
+
+    private class TestDoubleTime : ModDoubleTime;
+
+    private class TestDaycore : ModDaycore;
 
     [Test]
     public void TestSortsByRequestedLeaderboardMode()

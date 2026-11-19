@@ -48,6 +48,7 @@ using osu.Game.Overlays.Mods;
 using osu.Game.Overlays.Volume;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.DifficultyTable;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.UI.Result;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Course;
@@ -1343,15 +1344,16 @@ public abstract partial class BmsSongSelect : ScreenWithBeatmapBackground, IKeyB
 
     void ISongSelect.PresentScore(ScoreInfo score, ScorePresentType presentType)
     {
+        score = BmsLocalScores.ForPlayback(score, Ruleset.Value);
         switch (presentType)
         {
-            case ScorePresentType.Results:
+            case ScorePresentType.Results when Ruleset.Value.Equals(score.Ruleset):
                 Debug.Assert(Beatmap.Value.BeatmapInfo.Equals(score.BeatmapInfo));
-                Debug.Assert(Ruleset.Value.Equals(score.Ruleset));
 
                 this.Push(score.Ruleset.ShortName == Constant.SHORT_NAME ? new BmsResultsScreen(score) : new SoloResultsScreen(score));
                 break;
 
+            case ScorePresentType.Results:
             case ScorePresentType.Gameplay:
                 (game as OsuGame)?.PresentScore(score, presentType);
                 break;

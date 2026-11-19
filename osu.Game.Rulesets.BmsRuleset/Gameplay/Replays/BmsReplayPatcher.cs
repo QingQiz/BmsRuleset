@@ -48,6 +48,7 @@ public static class BmsReplayPatcher
             var importScorePostfixMethod = AccessTools.Method(typeof(BmsReplayPatcher), nameof(importScorePostfix));
             var getScoreTarget = AccessTools.Method(typeof(ScoreImporter), nameof(ScoreImporter.GetScore), [typeof(ScoreInfo)]);
             var getScorePrefixMethod = AccessTools.Method(typeof(BmsReplayPatcher), nameof(getScorePrefix));
+            var loadScoreTarget = AccessTools.Method(typeof(ScoreManager), nameof(ScoreManager.GetScore), [typeof(IScoreInfo)]);
             var getDatabasedScoreTarget = AccessTools.Method(typeof(ScoreManager), "getDatabasedScoreInfo", [typeof(IScoreInfo)]);
             var getDatabasedScorePrefixMethod = AccessTools.Method(typeof(BmsReplayPatcher), nameof(getDatabasedScorePrefix));
             var replayFailIndicatorDisposeTarget = AccessTools.Method(typeof(ReplayFailIndicator), "Dispose", [typeof(bool)]);
@@ -72,6 +73,7 @@ public static class BmsReplayPatcher
                 (name: "Player.ImportScore", member: importScoreTarget),
                 (name: "BmsReplayPatcher.importScorePostfix", member: importScorePostfixMethod),
                 (name: "ScoreImporter.GetScore", member: getScoreTarget),
+                (name: "ScoreManager.GetScore", member: loadScoreTarget),
                 (name: "BmsReplayPatcher.getScorePrefix", member: getScorePrefixMethod),
                 (name: "ScoreManager.getDatabasedScoreInfo", member: getDatabasedScoreTarget),
                 (name: "BmsReplayPatcher.getDatabasedScorePrefix", member: getDatabasedScorePrefixMethod),
@@ -101,6 +103,7 @@ public static class BmsReplayPatcher
             var harmony = new Harmony(harmony_id);
             harmony.Patch(importScoreTarget, postfix: new HarmonyMethod(importScorePostfixMethod));
             harmony.Patch(getScoreTarget, prefix: new HarmonyMethod(getScorePrefixMethod));
+            harmony.Patch(loadScoreTarget, postfix: new HarmonyMethod(typeof(BmsReplayPatcher), nameof(loadScorePostfix)));
             harmony.Patch(getDatabasedScoreTarget, prefix: new HarmonyMethod(getDatabasedScorePrefixMethod));
             harmony.Patch(replayFailIndicatorDisposeTarget, prefix: new HarmonyMethod(replayFailIndicatorDisposePrefixMethod));
             harmony.Patch(mainMenuLogoArrivingTarget, prefix: new HarmonyMethod(mainMenuLogoArrivingPrefixMethod));
@@ -203,6 +206,29 @@ public static class BmsReplayPatcher
         }
 
         return false;
+    }
+
+    private static void loadScorePostfix(IScoreInfo scoreInfo, Func<BeatmapManager> ___beatmaps, ref Score? __result)
+    {
+        // The database ID still identifies the original mania record. Let its importer decode the .osr first;
+        // exports and requests made by mania itself must continue to see the original score.
+        if (scoreInfo is not ScoreInfo requested || !isBmsScore(requested) || __result?.ScoreInfo.Ruleset.OnlineID != 3)
+            return;
+
+        if (__result.ScoreInfo.ID != requested.ID || requested.BeatmapInfo == null || __result.Replay.Frames.Count == 0)
+        {
+            __result = null;
+            return;
+        }
+
+        if (__result.ScoreInfo.Mods.Any(mod => mod.Acronym is "HO" or "NR" or "EZ" or "HR" || mod is osu.Game.Rulesets.Mods.ModRandom { Seed.Value: null }))
+        {
+            BmsLogger.Log("This mania replay uses a chart or judgement modifier that BMS cannot reproduce.", LogLevel.Important);
+            __result = null;
+            return;
+        }
+
+        __result = BmsManiaReplay.Convert(__result, requested, ___beatmaps().GetWorkingBeatmap(requested.BeatmapInfo).Beatmap);
     }
 
     private static bool getDatabasedScorePrefix(IScoreInfo originalScoreInfo, ScoreManager __instance, ref ScoreInfo __result)

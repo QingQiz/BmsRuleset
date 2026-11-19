@@ -410,22 +410,24 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
             var rulesetShortName = gameplayState.Ruleset.RulesetInfo.ShortName;
             var localUserId = gameplayState.Score.ScoreInfo.UserID;
 
-            var scores = realm.Run(r => r.All<ScoreInfo>()
-                .Where(score => score.BeatmapHash == beatmapHash && !score.DeletePending)
-                .ToArray()
-                .Where(score => score.Ruleset.ShortName == rulesetShortName)
-                .Where(score => score.UserID == localUserId || score.UserID <= 1)
-                .Select(score => score.DeepClone())
-                .ToArray());
-
-            var personalBest = BmsLampScoreSelector.SelectBest(scores, gameplayState.Mods, maximumScore);
+            var personalBest = realm.Run(r =>
+            {
+                var scores = r.All<ScoreInfo>()
+                    .Where(score => score.BeatmapHash == beatmapHash && !score.DeletePending)
+                    .AsEnumerable()
+                    .Where(score => score.UserID == localUserId || score.UserID <= 1)
+                    .ForRuleset(rulesetShortName, gameplayState.Beatmap.BeatmapInfo);
+                return BmsLampScoreSelector.SelectBest(scores, gameplayState.Mods, maximumScore)?.Detach();
+            });
 
             if (personalBest == null || profile.StoredScore(personalBest, maximumScore) is not { } storedScore)
                 return;
 
             personalBestFinalScore = storedScore;
 
-            var scoreWithReplay = scoreManager.GetScore(personalBest);
+            var playback = BmsLocalScores.ForPlayback(personalBest, gameplayState.Ruleset.RulesetInfo);
+            playback.BeatmapInfo ??= gameplayState.Beatmap.BeatmapInfo;
+            var scoreWithReplay = scoreManager.GetScore(playback);
 
             if (scoreWithReplay == null)
                 return;
@@ -437,7 +439,7 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
             {
                 var mods = scoreWithReplay.ScoreInfo.Mods;
 
-                var beatmap = beatmapManager.GetWorkingBeatmap(personalBest.BeatmapInfo).GetPlayableBeatmap(personalBest.Ruleset, mods);
+                var beatmap = beatmapManager.GetWorkingBeatmap(scoreWithReplay.ScoreInfo.BeatmapInfo).GetPlayableBeatmap(scoreWithReplay.ScoreInfo.Ruleset, mods);
                 if (beatmap is BmsBeatmap bmsBeatmap)
                     judgementEvents = BmsReplaySimulation.Run(bmsBeatmap, replay, scoreWithReplay.ScoreInfo, onScore: state =>
                     {

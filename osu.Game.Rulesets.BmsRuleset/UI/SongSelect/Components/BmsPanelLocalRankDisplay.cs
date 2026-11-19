@@ -17,6 +17,7 @@ using osu.Game.Database;
 using osu.Game.Online.API.Requests.Responses;
 using osu.Game.Online.API;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.UI.Ranking;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Lamp;
 using osu.Game.Rulesets.Mods;
@@ -198,7 +199,7 @@ internal partial class BmsPanelLocalRankDisplay : CompositeDrawable
                 .Where(s => s.BeatmapHash == beatmapHash && !s.DeletePending)
                 .AsEnumerable()
                 .Where(s => s.UserID == userId || s.UserID <= 1)
-                .Where(s => s.Ruleset.ShortName == rulesetShortName)
+                .ForRuleset(rulesetShortName, currentBeatmap)
                 .ToArray();
 
             if (rulesetShortName == Constant.SHORT_NAME && mods != null)

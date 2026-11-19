@@ -17,6 +17,7 @@ using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Graphics;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Lamp;
 using osu.Game.Rulesets.Scoring;
@@ -104,18 +105,18 @@ internal partial class BmsResultComparisonPopover : OsuPopover
             .Where(candidate => candidate.BeatmapHash == score.BeatmapHash && !candidate.DeletePending)
             .AsEnumerable()
             .Where(candidate =>
-                candidate.Ruleset.ShortName == score.Ruleset.ShortName
-                && (candidate.UserID == score.UserID || candidate.UserID <= 1)
-                && candidate.Mods.All(mod => mod.UserPlayable)
+                (candidate.UserID == score.UserID || candidate.UserID <= 1)
                 && candidate.ID != score.ID
                 && (score.OnlineID <= 0 || candidate.OnlineID != score.OnlineID)
                 && (score.LegacyOnlineID <= 0 || candidate.LegacyOnlineID != score.LegacyOnlineID))
+            .ForRuleset(score.Ruleset.ShortName, score.BeatmapInfo)
+            .Where(candidate => candidate.Mods.All(mod => mod.UserPlayable))
             .ToArray();
 
         var profile = GameplayProfile.FromMods(score.Mods);
         var maximum = candidates.Where(candidate => BmsLampScoreSelector.MatchesSelectedMods(candidate, score.Mods))
             .Select(profile.StoredMaximumScore).Append(profile.StoredMaximumScore(score)).Max();
-        return BmsLampScoreSelector.SelectBest(candidates, score.Mods, maximum)?.DeepClone();
+        return BmsLampScoreSelector.SelectBest(candidates, score.Mods, maximum)?.Detach();
     });
 
     private async Task loadComparisonAsync(CancellationToken token)
