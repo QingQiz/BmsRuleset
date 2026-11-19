@@ -2,7 +2,9 @@ using System.Linq;
 using NUnit.Framework;
 using osu.Framework.Graphics;
 using osu.Framework.Testing;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Profiles;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
+using osu.Game.Scoring;
 using osu.Game.Skinning;
 using osuTK;
 
@@ -71,6 +73,24 @@ public class BmsScoreGraphTest
         graph.ShowJudgementComparison.Value = false;
 
         Assert.That(graph.ShowJudgementComparison.Value, Is.True);
+    }
+
+    [Test]
+    public void TestSelectionRequiresMatchingGameplayProfile()
+    {
+        var withoutMania = new ScoreInfo { Mods = [] };
+        var withMania = new ScoreInfo { Mods = [new BmsModManiaProfile()] };
+        var withNoGreat = new ScoreInfo { Mods = [new BmsModNoGreat()] };
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(BmsScoreGraph.MatchesSelectedScoreProfile(withoutMania, [new BmsModManiaProfile()]), Is.False);
+            Assert.That(BmsScoreGraph.MatchesSelectedScoreProfile(withMania, [new BmsModManiaProfile()]), Is.True);
+            Assert.That(BmsScoreGraph.MatchesSelectedScoreProfile(withoutMania, []), Is.True);
+            Assert.That(BmsScoreGraph.MatchesSelectedScoreProfile(withMania, []), Is.False);
+            Assert.That(BmsScoreGraph.MatchesSelectedScoreProfile(withNoGreat, [new BmsModNoGreat()]), Is.True);
+            Assert.That(BmsScoreGraph.MatchesSelectedScoreProfile(withNoGreat, [new BmsModManiaProfile()]), Is.False);
+        });
     }
 
     [Test]

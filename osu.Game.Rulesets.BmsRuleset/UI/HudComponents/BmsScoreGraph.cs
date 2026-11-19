@@ -16,11 +16,13 @@ using osu.Game.Graphics;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Profiles;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Lamp;
+using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Scoring;
@@ -416,7 +418,9 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
                     .Where(score => score.BeatmapHash == beatmapHash && !score.DeletePending)
                     .AsEnumerable()
                     .Where(score => score.UserID == localUserId || score.UserID <= 1)
-                    .ForRuleset(rulesetShortName, gameplayState.Beatmap.BeatmapInfo);
+                    .ForRuleset(rulesetShortName, gameplayState.Beatmap.BeatmapInfo)
+                    .Where(score => MatchesSelectedScoreProfile(score, gameplayState.Mods));
+
                 return BmsLampScoreSelector.SelectBest(scores, gameplayState.Mods, maximumScore)?.Detach();
             });
 
@@ -632,6 +636,13 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
         }
 
         return progression;
+    }
+
+    internal static bool MatchesSelectedScoreProfile(ScoreInfo score, IReadOnlyList<Mod> selectedMods)
+    {
+        var selectedProfileMods = selectedMods.OfType<IApplicableToGameplayProfile>().Select(mod => mod.GetType()).ToHashSet();
+        var scoreProfileMods = score.Mods.OfType<IApplicableToGameplayProfile>().Select(mod => mod.GetType()).ToHashSet();
+        return selectedProfileMods.SetEquals(scoreProfileMods);
     }
 
     private static double judgementTime(BmsJudgementEvent judgementEvent) =>
