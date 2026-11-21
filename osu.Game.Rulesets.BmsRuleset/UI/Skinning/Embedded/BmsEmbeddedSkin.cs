@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using osu.Framework.Audio.Sample;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -72,8 +73,13 @@ public sealed class BmsEmbeddedSkin : ISkin, IDisposable
             return texture;
         }
 
-        // Fallback to plain name (for LegacyModern or any 1x texture).
-        return textures.Get(componentName, wrapModeS, wrapModeT);
+        texture = textures.Get(componentName, wrapModeS, wrapModeT);
+
+        // The skin editor uses exact filenames, including the resolution suffix.
+        if (texture != null && Path.GetFileNameWithoutExtension(componentName).EndsWith("@2x", StringComparison.Ordinal))
+            texture.ScaleAdjust = 2;
+
+        return texture;
     }
 
     /// <inheritdoc/>

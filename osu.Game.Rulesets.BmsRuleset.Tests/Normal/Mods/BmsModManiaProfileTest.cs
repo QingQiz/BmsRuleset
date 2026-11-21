@@ -433,7 +433,6 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Mods
                 Assert.That(profile.JudgementColour(result), Is.EqualTo(new osu.Game.Graphics.OsuColour().ForHitResult(result)));
                 Assert.That(profile.JudgementImage(result), Is.EqualTo(image));
                 Assert.That(BmsReplayVisualizer.ColourFor(result, profile), Is.EqualTo((Colour4)profile.JudgementColour(result)));
-                Assert.That(profile.CreateJudgementDrawable(result), Is.TypeOf<SkinnableDrawable>());
             });
         }
 
@@ -1668,7 +1667,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize
             });
             AddAssert("judgement display uses skin images", () =>
             {
-                var drawables = Player.ChildrenOfType<BmsJudgementDisplay>().Single().ChildrenOfType<SkinnableDrawable>().ToArray();
+                var drawables = Player.ChildrenOfType<BmsJudgementDisplay>().Single().ChildrenOfType<BmsJudgementDrawable>().ToArray();
                 return drawables.Length == 6 && drawables.All(drawable => drawable.Drawable is BmsJudgementPiece
                     && drawable.Drawable.ChildrenOfType<Sprite>().Any());
             });

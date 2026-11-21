@@ -209,7 +209,9 @@ animation. Uses `[BMS]` images `HitPGreat` through `HitPoor`, or their osu!mania
 
 - **Show E-POOR** toggles whether empty POOR judgements appear in the popup. It is enabled by default.
 
-Edit the skin image files to change the artwork or animation.
+Select **Judgement Display** in the skin editor to choose a separate image for each grade from imported and
+built-in skin images. Drag new images into the editor to add them to the current skin. Choose
+**Default judgement image** to restore that grade’s skin-defined artwork and frame animation.
 
 <p align="center">
   <img src="images/skin-component-judgement.jpg" width="800" alt="Judgement selected in the skin editor, with resize handles and the Show E-POOR setting">

@@ -4,7 +4,6 @@ using System.Linq;
 using RhythmEngine.Core;
 using RhythmEngine.Profiles.Common;
 using osu.Framework.Bindables;
-using osu.Framework.Graphics;
 using osu.Framework.Localisation;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
@@ -128,13 +127,13 @@ internal abstract partial class GameplayProfile
 
     internal virtual bool ShowHitEffect(HitResult result) => result.IsHit();
 
-    internal virtual Drawable CreateJudgementDrawable(HitResult result)
-        => new SkinnableDrawable(new SkinComponentLookup<LegacyManiaSkinConfigurationLookups>(JudgementImage(result)), _ => new BmsJudgementPiece(!result.IsHit(), new OsuSpriteText
+    internal virtual BmsJudgementDrawable CreateJudgementDrawable(HitResult result, Bindable<string> image)
+        => new(new SkinComponentLookup<LegacyManiaSkinConfigurationLookups>(JudgementImage(result)), image, !result.IsHit(), () => new OsuSpriteText
         {
             Text = JudgementLabel(result),
             Font = OsuFont.Default.With(size: 32, weight: FontWeight.Bold),
             Colour = JudgementColour(result),
-        })) { RelativeSizeAxes = Axes.None, AutoSizeAxes = Axes.Both };
+        });
 
     internal abstract BmsLamp LampFor(ScoreInfo score);
 

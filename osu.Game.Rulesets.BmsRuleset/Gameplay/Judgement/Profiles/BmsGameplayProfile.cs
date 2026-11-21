@@ -6,7 +6,6 @@ using RhythmEngine.Profiles.Bms;
 using RhythmEngine.Profiles.Common;
 using RhythmEngine.Profiles.Patterns;
 using osu.Framework.Bindables;
-using osu.Framework.Graphics;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
@@ -19,6 +18,7 @@ using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 using osu.Game.Skinning;
 using osu.Game.Rulesets.BmsRuleset.UI;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables;
 using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
@@ -56,12 +56,8 @@ internal sealed partial class BmsGameplayProfile : GameplayProfile
 
     internal override Color4 JudgementColour(HitResult result) => BmsHitResultColours.ForHitResult(result);
 
-    internal override Drawable CreateJudgementDrawable(HitResult result)
-        => new SkinnableDrawable(new SkinComponentLookup<HitResult>(result))
-        {
-            RelativeSizeAxes = Axes.None,
-            AutoSizeAxes = Axes.Both,
-        };
+    internal override BmsJudgementDrawable CreateJudgementDrawable(HitResult result, Bindable<string> image)
+        => new(new SkinComponentLookup<HitResult>(result), image, result is HitResult.Meh or HitResult.Miss);
 
     internal override GameplayEventKind EventKind(JudgementEvent result) => result switch
     {

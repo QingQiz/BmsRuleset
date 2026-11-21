@@ -726,6 +726,25 @@ public static class BmsStrings
 
     public static LocalisableString JudgementDisplayShowEmptyPoorDescription => get("judgement_display_show_empty_poor_description");
 
+    public static LocalisableString JudgementDisplayPerfectImage => judgementDisplayImage(Scoring.HitResult.Perfect);
+
+    public static LocalisableString JudgementDisplayGreatImage => judgementDisplayImage(Scoring.HitResult.Great);
+
+    public static LocalisableString JudgementDisplayGoodImage => judgementDisplayImage(Scoring.HitResult.Good);
+
+    public static LocalisableString JudgementDisplayOkImage => judgementDisplayImage(Scoring.HitResult.Ok);
+
+    public static LocalisableString JudgementDisplayMehImage => judgementDisplayImage(Scoring.HitResult.Meh);
+
+    public static LocalisableString JudgementDisplayMissImage => judgementDisplayImage(Scoring.HitResult.Miss);
+
+    public static LocalisableString JudgementDisplayImageDescription => get("judgement_display_image_description");
+
+    public static LocalisableString JudgementDisplayDefaultImage => get("judgement_display_default_image");
+
+    private static LocalisableString judgementDisplayImage(Scoring.HitResult result)
+        => get("judgement_display_image", ResultJudgement(result), ManiaJudgement(result));
+
     public static LocalisableString Key(int number) => get("key", number);
 
     public static LocalisableString Notes => get("notes");

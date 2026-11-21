@@ -65,7 +65,7 @@ public partial class TestSceneBmsSkins : BmsPlayerTestScene
         this.AddSetupUntilStep("judgement hud active", () =>
         {
             var display = Player.HUDOverlay.ChildrenOfType<BmsJudgementDisplay>().SingleOrDefault();
-            return display?.ChildrenOfType<SkinnableDrawable>().Any(d => d.Parent?.Alpha > 0 && d.Alpha > 0 && d.DrawWidth > 0 && d.DrawHeight > 0) == true;
+            return display?.ChildrenOfType<BmsJudgementDrawable>().Any(d => d.Parent?.Alpha > 0 && d.Alpha > 0 && d.DrawWidth > 0 && d.DrawHeight > 0) == true;
         });
         this.AddSetupAssert("score changed", () => Player.ScoreProcessor.TotalScore.Value, Is.GreaterThan(0));
         AddStep("skin scene complete", () => { });

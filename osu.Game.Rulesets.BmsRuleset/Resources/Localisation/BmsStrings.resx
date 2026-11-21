@@ -147,6 +147,9 @@
   <data name="hit_error_meter_colour_bar_height_description" xml:space="preserve"><value>Adjusts the height of the coloured judgement area. Set to 0 to hide it.</value></data>
   <data name="judgement_display_show_empty_poor" xml:space="preserve"><value>Show empty inputs</value></data>
   <data name="judgement_display_show_empty_poor_description" xml:space="preserve"><value>Shows empty-input judgements in the judgement HUD.</value></data>
+  <data name="judgement_display_image" xml:space="preserve"><value>{0} / {1} image</value></data>
+  <data name="judgement_display_image_description" xml:space="preserve"><value>Choose an imported or built-in skin image. Drag an image into the skin editor to add it to the skin.</value></data>
+  <data name="judgement_display_default_image" xml:space="preserve"><value>Default judgement image</value></data>
   <data name="key" xml:space="preserve"><value>Key {0}</value></data>
   <data name="notes" xml:space="preserve"><value>Notes</value></data>
   <data name="judgement" xml:space="preserve"><value>Judgement</value></data>
