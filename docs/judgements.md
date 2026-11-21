@@ -970,7 +970,7 @@ f(c) = \min\left(\max\left(0.5, \log_4\left(\max(1,c)\right)\right), \log_4 400\
 $$
 
 $$
-S = \operatorname{round}\left(150000\frac{Q}{Q_{\max}} + 850000 A^{2+2A}p\right)
+S = \mathrm{round}\left(150000\frac{Q}{Q_{\max}} + 850000 A^{2+2A}p\right)
 $$
 
 $$
