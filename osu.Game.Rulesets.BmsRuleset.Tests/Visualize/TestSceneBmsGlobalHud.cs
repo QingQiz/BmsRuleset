@@ -7,8 +7,10 @@ using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics.Containers;
 using osu.Game.Overlays.SkinEditor;
+using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 using osu.Game.Skinning;
 using osu.Game.Tests.Visual;
+using osuTK;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 
@@ -31,6 +33,76 @@ public partial class TestSceneBmsGlobalHud : BmsPlayerTestScene
         var beatmap = BmsTestBeatmaps.CreateBeatmap();
         BmsTestBeatmaps.SetupBeatmapInfo(beatmap, ruleset);
         return beatmap;
+    }
+
+    [Test]
+    public void TestPlayfieldHudPositionsSurviveLayoutReload()
+    {
+        SkinnableContainer playfieldHud() => Player.HUDOverlay.ChildrenOfType<SkinnableContainer>()
+            .Single(container => container.Lookup.Lookup == GlobalSkinnableContainers.Playfield);
+        BmsJudgementDisplay judgementDisplay() => playfieldHud().Components.OfType<BmsJudgementDisplay>().Single();
+        BmsComboCounter comboCounter() => playfieldHud().Components.OfType<BmsComboCounter>().Single();
+        var judgementPosition = new Vector2(30, 0);
+        var comboPosition = new Vector2(-40, -60);
+
+        AddStep("load player", LoadPlayer);
+        AddUntilStep("playfield HUD loaded", () => Player.IsLoaded && playfieldHud().ComponentsLoaded);
+        AddAssert("default judgement position comes from the embedded skin", () => judgementDisplay().Y,
+            () => Is.EqualTo(250 * LegacySkin.STABLE_MAGIC_SCALE_FACTOR));
+        AddAssert("default combo position is applied", () => comboCounter().Y, () => Is.EqualTo(300));
+        AddStep("move playfield components and save layout", () =>
+        {
+            var display = judgementDisplay();
+            display.Anchor = Anchor.Centre;
+            display.Origin = Anchor.Centre;
+            display.Position = judgementPosition;
+
+            var combo = comboCounter();
+            combo.Anchor = Anchor.BottomRight;
+            combo.Origin = Anchor.BottomRight;
+            combo.Position = comboPosition;
+            skin.UpdateDrawableTarget(playfieldHud());
+        });
+        AddStep("reload saved layout", () => playfieldHud().Reload());
+        AddUntilStep("saved playfield HUD loaded", () => playfieldHud().ComponentsLoaded);
+        AddAssert("saved judgement anchor is restored", () => judgementDisplay().Anchor, () => Is.EqualTo(Anchor.Centre));
+        AddAssert("saved judgement position is restored", () => judgementDisplay().Position, () => Is.EqualTo(judgementPosition));
+        AddAssert("saved combo anchor and origin are restored", () => (comboCounter().Anchor, comboCounter().Origin),
+            () => Is.EqualTo((Anchor.BottomRight, Anchor.BottomRight)));
+        AddAssert("saved combo position is restored", () => comboCounter().Position, () => Is.EqualTo(comboPosition));
+    }
+
+    [Test]
+    public void TestBgaUndoRestoresFixedSizeFromFullScreen()
+    {
+        SkinnableContainer rulesetHud() => Player.HUDOverlay.ChildrenOfType<SkinnableContainer>()
+            .Single(container => container.Lookup is { Lookup: GlobalSkinnableContainers.MainHUDComponents, Ruleset: not null });
+        BmsBgaDisplay display() => rulesetHud().Components.OfType<BmsBgaDisplay>().Single();
+        var size = new Vector2(320, 240);
+        var position = new Vector2(20, 40);
+        SkinEditorChangeHandler changes = null!;
+
+        AddStep("load player", LoadPlayer);
+        AddUntilStep("ruleset HUD loaded", () => Player.IsLoaded && rulesetHud().ComponentsLoaded);
+        AddStep("set a fixed BGA layout", () =>
+        {
+            display().FillScreen.Value = false;
+            display().Size = size;
+            display().Position = position;
+            changes = new SkinEditorChangeHandler(rulesetHud());
+        });
+        AddStep("enable full screen", () =>
+        {
+            changes.BeginChange();
+            display().FillScreen.Value = true;
+            changes.EndChange();
+        });
+        AddStep("undo full screen", () => changes.RestoreState(-1));
+        AddAssert("fixed BGA layout restored", () => (display().RelativeSizeAxes, display().Size, display().Position),
+            () => Is.EqualTo((Axes.None, size, position)));
+        AddStep("redo full screen", () => changes.RestoreState(1));
+        AddAssert("full-screen BGA layout restored", () => (display().RelativeSizeAxes, display().Size, display().Position),
+            () => Is.EqualTo((Axes.Both, Vector2.One, Vector2.Zero)));
     }
 
     [Test]

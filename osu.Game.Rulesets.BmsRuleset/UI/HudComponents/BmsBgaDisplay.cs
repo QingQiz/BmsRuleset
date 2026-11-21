@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -30,11 +31,12 @@ using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Screens.Play;
+using osu.Game.Skinning;
 using osuTK;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 
-public sealed partial class BmsBgaDisplay : BmsHudComponent
+public sealed partial class BmsBgaDisplay : BmsHudComponent, ISerialisableDrawable
 {
     private const int maximum_incremental_events = 64;
 
@@ -384,6 +386,20 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
         layers.Colour = OsuColour.Gray(brightness);
         layers.Alpha = clampedDim < 1 ? 1 : 0;
         layers.AlwaysPresent = false;
+    }
+
+    void ISerialisableDrawable.CopyAdjustedSetting(IBindable target, object source)
+    {
+        var savedSize = Size;
+        ((IParseable)target).Parse(source, CultureInfo.InvariantCulture);
+
+        if (target == FillScreen && !FillScreen.Value)
+        {
+            // Undo can reuse a full-screen instance. Its restored dimensions are already absolute,
+            // even though the relative size axes from the previous layout are still applied.
+            RelativeSizeAxes = Axes.None;
+            Size = savedSize;
+        }
     }
 
     private void applyFillScreen(bool fillScreen)

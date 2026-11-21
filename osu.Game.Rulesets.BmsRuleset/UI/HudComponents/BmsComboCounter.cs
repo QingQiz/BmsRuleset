@@ -67,6 +67,24 @@ public sealed partial class BmsComboCounter : BmsHudComponent
     private Color4 breakColour = Color4.Red;
     private IBmsGameplayEvents? gameplayEvents;
 
+    [Resolved]
+    private ISkinSource skin { get; set; } = null!;
+
+    public BmsComboCounter()
+    {
+        Anchor = Anchor.TopCentre;
+        Origin = Anchor.Centre;
+        AlwaysPresent = true;
+        AutoSizeAxes = Axes.Both;
+    }
+
+    internal void ApplyDefaultPosition()
+    {
+        Y = skin.GetConfig<BmsSkinConfigurationLookup, float>(
+            new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.ComboPosition)
+        )?.Value ?? 300;
+    }
+
     protected override void Dispose(bool isDisposing)
     {
         if (gameplayEvents != null) gameplayEvents.ReplaySeeked -= resetReplayDisplay;
@@ -108,23 +126,14 @@ public sealed partial class BmsComboCounter : BmsHudComponent
     }
 
     [BackgroundDependencyLoader(true)]
-    private void load(ISkinSource skin, ScoreProcessor scoreProcessor, DrawableRuleset? drawableRuleset)
+    private void load(ScoreProcessor scoreProcessor, DrawableRuleset? drawableRuleset)
     {
         gameplayEvents = (drawableRuleset as BmsDrawableRuleset)?.GameplayEvents;
         if (gameplayEvents != null) gameplayEvents.ReplaySeeked += resetReplayDisplay;
-        Anchor = Anchor.TopCentre;
-        Origin = Anchor.Centre;
-
-        Y = skin.GetConfig<BmsSkinConfigurationLookup, float>(
-            new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.ComboPosition)
-        )?.Value ?? 300;
 
         breakColour = skin.GetConfig<BmsSkinConfigurationLookup, Color4>(
             new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.ComboBreakColour)
         )?.Value ?? Color4.Red;
-
-        AlwaysPresent = true;
-        AutoSizeAxes = Axes.Both;
 
         InternalChildren =
         [

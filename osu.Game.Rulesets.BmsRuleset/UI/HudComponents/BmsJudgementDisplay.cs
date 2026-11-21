@@ -108,10 +108,6 @@ public sealed partial class BmsJudgementDisplay : BmsHudComponent
         parentSkin.SourceChanged += updateEmbeddedSkinFallback;
         updateEmbeddedSkinFallback();
 
-        Y = activeSkin.GetConfig<BmsSkinConfigurationLookup, float>(
-            new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.ScorePosition)
-        )?.Value ?? 300 * 1.6f;
-
         foreach (var result in BmsRuleset.STATIC_VALID_HIT_RESULTS)
         {
             var drawable = profile.CreateJudgementDrawable(result).With(drawable =>
@@ -123,6 +119,13 @@ public sealed partial class BmsJudgementDisplay : BmsHudComponent
             drawableCache[result] = drawable;
             drawablePool.Add(drawable);
         }
+    }
+
+    internal void ApplyDefaultPosition()
+    {
+        Y = activeSkin.GetConfig<BmsSkinConfigurationLookup, float>(
+            new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.ScorePosition)
+        )?.Value ?? 300 * LegacySkin.STABLE_MAGIC_SCALE_FACTOR;
     }
 
     private void updateEmbeddedSkinFallback()

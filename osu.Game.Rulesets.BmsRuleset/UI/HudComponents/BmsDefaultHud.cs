@@ -86,7 +86,15 @@ public static class BmsDefaultHud
 
     private static Drawable bmsPlayfield()
     {
-        return new DefaultSkinComponentsContainer(_ => { })
+        var judgementDisplay = new BmsJudgementDisplay();
+        var comboCounter = new BmsComboCounter();
+
+        // Legacy positions are defaults for this layout. Saved layouts supply their own positions.
+        return new DefaultSkinComponentsContainer(_ =>
+        {
+            judgementDisplay.ApplyDefaultPosition();
+            comboCounter.ApplyDefaultPosition();
+        })
         {
             Children =
             [
@@ -103,8 +111,8 @@ public static class BmsDefaultHud
                     Origin = Anchor.BottomLeft,
                     X = 5,
                 },
-                new BmsJudgementDisplay(),
-                new BmsComboCounter(),
+                judgementDisplay,
+                comboCounter,
             ],
         };
     }
