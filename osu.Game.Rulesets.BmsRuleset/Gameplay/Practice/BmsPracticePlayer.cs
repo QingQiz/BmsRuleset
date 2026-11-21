@@ -11,8 +11,6 @@ using osu.Framework.Input.Events;
 using osu.Framework.Screens;
 using osu.Framework.Threading;
 using osu.Game.Beatmaps;
-using osu.Game.Graphics.Sprites;
-using osu.Game.Graphics;
 using osu.Game.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
@@ -20,7 +18,6 @@ using osu.Game.Rulesets.BmsRuleset.Gameplay.Practice.Audio;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
-using osu.Game.Rulesets.Objects;
 using osu.Game.Scoring;
 using osu.Game.Screens.Backgrounds;
 using osu.Game.Screens.Play;
@@ -41,13 +38,11 @@ internal partial class BmsPracticePlayer : Player
     private bool attemptStarted;
     private bool exiting;
     private long previousTimestamp;
-    private double practiceEndTime;
     private BmsPracticeCountInOverlay countInOverlay = null!;
     private bool instantExit;
     private bool internalExit;
     private bool retainForRepeat;
     private bool revealWhenPrepared;
-    private OsuSpriteText? progress;
 
     protected override bool PlayExitSound => !instantExit && base.PlayExitSound;
     protected override bool ShouldBeAlive => retainForRepeat || base.ShouldBeAlive;
@@ -136,13 +131,6 @@ internal partial class BmsPracticePlayer : Player
             container.Depth = 1;
             container.Child = countInOverlay = new BmsPracticeCountInOverlay();
         }));
-        AddInternal(progress = new OsuSpriteText
-        {
-            Anchor = Anchor.TopCentre,
-            Origin = Anchor.TopCentre,
-            Y = 36,
-            Font = OsuFont.GetFont(size: 14),
-        });
     }
 
     internal void RequestRetry()
@@ -156,8 +144,6 @@ internal partial class BmsPracticePlayer : Player
     internal void PrepareForCountdown()
     {
         GameplayClockContainer.Stop();
-        practiceEndTime = Math.Max(session.Settings.EndTime, DrawableRuleset.Objects.Select(hit => hit.GetEndTime())
-            .DefaultIfEmpty(session.Settings.EndTime).Max());
         SetGameplayStartTime(computeStartTime());
         PracticeRuleset.KeyBindingInputManager.UseParentInput = false;
         GameplayClockContainer.AlwaysPresent = true;
@@ -332,12 +318,7 @@ internal partial class BmsPracticePlayer : Player
             previousTimestamp = now;
             PreparationAdvanced?.Invoke(elapsed);
         }
-        if (!LoadedBeatmapSuccessfully || progress == null)
-            return;
-
-        var duration = practiceEndTime - session.Settings.StartTime;
-        progress.Text = BmsStrings.PracticeProgress(Math.Clamp(GameplayClockContainer.CurrentTime - session.Settings.StartTime, 0, duration), duration);
-        if (completionPending)
+        if (!LoadedBeatmapSuccessfully || completionPending)
             return;
 
         // During an attempt, fixed gauge configuration makes unchanged health produce the same history projection.

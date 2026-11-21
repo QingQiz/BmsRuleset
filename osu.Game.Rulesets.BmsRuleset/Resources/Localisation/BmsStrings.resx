@@ -536,9 +536,6 @@
   <data name="practice_chart_title" xml:space="preserve">
     <value>{0} / {1}</value>
   </data>
-  <data name="practice_progress" xml:space="preserve">
-    <value>{0:0.00} / {1:0.00} s</value>
-  </data>
   <data name="practice_invalid_time" xml:space="preserve">
     <value>Enter chart times in seconds, with the start earlier than the end.</value>
   </data>

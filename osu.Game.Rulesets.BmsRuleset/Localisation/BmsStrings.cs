@@ -41,8 +41,6 @@ public static class BmsStrings
 
     public static LocalisableString PracticeInvalidTime => get("practice_invalid_time");
 
-    public static LocalisableString PracticeProgress(double elapsedMilliseconds, double durationMilliseconds) => get("practice_progress", elapsedMilliseconds / 1000, durationMilliseconds / 1000);
-
     public static LocalisableString PracticeChartTitle(string title, string difficulty) => get("practice_chart_title", title, difficulty);
 
     public static LocalisableString Practice => get("practice");
