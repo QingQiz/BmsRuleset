@@ -2,12 +2,16 @@ using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.Json;
 using System.Threading;
 using NUnit.Framework;
 using RhythmEngine.Core;
 using RhythmEngine.Profiles.Bms;
+using osu.Game.Beatmaps.Formats;
+using osu.Game.IO;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
@@ -21,10 +25,14 @@ using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
+using osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
+using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
+using osu.Game.Tests.Beatmaps;
 using ReplayData = osu.Game.Replays.Replay;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Replay;
@@ -191,6 +199,52 @@ public class BmsReplaySimulationTest
         var deadline = 1000.001 + BmsEngineRules.GetTiming(beatmap.LayoutVariant, 1, beatmap.Rank, false).SlowWindowFor(HitResult.Ok);
         Assert.That(result.Judgements.SelectMany(entry => entry.TimingObservations).Single(observation => observation.Kind == BmsTimingObservationKind.LongNoteHead).ActualTime,
             Is.EqualTo(deadline));
+    }
+
+    [TestCase(1130, false, HitResult.Miss)]
+    [TestCase(1130, true, HitResult.Miss)]
+    [TestCase(1128, false, HitResult.Perfect)]
+    [TestCase(1128, true, HitResult.Miss)]
+    public void ManiaReplayChecksTimeoutsOnIdleStepsAndBetweenEqualTimeFrames(double pressTime, bool idleFrame, HitResult first)
+    {
+        var beatmap = createBeatmap();
+        beatmap.HitObjects.Add(new BmsNote { Beatmap = beatmap, Column = 1, StartTime = 1000 });
+        beatmap.HitObjects.Add(new BmsNote { Beatmap = beatmap, Column = 2, StartTime = 1140 });
+        var source = new ScoreInfo { Ruleset = new BmsRuleset().RulesetInfo, Mods = [new BmsModManiaProfile()] };
+        var replay = createReplay(new BmsReplayFrame(0), new BmsReplayFrame(pressTime, BmsAction.Key2), new BmsReplayFrame(1400));
+        if (idleFrame)
+            replay.Frames.Insert(1, new BmsReplayFrame(1128));
+
+        var judgements = simulate(beatmap, replay, source).Judgements;
+
+        Assert.That(judgements.Select(entry => entry.Result), Is.EqualTo(first == HitResult.Miss
+            ? new[] { HitResult.Miss, HitResult.Perfect }
+            : new[] { HitResult.Perfect, HitResult.Miss }));
+        Assert.That(judgements.Single(entry => entry.Result == HitResult.Miss).TimingObservations.Single().ActualTime, Is.EqualTo(1128));
+    }
+
+    [Test]
+    public void ManiaForwardSeekContinuesWithTheRemainingInputAtTheSameTime()
+    {
+        var beatmap = createBeatmap();
+        var first = new BmsNote { Beatmap = beatmap, Column = 1, StartTime = 1000 };
+        var second = new BmsNote { Beatmap = beatmap, Column = 2, StartTime = 1000 };
+        beatmap.HitObjects.AddRange([first, second]);
+        Mod[] mods = [new BmsModManiaProfile()];
+        var compiled = new BmsEngineChart(beatmap, GameplayProfile.FromMods(mods));
+        var output = new BmsRecordingJudgementOutput();
+        var engine = new BmsJudgementEngine(compiled,
+            Enumerable.Range(0, compiled.Chart.LaneCount).Select(column => new BmsJudgementColumnDefinition(column, output)).ToArray());
+        var firstFrame = new BmsReplayFrame(1000, BmsAction.Key1);
+        var replay = createReplay(firstFrame, new BmsReplayFrame(1000, BmsAction.Key2), new BmsReplayFrame(1600));
+
+        engine.QueueInput(firstFrame.Time, first.Column, true, false);
+        engine.ProcessFrame(new BmsFrameContext(firstFrame.Time, 1), 0);
+        BmsReplaySimulation.AdvanceTo(beatmap, replay, mods, engine, compiled.Chart.LaneCount, 1500, _ => { },
+            resume: new BmsReplayPosition(firstFrame.Time, firstFrame));
+
+        Assert.That(output.MainResults, Is.EqualTo(2));
+        Assert.That(output.GetMainResult(second).Type, Is.EqualTo(HitResult.Perfect));
     }
 
     [Test]
@@ -502,6 +556,57 @@ public class BmsReplaySimulationTest
         Assert.That(result.HitEvents.Single().Result, Is.EqualTo(HitResult.Ok));
         Assert.That(result.HitEvents.Single().TimeOffset, Is.EqualTo(80));
         Assert.That(result.HitEvents.Single().GameplayRate, Is.EqualTo(1.5));
+    }
+
+    [TestCase(1.1, 17, 26, HitResult.Perfect)]
+    [TestCase(0.75, 13, 19, HitResult.Great)]
+    public void ManiaFixedRatesScaleTapHeadAndTailWindows(double rate, double pressOffset, double releaseOffset, HitResult expected)
+    {
+        const string chart = """
+                             osu file format v14
+
+                             [General]
+                             Mode:3
+
+                             [Metadata]
+                             Title:Fixed rate windows
+                             Artist:Test
+                             Creator:Test
+                             Version:7K
+
+                             [Difficulty]
+                             CircleSize:7
+                             OverallDifficulty:8
+
+                             [TimingPoints]
+                             0,500,4,1,0,100,1,0
+
+                             [HitObjects]
+                             36,192,1000,1,0,0:0:0:0:
+                             36,192,2000,128,0,3000:0:0:0:0:
+                             """;
+        using var reader = new LineBufferedReader(new MemoryStream(Encoding.UTF8.GetBytes(chart)));
+        var source = new LegacyBeatmapDecoder().Decode(reader);
+        source.BeatmapInfo.Ruleset = new RulesetInfo { OnlineID = 3, ShortName = "mania" };
+        var mania = new BmsModManiaProfile();
+        Mod[] mods = rate > 1
+            ? [mania, new BmsModDoubleTime { SpeedChange = { Value = rate } }]
+            : [new BmsModHalfTime { SpeedChange = { Value = rate } }, mania];
+        var ruleset = new BmsRuleset().RulesetInfo;
+        var beatmap = (BmsBeatmap)new TestWorkingBeatmap(source).GetPlayableBeatmap(ruleset, mods);
+        var replay = createReplay(new BmsReplayFrame(1000 + pressOffset, BmsAction.Key1), new BmsReplayFrame(1100),
+            new BmsReplayFrame(2000 + pressOffset, BmsAction.Key1), new BmsReplayFrame(3000 + releaseOffset), new BmsReplayFrame(3500));
+        var result = BmsReplaySimulation.Run(beatmap, replay, new ScoreInfo { Ruleset = ruleset, BeatmapInfo = source.BeatmapInfo, Mods = mods });
+        var observations = result.Judgements.SelectMany(entry => entry.TimingObservations).ToArray();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(observations.Select(entry => entry.Kind), Is.EqualTo(new[]
+            {
+                BmsTimingObservationKind.Note, BmsTimingObservationKind.LongNoteHead, BmsTimingObservationKind.LongNoteTail,
+            }));
+            Assert.That(observations.Select(entry => entry.Result), Is.All.EqualTo(expected));
+        }
     }
 
     [Test]

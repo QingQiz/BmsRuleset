@@ -179,6 +179,42 @@ public class ProfileConformanceTest
         Assert.That(session.GetEventsSince(0).Select(e => (e.NoteId, e.Result.Value)), Is.EqualTo([(1, "perfect"), (0, "miss")]));
     }
 
+    [Test]
+    public void LazerCompletedHoldCanStillBlockRetirementOfAnOverlappingNote()
+    {
+        var chart = new KeyChart(1, [hold(KeyNoteKind.Hold), note(1, 1850), note(2, 1950)]);
+        var session = ManiaProfiles.CreateLazer(chart, new ManiaOptions(FrameJudgements: true)).CreateRecordingSession();
+        session.AdvanceTo(ms(1000), [press(1000)]);
+        session.AdvanceTo(ms(1920), [release(1920)]);
+        var beforePress = session.EventCount;
+
+        session.AdvanceTo(ms(1950), [press(1950)]);
+
+        Assert.That(session.GetEventsSince(beforePress).Select(e => (e.NoteId, e.Result)), Is.EqualTo(new[] { (2, ManiaResults.PERFECT) }));
+    }
+
+    [Test]
+    public void LazerTailHitImmediatelyRetiresAnEarlierUnjudgedTail()
+    {
+        var chart = new KeyChart(1,
+        [
+            new KeyNote(0, 0, ms(1000), ms(1500), KeyNoteKind.Hold),
+            new KeyNote(1, 0, ms(1400), ms(1650), KeyNoteKind.Hold),
+        ]);
+        var session = ManiaProfiles.CreateLazer(chart, new ManiaOptions(FrameJudgements: true)).CreateRecordingSession();
+        session.AdvanceTo(ms(1400), [press(1400)]);
+        var beforeRelease = session.EventCount;
+
+        session.AdvanceTo(ms(1610), [release(1610)]);
+
+        Assert.That(session.GetEventsSince(beforeRelease).Select(e => (e.NoteId, e.Part, e.Result, e.Time)), Is.EqualTo(new[]
+        {
+            (1, NoteParts.TAIL, ManiaResults.GREAT, ms(1610)),
+            (0, NoteParts.TAIL, ManiaResults.MISS, ms(1610)),
+            (0, NoteParts.BODY, ManiaResults.COMBO_BREAK, ms(1610)),
+        }));
+    }
+
     [TestCase(5)]
     [TestCase(6)]
     [TestCase(7)]

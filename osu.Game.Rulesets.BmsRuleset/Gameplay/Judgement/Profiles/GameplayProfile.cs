@@ -36,7 +36,7 @@ internal abstract partial class GameplayProfile
 
     internal static GameplayProfile FromMods(IEnumerable<Mod> mods)
         => mods.OfType<IApplicableToGameplayProfile>().Aggregate((GameplayProfile)BmsGameplayProfile.INSTANCE,
-            (profile, mod) => mod.ApplyToGameplayProfile(profile));
+            (profile, mod) => mod.ApplyToGameplayProfile(profile, mods));
 
     internal abstract (Chart Chart, SessionConfiguration Configuration) Compile(BmsHitObject[] objects, KeyChart source, IBeatmapInfo beatmapInfo,
                                                                                 Func<IEnumerable<KeySoundMarker>> collectKeySoundMarkers);

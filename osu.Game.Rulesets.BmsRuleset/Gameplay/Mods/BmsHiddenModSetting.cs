@@ -4,12 +4,12 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.UserInterface;
 using osu.Game.Overlays.Settings;
 
-namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Gauge;
+namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 
-// SettingSource is required for score persistence, but course carry-over is not a player-editable setting.
-internal partial class BmsCourseGaugeSetting<T> : SettingsItem<T>
+// SettingSource is required for score persistence, but some mod settings are set by gameplay or replay loading.
+internal partial class BmsHiddenModSetting<T> : SettingsItem<T>
 {
-    public BmsCourseGaugeSetting()
+    public BmsHiddenModSetting()
     {
         CanBeShown.Value = false;
         MatchingFilter = false;

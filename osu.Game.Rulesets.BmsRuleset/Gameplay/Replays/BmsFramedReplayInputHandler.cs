@@ -9,19 +9,25 @@ using osu.Game.Rulesets.UI;
 
 namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 
+internal readonly record struct BmsReplayPosition(double Time, BmsReplayFrame? LastFrame);
+
 public class BmsFramedReplayInputHandler(Replay replay, Action<double>? onEnd = null) : FramedReplayInputHandler<BmsReplayFrame>(replay)
 {
+    internal BmsManiaReplayCadence? ManiaCadence { get; init; }
+
+    internal bool IsJudgementFrame { get; private set; } = true;
+
     private bool advancing;
     private bool ended;
     private Func<double?>? getSeekTarget;
-    private Func<double, bool>? rebuild;
+    private Func<double, BmsReplayPosition?, bool>? rebuild;
     private Action? seekInputApplied;
     private bool rebuiltInput;
     private bool seekRequested;
 
     internal void RequestSeek() => seekRequested = true;
 
-    internal void ConfigureSeeking(Func<double?> getTarget, Func<double, bool> rebuildState, Action inputApplied)
+    internal void ConfigureSeeking(Func<double?> getTarget, Func<double, BmsReplayPosition?, bool> rebuildState, Action inputApplied)
     {
         getSeekTarget = getTarget;
         rebuild = rebuildState;
@@ -32,6 +38,7 @@ public class BmsFramedReplayInputHandler(Replay replay, Action<double>? onEnd = 
 
     public override double? SetFrameFromTime(double time)
     {
+        IsJudgementFrame = ManiaCadence == null;
         var target = getSeekTarget?.Invoke() ?? time;
         // Explicit seeks can skip frame stability; ordinary playback must still deliver each input.
         if (seekRequested || target < CurrentTime)
@@ -39,7 +46,9 @@ public class BmsFramedReplayInputHandler(Replay replay, Action<double>? onEnd = 
             if (!double.IsFinite(target))
                 return null;
 
-            if (rebuild != null && !rebuild(target))
+            // The frame identity distinguishes inputs sharing the same judgement timestamp.
+            var position = double.IsFinite(CurrentTime) ? new BmsReplayPosition(CurrentTime, CurrentFrame) : (BmsReplayPosition?)null;
+            if (rebuild != null && !rebuild(target, position))
                 return null;
 
             seekRequested = false;
@@ -66,7 +75,15 @@ public class BmsFramedReplayInputHandler(Replay replay, Action<double>? onEnd = 
 
         advancing = time >= CurrentTime;
         if (!advancing) ended = false;
-        return base.SetFrameFromTime(time);
+        if (!advancing || ManiaCadence is not { } cadence)
+            return base.SetFrameFromTime(time);
+
+        // Advance visuals to the host time, but split at every judgement step or input frame.
+        var idleTime = cadence.NextIdleTimeAfter(CurrentTime);
+        var previous = CurrentFrame;
+        var next = base.SetFrameFromTime(Math.Min(time, idleTime));
+        IsJudgementFrame = next.HasValue && (next == idleTime || !ReferenceEquals(previous, CurrentFrame));
+        return next;
     }
 
     protected override void CollectReplayInputs(List<IInput> inputs)
@@ -74,7 +91,7 @@ public class BmsFramedReplayInputHandler(Replay replay, Action<double>? onEnd = 
         do
         {
             inputs.Add(new BmsReplayState { PressedActions = CurrentFrame?.Actions ?? [] });
-            if (!advancing || NextFrame?.Time != CurrentTime)
+            if (ManiaCadence != null || !advancing || NextFrame?.Time != CurrentTime)
                 break;
 
             base.SetFrameFromTime(CurrentTime);

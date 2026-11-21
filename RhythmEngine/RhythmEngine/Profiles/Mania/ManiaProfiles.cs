@@ -11,7 +11,9 @@ public sealed record ManiaOptions(
     double ClockRate = 1,
     double DifficultyMultiplier = 1,
     bool Converted = false,
-    long DrainStartTime = 0);
+    long DrainStartTime = 0,
+    bool ClassicHitWindows = false,
+    bool FrameJudgements = false);
 
 public static class ManiaProfiles
 {
@@ -70,8 +72,19 @@ public static class ManiaProfiles
             context => context.Time >= endTime && context.NotesRetired)
         {
             KeySounds = stable ? KeySoundPolicies.ManiaStable : KeySoundPolicies.ManiaLazer,
-            RetireNotesEndingBeforeHit = stable ? null : OrderedNoteRule.RetirementAfterHit,
+            RetirementBoundaryAfterHit = stable ? null : OrderedNoteRule.RetirementBoundaryAfterHit,
+            RetireNote = stable ? null : OrderedNoteRule.Retire,
+            FrameTimerOrder = !stable && options.FrameJudgements ? compareDrawableOrder : null,
         }, descriptor);
+    }
+
+    private static int compareDrawableOrder(ChartNote a, ChartNote b)
+    {
+        var lane = a.Lane.CompareTo(b.Lane);
+        if (lane != 0)
+            return lane;
+        var time = b.StartTime.CompareTo(a.StartTime);
+        return time != 0 ? time : b.Id.CompareTo(a.Id);
     }
 
     /// <summary>Base press windows shared by rule compilation and chart rating.</summary>
@@ -82,9 +95,10 @@ public static class ManiaProfiles
         ProfileSupport.RequireRange(options.DifficultyMultiplier, 0.01, 100, nameof(options.DifficultyMultiplier));
         var od = options.OverallDifficulty;
         var scale = options.ClockRate / options.DifficultyMultiplier;
-        var bounds = stable && options.Converted
+        var classicHitWindows = stable || options.ClassicHitWindows;
+        var bounds = classicHitWindows && options.Converted
             ? new[] { 16.0, Math.Round(od) > 4 ? 34 : 47, Math.Round(od) > 4 ? 67 : 77, 97, 121, 158 }
-            : [stable ? 16 : ProfileSupport.DifficultyRange(od, 22.4, 19.4, 13.9), 64 - 3 * od, 97 - 3 * od, 127 - 3 * od, 151 - 3 * od, 188 - 3 * od];
+            : [classicHitWindows ? 16 : ProfileSupport.DifficultyRange(od, 22.4, 19.4, 13.9), 64 - 3 * od, 97 - 3 * od, 127 - 3 * od, 151 - 3 * od, 188 - 3 * od];
         bounds = bounds.Select(w => Math.Floor(w * scale) + 0.5).ToArray();
         return ProfileSupport.Symmetric((ManiaResults.PERFECT, bounds[0]), (ManiaResults.GREAT, bounds[1]), (ManiaResults.GOOD, bounds[2]),
             (ManiaResults.OK, bounds[3]), (ManiaResults.MEH, bounds[4]), (ManiaResults.MISS, bounds[5]));
@@ -229,7 +243,11 @@ public static class ManiaProfiles
         return new ScoreConfiguration(new ScoreState(), (state, context) =>
         {
             if (context.Event.Result == ManiaResults.COMBO_BREAK)
-                return state with { Combo = 0 };
+                return state with
+                {
+                    Combo = 0,
+                    ResultCounts = state.ResultCounts.SetItem(ManiaResults.COMBO_BREAK, state.ResultCounts.GetValueOrDefault(ManiaResults.COMBO_BREAK) + 1),
+                };
 
             if (context.Opportunity == null)
                 return state;

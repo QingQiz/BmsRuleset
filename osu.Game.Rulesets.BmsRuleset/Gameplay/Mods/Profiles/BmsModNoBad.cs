@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using RhythmEngine.Profiles.Bms;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using osu.Framework.Graphics.Sprites;
@@ -22,6 +23,6 @@ public class BmsModNoBad : Mod, IApplicableToGameplayProfile, IApplicableToScore
 
     public IScoreSelectionRule ScoreSelectionRule => BmsModTypeScoreSelectionRule<BmsModNoBad>.REDUCTION;
 
-    GameplayProfile IApplicableToGameplayProfile.ApplyToGameplayProfile(GameplayProfile profile)
+    GameplayProfile IApplicableToGameplayProfile.ApplyToGameplayProfile(GameplayProfile profile, IEnumerable<Mod> mods)
         => ((BmsGameplayProfile)profile).WithJudgementModifier(BmsJudgementModifiers.NoBad);
 }

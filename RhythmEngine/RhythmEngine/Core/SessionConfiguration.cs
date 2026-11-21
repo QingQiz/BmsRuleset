@@ -89,7 +89,11 @@ public sealed record SessionConfiguration(
 {
     public KeySoundPolicy? KeySounds { get; init; }
 
-    internal Func<NoteUpdate, Func<NoteContext, NoteUpdate>?>? RetireNotesEndingBeforeHit { get; init; }
+    internal Comparison<ChartNote>? FrameTimerOrder { get; init; }
+
+    internal Func<NoteUpdate, long?>? RetirementBoundaryAfterHit { get; init; }
+
+    internal Func<NoteContext, NoteUpdate>? RetireNote { get; init; }
 }
 
 public readonly record struct SessionCompletionContext(long? Time, bool NotesRetired, ScoreState Score, ScorePlan Plan);

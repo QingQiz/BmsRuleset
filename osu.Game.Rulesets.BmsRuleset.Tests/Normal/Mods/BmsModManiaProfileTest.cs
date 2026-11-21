@@ -98,6 +98,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize
             AddStep("select BMS", () => Beatmap.Value = CreateWorkingBeatmap(new Beatmap()));
             checkValues(8, 8);
             AddAssert("defaults stay implicit", () => mod.UsesDefaultConfiguration);
+            AddAssert("only OD, HP and lazer mode have visible settings", () => ((FillFlowContainer)Child).Children.Count(control => control.IsPresent), () => Is.EqualTo(3));
 
             void checkValues(float od, float hp) => AddStep("sliders show effective defaults", () =>
             {
@@ -198,6 +199,38 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Mods
             Assert.That(mod.DrainRate.Value, Is.Null);
             Assert.That(mod.UseLazer.Value, Is.True);
         }
+
+        [TestCase(true, HitResult.Great)]
+        [TestCase(false, HitResult.Perfect)]
+        public void ManiaReplayUsesSourceWindowsAndScoresBothHoldEndpoints(bool classic, HitResult headResult)
+        {
+            var ruleset = new BmsRuleset();
+            var mania = new RulesetInfo { ShortName = "mania", OnlineID = 3 };
+            var beatmap = new BeatmapInfo(mania, new BeatmapDifficulty { CircleSize = 7, OverallDifficulty = 8 });
+            var difficulty = new TestDifficultyAdjust { OverallDifficulty = { Value = 5 } };
+            var source = new ScoreInfo(beatmap, mania) { Mods = classic ? [difficulty, new TestClassic()] : [difficulty] };
+            var displayed = new[] { source }.ForRuleset(ruleset.ShortName, beatmap).Single();
+            var playback = BmsLocalScores.ForPlayback(displayed, ruleset.RulesetInfo);
+            var mods = playback.DeepClone().Mods;
+            var profile = mods.OfType<BmsModManiaProfile>().Single();
+            using var play = new Play(mods, new BmsLongNote { StartTime = 1000, Duration = 1000, Column = 1 });
+
+            play.Press(983);
+            play.Release(2000);
+            play.Advance(3000);
+
+            Assert.That(displayed.Mods.OfType<BmsModManiaProfile>().Single().ClassicHitWindows.Value, Is.False);
+            Assert.That(profile.ClassicHitWindows.Value, Is.EqualTo(classic));
+            Assert.That(mods.Select(mod => mod.Acronym), Is.EquivalentTo(new[] { "OM", new BmsModHideScratch().Acronym }));
+            Assert.That(ruleset.CreateScoreMultiplierCalculator(new ScoreMultiplierContext(beatmap.Difficulty)).CalculateFor(mods), Is.EqualTo(1));
+            Assert.That(play.Score.ScoringJudgementEventCount, Is.EqualTo(2));
+            Assert.That(play.Score.JudgementEvents.Where(entry => entry.Result.IsBasic()).Select(entry => entry.Result),
+                Is.EqualTo(new[] { headResult, HitResult.Perfect }));
+        }
+
+        private class TestClassic : ModClassic;
+
+        private class TestDifficultyAdjust : ModDifficultyAdjust;
 
         [TestCase(true, 305, 2, 2)]
         [TestCase(false, 300, 1, 10)]
@@ -838,6 +871,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Mods
             play.Score.PopulateScore(saved);
             Assert.That(BmsLampCalculator.Calculate(saved), Is.EqualTo(BmsLamp.Clear));
             Assert.That(play.Score.Statistics.GetValueOrDefault(HitResult.Meh), Is.EqualTo(1));
+            Assert.That(saved.Statistics.GetValueOrDefault(HitResult.ComboBreak), Is.EqualTo(1));
 
             play.Engine.Reset();
             play.Score.ResetReplayState();

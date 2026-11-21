@@ -7,6 +7,7 @@ using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.Mods;
+using EngineTime = RhythmEngine.Core.Time;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 
@@ -38,7 +39,7 @@ public sealed partial class BmsPlayfield
         FinishReplaySeekInput();
     }
 
-    internal bool SeekReplay(Replay replay, IReadOnlyList<Mod> mods, double time, Func<bool>? allowFailure = null)
+    internal bool SeekReplay(Replay replay, IReadOnlyList<Mod> mods, double time, BmsReplayPosition? position = null, Func<bool>? allowFailure = null)
     {
         if (scoreProcessor is not { } score || healthProcessor is not { } health)
             return false;
@@ -47,9 +48,11 @@ public sealed partial class BmsPlayfield
         var healthClock = health.Clock;
         var manualClock = new ManualClock();
         var clock = new FramedClock(manualClock);
-        var fromTime = double.IsFinite(judgementEngine.CurrentTime) && time > judgementEngine.CurrentTime
-            ? judgementEngine.CurrentTime
-            : (double?)null;
+        // The view can be ahead of the last judgement step between two replay frames.
+        var resume = position is { } current && time > current.Time && !judgementEngine.HasPendingInputs
+                     && judgementEngine.CurrentTime <= EngineTime.ToMilliseconds(EngineTime.FromMilliseconds(current.Time))
+            ? position
+            : null;
 
         using (new BmsReplayRebuildScope(score, health, allowFailure))
         {
@@ -59,7 +62,7 @@ public sealed partial class BmsPlayfield
             {
                 score.Clock = health.Clock = clock;
 
-                if (fromTime == null)
+                if (resume == null)
                     ResetReplayState();
                 else
                 {
@@ -71,7 +74,7 @@ public sealed partial class BmsPlayfield
                 {
                     manualClock.CurrentTime = currentTime;
                     clock.ProcessFrame();
-                }, fromTime: fromTime);
+                }, resume: resume);
             }
             finally
             {

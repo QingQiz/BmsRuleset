@@ -60,5 +60,5 @@ internal static class BmsLocalLeaderboardService
         return LeaderboardScores.Success(selectedScores, selectedScores.Length, selectedScores.Length, null);
     }
 
-    private static bool isFilterableMod(Mod mod) => mod.Type != ModType.System;
+    private static bool isFilterableMod(Mod mod) => mod.Type != ModType.System && mod is not ModClassic;
 }

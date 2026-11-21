@@ -14,10 +14,12 @@ public sealed class JudgementSession
     private readonly SessionConfiguration configuration;
     private readonly NoteState[] states;
     private readonly int[] revisions;
-    private readonly int[] laneStarts;
+    private readonly (int FirstIncomplete, long LatestEndTime)[] completedLanePrefixes;
     private readonly int?[]? keySoundMemory;
     private readonly HashSet<int>[] heldControls;
     private readonly PriorityQueue<(int Index, int Revision), (long Time, TimerOrder Order, int Index)> timers = new();
+    private List<int>? dueFrameTimers;
+    private Comparison<int>? frameTimerComparison;
     private int remainingNotes;
 
     public long? CurrentTime { get; private set; }
@@ -52,7 +54,7 @@ public sealed class JudgementSession
         keySoundMemory = configuration.KeySounds == null ? null : new int?[chart.LaneCount];
         states = new NoteState[chart.Notes.Length];
         revisions = new int[states.Length];
-        laneStarts = new int[chart.LaneCount];
+        completedLanePrefixes = new (int, long)[chart.LaneCount];
         heldControls = Enumerable.Range(0, chart.LaneCount).Select(_ => new HashSet<int>()).ToArray();
         Score = configuration.Score.InitialState;
         MaximumScore = configuration.Score.MaximumScore(chart.ScorePlan);
@@ -68,7 +70,7 @@ public sealed class JudgementSession
         configuration = source.configuration;
         states = (NoteState[])source.states.Clone();
         revisions = new int[states.Length];
-        laneStarts = (int[])source.laneStarts.Clone();
+        completedLanePrefixes = ((int, long)[])source.completedLanePrefixes.Clone();
         keySoundMemory = source.keySoundMemory?.ToArray();
         heldControls = source.heldControls.Select(c => new HashSet<int>(c)).ToArray();
         TransitionCount = source.TransitionCount;
@@ -95,7 +97,7 @@ public sealed class JudgementSession
         TransitionCount = 0;
         EventCount = 0;
         Array.Clear(revisions);
-        Array.Clear(laneStarts);
+        Array.Fill(completedLanePrefixes, (0, long.MinValue));
         if (keySoundMemory != null)
             Array.Clear(keySoundMemory);
         foreach (var controls in heldControls)
@@ -142,7 +144,8 @@ public sealed class JudgementSession
         while (index < inputs.Length)
         {
             var inputTime = inputs[index].Time;
-            runTimers(inputTime, TimerOrder.BeforeInput, transitions);
+            if (configuration.FrameTimerOrder == null)
+                runTimers(inputTime, TimerOrder.BeforeInput, transitions);
             var changedInputs = new List<(InputEvent Event, LaneInput State)>();
 
             do
@@ -153,14 +156,15 @@ public sealed class JudgementSession
             } while (index < inputs.Length && inputs[index].Time == inputTime);
 
             // Sampled hazards observe the physical state for this instant before note judgements mutate scores or health.
-            runTimers(inputTime, TimerOrder.AfterInputState, transitions);
+            if (configuration.FrameTimerOrder == null)
+                runTimers(inputTime, TimerOrder.AfterInputState, transitions);
             foreach (var input in changedInputs)
                 dispatched.Add(applyInput(input.Event, input.State, transitions));
 
-            runTimers(inputTime, TimerOrder.AfterInput, transitions);
+            finishFrame(inputTime, transitions);
         }
 
-        runTimers(time, TimerOrder.AfterInput, transitions);
+        finishFrame(time, transitions);
         CurrentTime = time;
         return new JudgementBatch([.. transitions], dispatched.ToImmutable());
     }
@@ -226,9 +230,14 @@ public sealed class JudgementSession
 
         var lane = chart.LaneNotes[input.Lane];
         var timeOrdered = lane == chart.LaneNotesByTime[input.Lane];
-        ref var firstIncomplete = ref laneStarts[input.Lane];
-        while (firstIncomplete < lane.Length && states[lane[firstIncomplete]].Completed)
-            firstIncomplete++;
+        ref var prefix = ref completedLanePrefixes[input.Lane];
+        while (prefix.FirstIncomplete < lane.Length && states[lane[prefix.FirstIncomplete]].Completed)
+        {
+            prefix.LatestEndTime = Math.Max(prefix.LatestEndTime, chart.Notes[lane[prefix.FirstIncomplete]].EndTime);
+            prefix.FirstIncomplete++;
+        }
+
+        var firstIncomplete = prefix.FirstIncomplete;
 
         var earliestOffset = chart.LaneCandidateOffsets[input.Lane];
         var latestStart = earliestOffset == long.MinValue || input.Time >= long.MaxValue + earliestOffset
@@ -255,7 +264,7 @@ public sealed class JudgementSession
         }
 
         foreach (var candidate in configuration.SelectCandidates(new InputArbitrationContext(input, candidates?.ToImmutable() ?? [], laneInput)))
-            applyCandidate(candidate.NoteIndex, input, laneInput, firstIncomplete, transitions);
+            applyCandidate(candidate.NoteIndex, input, laneInput, timeOrdered, transitions);
         var count = transitions.Count - firstTransition;
         if (!input.Pressed || configuration.KeySounds is not { } keySounds)
             return new InputDispatch(input, firstTransition, count);
@@ -267,31 +276,77 @@ public sealed class JudgementSession
         return new InputDispatch(input, firstTransition, count, decision.Playback);
     }
 
-    private void applyCandidate(int index, InputEvent input, LaneInput laneInput, int firstIncomplete, List<NoteTransition> transitions)
+    private void applyCandidate(int index, InputEvent input, LaneInput laneInput, bool timeOrdered, List<NoteTransition> transitions)
     {
         var note = chart.Notes[index];
         var context = new NoteContext(note, states[index], input.Time, laneInput);
         var update = note.Rule.ApplyInput(context, input);
         applyUpdate(index, context, input, update, transitions);
 
-        if (!input.Pressed || update.Emissions.IsEmpty || configuration.RetireNotesEndingBeforeHit?.Invoke(update) is not { } retire)
+        if (update.Emissions.IsEmpty || configuration.RetirementBoundaryAfterHit?.Invoke(update) is not { } boundary
+                                     || configuration.RetireNote is not { } retire)
             return;
 
-        var lane = chart.LaneNotes[note.Lane];
-        var timeOrdered = lane == chart.LaneNotesByTime[note.Lane];
-        for (var i = firstIncomplete; i < lane.Length; i++)
+        var lane = chart.LaneNotesByTime[note.Lane];
+        var start = 0;
+        if (timeOrdered)
+        {
+            var prefix = completedLanePrefixes[note.Lane];
+            // A completed overlapping hold can still stop retirement of the objects behind it.
+            if (prefix.LatestEndTime >= boundary)
+                return;
+
+            start = prefix.FirstIncomplete;
+        }
+
+        for (var i = start; i < lane.Length; i++)
         {
             var earlierIndex = lane[i];
             var earlier = chart.Notes[earlierIndex];
-            if (timeOrdered && earlier.StartTime >= note.StartTime)
+            if (earlier.EndTime >= boundary)
                 break;
 
-            // A tail at the same chart time as the new head can still be released.
-            if (earlier.EndTime >= note.StartTime || states[earlierIndex].Completed)
+            if (states[earlierIndex].Completed)
                 continue;
 
             var earlierContext = new NoteContext(earlier, states[earlierIndex], input.Time, laneInput);
             applyUpdate(earlierIndex, earlierContext, null, retire(earlierContext), transitions);
+        }
+    }
+
+    private void finishFrame(long time, List<NoteTransition> transitions)
+    {
+        if (configuration.FrameTimerOrder == null)
+        {
+            runTimers(time, TimerOrder.AfterInput, transitions);
+            return;
+        }
+
+        if (!timers.TryPeek(out _, out var next) || next.Time > time)
+            return;
+
+        // Drawables with overdue timers each receive one update, in playfield traversal order.
+        var due = dueFrameTimers ??= [];
+        due.Clear();
+        while (timers.TryPeek(out var pending, out var priority) && priority.Time <= time)
+        {
+            timers.Dequeue();
+            if (pending.Revision == revisions[pending.Index])
+                due.Add(pending.Index);
+        }
+
+        if (due.Count > 1)
+            due.Sort(frameTimerComparison ??= (first, second) => configuration.FrameTimerOrder!(chart.Notes[first], chart.Notes[second]));
+
+        foreach (var index in due)
+        {
+            var note = chart.Notes[index];
+            if (states[index].NextTimer is not { } timer || timer.Time > time)
+                continue;
+
+            var held = heldControls[note.Lane].Count > 0;
+            var context = new NoteContext(note, states[index], time, new LaneInput(held, held));
+            applyUpdate(index, context, null, note.Rule.ApplyTimer(context), transitions);
         }
     }
 

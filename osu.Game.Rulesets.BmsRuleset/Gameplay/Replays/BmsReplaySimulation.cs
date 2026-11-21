@@ -12,6 +12,7 @@ using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Gauge;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Profiles;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
@@ -103,29 +104,31 @@ internal static class BmsReplaySimulation
 
     internal static void AdvanceTo(BmsBeatmap beatmap, Replay replay, IReadOnlyList<Mod> mods, BmsJudgementEngine engine,
                                    int columnCount, double targetTime, Action<double> updateClock, CancellationToken cancellationToken = default,
-                                   double? fromTime = null)
+                                   BmsReplayPosition? resume = null)
         => advanceTo(beatmap, replay, replay.Frames.OfType<BmsReplayFrame>().OrderBy(frame => frame.Time).ToArray(),
-            mods, engine, columnCount, targetTime, updateClock, cancellationToken, fromTime);
+            mods, engine, columnCount, targetTime, updateClock, cancellationToken, resume);
 
     private static void advanceTo(BmsBeatmap beatmap, Replay replay, BmsReplayFrame[] frames, IReadOnlyList<Mod> mods, BmsJudgementEngine engine,
                                   int columnCount, double targetTime, Action<double> updateClock, CancellationToken cancellationToken,
-                                  double? fromTime)
+                                  BmsReplayPosition? resume)
     {
         var algorithm = BmsReplayFrame.GetAlgorithm(replay);
         var rates = mods.OfType<IApplicableToRate>().ToArray();
+        var useManiaCadence = mods.Any(mod => mod is BmsModManiaProfile { UseLazer.Value: true });
         var pressed = new HashSet<BmsAction>();
         var nextInput = 0;
-        var time = fromTime ?? Math.Min(targetTime, Math.Min(0, Math.Min(frames.Length > 0 ? frames[0].Time : 0,
-            engine.EarliestInputTime)));
+        var firstFrameTime = frames.Length > 0 ? frames[0].Time : 0;
+        var start = useManiaCadence
+            ? Math.Min(firstFrameTime, beatmap.HitObjects.FirstOrDefault()?.StartTime - 2000 ?? 0)
+            : Math.Min(0, Math.Min(firstFrameTime, engine.EarliestInputTime));
+        var time = resume?.Time ?? Math.Min(targetTime, start);
+        var cadence = useManiaCadence ? new BmsManiaReplayCadence(start) : (BmsManiaReplayCadence?)null;
+        var idleTime = cadence?.NextIdleTimeAfter(resume?.Time ?? double.NegativeInfinity) ?? double.PositiveInfinity;
 
-        if (fromTime != null)
+        if (resume?.LastFrame is { } lastFrame)
         {
-            // The existing engine already consumed every input at the starting timestamp.
-            // Seed transition detection without re-pressing held keys or scratch directions.
-            while (nextInput < frames.Length && frames[nextInput].Time <= time)
-                nextInput++;
-            if (nextInput > 0)
-                pressed.UnionWith(frames[nextInput - 1].Actions);
+            nextInput = Array.IndexOf(frames, lastFrame) + 1;
+            pressed.UnionWith(lastFrame.Actions);
         }
 
         var previousTime = time;
@@ -133,11 +136,14 @@ internal static class BmsReplaySimulation
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            updateClock(time);
             var frame = frameAt(time);
 
+            var firstInput = nextInput;
             while (nextInput < frames.Length && frames[nextInput].Time == time)
             {
+                if (useManiaCadence && nextInput != firstInput)
+                    break;
+
                 var input = frames[nextInput++];
                 if (pressed.SetEquals(input.Actions))
                     continue;
@@ -159,12 +165,16 @@ internal static class BmsReplaySimulation
                 pressed = actions;
             }
 
-            engine.ProcessFrame(frame, time - previousTime, algorithm, frameAt);
+            if (!useManiaCadence || time == idleTime || nextInput > firstInput)
+                engine.ProcessFrame(frame, time - previousTime, algorithm, frameAt);
+
+            if (time == idleTime)
+                idleTime = cadence!.Value.NextIdleTimeAfter(time);
             // Aborted attempts also settle held tails at their recorded endpoint.
-            if (replay.HasReceivedAllFrames && frames.Length > 0 && nextInput == frames.Length && time == frames[^1].Time)
+            if (replay.HasReceivedAllFrames && nextInput > firstInput && nextInput == frames.Length)
                 engine.CompleteLongNotesAtEnd(frame, frameAt);
 
-            if (time == targetTime)
+            if (time == targetTime && (nextInput == frames.Length || frames[nextInput].Time > time))
             {
                 updateClock(targetTime);
                 return;
@@ -172,7 +182,7 @@ internal static class BmsReplaySimulation
 
             previousTime = time;
             var nextTime = nextInput < frames.Length ? frames[nextInput].Time : double.PositiveInfinity;
-            time = Math.Min(nextTime, targetTime);
+            time = Math.Min(Math.Min(nextTime, idleTime), targetTime);
         }
 
         BmsFrameContext frameAt(double eventTime)

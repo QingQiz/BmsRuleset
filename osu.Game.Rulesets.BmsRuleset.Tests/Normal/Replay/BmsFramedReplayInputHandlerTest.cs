@@ -140,7 +140,7 @@ public class BmsFramedReplayInputHandlerTest
 
         var rebuilds = new List<double>();
         var inputApplied = false;
-        handler.ConfigureSeeking(() => 1000, time => { rebuilds.Add(time); return true; }, () => inputApplied = true);
+        handler.ConfigureSeeking(() => 1000, (time, _) => { rebuilds.Add(time); return true; }, () => inputApplied = true);
         Assert.That(handler.SetFrameFromTime(1983), Is.EqualTo(1000));
         var inputs = new List<IInput>();
         handler.CollectPendingInputs(inputs);
@@ -171,7 +171,7 @@ public class BmsFramedReplayInputHandlerTest
         handler.CollectPendingInputs([]);
         var seeks = new List<double>();
         var applied = 0;
-        handler.ConfigureSeeking(() => target, time => { seeks.Add(time); return true; }, () => applied++);
+        handler.ConfigureSeeking(() => target, (time, _) => { seeks.Add(time); return true; }, () => applied++);
         handler.RequestSeek();
 
         Assert.That(handler.SetFrameFromTime(16), Is.EqualTo(target));
@@ -191,6 +191,45 @@ public class BmsFramedReplayInputHandlerTest
         Assert.That(seeks, Has.Count.EqualTo(1), "A seek request is consumed once.");
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public void ForwardSeekReportsTheLastDeliveredEqualTimeFrame(bool deliveredRelease)
+    {
+        var replay = new osu.Game.Replays.Replay
+        {
+            HasReceivedAllFrames = true,
+            Frames = [new BmsReplayFrame(0), new BmsReplayFrame(1000, BmsAction.Key1), new BmsReplayFrame(1000), new BmsReplayFrame(2000)],
+        };
+        using var handler = new BmsFramedReplayInputHandler(replay) { ManiaCadence = new BmsManiaReplayCadence(0) };
+        var inputs = new List<IInput>();
+        var state = new RulesetInputManagerInputState<BmsAction>(new InputState());
+        var receiver = new InputReceiver();
+        advance(0);
+        for (var time = 16; time < 1000; time += 16)
+            advance(time);
+        advance(1000);
+        Assert.That(receiver.States.Last(), Is.EqualTo(new[] { BmsAction.Key1 }));
+        if (deliveredRelease)
+            advance(1000);
+
+        var continuations = new List<BmsReplayPosition?>();
+        handler.ConfigureSeeking(() => 1500, (_, position) => { continuations.Add(position); return true; }, () => { });
+        handler.RequestSeek();
+        advance(1500);
+
+        Assert.That(continuations, Is.EqualTo(new BmsReplayPosition?[] { new(1000, (BmsReplayFrame)replay.Frames[deliveredRelease ? 2 : 1]) }));
+        Assert.That(receiver.States.Last(), Is.Empty);
+
+        void advance(double time)
+        {
+            Assert.That(handler.SetFrameFromTime(time), Is.EqualTo(time));
+            inputs.Clear();
+            handler.CollectPendingInputs(inputs);
+            foreach (var input in inputs)
+                input.Apply(state, receiver);
+        }
+    }
+
     [Test]
     public void OrdinaryPlaybackKeepsFrameStepping()
     {
@@ -201,7 +240,7 @@ public class BmsFramedReplayInputHandlerTest
         handler.SetFrameFromTime(0);
         handler.CollectPendingInputs([]);
         var seeks = 0;
-        handler.ConfigureSeeking(() => 2000, _ => { seeks++; return true; }, () => { });
+        handler.ConfigureSeeking(() => 2000, (_, _) => { seeks++; return true; }, () => { });
 
         Assert.That(handler.SetFrameFromTime(16), Is.EqualTo(16));
         Assert.That(seeks, Is.Zero);

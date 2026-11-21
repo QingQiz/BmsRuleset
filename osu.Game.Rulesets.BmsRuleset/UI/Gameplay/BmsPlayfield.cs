@@ -15,6 +15,7 @@ using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
@@ -285,6 +286,9 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
                 column.JudgementBridge.SynchroniseReplayVisuals();
             gameplayEvents.RaiseReplaySeeked();
         }
+
+        if (Clock is IHasReplayHandler { ReplayInputHandler: BmsFramedReplayInputHandler { IsJudgementFrame: false } })
+            return;
 
         judgementEngine.ProcessFrame(new BmsFrameContext(Time.Current, (Clock as IGameplayClock)?.GetTrueGameplayRate() ?? Clock.Rate,
             (Clock as IGameplayClock)?.IsRewinding == true), Time.Elapsed, JudgementAlgorithm);

@@ -13,6 +13,7 @@ using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.LongNoteMode;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Profiles;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
@@ -20,6 +21,7 @@ using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Replays;
+using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play.HUD;
 using osu.Game.Screens.Play.HUD.JudgementCounter;
 using osu.Game.Skinning;
@@ -35,15 +37,22 @@ public partial class TestSceneBmsReplayRebuild : BmsPlayerTestScene
     private bool scratchReplay;
     private bool disableFailure;
     private bool emptyReplay;
+    private bool maniaReplay;
 
     [SetUp]
-    public void ResetReplayMode() => emptyReplay = false;
+    public void ResetReplayMode()
+    {
+        emptyReplay = false;
+        maniaReplay = false;
+    }
 
     protected override TestPlayer CreatePlayer(Ruleset ruleset) => disableFailure
         ? new FailurePolicyPlayer(BmsTestSkins.CreateSkinSource(BmsTestSkins.SkinKind.Argon, this), _ => createReplayFrames())
         : CreateBmsPlayer(_ => createReplayFrames());
 
-    private IList<ReplayFrame> createReplayFrames() => emptyReplay ? [] : scratchReplay ?
+    private IList<ReplayFrame> createReplayFrames() => emptyReplay ? [] : maniaReplay
+        ? [new BmsReplayFrame(0), new BmsReplayFrame(1140, BmsAction.Key2), new BmsReplayFrame(2300)]
+        : scratchReplay ?
     [
         new BmsReplayFrame(0), new BmsReplayFrame(1000, BmsAction.Scratch),
         new BmsReplayFrame(1400, BmsAction.ScratchReverse), new BmsReplayFrame(1500),
@@ -80,7 +89,16 @@ public partial class TestSceneBmsReplayRebuild : BmsPlayerTestScene
                 new BmsNote { StartTime = 20000, Column = 1 },
             },
         };
-        if (scratchReplay)
+        if (maniaReplay)
+        {
+            beatmap.HitObjects.Clear();
+            beatmap.HitObjects.AddRange([
+                new BmsNote { StartTime = 1000, Column = 1 },
+                new BmsNote { StartTime = 1140, Column = 2 },
+                new BmsNote { StartTime = 4000, Column = 1 },
+            ]);
+        }
+        else if (scratchReplay)
             foreach (var note in beatmap.HitObjects.Where(note => note.Column == 1 && note.StartTime < 20000))
                 note.Column = 0;
         BmsTestBeatmaps.SetupBeatmapInfo(beatmap, ruleset);
@@ -294,6 +312,37 @@ public partial class TestSceneBmsReplayRebuild : BmsPlayerTestScene
             Assert.That(snapshot(), Is.EqualTo(snapshots[target]));
             Player.GameplayClockContainer.Stop();
         });
+    }
+
+    [Test]
+    public void ManiaPlaybackAndReconstructionUseTheSameIdleJudgementSteps()
+    {
+        AddStep("load OM replay with a missed note before the next input", () =>
+        {
+            layout = BmsLayoutVariant.Bme7K;
+            maniaReplay = true;
+            disableFailure = false;
+            LoadPlayer([new BmsModManiaProfile()]);
+        });
+        AddUntilStep("player loaded", () => Player.IsLoaded && Player.LoadedBeatmapSuccessfully && Player.Alpha == 1);
+        seek(0);
+
+        AddStep("play through the deadline on a different host cadence", () =>
+        {
+            for (var time = 7; time <= 1155; time += 7)
+            {
+                AdvanceReplayClock(time);
+                Player.DrawableRuleset.UpdateSubTree();
+            }
+        });
+        AddAssert("continuous playback records the miss on the fixed step", () => missTime(), () => Is.EqualTo(1128));
+        seek(1127.75);
+        AddAssert("a seek before the fixed step has no judgement yet", () => ((BmsScoreProcessor)Player.ScoreProcessor).JudgementEvents.Count, () => Is.Zero);
+        seek(1155);
+        AddAssert("reconstruction records the miss on the same step", () => missTime(), () => Is.EqualTo(1128));
+
+        double missTime() => ((BmsScoreProcessor)Player.ScoreProcessor).JudgementEvents
+            .Single(entry => entry.Result == HitResult.Miss).TimingObservations.Single().ActualTime;
     }
 
     [Test]

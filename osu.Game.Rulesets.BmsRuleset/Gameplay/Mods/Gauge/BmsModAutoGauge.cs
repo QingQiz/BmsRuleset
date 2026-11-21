@@ -28,16 +28,16 @@ public class BmsModAutoGauge : Mod, IApplicableToHealthProcessor, IApplicableToS
 
     public override ModType Type => ModType.Automation;
 
-    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.CourseInitialHealth), SettingControlType = typeof(BmsCourseGaugeSetting<double?>))]
+    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.CourseInitialHealth), SettingControlType = typeof(BmsHiddenModSetting<double?>))]
     public Bindable<double?> ClassHealth { get; } = new();
 
-    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.CourseInitialHealth), SettingControlType = typeof(BmsCourseGaugeSetting<double?>))]
+    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.CourseInitialHealth), SettingControlType = typeof(BmsHiddenModSetting<double?>))]
     public Bindable<double?> ExClassHealth { get; } = new();
 
-    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.CourseInitialHealth), SettingControlType = typeof(BmsCourseGaugeSetting<double?>))]
+    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.CourseInitialHealth), SettingControlType = typeof(BmsHiddenModSetting<double?>))]
     public Bindable<double?> ExHardClassHealth { get; } = new();
 
-    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.CourseGaugeProfile), SettingControlType = typeof(BmsCourseGaugeSetting<BmsGaugeProfileFamily?>))]
+    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.CourseGaugeProfile), SettingControlType = typeof(BmsHiddenModSetting<BmsGaugeProfileFamily?>))]
     public Bindable<BmsGaugeProfileFamily?> GaugeProfileFamily { get; } = new();
 
     public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription => [];

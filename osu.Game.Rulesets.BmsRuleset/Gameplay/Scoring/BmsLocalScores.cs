@@ -33,7 +33,6 @@ internal static class BmsLocalScores
                     new BmsModHideScratch(),
                     new BmsModManiaProfile
                     {
-                        UseLazer = { Value = !score.IsLegacyScore },
                         OverallDifficulty = { Value = difficulty?.OverallDifficulty.Value },
                         DrainRate = { Value = difficulty?.DrainRate.Value },
                     },
@@ -45,13 +44,21 @@ internal static class BmsLocalScores
 
     internal static ScoreInfo ForPlayback(ScoreInfo displayed, RulesetInfo ruleset)
     {
-        if (displayed.Ruleset.OnlineID != 3 || ruleset.ShortName != Constant.SHORT_NAME || !displayed.Mods.Any(mod => mod is BmsModManiaProfile))
+        if (displayed.Ruleset.OnlineID != 3 || ruleset.ShortName != Constant.SHORT_NAME)
             return displayed;
+
+        var displayMods = displayed.Mods;
+        if (!displayMods.Any(mod => mod is BmsModManiaProfile))
+            return displayed;
+
+        // Foreign mod instances may cast their beatmap or playfield to mania types. Only BMS mods can be activated.
+        var playbackMods = PlayableMods(displayMods).Select(mod => mod.DeepClone()).ToArray();
+        // Apply CL only to the playback copy so the leaderboard's Use Mods action keeps the default windows.
+        playbackMods.OfType<BmsModManiaProfile>().Single().ClassicHitWindows.Value = displayMods.Any(mod => mod is ModClassic);
 
         var result = displayed.DeepClone();
         result.Ruleset = ruleset;
-        // Foreign mod instances may cast their beatmap or playfield to mania types. Only BMS mods can be activated.
-        result.Mods = PlayableMods(displayed.Mods).Select(mod => mod.DeepClone()).ToArray();
+        result.Mods = playbackMods;
         return result;
     }
 

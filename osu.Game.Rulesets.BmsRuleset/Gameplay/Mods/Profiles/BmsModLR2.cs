@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System;
 using System.Linq;
 using RhythmEngine.Profiles.Bms;
@@ -33,7 +34,7 @@ public class BmsModLr2 : Mod, IApplicableToGameplayProfile,
 
     public IScoreSelectionRule ScoreSelectionRule => BmsModTypeScoreSelectionRule<BmsModLr2>.EXACT;
 
-    GameplayProfile IApplicableToGameplayProfile.ApplyToGameplayProfile(GameplayProfile profile)
+    GameplayProfile IApplicableToGameplayProfile.ApplyToGameplayProfile(GameplayProfile profile, IEnumerable<Mod> mods)
         => ((BmsGameplayProfile)profile).WithJudgementModifier(BmsJudgementModifiers.Lr2oraja);
 
     public void ApplyToBeatmap(IBeatmap beatmap)

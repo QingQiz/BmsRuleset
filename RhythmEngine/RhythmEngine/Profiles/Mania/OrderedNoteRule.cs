@@ -43,18 +43,19 @@ public sealed class OrderedNoteRule(INoteRule inner, long? nextStart) : INoteRul
 
     public NoteUpdate ApplyTimer(NoteContext context) => wrap(inner.ApplyTimer(unwrap(context)));
 
-    internal static Func<NoteContext, NoteUpdate>? RetirementAfterHit(NoteUpdate update)
+    internal static long? RetirementBoundaryAfterHit(NoteUpdate update)
     {
         foreach (var emission in update.Emissions)
         {
-            if ((emission.Part == NoteParts.TAP || emission.Part == NoteParts.HEAD) && emission.Result != ManiaResults.MISS)
-                return retire;
+            if ((emission.Part == NoteParts.TAP || emission.Part == NoteParts.HEAD || emission.Part == NoteParts.TAIL)
+                && emission.Result != ManiaResults.MISS)
+                return emission.ExpectedTime;
         }
 
         return null;
     }
 
-    private static NoteUpdate retire(NoteContext context)
+    internal static NoteUpdate Retire(NoteContext context)
     {
         var state = ((OrderedNoteState)context.State).Inner;
         var emissions = ImmutableArray.CreateBuilder<NoteEmission>();

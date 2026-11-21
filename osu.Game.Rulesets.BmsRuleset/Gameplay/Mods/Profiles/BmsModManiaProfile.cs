@@ -61,6 +61,12 @@ public partial class BmsModManiaProfile : Mod, IApplicableToGameplayProfile, IAp
     [SettingSource(typeof(BmsStrings), nameof(BmsStrings.ManiaUseLazer), nameof(BmsStrings.ManiaUseLazerDescription))]
     public BindableBool UseLazer { get; } = new(true);
 
+    [SettingSource(null, SettingControlType = typeof(BmsHiddenModSetting<bool>))]
+    public BindableBool ClassicHitWindows { get; } = new();
+
+    public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
+        => base.SettingDescription.Where(setting => setting.setting != (LocalisableString)string.Empty);
+
     public override Type[] IncompatibleMods =>
     [
         typeof(BmsModAssistEasyGauge), typeof(BmsModEasyGauge), typeof(BmsModHardGauge),
@@ -70,8 +76,12 @@ public partial class BmsModManiaProfile : Mod, IApplicableToGameplayProfile, IAp
 
     public IScoreSelectionRule ScoreSelectionRule => BmsModTypeScoreSelectionRule<BmsModManiaProfile>.REDUCTION;
 
-    GameplayProfile IApplicableToGameplayProfile.ApplyToGameplayProfile(GameplayProfile profile)
-        => new ManiaGameplayProfile(OverallDifficulty.Value, DrainRate.Value, UseLazer.Value);
+    GameplayProfile IApplicableToGameplayProfile.ApplyToGameplayProfile(GameplayProfile profile, IEnumerable<Mod> mods)
+    {
+        // Mania compensates fixed rate mods in chart time so the real-time window stays consistent.
+        var clockRate = mods.OfType<ModRateAdjust>().FirstOrDefault()?.SpeedChange.Value ?? 1;
+        return new ManiaGameplayProfile(OverallDifficulty.Value, DrainRate.Value, UseLazer.Value, clockRate, ClassicHitWindows.Value);
+    }
 
     public void ApplyToBeatmap(IBeatmap beatmap)
     {
@@ -129,7 +139,7 @@ public partial class BmsModManiaProfile : Mod, IApplicableToGameplayProfile, IAp
         }
     }
 
-    private sealed class ManiaGameplayProfile(float? overallDifficulty, float? drainRate, bool useLazer) : GameplayProfile
+    private sealed class ManiaGameplayProfile(float? overallDifficulty, float? drainRate, bool useLazer, double clockRate, bool classicHitWindows) : GameplayProfile
     {
         private static float originalOd(IBeatmapInfo beatmapInfo)
             => beatmapInfo is { Ruleset.OnlineID: 3 } ? beatmapInfo.Difficulty.OverallDifficulty : default_difficulty;
@@ -149,7 +159,7 @@ public partial class BmsModManiaProfile : Mod, IApplicableToGameplayProfile, IAp
                 originalOd(beatmapInfo), adjustedDifficulty.OverallDifficulty, 10)
             {
                 Description = BmsStrings.ManiaOverallDifficultyDescription,
-                AdditionalMetrics = ManiaProfiles.CreateHitWindows(new ManiaOptions(adjustedDifficulty.OverallDifficulty), !useLazer).Entries
+                AdditionalMetrics = ManiaProfiles.CreateHitWindows(new ManiaOptions(adjustedDifficulty.OverallDifficulty, ClassicHitWindows: classicHitWindows), !useLazer).Entries
                     .Select(window => new RulesetBeatmapAttribute.AdditionalMetric(JudgementLabel(HitResultFor(window.Result)),
                         BmsStrings.TimingWindow(window.Early / 1000.0, window.Late / 1000.0), JudgementColour(HitResultFor(window.Result)))).ToArray(),
             };
@@ -183,13 +193,13 @@ public partial class BmsModManiaProfile : Mod, IApplicableToGameplayProfile, IAp
             => !useLazer && ManiaProfiles.GetStableHoldTicks(note) is > 0 and var ticks ? [new(HitResult.LargeTickHit, ticks)] : [];
 
         internal override double RatingWindowFor(BmsBeatmap beatmap)
-            => ManiaProfiles.CreateHitWindows(new ManiaOptions(overallDifficulty ?? originalOd(beatmap.BeatmapInfo)), !useLazer)
+            => ManiaProfiles.CreateHitWindows(new ManiaOptions(overallDifficulty ?? originalOd(beatmap.BeatmapInfo), ClassicHitWindows: classicHitWindows), !useLazer)
                 .Entries.Single(window => window.Result == ManiaResults.GREAT).Late / 1000.0;
 
         internal override (Chart Chart, SessionConfiguration Configuration) Compile(BmsHitObject[] objects, KeyChart source, IBeatmapInfo beatmapInfo,
                                                                                     Func<IEnumerable<KeySoundMarker>> collectKeySoundMarkers)
         {
-            var options = new ManiaOptions(overallDifficulty ?? originalOd(beatmapInfo), drainRate ?? originalHp(beatmapInfo));
+            var options = new ManiaOptions(overallDifficulty ?? originalOd(beatmapInfo), drainRate ?? originalHp(beatmapInfo), ClockRate: clockRate, ClassicHitWindows: classicHitWindows, FrameJudgements: useLazer);
             var profile = useLazer ? ManiaProfiles.CreateLazer(source, options) : ManiaProfiles.CreateStable(source, options);
             return (profile.Chart, profile.Configuration);
         }
@@ -221,9 +231,8 @@ public partial class BmsModManiaProfile : Mod, IApplicableToGameplayProfile, IAp
             var id when id == ManiaResults.OK => HitResult.Ok,
             var id when id == ManiaResults.MEH => HitResult.Meh,
             var id when id == ManiaResults.MISS => HitResult.Miss,
-            var id when id == ManiaResults.COMBO_BREAK => HitResult.None,
             var id when id == ManiaResults.HOLD_TICK => HitResult.LargeTickHit,
-            var id when id == ManiaResults.HOLD_BREAK => HitResult.ComboBreak,
+            var id when id == ManiaResults.COMBO_BREAK || id == ManiaResults.HOLD_BREAK => HitResult.ComboBreak,
             _ => throw new ArgumentOutOfRangeException(nameof(result), result, @"Undefined mania result."),
         };
 

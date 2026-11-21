@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System;
 using RhythmEngine.Profiles.Bms;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
@@ -23,6 +24,6 @@ public class BmsModNoGood : Mod, IApplicableToGameplayProfile
 
     public override Type[] IncompatibleMods => [typeof(BmsModNoGreat)];
 
-    GameplayProfile IApplicableToGameplayProfile.ApplyToGameplayProfile(GameplayProfile profile)
+    GameplayProfile IApplicableToGameplayProfile.ApplyToGameplayProfile(GameplayProfile profile, IEnumerable<Mod> mods)
         => ((BmsGameplayProfile)profile).WithJudgementModifier(BmsJudgementModifiers.NoGood);
 }

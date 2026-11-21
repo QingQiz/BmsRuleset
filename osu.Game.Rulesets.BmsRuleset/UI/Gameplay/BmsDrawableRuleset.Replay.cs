@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -7,6 +8,7 @@ using osu.Game.Input.Handlers;
 using osu.Game.Replays;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Profiles;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 using osu.Game.Rulesets.UI;
@@ -33,16 +35,19 @@ public partial class BmsDrawableRuleset
     protected override ReplayInputHandler CreateReplayInputHandler(Replay replay)
     {
         var playfield = (BmsPlayfield)Playfield;
-        var handler = new BmsFramedReplayInputHandler(replay, playfield.CompleteAtEnd);
+        var cadence = Mods.Any(mod => mod is BmsModManiaProfile { UseLazer.Value: true })
+            ? new BmsManiaReplayCadence(Math.Min(GameplayStartTime, replay.Frames.Count > 0 ? replay.Frames.Min(frame => frame.Time) : 0))
+            : (BmsManiaReplayCadence?)null;
+        var handler = new BmsFramedReplayInputHandler(replay, playfield.CompleteAtEnd) { ManiaCadence = cadence };
         handler.ConfigureSeeking(() => gameplayClockContainer?.CurrentTime,
-            time => seekReplay(replay, time),
+            (time, position) => seekReplay(replay, time, position),
             playfield.FinishReplaySeekInput);
         if (IsLoaded)
             handler.RequestSeek();
         return handler;
     }
 
-    private bool seekReplay(Replay replay, double time)
+    private bool seekReplay(Replay replay, double time, BmsReplayPosition? position)
     {
         resolveReplayHud();
         var counters = replayHud?.ChildrenOfType<GameplayAccuracyCounter>().ToArray() ?? [];
@@ -51,7 +56,7 @@ public partial class BmsDrawableRuleset
             counter.Current.UnbindBindings();
         try
         {
-            return ((BmsPlayfield)Playfield).SeekReplay(replay, Mods, time, allowReplayFailure);
+            return ((BmsPlayfield)Playfield).SeekReplay(replay, Mods, time, position, allowReplayFailure);
         }
         finally
         {
