@@ -57,8 +57,8 @@ public class BmsLocalisationTest
         var first = BmsTimelineStatistic.CreateData(BmsGameplayProfile.INSTANCE, beatmap, [], []);
         var offset = BmsHitOffsetStatistic.CreateStatistics(BmsGameplayProfile.INSTANCE, beatmap, []);
         var scatter = BmsHitScatterStatistic.CreateStatistics(BmsGameplayProfile.INSTANCE, beatmap, []);
-        var key = localisation.GetLocalisedBindableString(offset.Keys[1].Label);
-        var scratch = localisation.GetLocalisedBindableString(scatter.Keys[0].Label);
+        var key = localisation.GetLocalisedBindableString(offset.Lanes[1].Label);
+        var scratch = localisation.GetLocalisedBindableString(scatter.Lanes[0].Label);
         var note = localisation.GetLocalisedBindableString(first.Notes.Categories.Single(category => category.Label == BmsStrings.Note).Label);
         Assert.That(new[] { key.Value, scratch.Value, note.Value }, Is.EqualTo(new[] { "Key 1", "Scratch", "note" }));
 

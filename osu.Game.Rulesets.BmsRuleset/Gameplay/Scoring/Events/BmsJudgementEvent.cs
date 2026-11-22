@@ -55,6 +55,7 @@ public readonly record struct BmsJudgementSource(
             {
                 BmsLandmine => BmsJudgementSourceKind.Landmine,
                 BmsLongNote => BmsJudgementSourceKind.LongNote,
+                BmsEmptyInputHitObject => BmsJudgementSourceKind.EmptyInput,
                 BmsHitObject => BmsJudgementSourceKind.Note,
                 _ => BmsJudgementSourceKind.EmptyInput,
             },

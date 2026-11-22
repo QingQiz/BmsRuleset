@@ -102,6 +102,7 @@ public static class BmsJudgementEventProjection
             BmsTimingObservationKind.LongNoteTail => CreateTimingNote(source.Column, observation.ExpectedTime, isTail: true),
             BmsTimingObservationKind.LongNoteHead => CreateTimingNote(source.Column, observation.ExpectedTime),
             _ when source.Kind == BmsJudgementSourceKind.NonConsumingHit => CreateTimingNote(source.Column, observation.ExpectedTime),
+            _ when source.Kind == BmsJudgementSourceKind.EmptyInput => new BmsEmptyInputHitObject { Column = source.Column, StartTime = source.StartTime },
             _ => createHitObject(source),
         };
     }
@@ -134,3 +135,5 @@ public static class BmsJudgementEventProjection
 }
 
 internal sealed class BmsLongNoteTailHitObject : BmsNote;
+
+internal sealed class BmsEmptyInputHitObject : BmsHitObject;

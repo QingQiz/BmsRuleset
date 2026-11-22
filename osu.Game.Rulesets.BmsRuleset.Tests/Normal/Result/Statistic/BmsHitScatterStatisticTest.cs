@@ -97,7 +97,7 @@ public class BmsHitScatterStatisticTest
     }
 
     [Test]
-    public void TestStatisticsAreGroupedByKeyLikeHitOffsetStatistic()
+    public void TestSelectedLanesShareOneScatterPlot()
     {
         var statistics = BmsHitScatterStatistic.CreateStatistics(BmsGameplayProfile.INSTANCE,
             createBeatmap(BmsLayoutVariant.Bms5K),
@@ -111,10 +111,14 @@ public class BmsHitScatterStatisticTest
             ]);
 
         Assert.That(statistics.Overall.Points.Select(p => p.DisplayOffset(statistics.Overall.OffsetRange)), Is.EqualTo([-12, 8, 30, -20, -150]));
-        Assert.That(statistics.Keys.Select(k => k.Label), Is.EqualTo(new[] { BmsStrings.Scratch }.Concat(Enumerable.Range(1, 5).Select(BmsStrings.Key))));
-        Assert.That(statistics.Keys[0].Data.Points.Select(p => p.Offset), Is.EqualTo([-12, 8]));
-        Assert.That(statistics.Keys[1].Data.Points.Select(p => p.Offset), Is.EqualTo([30, -20]));
-        Assert.That(statistics.Keys[2].Data.Points, Is.Empty);
+        Assert.That(statistics.Lanes.Select(lane => lane.Label), Is.EqualTo(new[] { BmsStrings.Scratch }.Concat(Enumerable.Range(1, 5).Select(BmsStrings.Key))));
+        var scratch = BmsHitScatterStatistic.FilterData(statistics.Overall, true, true, column => column == 0);
+        var selected = BmsHitScatterStatistic.FilterData(statistics.Overall, true, true, column => column is 0 or 1);
+        var empty = BmsHitScatterStatistic.FilterData(statistics.Overall, true, true, column => column == 2);
+        Assert.That(scratch.Points.Select(p => p.Offset), Is.EqualTo([-12, 8]));
+        Assert.That(selected.Points.Select(p => p.Offset), Is.EqualTo([-12, 8, 30, -20]));
+        Assert.That(selected.Duration, Is.EqualTo(statistics.Overall.Duration));
+        Assert.That(empty.Points, Is.Empty);
     }
 
     [Test]
@@ -163,7 +167,8 @@ public class BmsHitScatterStatisticTest
 
         var all = BmsHitScatterStatistic.FilterData(data, true, true);
         var press = BmsHitScatterStatistic.FilterData(data, true, false);
-        var release = BmsHitScatterStatistic.FilterData(data, false, true);
+        var release = BmsHitScatterStatistic.FilterData(data, false, true, column => column == 0);
+        var hiddenRelease = BmsHitScatterStatistic.FilterData(data, false, true, column => column == 1);
         var none = BmsHitScatterStatistic.FilterData(data, false, false);
 
         Assert.Multiple(() =>
@@ -173,6 +178,7 @@ public class BmsHitScatterStatisticTest
             Assert.That(press.OffsetRange, Is.EqualTo(150));
             Assert.That(release.Points.Select(point => point.Offset), Is.EqualTo([270]));
             Assert.That(release.OffsetRange, Is.EqualTo(300));
+            Assert.That(hiddenRelease.Points, Is.Empty);
             Assert.That(none.Points, Is.Empty);
             Assert.That(none.Duration, Is.EqualTo(4000));
         });

@@ -10,11 +10,11 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Framework.Testing;
+using osu.Game.Graphics.UserInterface;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
-using osuTK.Input;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 
@@ -50,37 +50,36 @@ public partial class TestSceneBmsResultScreenStatistics
             Child = new GridContainer
             {
                 RelativeSizeAxes = Axes.Both,
-                Content = new[] { new Drawable[] { offset, scatter, timeline } },
+                RowDimensions = [new Dimension(GridSizeMode.Absolute, 30)],
+                Content = new[]
+                {
+                    new Drawable[] { offset.LaneFilter, scatter.LaneFilter, new Container() },
+                    new Drawable[] { offset, scatter, timeline },
+                },
             };
         });
         AddUntilStep("charts loaded", () => offset.IsLoaded && scatter.IsLoaded && timeline.IsLoaded);
-        AddStep("expand offset rows", () =>
+        AddStep("hide Scratch on both charts", () =>
         {
-            InputManager.MoveMouseTo(offset);
-            InputManager.Click(MouseButton.Left);
-        });
-        AddStep("expand scatter rows", () =>
-        {
-            InputManager.MoveMouseTo(scatter);
-            InputManager.Click(MouseButton.Left);
+            foreach (var filter in new[] { offset.LaneFilter, scatter.LaneFilter })
+                filter.ChildrenOfType<OsuAnimatedButton>().Single(button => button.Name == "Lane 0").TriggerClick();
         });
         AddStep("retain actual label drawables", () =>
         {
             SpriteText label(Drawable chart, LocalisableString text) => chart.ChildrenOfType<SpriteText>().First(sprite => sprite.Text == text);
             labels =
             [
-                label(offset, BmsStrings.Scratch), label(offset, BmsStrings.Key(1)),
-                label(scatter, BmsStrings.Scratch), label(scatter, BmsStrings.Key(1)),
+                label(offset, BmsStrings.ResultSelectedLaneCount(5)), label(scatter, BmsStrings.ResultSelectedLaneCount(5)),
                 label(timeline, BmsStrings.Scratch), label(timeline, BmsStrings.Note), label(timeline, BmsStrings.Fast),
             ];
         });
         AddUntilStep("English labels displayed", () => labels.Select(label => label.Current.Value)
-            .SequenceEqual(["Scratch", "Key 1", "Scratch", "Key 1", "Scratch", "note", "fast"]));
+            .SequenceEqual(["5 lanes", "5 lanes", "Scratch", "note", "fast"]));
         AddStep("switch existing charts to Chinese", () => Dependencies.Get<FrameworkConfigManager>().SetValue(FrameworkSetting.Locale, "zh"));
         AddUntilStep("same label drawables display Chinese", () => labels.Select(label => label.Current.Value)
-            .SequenceEqual(["皿", "按键 1", "皿", "按键 1", "皿", "单键", "偏快"]));
+            .SequenceEqual(["5 条轨道", "5 条轨道", "皿", "单键", "偏快"]));
         AddStep("switch existing charts back to English", () => Dependencies.Get<FrameworkConfigManager>().SetValue(FrameworkSetting.Locale, "en"));
         AddUntilStep("same label drawables return to English", () => labels.Select(label => label.Current.Value)
-            .SequenceEqual(["Scratch", "Key 1", "Scratch", "Key 1", "Scratch", "note", "fast"]));
+            .SequenceEqual(["5 lanes", "5 lanes", "Scratch", "note", "fast"]));
     }
 }

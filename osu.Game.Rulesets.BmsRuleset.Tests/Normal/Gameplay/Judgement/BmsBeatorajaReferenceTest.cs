@@ -30,8 +30,9 @@ public class BmsBeatorajaReferenceTest
         var saved = new ScoreInfo();
         processor.PopulateScore(saved);
         var statistics = BmsHitScatterStatistic.CreateStatistics(BmsGameplayProfile.INSTANCE, beatmap, saved.HitEvents);
-        Assert.That(statistics.Keys[1].Data.Points.Single().DisplayOffset(statistics.Keys[1].Data.OffsetRange), Is.EqualTo(-150));
-        Assert.That(statistics.Keys[0].Data.Points, Is.Empty);
+        var point = statistics.Overall.Points.Single();
+        Assert.That(point.Column, Is.EqualTo(1));
+        Assert.That(point.DisplayOffset(statistics.Overall.OffsetRange), Is.EqualTo(-150));
         Assert.That(processor.ScoringJudgementEventCount, Is.Zero);
         Assert.That(saved.Statistics.GetValueOrDefault(HitResult.Ok), Is.EqualTo(1));
         Assert.That(statistics.Overall.Points, Has.Count.EqualTo(1), "beatoraja updateMicro records BAD in its recent timing observations even when it does not consume the note.");

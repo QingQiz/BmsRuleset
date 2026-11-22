@@ -11,14 +11,11 @@ using osu.Framework.Graphics.Shaders;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Graphics;
-using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
-using osu.Game.Rulesets.BmsRuleset.Beatmaps;
-using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
@@ -30,9 +27,7 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
 
 public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResultStatistic
 {
-    public override bool HandlePositionalInput => true;
-
-    internal readonly record struct ScatterPoint(double Time, double Offset, HitResult Result, ResultTimingKind Kind, bool IsRelease)
+    internal readonly record struct ScatterPoint(double Time, double Offset, HitResult Result, ResultTimingKind Kind, bool IsRelease, int? Column)
     {
         internal double DisplayOffset(double offsetRange) => Kind switch
         {
@@ -43,7 +38,6 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResu
     }
 
     private const float graph_height = 200;
-    private const float key_graph_height = 140;
     private const float axis_width = 52;
     private const float x_axis_height = 28;
     private const float label_width = 96;
@@ -55,12 +49,13 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResu
     private readonly GameplayProfile profile;
     private HitScatterStatistics statistics;
     private FillFlowContainer content = null!;
-    private bool expanded;
     private Drawable legend = null!;
-    private Drawable overallRow = null!;
+    private Drawable plotRow = null!;
     private float summaryHeight = graph_height;
 
     internal BmsResultTimingFilter TimingFilter { get; }
+
+    internal BmsResultLaneFilter LaneFilter { get; }
 
     internal BmsHitScatterStatistic(HitScatterStatistics statistics, GameplayProfile profile)
     {
@@ -69,33 +64,22 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResu
         this.statistics = statistics;
         this.profile = profile;
         TimingFilter = new BmsResultTimingFilter(rebuild);
+        LaneFilter = new BmsResultLaneFilter(statistics.Lanes, rebuild);
     }
 
     internal static HitScatterStatistics CreateStatistics(GameplayProfile profile, IBeatmap playableBeatmap, IReadOnlyList<HitEvent> hitEvents, double minimumDuration = 0)
     {
-        var scatterHits = hitEvents.Where(profile.IsTimingEvent).ToArray();
-        var bmsHitEvents = scatterHits.Where(e => e.HitObject is BmsHitObject).ToArray();
-
-        var variant = playableBeatmap is BmsBeatmap bms ? bms.LayoutVariant : BmsLayoutVariant.Bms5K;
-        var totalColumns = playableBeatmap is BmsBeatmap { TotalColumns: > 0 } bmsWithColumns
-            ? bmsWithColumns.TotalColumns
-            : Math.Max(BmsLayout.GetTotalColumns(variant), bmsHitEvents.Select(e => ((BmsHitObject)e.HitObject).Column + 1).DefaultIfEmpty(0).Max());
-
-        var hitsByColumn = bmsHitEvents.ToLookup(e => ((BmsHitObject)e.HitObject).Column);
-        var keyIndex = 0;
-
-        var keyGroups = Enumerable.Range(0, totalColumns)
-            .Select(column => new KeyHitScatterStatistics(labelFor(column, variant, ref keyIndex), CreateData(profile, hitsByColumn[column].ToArray(), minimumDuration)))
-            .ToArray();
-
-        return new HitScatterStatistics(CreateData(profile, scatterHits, minimumDuration), keyGroups);
+        var data = CreateData(profile, hitEvents, minimumDuration);
+        var lanes = BmsResultLane.ForBeatmap(playableBeatmap, data.Points.Select(point => point.Column));
+        return new HitScatterStatistics(data, lanes);
     }
 
     internal static ScatterData CreateData(GameplayProfile profile, IReadOnlyList<HitEvent> hitEvents, double minimumDuration = 0)
     {
         var points = hitEvents
             .Where(profile.IsTimingEvent)
-            .Select(e => new ScatterPoint(e.HitObject.StartTime, e.TimeOffset, e.Result, profile.TimingKindFor(e.Result), e.HitObject is BmsLongNoteTailHitObject))
+            .Select(e => new ScatterPoint(e.HitObject.StartTime, e.TimeOffset, e.Result, profile.TimingKindFor(e.Result), e.HitObject is BmsLongNoteTailHitObject,
+                (e.HitObject as BmsHitObject)?.Column))
             .OrderBy(p => p.Time)
             .ToArray();
 
@@ -104,31 +88,17 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResu
         return new ScatterData(points, duration, offsetRange, offsetTicks(offsetRange), []);
     }
 
-    protected override bool OnClick(ClickEvent e)
-    {
-        expanded = !expanded;
-        rebuild();
-
-        return true;
-    }
-
     internal static HitScatterStatistics CombineStatistics(IReadOnlyList<HitScatterStatistics> stageStatistics)
     {
-        var durations = stageStatistics.Select(stage => stage.Overall.Duration).ToArray();
-        var keyCount = stageStatistics.Select(stage => stage.Keys.Count).DefaultIfEmpty(0).Max();
-
         return new HitScatterStatistics(
-            combineData(stageStatistics.Select((stage, index) => (Data: (ScatterData?)stage.Overall, Duration: durations[index])).ToArray()),
-            Enumerable.Range(0, keyCount).Select(keyIndex => new KeyHitScatterStatistics(
-                stageStatistics.First(stage => stage.Keys.Count > keyIndex).Keys[keyIndex].Label,
-                combineData(stageStatistics.Select((stage, index) =>
-                    (stage.Keys.ElementAtOrDefault(keyIndex)?.Data, Duration: durations[index])).ToArray()))).ToArray());
+            combineData(stageStatistics.Select(stage => stage.Overall).ToArray()),
+            BmsResultLane.Combine(stageStatistics.Select(stage => stage.Lanes)));
     }
 
-    private static ScatterData combineData(IReadOnlyList<(ScatterData? Data, double Duration)> stages)
+    private static ScatterData combineData(IReadOnlyList<ScatterData> stages)
     {
         var duration = Math.Max(1, stages.Sum(stage => stage.Duration));
-        var offsetRange = stages.Select(stage => stage.Data?.OffsetRange ?? minimum_offset_range).DefaultIfEmpty(minimum_offset_range).Max();
+        var offsetRange = stages.Select(stage => stage.OffsetRange).DefaultIfEmpty(minimum_offset_range).Max();
         var points = new List<ScatterPoint>();
         var boundaries = new List<float>();
         double elapsed = 0;
@@ -136,13 +106,7 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResu
         for (var i = 0; i < stages.Count; i++)
         {
             var stage = stages[i];
-            if (stage.Data != null)
-            {
-                points.AddRange(stage.Data.Points.Select(point => point with
-                {
-                    Time = elapsed + point.Time,
-                }));
-            }
+            points.AddRange(stage.Points.Select(point => point with { Time = elapsed + point.Time }));
 
             elapsed += stage.Duration;
             if (i < stages.Count - 1)
@@ -150,14 +114,6 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResu
         }
 
         return new ScatterData(points, duration, offsetRange, offsetTicks(offsetRange), boundaries);
-    }
-
-    private static LocalisableString labelFor(int column, BmsLayoutVariant variant, ref int keyIndex)
-    {
-        if (BmsLayout.IsScratchColumn(column, variant))
-            return BmsStrings.Scratch;
-
-        return BmsStrings.Key(++keyIndex);
     }
 
     private Drawable createLegend(ScatterData data)
@@ -612,33 +568,28 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResu
     internal void SetData(HitScatterStatistics data)
     {
         statistics = data;
+        LaneFilter.SetLanes(data.Lanes);
         if (LoadState >= LoadState.Ready)
             rebuild();
     }
 
     private void rebuild()
     {
-        content.Clear();
-
-        var overall = FilterData(statistics.Overall, TimingFilter.ShowPresses, TimingFilter.ShowReleases);
-        content.Add(legend = createLegend(overall));
-        content.Add(overallRow = createRow(BmsStrings.Overall, overall, summaryHeight));
-
-        if (expanded)
-        {
-            foreach (var key in statistics.Keys)
-                content.Add(createRow(key.Label, FilterData(key.Data, TimingFilter.ShowPresses, TimingFilter.ShowReleases), key_graph_height));
-        }
+        var data = FilterData(statistics.Overall, TimingFilter.ShowPresses, TimingFilter.ShowReleases, LaneFilter.AllSelected ? null : LaneFilter.Includes);
+        content.Children =
+        [
+            legend = createLegend(data),
+            plotRow = createRow(LaneFilter.SelectionLabel, data, summaryHeight),
+        ];
     }
 
-    internal static ScatterData FilterData(ScatterData data, bool showPresses, bool showReleases)
+    internal static ScatterData FilterData(ScatterData data, bool showPresses, bool showReleases, Func<int?, bool>? includesLane = null)
     {
-        if (showPresses && showReleases)
+        if (showPresses && showReleases && includesLane == null)
             return data;
 
-        var points = data.Points
-            .Where(point => point.IsRelease ? showReleases : showPresses)
-            .ToArray();
+        var points = data.Points.Where(point => (point.IsRelease ? showReleases : showPresses)
+            && (includesLane?.Invoke(point.Column) ?? true)).ToArray();
         var offsetRange = calculateOffsetRange(points);
         return data with { Points = points, OffsetRange = offsetRange, OffsetTicks = offsetTicks(offsetRange) };
     }
@@ -660,12 +611,10 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResu
             return;
 
         summaryHeight = Math.Max(0, height - legend.DrawHeight - 8 - x_axis_height);
-        overallRow.Height = summaryHeight + x_axis_height;
+        plotRow.Height = summaryHeight + x_axis_height;
     }
 
-    internal sealed record HitScatterStatistics(ScatterData Overall, IReadOnlyList<KeyHitScatterStatistics> Keys);
-
-    internal sealed record KeyHitScatterStatistics(LocalisableString Label, ScatterData Data);
+    internal sealed record HitScatterStatistics(ScatterData Overall, IReadOnlyList<BmsResultLane> Lanes);
 
     internal sealed record ScatterData(IReadOnlyList<ScatterPoint> Points, double Duration, double OffsetRange, IReadOnlyList<double> OffsetTicks, IReadOnlyList<float> StageBoundaries);
 }

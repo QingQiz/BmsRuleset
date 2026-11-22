@@ -82,10 +82,10 @@ public class BmsHitOffsetStatisticTest
                 new HitEvent(-8, 1, HitResult.Perfect, new BmsNote { Column = 8, StartTime = 1500 }, null, null),
             ]);
 
-        Assert.That(statistics.Keys.Select(k => k.Label), Is.EqualTo(Enumerable.Range(1, 9).Select(BmsStrings.Key)));
-        Assert.That(statistics.Keys[0].Summary.Count, Is.EqualTo(1));
-        Assert.That(statistics.Keys[8].Summary.Count, Is.EqualTo(1));
-        Assert.That(statistics.Keys.Any(k => k.Label == BmsStrings.Scratch), Is.False);
+        Assert.That(statistics.Lanes.Select(lane => lane.Label), Is.EqualTo(Enumerable.Range(1, 9).Select(BmsStrings.Key)));
+        Assert.That(BmsHitOffsetStatistic.FilterSummary(statistics, true, true, column => column == 0).Count, Is.EqualTo(1));
+        Assert.That(BmsHitOffsetStatistic.FilterSummary(statistics, true, true, column => column == 8).Count, Is.EqualTo(1));
+        Assert.That(statistics.Lanes.Any(lane => lane.IsScratch), Is.False);
     }
 
     [Test]
@@ -129,12 +129,12 @@ public class BmsHitOffsetStatisticTest
             Assert.That(course.Offset.Overall.BinSize, Is.EqualTo(4));
             Assert.That(course.Offset.Overall.BinsByResult[HitResult.Good][47], Is.EqualTo(1));
             Assert.That(course.Offset.Overall.BinsByResult[HitResult.Good][97], Is.EqualTo(1));
-            Assert.That(course.Offset.Keys[1].Summary.Count, Is.EqualTo(2));
+            Assert.That(BmsHitOffsetStatistic.FilterSummary(course.Offset, true, true, column => column == 1).Count, Is.EqualTo(2));
         });
     }
 
     [Test]
-    public void TestStatisticsAreGroupedByKey()
+    public void TestSelectedLanesShareOneOffsetSummary()
     {
         var statistics = BmsHitOffsetStatistic.CreateStatistics(BmsGameplayProfile.INSTANCE,
             createBeatmap(BmsLayoutVariant.Bms5K),
@@ -158,15 +158,18 @@ public class BmsHitOffsetStatisticTest
         Assert.That(statistics.Overall.BinsByResult[HitResult.Meh][^1], Is.EqualTo(1));
         Assert.That(statistics.Overall.BinsByResult[HitResult.Miss][0], Is.EqualTo(2));
 
-        Assert.That(statistics.Keys.Select(k => k.Label), Is.EqualTo(new[] { BmsStrings.Scratch }.Concat(Enumerable.Range(1, 5).Select(BmsStrings.Key))));
-        Assert.That(statistics.Keys[0].Summary.Count, Is.EqualTo(4));
-        Assert.That(statistics.Keys[0].Summary.AverageOffset, Is.EqualTo(-2).Within(0.001));
-        Assert.That(statistics.Keys[0].Summary.StandardDeviation, Is.EqualTo(10).Within(0.001));
-        Assert.That(statistics.Keys[1].Summary.Count, Is.EqualTo(2));
-        Assert.That(statistics.Keys[1].Summary.AverageOffset, Is.EqualTo(5).Within(0.001));
-        Assert.That(statistics.Keys[1].Summary.StandardDeviation, Is.EqualTo(25).Within(0.001));
-        Assert.That(statistics.Keys[2].Summary.Count, Is.Zero);
-        Assert.That(statistics.Keys[2].Summary.StandardDeviation, Is.Zero);
+        Assert.That(statistics.Lanes.Select(lane => lane.Label), Is.EqualTo(new[] { BmsStrings.Scratch }.Concat(Enumerable.Range(1, 5).Select(BmsStrings.Key))));
+        var scratch = BmsHitOffsetStatistic.FilterSummary(statistics, true, true, column => column == 0);
+        var selected = BmsHitOffsetStatistic.FilterSummary(statistics, true, true, column => column is 0 or 1);
+        var empty = BmsHitOffsetStatistic.FilterSummary(statistics, true, true, column => column == 2);
+        Assert.That(scratch.Count, Is.EqualTo(4));
+        Assert.That(scratch.AverageOffset, Is.EqualTo(-2).Within(0.001));
+        Assert.That(scratch.StandardDeviation, Is.EqualTo(10).Within(0.001));
+        Assert.That(selected.Count, Is.EqualTo(6));
+        Assert.That(selected.AverageOffset, Is.EqualTo(1.5).Within(0.001));
+        Assert.That(selected.BinsByResult[HitResult.Miss][0], Is.EqualTo(1));
+        Assert.That(empty.Count, Is.Zero);
+        Assert.That(empty.StandardDeviation, Is.Zero);
     }
 
     [Test]
@@ -180,20 +183,21 @@ public class BmsHitOffsetStatisticTest
                 new HitEvent(-10, 1, HitResult.Great, new BmsLongNoteTailHitObject { Column = 0, StartTime = 3000 }, null, null),
             ]);
 
-        var press = BmsHitOffsetStatistic.FilterStatistics(statistics, true, false);
-        var release = BmsHitOffsetStatistic.FilterStatistics(statistics, false, true);
-        var none = BmsHitOffsetStatistic.FilterStatistics(statistics, false, false);
+        var press = BmsHitOffsetStatistic.FilterSummary(statistics, true, false);
+        var release = BmsHitOffsetStatistic.FilterSummary(statistics, false, true, column => column == 0);
+        var hiddenRelease = BmsHitOffsetStatistic.FilterSummary(statistics, false, true, column => column == 1);
+        var none = BmsHitOffsetStatistic.FilterSummary(statistics, false, false);
 
         Assert.Multiple(() =>
         {
-            Assert.That(press.Overall.Count, Is.EqualTo(2));
-            Assert.That(press.Overall.AverageOffset, Is.EqualTo(30));
-            Assert.That(press.Overall.BinsByResult[HitResult.Great].Sum(), Is.EqualTo(2));
-            Assert.That(release.Overall.Count, Is.EqualTo(1));
-            Assert.That(release.Overall.AverageOffset, Is.EqualTo(-10));
-            Assert.That(release.Keys[0].Summary.Count, Is.EqualTo(1));
-            Assert.That(none.Overall.Count, Is.Zero);
-            Assert.That(none.Overall.BinsByResult, Is.Empty);
+            Assert.That(press.Count, Is.EqualTo(2));
+            Assert.That(press.AverageOffset, Is.EqualTo(30));
+            Assert.That(press.BinsByResult[HitResult.Great].Sum(), Is.EqualTo(2));
+            Assert.That(release.Count, Is.EqualTo(1));
+            Assert.That(release.AverageOffset, Is.EqualTo(-10));
+            Assert.That(hiddenRelease.Count, Is.Zero);
+            Assert.That(none.Count, Is.Zero);
+            Assert.That(none.BinsByResult, Is.Empty);
         });
     }
 }

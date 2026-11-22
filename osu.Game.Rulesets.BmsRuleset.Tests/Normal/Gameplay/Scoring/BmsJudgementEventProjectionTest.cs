@@ -85,7 +85,7 @@ public class BmsJudgementEventProjectionTest
     }
 
     [Test]
-    public void TestEmptyPoorProjectionKeepsPressTimeAndNextNoteOffset()
+    public void TestEmptyPoorTimingProjectionKeepsPressTimeOffsetAndLane()
     {
         var judgementEvent = new BmsJudgementEvent(
             new BmsJudgementSource(600, 2, BmsJudgementSourceKind.EmptyInput),
@@ -99,7 +99,7 @@ public class BmsJudgementEventProjectionTest
         {
             Assert.That(scoring.HitObject.StartTime, Is.EqualTo(600));
             Assert.That(scoring.TimeOffset, Is.EqualTo(-400));
-            Assert.That(timing.HitObject.StartTime, Is.EqualTo(600));
+            Assert.That(BmsJudgementSource.From(timing.HitObject), Is.EqualTo(judgementEvent.Source));
             Assert.That(timing.TimeOffset, Is.EqualTo(-400));
         });
     }

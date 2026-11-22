@@ -233,6 +233,16 @@ public static class BmsStrings
 
     public static LocalisableString ResultTimingRelease => get("result_timing_release");
 
+    public static LocalisableString ResultShowFilter(LocalisableString label) => get("result_show_filter", label);
+
+    public static LocalisableString ResultHideFilter(LocalisableString label) => get("result_hide_filter", label);
+
+    public static LocalisableString ResultAllLanes => get("result_all_lanes");
+
+    public static LocalisableString ResultClearLanes => get("result_clear_lanes");
+
+    public static LocalisableString ResultSelectedLaneCount(int count) => get("result_selected_lane_count", count);
+
     public static LocalisableString ResultStatisticsRequireReplay => get("result_statistics_require_replay");
 
     public static LocalisableString ResultStatisticsUnavailable => get("result_statistics_unavailable");

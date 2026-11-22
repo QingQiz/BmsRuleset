@@ -67,7 +67,9 @@ public partial class TestSceneBmsBeatorajaPmsConsumers : BmsPlayerTestScene
             Assert.That(hit.HitObject.StartTime, Is.EqualTo(1000));
             Assert.That(hit.TimeOffset, Is.EqualTo(-150));
             var scatter = BmsHitScatterStatistic.CreateStatistics(BmsGameplayProfile.INSTANCE, (BmsBeatmap)Player.GameplayState.Beatmap, saved.HitEvents);
-            Assert.That(scatter.Keys[1].Data.Points.Single().DisplayOffset(scatter.Keys[1].Data.OffsetRange), Is.EqualTo(-150));
+            var point = scatter.Overall.Points.Single();
+            Assert.That(point.Column, Is.EqualTo(1));
+            Assert.That(point.DisplayOffset(scatter.Overall.OffsetRange), Is.EqualTo(-150));
             Assert.That(saved.Statistics.GetValueOrDefault(HitResult.Ok), Is.EqualTo(1));
         }, advanceNormally: true);
         checkpoint(950, () =>

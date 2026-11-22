@@ -22,9 +22,9 @@ internal partial class BmsResultStatisticsGrid : CompositeDrawable
     private const float gap = 8;
     private const float content_padding = 8;
     private const float heading_spacing = 6;
-    private const float first_row_weight = 1.4f;
+    private const float first_row_weight = 1.25f;
     private const float scatter_row_weight = 1.3f;
-    private const float offset_row_weight = 0.7f;
+    private const float offset_row_weight = 0.85f;
     private readonly StatisticCell[] cells;
     private readonly BmsGaugeHistoryGraph gauge;
     private readonly BmsTimelineStatistic timeline;
@@ -43,8 +43,8 @@ internal partial class BmsResultStatisticsGrid : CompositeDrawable
         [
             new StatisticCell(BmsStrings.GaugeHistory, gauge),
             new StatisticCell(BmsStrings.Timeline, timeline),
-            new StatisticCell(BmsStrings.HitScatter, scatter, scatter.TimingFilter),
-            new StatisticCell(BmsStrings.HitOffset, offset, offset.TimingFilter),
+            new StatisticCell(BmsStrings.HitScatter, scatter, scatter.LaneFilter, scatter.TimingFilter),
+            new StatisticCell(BmsStrings.HitOffset, offset, offset.LaneFilter, offset.TimingFilter),
         ];
 
         InternalChild = new OsuScrollContainer
@@ -95,7 +95,7 @@ internal partial class BmsResultStatisticsGrid : CompositeDrawable
         private readonly Drawable statistic;
         private readonly Drawable heading;
 
-        internal StatisticCell(LocalisableString name, Drawable statistic, Drawable? controls = null)
+        internal StatisticCell(LocalisableString name, Drawable statistic, BmsResultLaneFilter? lanes = null, BmsResultTimingFilter? timing = null)
         {
             this.statistic = statistic;
             RelativeSizeAxes = Axes.X;
@@ -104,14 +104,18 @@ internal partial class BmsResultStatisticsGrid : CompositeDrawable
             var title = new OsuSpriteText { Text = name, Font = OsuFont.GetFont(size: 17, weight: FontWeight.SemiBold) };
             heading = title;
 
-            if (controls != null)
+            if (lanes != null && timing != null)
             {
                 title.Anchor = title.Origin = Anchor.CentreLeft;
-                heading = new Container
+                title.Margin = new MarginPadding { Right = 8 };
+                timing.Margin = new MarginPadding { Left = 6 };
+                heading = new GridContainer
                 {
                     RelativeSizeAxes = Axes.X,
                     AutoSizeAxes = Axes.Y,
-                    Children = [title, controls],
+                    RowDimensions = [new Dimension(GridSizeMode.AutoSize)],
+                    ColumnDimensions = [new Dimension(GridSizeMode.AutoSize), new Dimension(), new Dimension(GridSizeMode.AutoSize)],
+                    Content = new[] { new Drawable[] { title, lanes, timing } },
                 };
             }
 
@@ -137,7 +141,6 @@ internal partial class BmsResultStatisticsGrid : CompositeDrawable
         internal void FitSummaryToHeight(float height)
         {
             var available = Math.Max(0, height - gap - content_padding * 2 - heading.DrawHeight - heading_spacing);
-            // Only the overall plots share the viewport budget; expanded key rows remain scrollable.
             (statistic as IBmsResultStatistic)?.FitSummaryToHeight(available);
         }
     }
