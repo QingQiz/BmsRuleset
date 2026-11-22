@@ -313,6 +313,49 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
             return Math.Abs(gauge.Top - timeline.Top) < 1 && gauge.Right < timeline.Left;
         });
         AddAssert("scatter and offset each occupy a full row", () => ChartsUseExpectedRows(screen));
+        AddAssert("timing filters align with the chart titles at the right edge", () =>
+        {
+            var grid = screen.ChildrenOfType<BmsResultStatisticsGrid>().Single();
+            var titles = grid.ChildrenOfType<SpriteText>().Where(text => text.Text.Equals(BmsStrings.HitScatter) || text.Text.Equals(BmsStrings.HitOffset))
+                .Select(text => text.ScreenSpaceDrawQuad.AABBFloat).OrderBy(bounds => bounds.Top).ToArray();
+            var filters = grid.ChildrenOfType<BmsResultTimingFilter>().Select(filter => filter.ScreenSpaceDrawQuad.AABBFloat)
+                .OrderBy(bounds => bounds.Top).ToArray();
+            var charts = new Drawable[] { grid.ChildrenOfType<BmsHitScatterStatistic>().Single(), grid.ChildrenOfType<BmsHitOffsetStatistic>().Single() };
+            if (titles.Length != 2 || filters.Length != 2)
+                return false;
+
+            return charts.Select((chart, index) =>
+            {
+                var bounds = chart.ScreenSpaceDrawQuad.AABBFloat;
+                var title = titles[index];
+                var filter = filters[index];
+                return Math.Abs(title.Centre.Y - filter.Centre.Y) < 1 && title.Right < filter.Left
+                                                      && Math.Abs(title.Left - bounds.Left) < 1 && Math.Abs(filter.Right - bounds.Right) < 1;
+            }).All(aligned => aligned);
+        });
+        AddAssert("both timing types start visible and both buttons are lit", () =>
+        {
+            var filters = screen.ChildrenOfType<BmsResultTimingFilter>().ToArray();
+            return filters.Length == 2 && filters.All(filter => filter.ShowPresses && filter.ShowReleases
+                                                                       && filter.Children.All(button => button.IconColour.A == 1));
+        });
+        AddStep("hide press timing on both charts", () =>
+        {
+            foreach (var filter in screen.ChildrenOfType<BmsResultTimingFilterButton>().Where(button => button.Name == "Press timing filter"))
+            {
+                InputManager.MoveMouseTo(filter);
+                InputManager.Click(MouseButton.Left);
+            }
+        });
+        AddUntilStep("both charts display the selected subset without expanding", () =>
+        {
+            var filters = screen.ChildrenOfType<BmsResultTimingFilter>();
+            var scatterLabels = screen.ChildrenOfType<BmsHitScatterStatistic>().Single().ChildrenOfType<SpriteText>();
+            var offsetLabels = screen.ChildrenOfType<BmsHitOffsetStatistic>().Single().ChildrenOfType<SpriteText>();
+            return ChartsFitViewport(screen) && filters.All(filter => filter.ShowReleases && !filter.ShowPresses)
+                                 && scatterLabels.Any(text => text.Text.Equals(BmsStrings.HitCount(0)))
+                                 && offsetLabels.Any(text => text.Text.Equals(BmsStrings.HitCount(0)));
+        });
         AddAssert("native tags absent", () => screen.ChildrenOfType<UserTagControl>(), () => Is.Empty);
         AddAssert("chart labels fit their cells", () => screen.ChildrenOfType<BmsResultStatisticsGrid>().Single()
             .ChildrenOfType<SpriteText>().Where(text =>

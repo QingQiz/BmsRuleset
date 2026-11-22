@@ -15,6 +15,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
 using osu.Game.Rulesets.Scoring;
 using osuTK;
 using osuTK.Graphics;
@@ -39,6 +40,8 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable, IBmsResul
     private Drawable overallRow = null!;
     private float summaryHeight = graph_height;
 
+    internal BmsResultTimingFilter TimingFilter { get; }
+
     private readonly GameplayProfile profile;
 
     internal BmsHitOffsetStatistic(HitOffsetStatistics statistics, GameplayProfile profile)
@@ -47,6 +50,7 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable, IBmsResul
         AutoSizeAxes = Axes.Y;
         this.statistics = statistics;
         this.profile = profile;
+        TimingFilter = new BmsResultTimingFilter(rebuild);
     }
 
     public override bool HandlePositionalInput => true;
@@ -117,13 +121,29 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable, IBmsResul
     private void rebuild()
     {
         content.Clear();
-        content.Add(overallRow = createRow(BmsStrings.Overall, statistics.Overall, summaryHeight));
+
+        var filtered = FilterStatistics(statistics, TimingFilter.ShowPresses, TimingFilter.ShowReleases);
+        content.Add(overallRow = createRow(BmsStrings.Overall, filtered.Overall, summaryHeight));
 
         if (expanded)
         {
-            foreach (var key in statistics.Keys)
+            foreach (var key in filtered.Keys)
                 content.Add(createRow(key.Label, key.Summary, key_graph_height));
         }
+    }
+
+    internal static HitOffsetStatistics FilterStatistics(HitOffsetStatistics statistics, bool showPresses, bool showReleases)
+    {
+        if (showPresses && showReleases)
+            return statistics;
+
+        var observations = statistics.Observations.Where(observation => observation.Hit.HitObject is BmsLongNoteTailHitObject ? showReleases : showPresses).ToArray();
+        var byColumn = observations.Where(observation => observation.Hit.HitObject is BmsHitObject)
+            .ToLookup(observation => ((BmsHitObject)observation.Hit.HitObject).Column);
+        return new HitOffsetStatistics(
+            createSummary(observations),
+            statistics.Keys.Select((key, column) => key with { Summary = createSummary(byColumn[column]) }).ToArray(),
+            observations);
     }
 
     void IBmsResultStatistic.FitSummaryToHeight(float height)

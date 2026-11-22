@@ -117,6 +117,20 @@ public class BmsReplaySimulationTest
             Assert.That(result.HitEvents.Select(entry => entry.Result), Is.EqualTo([HitResult.Great, HitResult.Perfect]));
             Assert.That(result.HitEvents.Select(entry => entry.TimeOffset), Is.EqualTo([40d, -10d]));
         });
+
+        var statistics = BmsResultStatisticsData.Create(new ScoreInfo(), beatmap, result.HitEvents,
+            BmsJudgementEventProjection.CreateScoringHitEvents(result.Judgements), result.Gauges);
+        var presses = BmsHitScatterStatistic.FilterData(statistics.Scatter.Overall, true, false);
+        var releases = BmsHitScatterStatistic.FilterData(statistics.Scatter.Overall, false, true);
+        var releaseOffsets = BmsHitOffsetStatistic.FilterStatistics(statistics.Offset, false, true);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(presses.Points.Select(point => (point.Time, point.Offset)), Is.EqualTo(new[] { (1000d, 40d) }));
+            Assert.That(releases.Points.Select(point => (point.Time, point.Offset)), Is.EqualTo(new[] { (2000d, -10d) }));
+            Assert.That(releaseOffsets.Keys[1].Summary.Count, Is.EqualTo(1));
+            Assert.That(releaseOffsets.Overall.AverageOffset, Is.EqualTo(-10));
+        });
     }
 
     [Test]

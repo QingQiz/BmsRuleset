@@ -6,6 +6,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
 
@@ -14,7 +15,6 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Result.Statistic;
 [TestFixture]
 public class BmsHitScatterStatisticTest
 {
-
     private static BmsBeatmap createBeatmap(BmsLayoutVariant variant) => new()
     {
         LayoutVariant = variant,
@@ -148,6 +148,33 @@ public class BmsHitScatterStatisticTest
             Assert.That(combined.OffsetRange, Is.EqualTo(200));
             Assert.That(combined.Points.Select(point => point.DisplayOffset(combined.OffsetRange)), Is.EqualTo(new[] { 200, -200, 187 }));
             Assert.That(combined.Points[0].Offset, Is.EqualTo(210));
+        });
+    }
+
+    [Test]
+    public void TestPressAndReleaseFiltersRecalculateScatterRange()
+    {
+        var data = BmsHitScatterStatistic.CreateData(BmsGameplayProfile.INSTANCE,
+        [
+            new HitEvent(35, 1, HitResult.Great, new BmsNote { StartTime = 1000 }, null, null),
+            new HitEvent(-60, 1, HitResult.Great, new BmsNote { StartTime = 2000 }, null, null),
+            new HitEvent(270, 1, HitResult.Great, new BmsLongNoteTailHitObject { StartTime = 3000 }, null, null),
+        ], 4000);
+
+        var all = BmsHitScatterStatistic.FilterData(data, true, true);
+        var press = BmsHitScatterStatistic.FilterData(data, true, false);
+        var release = BmsHitScatterStatistic.FilterData(data, false, true);
+        var none = BmsHitScatterStatistic.FilterData(data, false, false);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(all.Points, Has.Count.EqualTo(3));
+            Assert.That(press.Points.Select(point => point.Offset), Is.EqualTo([35, -60]));
+            Assert.That(press.OffsetRange, Is.EqualTo(150));
+            Assert.That(release.Points.Select(point => point.Offset), Is.EqualTo([270]));
+            Assert.That(release.OffsetRange, Is.EqualTo(300));
+            Assert.That(none.Points, Is.Empty);
+            Assert.That(none.Duration, Is.EqualTo(4000));
         });
     }
 }

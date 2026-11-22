@@ -14,7 +14,6 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Result.Statistic;
 [TestFixture]
 public class BmsJudgementEventConsumerTest
 {
-
     private static (ScoreInfo Score, BmsJudgementEvent[] Events) createStandardLongNoteScore(HitResult result)
     {
         var longNote = new BmsLongNote { StartTime = 1000, Duration = 500, Column = 1 };
@@ -44,6 +43,20 @@ public class BmsJudgementEventConsumerTest
             new BmsNote { StartTime = 2000, Column = 2 },
         },
     };
+
+    [Test]
+    public void TestTimingProjectionMarksLongNoteRelease()
+    {
+        var score = createStandardLongNoteScore(HitResult.Great);
+        var data = BmsHitScatterStatistic.CreateStatistics(BmsGameplayProfile.INSTANCE, createBeatmap(), score.Score.HitEvents);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(score.Score.HitEvents[0].HitObject, Is.TypeOf<BmsNote>());
+            Assert.That(score.Score.HitEvents[1].HitObject, Is.TypeOf<BmsLongNoteTailHitObject>());
+            Assert.That(data.Overall.Points.Select(point => point.IsRelease), Is.EqualTo([false, true]));
+        });
+    }
 
     [Test]
     public void TestTimelineUsesCanonicalResultAndBothTimingObservations()

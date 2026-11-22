@@ -24,6 +24,8 @@
   <data name="timeline" xml:space="preserve"><value>Timeline</value></data>
   <data name="hit_scatter" xml:space="preserve"><value>Hit Scatter</value></data>
   <data name="hit_offset" xml:space="preserve"><value>Hit Offset</value></data>
+  <data name="result_timing_press" xml:space="preserve"><value>Toggle press timings</value></data>
+  <data name="result_timing_release" xml:space="preserve"><value>Toggle release timings</value></data>
   <data name="result_statistics_require_replay" xml:space="preserve"><value>Watch the replay to view detailed statistics.</value></data>
   <data name="result_statistics_unavailable" xml:space="preserve"><value>Statistics could not be loaded.</value></data>
   <data name="result_performance" xml:space="preserve"><value>Performance</value></data>

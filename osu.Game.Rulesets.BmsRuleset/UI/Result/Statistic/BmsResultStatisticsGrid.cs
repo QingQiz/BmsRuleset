@@ -43,8 +43,8 @@ internal partial class BmsResultStatisticsGrid : CompositeDrawable
         [
             new StatisticCell(BmsStrings.GaugeHistory, gauge),
             new StatisticCell(BmsStrings.Timeline, timeline),
-            new StatisticCell(BmsStrings.HitScatter, scatter),
-            new StatisticCell(BmsStrings.HitOffset, offset),
+            new StatisticCell(BmsStrings.HitScatter, scatter, scatter.TimingFilter),
+            new StatisticCell(BmsStrings.HitOffset, offset, offset.TimingFilter),
         ];
 
         InternalChild = new OsuScrollContainer
@@ -93,14 +93,28 @@ internal partial class BmsResultStatisticsGrid : CompositeDrawable
     private partial class StatisticCell : CompositeDrawable
     {
         private readonly Drawable statistic;
-        private readonly OsuSpriteText heading;
+        private readonly Drawable heading;
 
-        internal StatisticCell(LocalisableString name, Drawable statistic)
+        internal StatisticCell(LocalisableString name, Drawable statistic, Drawable? controls = null)
         {
             this.statistic = statistic;
             RelativeSizeAxes = Axes.X;
             AutoSizeAxes = Axes.Y;
             Padding = new MarginPadding(gap / 2);
+            var title = new OsuSpriteText { Text = name, Font = OsuFont.GetFont(size: 17, weight: FontWeight.SemiBold) };
+            heading = title;
+
+            if (controls != null)
+            {
+                title.Anchor = title.Origin = Anchor.CentreLeft;
+                heading = new Container
+                {
+                    RelativeSizeAxes = Axes.X,
+                    AutoSizeAxes = Axes.Y,
+                    Children = [title, controls],
+                };
+            }
+
             InternalChildren =
             [
                 BmsResultSection.CreateBackground(),
@@ -113,7 +127,7 @@ internal partial class BmsResultStatisticsGrid : CompositeDrawable
                     Spacing = new Vector2(0, heading_spacing),
                     Children =
                     [
-                        heading = new OsuSpriteText { Text = name, Font = OsuFont.GetFont(size: 17, weight: FontWeight.SemiBold) },
+                        heading,
                         statistic,
                     ],
                 },

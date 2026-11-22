@@ -234,7 +234,6 @@ public partial class BmsScoreProcessor : ScoreProcessor
             return frameworkEvent;
 
         return BmsJudgementEventProjection.CreateTimingHitEvent(
-            judgementEvent.Source,
             judgementEvent.TimingObservations[^1],
             timingHitEvent!.Value.HitObject,
             frameworkEvent.LastHitObject);
@@ -250,14 +249,13 @@ public partial class BmsScoreProcessor : ScoreProcessor
         }).Order(JudgementOrderComparer.DEFAULT);
 
     private BmsNote createEndpoint(BmsLongNote note, BmsLongNoteEndpointKind kind)
-        => new()
-        {
-            StartTime = kind == BmsLongNoteEndpointKind.Head ? note.StartTime : note.EndTime,
-            Column = note.Column,
-            Beatmap = note.Beatmap,
-            HitWindows = profile.CreateHitWindows(note, EngineChart.TimingFor(note),
-                kind == BmsLongNoteEndpointKind.Head ? NoteParts.HEAD : NoteParts.TAIL),
-        };
+    {
+        var isTail = kind == BmsLongNoteEndpointKind.Tail;
+        var endpoint = BmsJudgementEventProjection.CreateTimingNote(note.Column, isTail ? note.EndTime : note.StartTime, isTail);
+        endpoint.Beatmap = note.Beatmap;
+        endpoint.HitWindows = profile.CreateHitWindows(note, EngineChart.TimingFor(note), isTail ? NoteParts.TAIL : NoteParts.HEAD);
+        return endpoint;
+    }
 
     private HitEvent? addJudgementEvent(BmsJudgementEvent judgementEvent, HitObject? sourceHitObject = null)
     {
@@ -279,7 +277,7 @@ public partial class BmsScoreProcessor : ScoreProcessor
             // and long-note endpoints need a projected object for the timing timeline.
             var hitObject = sourceHitObject is BmsNote or BmsLandmine
                 ? sourceHitObject
-                : BmsJudgementEventProjection.CreateTimingHitEvent(judgementEvent.Source, observation, null).HitObject;
+                : BmsJudgementEventProjection.CreateTimingHitObject(judgementEvent.Source, observation);
 
             timingHitEventEntries.Insert(insertionIndex, new TimingHitEventEntry(observation, hitObject));
             timingHitEvents.Insert(insertionIndex, createTimingHitEvent(insertionIndex));
@@ -315,13 +313,8 @@ public partial class BmsScoreProcessor : ScoreProcessor
     private HitEvent createTimingHitEvent(int index)
     {
         var entry = timingHitEventEntries[index];
-        return new HitEvent(
-            entry.Observation.TimeOffset,
-            entry.Observation.GameplayRate,
-            entry.Observation.Result,
-            entry.HitObject,
-            index == 0 ? null : timingHitEvents[index - 1].HitObject,
-            null);
+        return BmsJudgementEventProjection.CreateTimingHitEvent(entry.Observation, entry.HitObject,
+            index == 0 ? null : timingHitEvents[index - 1].HitObject);
     }
 
     private void repairNextTimingHitEvent(int index)

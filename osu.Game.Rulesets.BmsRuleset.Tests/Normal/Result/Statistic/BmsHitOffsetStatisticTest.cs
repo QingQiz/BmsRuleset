@@ -9,6 +9,7 @@ using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
@@ -57,6 +58,8 @@ public class BmsHitOffsetStatisticTest
         {
             Assert.That(score.HitEvents.Select(e => e.TimeOffset), Is.EqualTo([-13, 19]));
             Assert.That(score.HitEvents.Select(e => e.HitObject.StartTime), Is.EqualTo([1000, 1500]));
+            Assert.That(score.HitEvents[0].HitObject, Is.TypeOf<BmsNote>());
+            Assert.That(score.HitEvents[1].HitObject, Is.TypeOf<BmsLongNoteTailHitObject>());
             Assert.That(score.HitEvents.Select(e => e.TimeOffset), Does.Not.Contain(0));
             Assert.That(statistics.Overall.Count, Is.EqualTo(2));
             Assert.That(statistics.Overall.BinsByResult.Values.SelectMany(b => b).Sum(), Is.EqualTo(2));
@@ -164,5 +167,33 @@ public class BmsHitOffsetStatisticTest
         Assert.That(statistics.Keys[1].Summary.StandardDeviation, Is.EqualTo(25).Within(0.001));
         Assert.That(statistics.Keys[2].Summary.Count, Is.Zero);
         Assert.That(statistics.Keys[2].Summary.StandardDeviation, Is.Zero);
+    }
+
+    [Test]
+    public void TestPressAndReleaseFiltersRecalculateOffsetSummary()
+    {
+        var statistics = BmsHitOffsetStatistic.CreateStatistics(BmsGameplayProfile.INSTANCE,
+            createBeatmap(BmsLayoutVariant.Bms5K),
+            [
+                new HitEvent(20, 1, HitResult.Great, new BmsNote { Column = 0, StartTime = 1000 }, null, null),
+                new HitEvent(40, 1, HitResult.Great, new BmsNote { Column = 0, StartTime = 2000 }, null, null),
+                new HitEvent(-10, 1, HitResult.Great, new BmsLongNoteTailHitObject { Column = 0, StartTime = 3000 }, null, null),
+            ]);
+
+        var press = BmsHitOffsetStatistic.FilterStatistics(statistics, true, false);
+        var release = BmsHitOffsetStatistic.FilterStatistics(statistics, false, true);
+        var none = BmsHitOffsetStatistic.FilterStatistics(statistics, false, false);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(press.Overall.Count, Is.EqualTo(2));
+            Assert.That(press.Overall.AverageOffset, Is.EqualTo(30));
+            Assert.That(press.Overall.BinsByResult[HitResult.Great].Sum(), Is.EqualTo(2));
+            Assert.That(release.Overall.Count, Is.EqualTo(1));
+            Assert.That(release.Overall.AverageOffset, Is.EqualTo(-10));
+            Assert.That(release.Keys[0].Summary.Count, Is.EqualTo(1));
+            Assert.That(none.Overall.Count, Is.Zero);
+            Assert.That(none.Overall.BinsByResult, Is.Empty);
+        });
     }
 }

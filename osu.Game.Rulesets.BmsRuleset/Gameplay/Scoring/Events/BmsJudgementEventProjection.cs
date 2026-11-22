@@ -61,7 +61,7 @@ public static class BmsJudgementEventProjection
 
         foreach (var (source, observation) in observations)
         {
-            var hitEvent = CreateTimingHitEvent(source, observation, lastHitObject);
+            var hitEvent = CreateTimingHitEvent(observation, CreateTimingHitObject(source, observation), lastHitObject);
             hitEvents.Add(hitEvent);
             lastHitObject = hitEvent.HitObject;
         }
@@ -75,10 +75,7 @@ public static class BmsJudgementEventProjection
         ActualTime = observation.ActualTime - timeOrigin,
     };
 
-    internal static HitEvent CreateTimingHitEvent(BmsJudgementSource source, BmsTimingObservation observation, HitObject? lastHitObject)
-        => CreateTimingHitEvent(source, observation, createObservationHitObject(source, observation), lastHitObject);
-
-    internal static HitEvent CreateTimingHitEvent(BmsJudgementSource source, BmsTimingObservation observation, HitObject hitObject, HitObject? lastHitObject)
+    internal static HitEvent CreateTimingHitEvent(BmsTimingObservation observation, HitObject hitObject, HitObject? lastHitObject)
         => new(
             observation.TimeOffset,
             observation.GameplayRate,
@@ -90,26 +87,23 @@ public static class BmsJudgementEventProjection
 
     private static HitObject createScoringHitObject(BmsJudgementSource source, BmsTimingObservation observation)
     {
-        if (source.Kind == BmsJudgementSourceKind.NonConsumingHit)
-            return createNote(source, observation.ExpectedTime);
-
-        if (source.Kind == BmsJudgementSourceKind.LongNote
-            && observation.Kind == BmsTimingObservationKind.LongNoteHead)
-            return createNote(source, observation.ExpectedTime);
+        if (source.Kind == BmsJudgementSourceKind.NonConsumingHit
+            || (source.Kind == BmsJudgementSourceKind.LongNote && observation.Kind == BmsTimingObservationKind.LongNoteHead))
+            return CreateTimingNote(source.Column, observation.ExpectedTime);
 
         return createHitObject(source);
     }
 
-    private static HitObject createObservationHitObject(BmsJudgementSource source, BmsTimingObservation observation)
+    internal static HitObject CreateTimingHitObject(BmsJudgementSource source, BmsTimingObservation observation)
     {
-        if (source.Kind == BmsJudgementSourceKind.NonConsumingHit)
-            return createNote(source, observation.ExpectedTime);
-
-        if (source.Kind == BmsJudgementSourceKind.LongNote
-            && observation.Kind is BmsTimingObservationKind.LongNoteHead or BmsTimingObservationKind.LongNoteTail)
-            return createNote(source, observation.ExpectedTime);
-
-        return createHitObject(source);
+        // Independently scored endpoints have a note-shaped source, so the observation owns endpoint identity.
+        return observation.Kind switch
+        {
+            BmsTimingObservationKind.LongNoteTail => CreateTimingNote(source.Column, observation.ExpectedTime, isTail: true),
+            BmsTimingObservationKind.LongNoteHead => CreateTimingNote(source.Column, observation.ExpectedTime),
+            _ when source.Kind == BmsJudgementSourceKind.NonConsumingHit => CreateTimingNote(source.Column, observation.ExpectedTime),
+            _ => createHitObject(source),
+        };
     }
 
     private static HitObject createHitObject(BmsJudgementSource source)
@@ -130,9 +124,13 @@ public static class BmsJudgementEventProjection
         return hitObject;
     }
 
-    private static BmsNote createNote(BmsJudgementSource source, double startTime) => new()
+    internal static BmsNote CreateTimingNote(int column, double time, bool isTail = false)
     {
-        StartTime = startTime,
-        Column = source.Column,
-    };
+        var note = isTail ? new BmsLongNoteTailHitObject() : new BmsNote();
+        note.StartTime = time;
+        note.Column = column;
+        return note;
+    }
 }
+
+internal sealed class BmsLongNoteTailHitObject : BmsNote;

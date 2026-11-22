@@ -229,6 +229,10 @@ public static class BmsStrings
 
     public static LocalisableString HitOffset => get("hit_offset");
 
+    public static LocalisableString ResultTimingPress => get("result_timing_press");
+
+    public static LocalisableString ResultTimingRelease => get("result_timing_release");
+
     public static LocalisableString ResultStatisticsRequireReplay => get("result_statistics_require_replay");
 
     public static LocalisableString ResultStatisticsUnavailable => get("result_statistics_unavailable");
