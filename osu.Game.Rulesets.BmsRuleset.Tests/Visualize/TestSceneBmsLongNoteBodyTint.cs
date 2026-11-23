@@ -204,12 +204,12 @@ public partial class TestSceneBmsLongNoteBodyTint : BmsPlayerTestScene
         AddUntilStep("tail non-poor clears long note", () => Playfield.GetAliveObjectAtTime(second_start_time) == null);
     }
 
-    [TestCase(BmsLongNoteMode.LongNote, -165, false, 0f, null)]
-    [TestCase(BmsLongNoteMode.ChargeNote, -165, false, 0f, null)]
-    [TestCase(BmsLongNoteMode.LongNote, -120, false, 0f, null)]
-    [TestCase(BmsLongNoteMode.ChargeNote, -120, false, 0f, null)]
-    [TestCase(BmsLongNoteMode.LongNote, -90, false, 0f, null)]
-    [TestCase(BmsLongNoteMode.ChargeNote, -90, false, 0f, null)]
+    [TestCase(BmsLongNoteMode.LongNote, -165, true, 0.4f, null)]
+    [TestCase(BmsLongNoteMode.ChargeNote, -165, true, 0.4f, null)]
+    [TestCase(BmsLongNoteMode.LongNote, -120, true, 0.4f, null)]
+    [TestCase(BmsLongNoteMode.ChargeNote, -120, true, 0.4f, null)]
+    [TestCase(BmsLongNoteMode.LongNote, -90, true, 0.4f, null)]
+    [TestCase(BmsLongNoteMode.ChargeNote, -90, true, 0.4f, null)]
     [TestCase(BmsLongNoteMode.HellChargeNote, -165, true, 0.4f, null)]
     [TestCase(BmsLongNoteMode.HellChargeNote, -120, true, 1f, null)]
     [TestCase(BmsLongNoteMode.HellChargeNote, -90, true, 1f, null)]
@@ -222,7 +222,7 @@ public partial class TestSceneBmsLongNoteBodyTint : BmsPlayerTestScene
     [TestCase(BmsLongNoteMode.LongNote, -30, false, 0f, false)]
     public void TestEarlyTailWindowBodyVisibility(BmsLongNoteMode noteMode, double releaseOffset, bool visible, float alpha, bool? useLazer)
     {
-        AddStep("set release inside tail window", () =>
+        AddStep("configure tail release", () =>
         {
             mode = noteMode;
             this.useLazer = useLazer;

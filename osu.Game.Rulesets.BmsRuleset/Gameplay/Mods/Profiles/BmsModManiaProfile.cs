@@ -179,13 +179,17 @@ public partial class BmsModManiaProfile : Mod, IApplicableToGameplayProfile, IAp
             var head = snapshot.Parts.Single(part => part.Part == NoteParts.HEAD);
             var tail = snapshot.Parts.Single(part => part.Part == NoteParts.TAIL);
             var body = snapshot.Parts.Single(part => part.Part == NoteParts.BODY);
-            var feedback = hold_feedback.Resolve(body.Active && context.Held, body.Reason == HoldReasons.DROP);
-            return new BmsLongNotePresentation(head.Resolved, true, !tail.Resolved,
-                tail.Resolved, true, note.EndTime + context.Timing.TailDeadline / 1000.0 + 100)
+            var broken = body.Reason == HoldReasons.DROP;
+            var feedback = hold_feedback.Resolve(body.Active && context.Held, broken);
+            // Stable leaves the dimmed remainder of a recovered hold on screen after the tail hit.
+            var keepSettledBody = !useLazer && broken && tail.Resolved && HitResultFor(tail.Result).IsHit() && context.Time < note.EndTime;
+            var keepBody = !tail.Resolved || keepSettledBody;
+            return new BmsLongNotePresentation(head.Resolved, true, keepBody,
+                !keepBody, true, keepSettledBody ? note.EndTime : note.EndTime + context.Timing.TailDeadline / 1000.0 + 100)
             {
                 PrepareHeadPin = head.Resolved && !tail.Resolved,
                 HeadReached = context.Time >= note.StartTime,
-                KeepVisibleAfterHit = !tail.Resolved,
+                KeepVisibleAfterHit = keepBody,
             }.WithHoldFeedback(feedback, head.Resolved);
         }
 

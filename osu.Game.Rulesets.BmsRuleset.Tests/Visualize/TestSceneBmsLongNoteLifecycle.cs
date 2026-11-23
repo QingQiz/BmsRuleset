@@ -131,17 +131,17 @@ public partial class TestSceneBmsLongNoteLifecycle : BmsPlayerTestScene
         capture("retired again");
     }
 
-    [TestCase(BmsLongNoteMode.LongNote, 5500, true)]
-    [TestCase(BmsLongNoteMode.LongNote, 6834.999, true)]
-    [TestCase(BmsLongNoteMode.LongNote, 6835, false)]
-    [TestCase(BmsLongNoteMode.LongNote, 6840, false)]
-    [TestCase(BmsLongNoteMode.LongNote, 6950, false)]
-    [TestCase(BmsLongNoteMode.ChargeNote, 5500, true)]
-    [TestCase(BmsLongNoteMode.ChargeNote, 6834.999, true)]
-    [TestCase(BmsLongNoteMode.ChargeNote, 6835, false)]
-    [TestCase(BmsLongNoteMode.ChargeNote, 6840, false)]
-    [TestCase(BmsLongNoteMode.ChargeNote, 6950, false)]
-    public void EarlyTailVisibilityTracksWindowAcrossRewind(BmsLongNoteMode longNoteMode, double releaseTime, bool keepBody)
+    [TestCase(BmsLongNoteMode.LongNote, 5500)]
+    [TestCase(BmsLongNoteMode.LongNote, 6834.999)]
+    [TestCase(BmsLongNoteMode.LongNote, 6835)]
+    [TestCase(BmsLongNoteMode.LongNote, 6840)]
+    [TestCase(BmsLongNoteMode.LongNote, 6950)]
+    [TestCase(BmsLongNoteMode.ChargeNote, 5500)]
+    [TestCase(BmsLongNoteMode.ChargeNote, 6834.999)]
+    [TestCase(BmsLongNoteMode.ChargeNote, 6835)]
+    [TestCase(BmsLongNoteMode.ChargeNote, 6840)]
+    [TestCase(BmsLongNoteMode.ChargeNote, 6950)]
+    public void SettledBodyStaysDimAcrossRewind(BmsLongNoteMode longNoteMode, double releaseTime)
     {
         AddStep("load long notes", () =>
         {
@@ -158,19 +158,6 @@ public partial class TestSceneBmsLongNoteLifecycle : BmsPlayerTestScene
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
         seek(5000);
         seek(releaseTime);
-        AddStep("released body survives defaults", () =>
-        {
-            var drawable = Playfield.GetAliveObjectAtTime(5000);
-            var note = Playfield.Beatmap.HitObjects.OfType<BmsLongNote>().First();
-
-            if (!keepBody)
-            {
-                Assert.That(drawable == null || drawable.Alpha == 0, Is.True);
-                note.ApplyDefaults(Playfield.Beatmap.ControlPointInfo, Playfield.Beatmap.Difficulty);
-                drawable = Playfield.GetAliveObjectAtTime(5000);
-                Assert.That(drawable == null || drawable.Alpha == 0, Is.True, "Reapplying defaults must preserve settled tail visibility.");
-            }
-        });
         assertReleasedBody();
         seek(6999);
         assertReleasedBody();
@@ -183,17 +170,11 @@ public partial class TestSceneBmsLongNoteLifecycle : BmsPlayerTestScene
 
         void assertReleasedBody()
         {
-            AddStep("settled body visibility follows release window", () =>
+            AddStep("settled body is visible and dim", () =>
             {
                 var note = Playfield.Beatmap.HitObjects.OfType<BmsLongNote>().First();
                 Assert.That(((BmsColumn)Playfield.Stage.Columns[1]).Judgements.GetLongNoteState(note).TailJudged, Is.True);
                 var drawable = Playfield.GetAliveObjectAtTime(5000);
-
-                if (!keepBody)
-                {
-                    Assert.That(drawable == null || drawable.Alpha == 0, Is.True);
-                    return;
-                }
 
                 Assert.That(drawable, Is.Not.Null);
                 Assert.That(drawable!.Alpha, Is.EqualTo(1));

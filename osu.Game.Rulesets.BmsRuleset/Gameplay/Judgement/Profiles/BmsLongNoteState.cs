@@ -13,7 +13,7 @@ internal readonly record struct BmsLongNoteState(
     bool TailJudged,
     HitResult HeadResult,
     HitResult TailResult,
-    bool EarlyReleaseOutsideWindow = false,
+    bool TailReleased = false,
     bool BodyBroken = false)
 {
     internal static BmsLongNoteState From(BmsLongNote note, NoteSnapshot snapshot, double time, GameplayProfile profile)
@@ -23,11 +23,12 @@ internal readonly record struct BmsLongNoteState(
         var body = snapshot.Parts.Single(p => p.Part == NoteParts.BODY);
         var headResult = profile.HitResultFor(head.Result);
         var tailResult = profile.HitResultFor(tail.Result);
-        var started = body.Reason != HoldReasons.HOST_END && (note.Kind == KeyNoteKind.SustainHold
+        var ended = body.Reason == HoldReasons.HOST_END;
+        var started = !ended && (note.Kind == KeyNoteKind.SustainHold
             ? head.Resolved && !body.Resolved
             : head.Resolved && headResult != HitResult.Meh && (!tail.Resolved || (tailResult == HitResult.Meh && time <= note.EndTime + 50)));
         return new BmsLongNoteState(head.Resolved, started, tail.Resolved, headResult, tailResult,
-            tail.Reason == HoldReasons.DROP, body.Reason == HoldReasons.DROP);
+            !ended && (tail.Reason == HoldReasons.RELEASE || tail.Reason == HoldReasons.DROP), body.Reason == HoldReasons.DROP);
     }
 
     internal bool IsHolding => LongNoteStarted && !TailJudged;

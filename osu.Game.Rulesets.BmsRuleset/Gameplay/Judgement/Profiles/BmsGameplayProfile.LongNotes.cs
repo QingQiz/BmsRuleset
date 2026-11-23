@@ -14,28 +14,17 @@ internal sealed partial class BmsGameplayProfile
     internal override BmsLongNotePresentation LongNotePresentation(BmsLongNote note, NoteSnapshot snapshot, in BmsLongNotePresentationContext context)
     {
         var state = BmsLongNoteState.From(note, snapshot, context.Time, this);
-        return note.Kind switch
-        {
-            KeyNoteKind.ReleaseHold => chargeNote(note, state, context),
-            KeyNoteKind.SustainHold => hellChargeNote(note, state, context),
-            _ => longNote(note, state, context),
-        };
+        return note.Kind == KeyNoteKind.SustainHold ? hellChargeNote(note, state, context) : longNote(note, state, context);
     }
 
     private static BmsLongNotePresentation longNote(BmsLongNote note, in BmsLongNoteState state, in BmsLongNotePresentationContext context)
     {
-        var keepBody = state.TailJudged && state.EarlyReleaseOutsideWindow && context.Time < note.EndTime;
-        return complete(new BmsLongNotePresentation(state.HeadJudged, false, keepBody,
+        var charge = note.Kind == KeyNoteKind.ReleaseHold;
+        // Releasing ends the judgement, but the visible remainder still has to scroll to the line.
+        var keepBody = state.TailReleased && context.Time < note.EndTime;
+        return complete(new BmsLongNotePresentation(state.HeadJudged, charge, keepBody,
             state.TailJudged && !state.LongNoteStarted && state.HeadResult != HitResult.Meh && !keepBody, state.TailResult != HitResult.Meh,
-            note.EndTime), note, state, context);
-    }
-
-    private static BmsLongNotePresentation chargeNote(BmsLongNote note, in BmsLongNoteState state, in BmsLongNotePresentationContext context)
-    {
-        var keepBody = state.TailJudged && state.EarlyReleaseOutsideWindow && context.Time < note.EndTime;
-        return complete(new BmsLongNotePresentation(state.HeadJudged, true, keepBody,
-            state.TailJudged && !state.LongNoteStarted && state.HeadResult != HitResult.Meh && !keepBody, state.TailResult != HitResult.Meh,
-            state.TailJudged ? note.EndTime : chargeLifetimeEnd(note, context)), note, state, context);
+            charge && !state.TailJudged ? chargeLifetimeEnd(note, context) : note.EndTime), note, state, context);
     }
 
     private static BmsLongNotePresentation hellChargeNote(BmsLongNote note, in BmsLongNoteState state, in BmsLongNotePresentationContext context)

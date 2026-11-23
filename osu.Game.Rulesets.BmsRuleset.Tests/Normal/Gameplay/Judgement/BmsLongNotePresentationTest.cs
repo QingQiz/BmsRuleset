@@ -37,6 +37,8 @@ public class BmsLongNotePresentationTest
         var (run, next) = createAdjacentNotes(BmsLongNoteMode.LongNote, lr2: true);
         run.Press(1000);
         run.Release(releaseTime);
+        assertReleasedBody(run, releaseTime);
+
         Assert.That(run.Repress(pressTime), Is.True);
         Assert.That(run.Output.GetMainResult(next).Type, Is.EqualTo(HitResult.Perfect));
     }
@@ -164,38 +166,11 @@ public class BmsLongNotePresentationTest
     [TestCase(BmsLongNoteMode.LongNote, 1289.999, HitResult.Ok)]
     [TestCase(BmsLongNoteMode.ChargeNote, 1100, HitResult.Meh)]
     [TestCase(BmsLongNoteMode.ChargeNote, 1289.999, HitResult.Meh)]
-    public void OutOfWindowReleaseKeepsBodyUntilEnd(BmsLongNoteMode mode, double releaseTime, HitResult expected)
-    {
-        var run = new BmsLongNoteTestContext(mode);
-        run.Press(1000);
-        run.Release(releaseTime);
-
-        Assert.That(run.State.TailJudged, Is.True);
-        Assert.That(run.State.TailResult, Is.EqualTo(expected));
-        Assert.That(run.State.EarlyReleaseOutsideWindow, Is.True);
-        double[] times = [releaseTime, 1499];
-        bool[] heldInputs = [false, true];
-        foreach (var time in times)
-        {
-            foreach (var heldInput in heldInputs)
-            {
-                var current = run.Presentation(heldInput, time);
-                Assert.That(current.Retired || current.HoldingBody || current.HoldLightActive, Is.False);
-                Assert.That(current.KeepAlive && current.KeepVisibleAfterHit && current.ReleasedStyle, Is.True);
-                Assert.That(current.LifetimeEnd, Is.EqualTo(run.Note.EndTime));
-            }
-        }
-    }
-
     [TestCase(BmsLongNoteMode.LongNote, 1335, HitResult.Ok)]
-    [TestCase(BmsLongNoteMode.LongNote, 1340, HitResult.Ok)]
-    [TestCase(BmsLongNoteMode.LongNote, 1390, HitResult.Great)]
-    [TestCase(BmsLongNoteMode.LongNote, 1490, HitResult.Perfect)]
     [TestCase(BmsLongNoteMode.ChargeNote, 1335, HitResult.Ok)]
-    [TestCase(BmsLongNoteMode.ChargeNote, 1340, HitResult.Ok)]
-    [TestCase(BmsLongNoteMode.ChargeNote, 1390, HitResult.Great)]
+    [TestCase(BmsLongNoteMode.LongNote, 1490, HitResult.Perfect)]
     [TestCase(BmsLongNoteMode.ChargeNote, 1490, HitResult.Perfect)]
-    public void InWindowTailHidesImmediately(BmsLongNoteMode mode, double releaseTime, HitResult expected)
+    public void EarlyReleaseKeepsSettledBodyDimUntilEnd(BmsLongNoteMode mode, double releaseTime, HitResult expected)
     {
         var run = new BmsLongNoteTestContext(mode);
         run.Press(1000);
@@ -203,34 +178,28 @@ public class BmsLongNotePresentationTest
 
         Assert.That(run.State.TailJudged, Is.True);
         Assert.That(run.State.TailResult, Is.EqualTo(expected));
-        Assert.That(run.State.EarlyReleaseOutsideWindow, Is.False);
-        var current = run.Presentation(false, releaseTime);
-        Assert.That(current.Retired && current.ClearBodyOnRetire, Is.True);
-        Assert.That(current.KeepAlive || current.KeepVisibleAfterHit || current.ReleasedStyle, Is.False);
+        assertReleasedBody(run, releaseTime);
+        assertReleasedBody(run, 1499, held: true);
+        Assert.That(run.Presentation(false, 1500).KeepAlive, Is.False);
     }
 
-    [TestCase(BmsLongNoteMode.LongNote, 1289.999, true)]
-    [TestCase(BmsLongNoteMode.LongNote, 1335, false)]
-    [TestCase(BmsLongNoteMode.ChargeNote, 1289.999, true)]
-    [TestCase(BmsLongNoteMode.ChargeNote, 1335, false)]
-    public void DelayedFrameUsesReleaseWindowInsteadOfApplicationTime(BmsLongNoteMode mode, double releaseTime, bool keepBody)
+    [TestCase(BmsLongNoteMode.LongNote)]
+    [TestCase(BmsLongNoteMode.ChargeNote)]
+    public void LateFrameDoesNotExtendSettledBodyPastEnd(BmsLongNoteMode mode)
     {
         var run = new BmsLongNoteTestContext(mode);
         run.Press(1000);
-        run.Release(releaseTime, 1499);
+        run.Release(1490, 1501);
 
-        Assert.That(run.Column.GetNote(run.Note).Parts[2].Time / 1000.0, Is.EqualTo(releaseTime));
-        Assert.That(run.State.EarlyReleaseOutsideWindow, Is.EqualTo(keepBody));
-        var current = run.Presentation(false, 1499);
-        Assert.That(current.Retired, Is.EqualTo(!keepBody));
-        Assert.That(current.KeepAlive, Is.EqualTo(keepBody));
+        Assert.That(run.Column.GetNote(run.Note).Parts[2].Time / 1000.0, Is.EqualTo(1490));
+        Assert.That(run.Presentation(false, 1501).Retired, Is.True);
     }
 
-    [TestCase(BmsLongNoteMode.LongNote, 1100, true)]
-    [TestCase(BmsLongNoteMode.LongNote, 1250, false)]
-    [TestCase(BmsLongNoteMode.ChargeNote, 1100, true)]
-    [TestCase(BmsLongNoteMode.ChargeNote, 1250, false)]
-    public void ReleaseMarginExpiryPreservesReleaseWindow(BmsLongNoteMode mode, double releaseTime, bool keepBody)
+    [TestCase(BmsLongNoteMode.LongNote, 1100)]
+    [TestCase(BmsLongNoteMode.LongNote, 1250)]
+    [TestCase(BmsLongNoteMode.ChargeNote, 1100)]
+    [TestCase(BmsLongNoteMode.ChargeNote, 1250)]
+    public void ReleaseMarginExpiryKeepsRemainingBodyDim(BmsLongNoteMode mode, double releaseTime)
     {
         var run = new BmsLongNoteTestContext(mode, layout: BmsLayoutVariant.Popn9K);
         run.Press(1000);
@@ -241,32 +210,11 @@ public class BmsLongNotePresentationTest
 
         run.Frame(releaseTime + 200, 1, false);
         Assert.That(run.State.TailJudged, Is.True);
-        Assert.That(run.State.EarlyReleaseOutsideWindow, Is.EqualTo(keepBody));
-        var current = run.Presentation(false, releaseTime + 200);
-        Assert.That(current.Retired, Is.EqualTo(!keepBody));
-        Assert.That(current.KeepAlive && current.ReleasedStyle, Is.EqualTo(keepBody));
-        Assert.That(current.LifetimeEnd, Is.EqualTo(run.Note.EndTime));
-    }
-
-    [TestCase(BmsLongNoteMode.LongNote)]
-    [TestCase(BmsLongNoteMode.ChargeNote)]
-    public void RewindClearsOutOfWindowBreakBeforeInWindowRelease(BmsLongNoteMode mode)
-    {
-        var run = new BmsLongNoteTestContext(mode);
-        run.Press(1000);
-        run.Release(1100);
-        Assert.That(run.State.EarlyReleaseOutsideWindow, Is.True);
-
-        run.Rewind(1050);
-        Assert.That(run.State.TailJudged || run.State.EarlyReleaseOutsideWindow, Is.False);
-        run.Release(1490);
-        Assert.That(run.State.TailJudged, Is.True);
-        Assert.That(run.State.EarlyReleaseOutsideWindow, Is.False);
-        Assert.That(run.Presentation(false, 1490).Retired, Is.True);
+        assertReleasedBody(run, releaseTime + 200);
     }
 
     [Test]
-    public void HeadBadDoesNotKeepAnInWindowTailVisible()
+    public void BadHeadGradeStillAllowsReleasedBodyToScroll()
     {
         var run = new BmsLongNoteTestContext(BmsLongNoteMode.LongNote);
         run.Press(1150);
@@ -274,8 +222,15 @@ public class BmsLongNotePresentationTest
 
         Assert.That(run.State.TailResult, Is.EqualTo(HitResult.Perfect));
         Assert.That(run.Results.Single(), Is.EqualTo(HitResult.Ok));
-        Assert.That(run.State.EarlyReleaseOutsideWindow, Is.False);
-        Assert.That(run.Presentation(false, 1490).Retired, Is.True);
+        assertReleasedBody(run, 1490);
+    }
+
+    private static void assertReleasedBody(BmsLongNoteTestContext run, double time, bool held = false)
+    {
+        var current = run.Presentation(held, time);
+        Assert.That(current.Retired || current.HoldingBody || current.AnimateBody || current.HoldLightActive, Is.False);
+        Assert.That(current.KeepAlive && current.KeepVisibleAfterHit && current.ReleasedStyle, Is.True);
+        Assert.That(current.LifetimeEnd, Is.EqualTo(run.Note.EndTime));
     }
 
     [Test]

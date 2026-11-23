@@ -678,6 +678,19 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Mods
             Assert.That(repeatedPresentation.HoldingBody, Is.False);
             Assert.That(repeatedPresentation.ReleasedStyle, Is.True);
 
+            play.Release(1970);
+            var settled = play.Engine.GetColumn(1).GetNote(note);
+            Assert.That(settled.Completed, Is.True);
+            var settledPresentation = profile.LongNotePresentation(note, settled,
+                new BmsLongNotePresentationContext(1970, settled.Held, play.Score.EngineChart.TimingFor(note)));
+            Assert.That(settledPresentation.Retired, Is.EqualTo(useLazer));
+            if (!useLazer)
+            {
+                Assert.That(settledPresentation.ReleasedStyle && settledPresentation.KeepAlive && settledPresentation.KeepVisibleAfterHit, Is.True);
+                Assert.That(settledPresentation.HoldingBody || settledPresentation.AnimateBody || settledPresentation.HoldLightActive, Is.False);
+                Assert.That(settledPresentation.LifetimeEnd, Is.EqualTo(note.EndTime));
+            }
+
             play.Engine.Reset();
             play.Score.ResetReplayState();
             play.Health.ResetReplayState();
