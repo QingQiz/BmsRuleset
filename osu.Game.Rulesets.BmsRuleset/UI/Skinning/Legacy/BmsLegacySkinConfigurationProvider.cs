@@ -53,14 +53,8 @@ internal sealed class BmsLegacySkinConfigurationProvider
         foreach (var configuration in skinConfigurations.Value.Where(c => c.Section == BmsSkinConfigurationSection.Bms && c.Layout == layoutVariant))
             yield return configuration;
 
-        var layout1P = layoutVariant switch
-        {
-            BmsLayoutVariant.Bms5K2P => BmsLayoutVariant.Bms5K,
-            BmsLayoutVariant.Bme7K2P => BmsLayoutVariant.Bme7K,
-            _ => (BmsLayoutVariant?)null,
-        };
-
-        if (layout1P != null)
+        var layout1P = BmsLayout.FirstPlayerVariant(layoutVariant);
+        if (layout1P != layoutVariant)
         {
             foreach (var configuration in skinConfigurations.Value.Where(c => c.Section == BmsSkinConfigurationSection.Bms && c.Layout == layout1P))
                 yield return configuration;

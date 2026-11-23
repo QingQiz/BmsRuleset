@@ -1,20 +1,19 @@
 using System.Linq;
 using System.Reflection;
+using Newtonsoft.Json;
 using NUnit.Framework;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.IO.Serialization;
 using osu.Framework.Testing;
 using osu.Framework.Threading;
-using osu.Game.Configuration;
-using osu.Game.Graphics.UserInterface;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
-using osu.Game.Rulesets.BmsRuleset.UI.Settings.Components;
 using osu.Game.Skinning;
 using osuTK;
 
@@ -83,89 +82,6 @@ public partial class BmsGameplayVirtualisationTest
             Assert.That(playfield.Stage.Columns.All(column => !column.HitExplosionArea.Masking), Is.True);
             Assert.That(playfield.Stage.MeasureLineArea.Masking, Is.True);
         });
-    }
-
-    [Test]
-    public void TestStageHudCanScaleWidthRelativeToOriginalStage()
-    {
-        var playfield = createPlayfield(attachBeatmap(new BmsBeatmap
-        {
-            TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
-            LayoutVariant = BmsLayoutVariant.Bme7K,
-        }));
-        playfield.Stage.RelativeSizeAxes = Axes.None;
-        setAutoSizeAxes(playfield.Stage, Axes.None);
-        playfield.Stage.Size = new Vector2(150, 600);
-
-        var stageHud = new BmsStageHud();
-        stageHud.ProportionalWidthReference.Value = 100;
-        var controller = new BmsStageHudController(playfield);
-        controller.Register(stageHud);
-        controller.ApplyStageTransform(new Vector2(200, 600), Vector2.Zero);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(playfield.Stage.Scale.X, Is.EqualTo(2).Within(0.001f));
-            Assert.That(playfield.Stage.DrawWidth * playfield.Stage.Scale.X, Is.EqualTo(300).Within(0.001f));
-        });
-
-        stageHud.ProportionalWidthReference.Value = 0;
-        controller.ApplyStageTransform(new Vector2(200, 600), Vector2.Zero);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(playfield.Stage.Scale.X, Is.EqualTo(200f / 150).Within(0.001f));
-            Assert.That(playfield.Stage.DrawWidth * playfield.Stage.Scale.X, Is.EqualTo(200).Within(0.001f));
-        });
-    }
-
-    [Test]
-    public void TestProportionalStageHudBoundsFollowCurrentStageWidth()
-    {
-        var playfield = createPlayfield(attachBeatmap(new BmsBeatmap
-        {
-            TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
-            LayoutVariant = BmsLayoutVariant.Bme7K,
-        }));
-        playfield.Stage.RelativeSizeAxes = Axes.None;
-        setAutoSizeAxes(playfield.Stage, Axes.None);
-        playfield.Stage.Size = new Vector2(150, 600);
-
-        var stageHud = new BmsStageHud { Width = 200 };
-        stageHud.ProportionalWidthReference.Value = 100;
-        var controller = new BmsStageHudController(playfield);
-        controller.Register(stageHud);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(stageHud.Width, Is.EqualTo(300).Within(0.001f));
-            Assert.That(stageHud.ProportionalWidthReference.Value, Is.EqualTo(150));
-        });
-    }
-
-    [Test]
-    public void TestWidthScalingCheckboxCapturesCurrentStageWidth()
-    {
-        var playfield = createPlayfield(attachBeatmap(new BmsBeatmap
-        {
-            TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
-            LayoutVariant = BmsLayoutVariant.Bme7K,
-        }));
-        playfield.Stage.RelativeSizeAxes = Axes.None;
-        setAutoSizeAxes(playfield.Stage, Axes.None);
-        playfield.Stage.Size = new Vector2(150, 600);
-
-        var stageHud = new BmsStageHud();
-        var controller = new BmsStageHudController(playfield);
-        controller.Register(stageHud);
-        var setting = stageHud.CreateSettingsControls().OfType<StageWidthScalingCheckbox>().Single();
-        var checkbox = setting.ChildrenOfType<OsuCheckbox>().Single();
-
-        checkbox.Current.Value = true;
-        Assert.That(stageHud.ProportionalWidthReference.Value, Is.EqualTo(150));
-
-        checkbox.Current.Value = false;
-        Assert.That(stageHud.ProportionalWidthReference.Value, Is.Zero);
     }
 
     [Test]
@@ -338,6 +254,98 @@ public partial class BmsGameplayVirtualisationTest
                 Assert.That(playfield.Stage.DrawWidth * playfield.Stage.Scale.X, Is.EqualTo(hudSize.X).Within(0.001f));
                 Assert.That(playfield.Stage.HudViewportHeight * playfield.Stage.Scale.Y, Is.EqualTo(hudSize.Y).Within(0.001f));
             });
+        }
+    }
+
+    [Test]
+    public void TestStageHudLayoutsAreIsolatedAcrossSaveAndRestore()
+    {
+        // A skin from before per-layout editing has only the ordinary drawable settings.
+        var legacy = new BmsStageHud { Size = new Vector2(400, 0.75f) }.CreateSerialisedInfo();
+        legacy.Settings.Remove("layouts");
+        legacy.Settings["judgement_line_offset"] = 12f;
+        legacy.Settings["proportional_width_reference"] = 320f;
+
+        var hud = load(legacy, BmsLayoutVariant.Bme7K);
+        hud.Anchor = Anchor.BottomRight;
+        hud.Origin = Anchor.BottomRight;
+        hud.UsesFixedAnchor = true;
+        hud.Position = new Vector2(-40, -10);
+        hud.Rotation = 2;
+        hud.Scale = new Vector2(1.25f);
+        hud.Size = new Vector2(480, 0.7f);
+        hud.JudgementLineOffset.Value = 24;
+        hud.LightPositionOffset.Value = 30;
+        hud.NoteHeightScale.Value = 1.5f;
+        var sevenKey = hud.CreateSerialisedInfo();
+        Assert.That(sevenKey.Settings, Does.Not.ContainKey("proportional_width_reference"));
+
+        var fiveKey = load(sevenKey, BmsLayoutVariant.Bms5K);
+        Assert.Multiple(() =>
+        {
+            Assert.That(fiveKey.Size, Is.EqualTo(new Vector2(400, 0.75f)));
+            Assert.That(fiveKey.JudgementLineOffset.Value, Is.EqualTo(12));
+        });
+
+        // Saving a preview without editing Stage must not freeze the inherited settings.
+        var secondPlayer = load(sevenKey, BmsLayoutVariant.Bme7K2P);
+        Assert.Multiple(() =>
+        {
+            Assert.That(secondPlayer.Size, Is.EqualTo(hud.Size));
+            Assert.That(secondPlayer.JudgementLineOffset.Value, Is.EqualTo(24));
+        });
+        var leftAfterPreviewSave = load(secondPlayer.CreateSerialisedInfo(), BmsLayoutVariant.Bme7K);
+        leftAfterPreviewSave.Width = 510;
+        var rightAfterLeftEdit = load(leftAfterPreviewSave.CreateSerialisedInfo(), BmsLayoutVariant.Bme7K2P);
+        Assert.That(rightAfterLeftEdit.Width, Is.EqualTo(510));
+
+        secondPlayer.Width = 580;
+        secondPlayer.NoteHeightScale.Value = 0.75f;
+        var afterSecondPlayerEdit = secondPlayer.CreateSerialisedInfo();
+        var restored = load(afterSecondPlayerEdit, BmsLayoutVariant.Bme7K);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(restored.Anchor, Is.EqualTo(hud.Anchor));
+            Assert.That(restored.Origin, Is.EqualTo(hud.Origin));
+            Assert.That(restored.UsesFixedAnchor, Is.True);
+            Assert.That(restored.Position, Is.EqualTo(hud.Position));
+            Assert.That(restored.Rotation, Is.EqualTo(hud.Rotation));
+            Assert.That(restored.Scale, Is.EqualTo(hud.Scale));
+            Assert.That(restored.Size, Is.EqualTo(hud.Size));
+            Assert.That(restored.JudgementLineOffset.Value, Is.EqualTo(24));
+            Assert.That(restored.LightPositionOffset.Value, Is.EqualTo(30));
+            Assert.That(restored.NoteHeightScale.Value, Is.EqualTo(1.5f));
+        });
+
+        var rightAfterEdit = load(afterSecondPlayerEdit, BmsLayoutVariant.Bme7K2P);
+        Assert.Multiple(() =>
+        {
+            Assert.That(rightAfterEdit.Width, Is.EqualTo(580));
+            Assert.That(rightAfterEdit.NoteHeightScale.Value, Is.EqualTo(0.75f));
+        });
+
+        var reset = rightAfterEdit.CreateResetForLayout(BmsLayoutVariant.Bme7K2P);
+        reset.UseLayout(BmsLayoutVariant.Bme7K2P);
+        Assert.That(reset.Width, Is.EqualTo(480));
+
+        // The editor's undo handler reapplies snapshots to existing drawables.
+        secondPlayer.ApplySerialisedInfo(roundTrip(sevenKey));
+        Assert.That(secondPlayer.Width, Is.EqualTo(480));
+        secondPlayer.ApplySerialisedInfo(roundTrip(afterSecondPlayerEdit));
+        Assert.That(secondPlayer.Width, Is.EqualTo(580));
+
+        static BmsStageHud load(SerialisedDrawableInfo info, BmsLayoutVariant layout)
+        {
+            var result = (BmsStageHud)roundTrip(info).CreateInstance();
+            result.UseLayout(layout);
+            return result;
+        }
+
+        static SerialisedDrawableInfo roundTrip(SerialisedDrawableInfo info)
+        {
+            var converters = new Vector2Converter();
+            return JsonConvert.DeserializeObject<SerialisedDrawableInfo>(JsonConvert.SerializeObject(info, converters), converters)!;
         }
     }
 
@@ -554,20 +562,24 @@ public partial class BmsGameplayVirtualisationTest
     {
         var controller = createController();
         var container = new TestSerialisableDrawableContainer();
-        var hud = new BmsStageHud
-        {
-            Position = new Vector2(120, -80),
-            Size = new Vector2(0.75f, 0.5f),
-            Scale = new Vector2(1.5f),
-        };
+        var otherLayout = new BmsStageHud();
+        otherLayout.UseLayout(BmsLayoutVariant.Bme7K2P);
+        otherLayout.Width = 500;
 
+        var hud = (BmsStageHud)otherLayout.CreateSerialisedInfo().CreateInstance();
         container.Add(hud);
         controller.RegisterContainer(container);
         runScheduledTasks(controller);
+        hud.Position = new Vector2(120, -80);
+        hud.Size = new Vector2(0.75f, 0.5f);
+        hud.Scale = new Vector2(1.5f);
+
         container.Remove(hud, true);
         runScheduledTasks(controller);
 
         var replacement = container.Components.OfType<BmsStageHud>().Single();
+        var restoredOtherLayout = (BmsStageHud)replacement.CreateSerialisedInfo().CreateInstance();
+        restoredOtherLayout.UseLayout(BmsLayoutVariant.Bme7K2P);
 
         Assert.Multiple(() =>
         {
@@ -576,6 +588,7 @@ public partial class BmsGameplayVirtualisationTest
             Assert.That(replacement.Position, Is.EqualTo(Vector2.Zero));
             Assert.That(replacement.Size, Is.EqualTo(Vector2.Zero));
             Assert.That(replacement.Scale, Is.EqualTo(Vector2.One));
+            Assert.That(restoredOtherLayout.Width, Is.EqualTo(500));
         });
     }
 

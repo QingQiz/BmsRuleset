@@ -20,6 +20,7 @@ using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.LongNoteMode;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
+using osu.Game.Rulesets.BmsRuleset.UI.Settings.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.Presentation;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Lamp;
 using osu.Game.Rulesets.Difficulty;
@@ -61,7 +62,7 @@ public partial class BmsModManiaProfile : Mod, IApplicableToGameplayProfile, IAp
     [SettingSource(typeof(BmsStrings), nameof(BmsStrings.ManiaUseLazer), nameof(BmsStrings.ManiaUseLazerDescription))]
     public BindableBool UseLazer { get; } = new(true);
 
-    [SettingSource(null, SettingControlType = typeof(BmsHiddenModSetting<bool>))]
+    [SettingSource(null, SettingControlType = typeof(BmsHiddenSetting<bool>))]
     public BindableBool ClassicHitWindows { get; } = new();
 
     public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription

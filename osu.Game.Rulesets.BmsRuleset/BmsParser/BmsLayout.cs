@@ -218,6 +218,13 @@ public static class BmsLayout
         _ => false,
     };
 
+    internal static BmsLayoutVariant FirstPlayerVariant(BmsLayoutVariant variant) => variant switch
+    {
+        BmsLayoutVariant.Bms5K2P => BmsLayoutVariant.Bms5K,
+        BmsLayoutVariant.Bme7K2P => BmsLayoutVariant.Bme7K,
+        _ => variant,
+    };
+
     public static BmsLayoutVariant SecondPlayerVariant(BmsLayoutVariant variant) => variant switch
     {
         BmsLayoutVariant.Bms5K => BmsLayoutVariant.Bms5K2P,

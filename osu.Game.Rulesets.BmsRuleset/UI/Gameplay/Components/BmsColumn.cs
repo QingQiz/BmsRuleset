@@ -41,8 +41,7 @@ public partial class BmsColumn : Playfield, IBmsColumn
     public Container KeyAreaUnderNotesLayer { get; } = new() { RelativeSizeAxes = Axes.Both };
 
     /// <summary>
-    ///     When <c>true</c>, this column is hidden from layout — zero width, zero
-    ///     alpha, and <see cref="updateFromSkin"/> will not restore visual properties.
+    ///     Hidden columns keep their skin geometry for sizing the shared Stage HUD.
     /// </summary>
     public bool Hidden
     {
@@ -54,12 +53,7 @@ public partial class BmsColumn : Playfield, IBmsColumn
 
             field = value;
 
-            if (value)
-            {
-                Width = 0;
-                Alpha = 0;
-                Margin = new MarginPadding();
-            }
+            Alpha = value ? 0 : 1;
         }
     }
 
@@ -209,9 +203,6 @@ public partial class BmsColumn : Playfield, IBmsColumn
 
     private void updateFromSkin()
     {
-        if (Hidden)
-            return;
-
         var lookup = new BmsSkinComponentLookup(BmsSkinComponents.ColumnBackground, LayoutVariant, Index);
         Width = skin.GetConfig<BmsSkinConfigurationLookup, float>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.ColumnWidth, lookup))?.Value
                 ?? defaultColumnWidth(Index, LayoutVariant);

@@ -24,6 +24,23 @@ public sealed partial class BmsStage : CompositeDrawable
 
     internal Container ColumnArea { get; }
 
+    internal float FullLayoutWidth
+    {
+        get
+        {
+            var width = DrawWidth;
+
+            // HS reflows the remaining columns, but both modes use the same horizontal scale.
+            foreach (var column in Columns)
+            {
+                if (column.Hidden)
+                    width += ((Drawable)column).LayoutSize.X;
+            }
+
+            return width;
+        }
+    }
+
     public float HitTargetPosition => hitTargetPosition.Value;
 
     public float BarLineHeight => barLineHeight.Value;
@@ -339,27 +356,8 @@ public sealed partial class BmsStage : CompositeDrawable
         // exactly over the columns — including layout changes, Hide Scratch, and 2P reordering.
         for (var i = 0; i < Columns.Length; i++)
         {
-            var col = (Drawable)Columns[i];
-            var area = Columns[i].HitExplosionArea;
-            positionHitExplosionArea(area, col.DrawWidth, col.Margin, ref hitExplosionAreaStates[i]);
+            positionColumnLayer(Columns[i].HitExplosionArea, (Drawable)Columns[i], ref hitExplosionAreaStates[i]);
         }
-    }
-
-    private static void positionHitExplosionArea(Drawable area, float width, MarginPadding margin, ref ColumnLayoutState state)
-    {
-        if (!state.Valid || state.Width != width)
-        {
-            state.Width = width;
-            area.Width = width;
-        }
-
-        if (!state.Valid || !state.Margin.Equals(margin))
-        {
-            state.Margin = margin;
-            area.Margin = margin;
-        }
-
-        state.Valid = true;
     }
 
     [BackgroundDependencyLoader]

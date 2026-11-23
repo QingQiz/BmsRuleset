@@ -344,6 +344,15 @@ and remains visible when the gameplay HUD is hidden.
 
 Contains the lanes, notes, measure lines, key area, judgement line, hit effects, and Stage artwork. They move together.
 
+Stage edits are saved for the layout in the current gameplay preview. To edit another layout, preview it in the
+skin editor first. Existing shared Stage settings are the starting point for layouts without custom settings.
+
+**2P (right scratch)** follows the corresponding left-scratch Stage settings by default. To customise it separately,
+enable the **2P** mod, open the gameplay preview, edit the Stage, and save the skin.
+
+**Hide Scratch (HS)** uses the same Stage settings as the corresponding layout with scratch visible. The Stage
+narrows around the same centre, and the remaining lanes keep their widths.
+
 - **Judgement line offset** moves the line from its skin-defined position: positive moves up, negative moves down.
   The editor keeps it within the visible Stage. Judgement timing is unchanged.
 - **Note height scale** scales the height of note heads and tails from 0.01x to 5x (default 1x). It does not move notes,
@@ -358,12 +367,9 @@ Stage resize handles have three functions:
 - **Diagonal resize** (corner handles) scales the entire Stage uniformly, including lane width, note size, and Stage
   graphics, while preserving its proportions and the amount of lane content shown.
 
-Stage is required and absent from the component toolbox. Deleting it creates a default instance, resetting position,
-size, and settings, including judgement line offset. If a saved layout has duplicates, only the first is kept.
-
-<p align="center">
-  <img src="images/skin-component-stage.jpg" width="800" alt="Stage selected in the skin editor, with resize handles and settings for proportional width, judgement line offset, light position offset, and note height">
-</p>
+Stage is required and absent from the component toolbox. Deleting it resets the Stage position, size, and settings
+for the current layout. For 2P, this restores inheritance from the left-scratch layout. If a saved layout has duplicates,
+only the first is kept.
 
 ### Text
 

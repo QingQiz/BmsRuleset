@@ -4,12 +4,12 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.UserInterface;
 using osu.Game.Overlays.Settings;
 
-namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
+namespace osu.Game.Rulesets.BmsRuleset.UI.Settings.Components;
 
-// SettingSource is required for score persistence, but some mod settings are set by gameplay or replay loading.
-internal partial class BmsHiddenModSetting<T> : SettingsItem<T>
+// SettingSource also drives serialisation, including values that should not have an editor control.
+internal partial class BmsHiddenSetting<T> : SettingsItem<T>
 {
-    public BmsHiddenModSetting()
+    public BmsHiddenSetting()
     {
         CanBeShown.Value = false;
         MatchingFilter = false;

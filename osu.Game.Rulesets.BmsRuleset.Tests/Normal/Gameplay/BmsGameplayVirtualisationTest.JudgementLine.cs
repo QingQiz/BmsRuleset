@@ -1,6 +1,4 @@
-using System.Linq;
 using NUnit.Framework;
-using osu.Game.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
@@ -102,24 +100,5 @@ public partial class BmsGameplayVirtualisationTest
         var restored = (BmsStageHud)hud.CreateSerialisedInfo().CreateInstance();
 
         Assert.That(restored.NoteHeightScale.Value, Is.EqualTo(1.5f));
-    }
-
-    [Test]
-    public void TestProportionalWidthReferenceIsSerialisedWithStageHud()
-    {
-        var hud = new BmsStageHud();
-        hud.ProportionalWidthReference.Value = 360;
-
-        var restored = (BmsStageHud)hud.CreateSerialisedInfo().CreateInstance();
-
-        Assert.That(restored.ProportionalWidthReference.Value, Is.EqualTo(360));
-    }
-
-    [Test]
-    public void TestStageHudSettingsCanCreateWidthScalingCheckbox()
-    {
-        var hud = new BmsStageHud();
-
-        Assert.DoesNotThrow(() => _ = hud.CreateSettingsControls().ToArray());
     }
 }

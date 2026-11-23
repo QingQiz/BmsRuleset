@@ -14,6 +14,7 @@ using osu.Game.IO;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables;
@@ -27,6 +28,7 @@ using osu.Game.Rulesets.BmsRuleset.UI.Skinning.NoteTextures;
 using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Runtime;
 using osu.Game.Skinning;
 using osu.Game.Tests.Visual;
+using osuTK;
 using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
@@ -479,6 +481,59 @@ public partial class TestSceneBmsSkins : BmsPlayerTestScene
     {
         var match = aliveInternalChildren(drawable).Select((child, index) => (child, index)).SingleOrDefault(pair => pair.child.ChildrenOfType<T>().Any());
         return match.child == null ? -1 : match.index;
+    }
+
+    [Test]
+    public void TestStageHudHideScratchPreservesColumnWidthsAndCentre()
+    {
+        SerialisedDrawableInfo saved = null!;
+        (Vector2 Centre, float ColumnWidth, float StageWidth, float Scale) normal = default;
+
+        BmsStageHud stageHud() => Player.HUDOverlay.ChildrenOfType<BmsStageHud>().Single();
+
+        (Vector2 Centre, float ColumnWidth, float StageWidth, float Scale) geometry()
+        {
+            var stage = Playfield.Stage;
+            var column = (Drawable)stage.Columns.First(c => !c.IsScratch);
+            var quad = column.ToSpaceOfOtherDrawable(column.DrawRectangle, Playfield);
+            return (stage.ToSpaceOfOtherDrawable(stage.DrawRectangle, Playfield).Centre,
+                Vector2.Distance(quad.TopLeft, quad.TopRight), stage.DrawWidth, stage.Scale.X);
+        }
+
+        AddStep("load preview with scratch", () =>
+        {
+            skinKind = BmsTestSkins.SkinKind.Legacy;
+            LoadPlayer();
+        });
+        AddUntilStep("stage HUD ready", () => Player is { IsLoaded: true } && Playfield.Stage.HasHudTransform);
+        AddStep("configure the Stage", () =>
+        {
+            var hud = stageHud();
+            hud.X = 35;
+            hud.Width *= 0.8f;
+            hud.JudgementLineOffset.Value = 16;
+        });
+        AddStep("save the Stage and record its geometry", () =>
+        {
+            saved = stageHud().CreateSerialisedInfo();
+            normal = geometry();
+        });
+        AddStep("load the same layout with Hide Scratch", () => LoadPlayer([new BmsModHideScratch()]));
+        AddUntilStep("stage HUD ready with scratch hidden", () => Player is { IsLoaded: true } && Playfield.Stage.HasHudTransform
+            && Playfield.Stage.Columns.Any(c => c.IsScratch && c.Hidden));
+        AddStep("restore the saved Stage", () => stageHud().ApplySerialisedInfo(saved));
+        AddStep("verify the narrower Stage retains the same centre and column width", () =>
+        {
+            var current = geometry();
+            Assert.Multiple(() =>
+            {
+                Assert.That(current.StageWidth, Is.LessThan(normal.StageWidth));
+                Assert.That(Vector2.Distance(current.Centre, normal.Centre), Is.LessThan(0.01f));
+                Assert.That(current.ColumnWidth, Is.EqualTo(normal.ColumnWidth).Within(0.01f));
+                Assert.That(current.Scale, Is.EqualTo(normal.Scale).Within(0.001f));
+                Assert.That(Playfield.Stage.HitTargetPositionOffset, Is.EqualTo(16));
+            });
+        });
     }
 
     [Test]

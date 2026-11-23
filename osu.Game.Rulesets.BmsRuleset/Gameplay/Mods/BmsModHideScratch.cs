@@ -30,11 +30,9 @@ public class BmsModHideScratch : Mod, IApplicableToDrawableRuleset<BmsHitObject>
 
     public override Type[] IncompatibleMods => [typeof(BmsModSecondPlayer), typeof(BmsModAutoScratch)];
 
-    private BmsPlayfield playfield = null!;
-
     public void ApplyToDrawableRuleset(DrawableRuleset<BmsHitObject> drawableRuleset)
     {
-        playfield = (BmsPlayfield)drawableRuleset.Playfield;
+        var playfield = (BmsPlayfield)drawableRuleset.Playfield;
 
         foreach (var col in playfield.Stage.Columns)
         {

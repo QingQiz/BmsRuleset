@@ -488,7 +488,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
         var healthReserve = Math.Max(64, minimum_side_padding);
         var availableWidth = Math.Max(1, DrawWidth - healthReserve * 2);
-        var scale = Math.Min(1, availableWidth / Stage.DrawWidth);
+        var scale = Math.Min(1, availableWidth / Stage.FullLayoutWidth);
 
         if (float.IsFinite(scale) && scale > 0)
         {

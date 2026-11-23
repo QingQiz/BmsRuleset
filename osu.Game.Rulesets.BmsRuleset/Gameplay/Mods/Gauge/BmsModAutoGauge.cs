@@ -9,6 +9,7 @@ using osu.Game.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
+using osu.Game.Rulesets.BmsRuleset.UI.Settings.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.Icons;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
@@ -28,16 +29,16 @@ public class BmsModAutoGauge : Mod, IApplicableToHealthProcessor, IApplicableToS
 
     public override ModType Type => ModType.Automation;
 
-    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.CourseInitialHealth), SettingControlType = typeof(BmsHiddenModSetting<double?>))]
+    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.CourseInitialHealth), SettingControlType = typeof(BmsHiddenSetting<double?>))]
     public Bindable<double?> ClassHealth { get; } = new();
 
-    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.CourseInitialHealth), SettingControlType = typeof(BmsHiddenModSetting<double?>))]
+    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.CourseInitialHealth), SettingControlType = typeof(BmsHiddenSetting<double?>))]
     public Bindable<double?> ExClassHealth { get; } = new();
 
-    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.CourseInitialHealth), SettingControlType = typeof(BmsHiddenModSetting<double?>))]
+    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.CourseInitialHealth), SettingControlType = typeof(BmsHiddenSetting<double?>))]
     public Bindable<double?> ExHardClassHealth { get; } = new();
 
-    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.CourseGaugeProfile), SettingControlType = typeof(BmsHiddenModSetting<BmsGaugeProfileFamily?>))]
+    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.CourseGaugeProfile), SettingControlType = typeof(BmsHiddenSetting<BmsGaugeProfileFamily?>))]
     public Bindable<BmsGaugeProfileFamily?> GaugeProfileFamily { get; } = new();
 
     public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription => [];
