@@ -769,6 +769,7 @@ Click to open the BMS log for the complete list and error details.</value>
   <data name="stage_use_skin_image" xml:space="preserve"><value>Skin default ({0})</value></data>
   <data name="stage_lane_geometry" xml:space="preserve"><value>Size &amp; scale</value></data>
   <data name="stage_lane_images" xml:space="preserve"><value>Images</value></data>
+  <data name="stage_restore_default" xml:space="preserve"><value>Restore default</value></data>
   <data name="stage_apply_to_all_columns" xml:space="preserve"><value>Apply this value to all lanes</value></data>
   <data name="stage_apply_to_all_gaps" xml:space="preserve"><value>Apply this gap to all boundaries</value></data>
   <data name="stage_apply_to_all_separators" xml:space="preserve"><value>Apply this width to all dividers</value></data>

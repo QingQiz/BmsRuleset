@@ -64,6 +64,8 @@ public static class BmsStrings
 
     public static LocalisableString StageLaneImages => get("stage_lane_images");
 
+    public static LocalisableString StageRestoreDefault => get("stage_restore_default");
+
     public static LocalisableString StageApplyToAllColumns => get("stage_apply_to_all_columns");
 
     public static LocalisableString StageApplyToAllGaps => get("stage_apply_to_all_gaps");

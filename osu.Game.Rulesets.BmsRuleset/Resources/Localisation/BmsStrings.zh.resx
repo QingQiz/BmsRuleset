@@ -769,6 +769,7 @@
   <data name="stage_use_skin_image" xml:space="preserve"><value>皮肤默认（{0}）</value></data>
   <data name="stage_lane_geometry" xml:space="preserve"><value>尺寸与缩放</value></data>
   <data name="stage_lane_images" xml:space="preserve"><value>图片</value></data>
+  <data name="stage_restore_default" xml:space="preserve"><value>恢复默认</value></data>
   <data name="stage_apply_to_all_columns" xml:space="preserve"><value>将此项应用到所有列</value></data>
   <data name="stage_apply_to_all_gaps" xml:space="preserve"><value>将此间距应用到所有相邻列</value></data>
   <data name="stage_apply_to_all_separators" xml:space="preserve"><value>将此宽度应用到所有分隔线</value></data>

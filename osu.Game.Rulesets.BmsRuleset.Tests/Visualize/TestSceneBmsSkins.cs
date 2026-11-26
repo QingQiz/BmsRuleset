@@ -9,12 +9,15 @@ using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
+using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Localisation;
 using osu.Framework.Testing;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
+using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterface;
+using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.IO;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Settings;
@@ -41,6 +44,7 @@ using osu.Game.Skinning;
 using osu.Game.Tests.Visual;
 using osuTK;
 using osuTK.Graphics;
+using osuTK.Input;
 using SixLabors.ImageSharp;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
@@ -563,6 +567,7 @@ public partial class TestSceneBmsSkins : BmsPlayerTestScene
         var barColour = Colour4.FromHex("B44FC57F");
         var separatorColour = Colour4.FromHex("5290CE80");
         BmsStageEditorSetting stageEditor = null!;
+        OsuScrollContainer settingsScroll = null!;
         LegacyBmsHitTarget hitTarget = null!;
         BmsStageHud removedStage = null!;
         var defaultStageWidth = 0f;
@@ -597,7 +602,7 @@ public partial class TestSceneBmsSkins : BmsPlayerTestScene
                 [(int)layout_variant] = new() { Images = { [$"HitTarget:{BmsStageStyle.STAGE_WIDE_KEY}"] = BmsTestLegacySkin.LEFT_STAGE_IMAGE } },
             };
             stageEditor = hud.CreateSettingsControls().OfType<BmsStageEditorSetting>().Single();
-            Add(stageEditor);
+            Add(settingsScroll = new OsuScrollContainer { RelativeSizeAxes = Axes.Both, Child = stageEditor });
         });
         AddUntilStep("skin editor settings load", () => stageEditor.IsLoaded
             && stageEditor.ChildrenOfType<OsuTabControl<int>>().Count() == 2);
@@ -613,10 +618,10 @@ public partial class TestSceneBmsSkins : BmsPlayerTestScene
             Assert.That(stageEditor.Current.Value, Is.SameAs(original));
         });
         AddStep("select the skin's left stage image", () =>
-            stageEditor.ChildrenOfType<SettingsDropdown<string>>()
-                .Single(dropdown => dropdown.LabelText.Equals(BmsStrings.StageHitTarget)).Current.Value = BmsTestLegacySkin.LEFT_STAGE_IMAGE);
-        AddUntilStep("selected lane controls are ready", () => stageEditor.ChildrenOfType<SettingsSlider<float>>()
-            .Any(control => control.LabelText.Equals(BmsStrings.StageColumnWidth)));
+            stageEditor.ChildrenOfType<FormDropdown<string>>()
+                .Single(dropdown => dropdown.Caption.Equals(BmsStrings.StageHitTarget)).Current.Value = BmsTestLegacySkin.LEFT_STAGE_IMAGE);
+        AddUntilStep("selected lane controls are ready", () => stageEditor.ChildrenOfType<FormSliderBar<float>>()
+            .Any(control => control.IsLoaded && control.Caption.Equals(BmsStrings.StageColumnWidth)));
         AddStep("read unset values from skin.ini", () => Assert.Multiple(() =>
         {
             Assert.That(slider(BmsStrings.StageColumnWidth).Current.Value, Is.EqualTo(BmsTestLegacySkin.ExpectedColumnWidth(0)));
@@ -637,8 +642,8 @@ public partial class TestSceneBmsSkins : BmsPlayerTestScene
             slider(BmsStrings.StageHoldLightScale).Current.Value = 1.4f;
             slider(BmsStrings.StageHitTargetHeight).Current.Value = 1.5f;
             slider(BmsStrings.JudgementLineOffset).Current.Value = 16;
-            stageEditor.ChildrenOfType<SettingsCheckbox>()
-                .Single(control => control.LabelText.Equals(BmsStrings.StageShowMeasureLines)).Current.Value = false;
+            stageEditor.ChildrenOfType<FormCheckBox>()
+                .Single(control => control.Caption.Equals(BmsStrings.StageShowMeasureLines)).Current.Value = false;
             slider(BmsStrings.StageGap).Current.Value = 10;
             slider(BmsStrings.StageSeparator).Current.Value = 12;
             slider(BmsStrings.StageBarHeight).Current.Value = 5;
@@ -693,8 +698,8 @@ public partial class TestSceneBmsSkins : BmsPlayerTestScene
 
         AddStep("apply only the selected width and gap to all lanes and boundaries", () =>
         {
-            copy(slider(BmsStrings.StageColumnWidth)).TriggerClick();
-            copy(slider(BmsStrings.StageGap)).TriggerClick();
+            applyToAll(slider(BmsStrings.StageColumnWidth)).TriggerClick();
+            applyToAll(slider(BmsStrings.StageGap)).TriggerClick();
             var saved = stageEditor.Current.Value[(int)layout_variant];
             Assert.Multiple(() =>
             {
@@ -725,21 +730,25 @@ public partial class TestSceneBmsSkins : BmsPlayerTestScene
         });
         AddUntilStep("only the edited divider is hidden", () =>
             Playfield.Stage.ChildrenOfType<LegacyBmsColumnBackground>().Any(background => background.LeftSeparator.Width == 0 && background.LeftSeparator.Alpha == 0));
-        AddStep("restore that boundary and apply the scratch divider width to every boundary", () =>
+        AddStep("restore that boundary and return to the scratch divider", () =>
         {
             var separator = slider(BmsStrings.StageSeparator);
-            separator.ApplyDefault();
+            reset(separator).TriggerClick();
             Assert.That(stageEditor.Current.Value[(int)layout_variant].SeparatorWidths,
                 Is.EqualTo(new Dictionary<int, float> { [6] = 12 }));
             boundaryTabs().Current.Value = 6;
-            copy(slider(BmsStrings.StageSeparator)).TriggerClick();
+        });
+        AddUntilStep("scratch divider controls are loaded", () => slider(BmsStrings.StageSeparator).IsLoaded);
+        AddStep("apply the scratch divider width to every boundary", () =>
+        {
+            applyToAll(slider(BmsStrings.StageSeparator)).TriggerClick();
             var widths = stageEditor.Current.Value[(int)layout_variant].SeparatorWidths;
             Assert.That(widths.Keys, Is.EquivalentTo(Enumerable.Range(0, 7)));
             Assert.That(widths.Values, Is.All.EqualTo(12));
         });
         AddStep("choose an animation from the judgement line picker", () =>
         {
-            var picker = stageEditor.ChildrenOfType<SettingsDropdown<string>>().Single(control => control.LabelText.Equals(BmsStrings.StageHitTarget));
+            var picker = stageEditor.ChildrenOfType<FormDropdown<string>>().Single(control => control.Caption.Equals(BmsStrings.StageHitTarget));
             Assert.That(picker.Items, Does.Contain(animation_name));
             Assert.That(picker.Items, Does.Not.Contain(animation_first_frame));
             Assert.That(picker.Items, Does.Not.Contain(animation_second_frame));
@@ -748,19 +757,19 @@ public partial class TestSceneBmsSkins : BmsPlayerTestScene
         AddUntilStep("the chosen judgement line plays both frames", () =>
             Playfield.Stage.ChildrenOfType<LegacyBmsHitTarget>().Single().Target is TextureAnimation { FrameCount: 2 });
         AddStep("restore the earlier judgement line choice", () =>
-            stageEditor.ChildrenOfType<SettingsDropdown<string>>()
-                .Single(control => control.LabelText.Equals(BmsStrings.StageHitTarget)).Current.Value = BmsTestLegacySkin.LEFT_STAGE_IMAGE);
+            stageEditor.ChildrenOfType<FormDropdown<string>>()
+                .Single(control => control.Caption.Equals(BmsStrings.StageHitTarget)).Current.Value = BmsTestLegacySkin.LEFT_STAGE_IMAGE);
         AddStep("open lane images without changing the layout", () =>
         {
             var original = stageEditor.Current.Value;
             stageEditor.ChildrenOfType<OsuTabControl<bool>>().Single().Current.Value = true;
             Assert.That(stageEditor.Current.Value, Is.SameAs(original));
         });
-        AddUntilStep("lane image pickers are ready", () => stageEditor.ChildrenOfType<SettingsDropdown<string>>()
-            .Any(control => control.IsLoaded && control.LabelText.Equals(BmsStrings.StageNote)));
-        AddStep("apply a lane image, then restore the skin artwork for every lane", () =>
+        AddUntilStep("lane image pickers are ready", () => stageEditor.ChildrenOfType<FormDropdown<string>>()
+            .Any(control => control.IsLoaded && control.Caption.Equals(BmsStrings.StageNote)));
+        AddStep("select a lane image and scroll to its picker", () =>
         {
-            var note = stageEditor.ChildrenOfType<SettingsDropdown<string>>().Single(control => control.LabelText.Equals(BmsStrings.StageNote));
+            var note = notePicker();
             Assert.That(note.Items, Does.Contain(note_image));
             Assert.That(note.Items, Does.Contain(embedded_note));
             note.Current.Value = embedded_note;
@@ -769,29 +778,43 @@ public partial class TestSceneBmsSkins : BmsPlayerTestScene
             using var drawable = ((IBmsGameplaySkinDrawableSource)skin).GetDrawableFactory(lookup)!.Create();
             Assert.That(((Sprite)drawable!).Texture, Is.SameAs(skin.GetTexture(embedded_note, WrapMode.ClampToEdge, WrapMode.ClampToEdge)));
             note.Current.Value = note_image;
-            copy(note).TriggerClick();
+            settingsScroll.ScrollTo(note, false);
+        });
+        AddStep("click apply on the lane image", () => click(applyToAll(notePicker())));
+        AddUntilStep("all lanes use the chosen image", () =>
+            Enumerable.Range(0, 8).All(i => stageEditor.Current.Value[(int)layout_variant].GetImage(BmsStageImage.Note, i) == note_image));
+        AddStep("open the lane image menu from the chevron", () => click(notePicker().ChildrenOfType<SpriteIcon>()
+            .Single(icon => icon.Icon.Equals(FontAwesome.Solid.ChevronDown))));
+        AddUntilStep("the image menu opens", () => noteMenu().State == MenuState.Open);
+        AddStep("click the lane image reset", () => click(reset(notePicker())));
+        AddUntilStep("the picker restores the default and apply moves into the freed space", () =>
+        {
+            var note = notePicker();
+            return noteMenu().State == MenuState.Closed && note.Current.IsDefault && !reset(note).IsPresent && applyToAll(note).X == 0;
+        });
+        AddStep("click apply to restore the default image for all lanes", () =>
+        {
             var saved = stageEditor.Current.Value[(int)layout_variant];
-            Assert.That(Enumerable.Range(0, 8).Select(i => saved.GetImage(BmsStageImage.Note, i)), Is.All.EqualTo(note_image));
-            Assert.That(saved.GetImage(BmsStageImage.Key, 0), Is.Null);
-            note.Current.Value = string.Empty;
-            saved = stageEditor.Current.Value[(int)layout_variant];
             Assert.That(saved.GetImage(BmsStageImage.Note, 0), Is.Null);
             Assert.That(saved.GetImage(BmsStageImage.Note, 1), Is.EqualTo(note_image));
-            copy(note).TriggerClick();
-            saved = stageEditor.Current.Value[(int)layout_variant];
-            Assert.That(Enumerable.Range(0, 8).Select(i => saved.GetImage(BmsStageImage.Note, i)), Is.All.Null);
-            Assert.That(saved.GetImage(BmsStageImage.HitTarget, null), Is.EqualTo(BmsTestLegacySkin.LEFT_STAGE_IMAGE));
+            Assert.That(saved.GetImage(BmsStageImage.Key, 0), Is.Null);
+            click(applyToAll(notePicker()));
         });
+        AddUntilStep("all lanes are back to skin artwork", () =>
+            Enumerable.Range(0, 8).All(i => stageEditor.Current.Value[(int)layout_variant].GetImage(BmsStageImage.Note, i) == null));
+        AddAssert("the stage-wide judgement image is unchanged", () =>
+            stageEditor.Current.Value[(int)layout_variant].GetImage(BmsStageImage.HitTarget, null) == BmsTestLegacySkin.LEFT_STAGE_IMAGE);
 
         AddStep("return to lane geometry", () => stageEditor.ChildrenOfType<OsuTabControl<bool>>().Single().Current.Value = false);
-        AddUntilStep("restored geometry controls are ready", () => stageEditor.ChildrenOfType<SettingsSlider<float>>()
-            .Any(control => control.IsLoaded && control.LabelText.Equals(BmsStrings.StageColumnWidth)));
+        AddUntilStep("restored geometry controls are ready", () => stageEditor.ChildrenOfType<FormSliderBar<float>>()
+            .Any(control => control.IsLoaded && control.Caption.Equals(BmsStrings.StageColumnWidth)));
         AddStep("return to the gap beside scratch", () => boundaryTabs().Current.Value = 6);
+        AddUntilStep("scratch gap controls are loaded", () => slider(BmsStrings.StageGap).IsLoaded);
         AddStep("restore the original skin values", () =>
         {
             foreach (var label in new[] { BmsStrings.StageColumnWidth, BmsStrings.StageNoteWidthForHeightScale, BmsStrings.StageHitLightScale,
                          BmsStrings.StageHoldLightScale, BmsStrings.StageGap, BmsStrings.StageSeparator, BmsStrings.StageBarHeight })
-                slider(label).ApplyDefault();
+                reset(slider(label)).TriggerClick();
             colour(BmsStrings.StageSeparatorColour).ApplyDefault();
             colour(BmsStrings.StageBarColour).ApplyDefault();
 
@@ -823,8 +846,8 @@ public partial class TestSceneBmsSkins : BmsPlayerTestScene
         AddStep("delete the customised Stage", () =>
         {
             slider(BmsStrings.NoteHeightScale).Current.Value = 1.5f;
-            stageEditor.ChildrenOfType<SettingsCheckbox>()
-                .Single(control => control.LabelText.Equals(BmsStrings.StageKeepTotalWidth)).Current.Value = false;
+            stageEditor.ChildrenOfType<FormCheckBox>()
+                .Single(control => control.Caption.Equals(BmsStrings.StageKeepTotalWidth)).Current.Value = false;
             removedStage = Player.HUDOverlay.ChildrenOfType<BmsStageHud>().Single();
             removedStage.Width *= 0.8f;
             removedStage.FindClosestParent<ISerialisableDrawableContainer>()!.Remove(removedStage, true);
@@ -833,18 +856,18 @@ public partial class TestSceneBmsSkins : BmsPlayerTestScene
             Player.HUDOverlay.ChildrenOfType<BmsStageHud>().SingleOrDefault() is { IsLoaded: true } replacement && replacement != removedStage);
         AddStep("reopen the replacement Stage settings", () =>
         {
-            Remove(stageEditor, true);
+            settingsScroll.Remove(stageEditor, true);
             var replacement = Player.HUDOverlay.ChildrenOfType<BmsStageHud>().Single();
             stageEditor = replacement.CreateSettingsControls().OfType<BmsStageEditorSetting>().Single();
-            Add(stageEditor);
+            settingsScroll.Add(stageEditor);
         });
-        AddUntilStep("replacement settings are ready", () => stageEditor.IsLoaded && stageEditor.ChildrenOfType<SettingsCheckbox>().Count() == 2);
+        AddUntilStep("replacement settings are ready", () => stageEditor.IsLoaded && stageEditor.ChildrenOfType<FormCheckBox>().Count() == 2);
         AddStep("the replacement uses the skin defaults", () => Assert.Multiple(() =>
         {
             var stage = Playfield.Stage;
             Assert.That(stageEditor.Current.Value, Is.Empty);
             Assert.That(Player.HUDOverlay.ChildrenOfType<BmsStageHud>().Single().Width, Is.EqualTo(defaultStageWidth).Within(0.01f));
-            Assert.That(stageEditor.ChildrenOfType<SettingsCheckbox>().Select(control => control.Current.Value), Is.All.True);
+            Assert.That(stageEditor.ChildrenOfType<FormCheckBox>().Select(control => control.Current.Value), Is.All.True);
             Assert.That(slider(BmsStrings.NoteHeightScale).Current.Value, Is.EqualTo(1));
             Assert.That(stage.HitTargetPositionOffset, Is.Zero);
             Assert.That(stage.Columns.Cast<BmsColumn>().Select(column => column.Width),
@@ -855,10 +878,19 @@ public partial class TestSceneBmsSkins : BmsPlayerTestScene
 
         OsuTabControl<int> columnTabs() => stageEditor.ChildrenOfType<OsuTabControl<int>>().Single(control => control.Items.Count == 8);
         OsuTabControl<int> boundaryTabs() => stageEditor.ChildrenOfType<OsuTabControl<int>>().Single(control => control.Items.Count == 7);
-        IconButton copy(Drawable control) => control.Parent.ChildrenOfType<IconButton>().Single();
 
-        SettingsSlider<float> slider(LocalisableString caption) => stageEditor.ChildrenOfType<SettingsSlider<float>>()
-            .Single(control => control.LabelText.Equals(caption));
+        FormDropdown<string> notePicker() => stageEditor.ChildrenOfType<FormDropdown<string>>().Single(control => control.Caption.Equals(BmsStrings.StageNote));
+
+        Dropdown<string>.DropdownMenu noteMenu() => notePicker().ChildrenOfType<Dropdown<string>.DropdownMenu>().Single();
+
+        void click(Drawable drawable)
+        {
+            InputManager.MoveMouseTo(drawable);
+            InputManager.Click(MouseButton.Left);
+        }
+
+        FormSliderBar<float> slider(LocalisableString caption) => stageEditor.ChildrenOfType<FormSliderBar<float>>()
+            .Single(control => control.Caption.Equals(caption));
     }
 
     [Test]
@@ -915,28 +947,34 @@ public partial class TestSceneBmsSkins : BmsPlayerTestScene
         AddStep("redo the gap edit", () => changes.RestoreState(1));
         AddUntilStep("redo restores the gap and Stage width", () =>
             slider(BmsStrings.StageGap).Current.Value == gap + 12 && Precision.AlmostEquals(displayWidth(), unlockedWidth, 0.01f));
-        AddStep("reset the gap to its skin value", () => slider(BmsStrings.StageGap).ApplyDefault());
+        AddStep("reset the gap to its skin value", () => reset(slider(BmsStrings.StageGap)).TriggerClick());
         AddUntilStep("reset shrinks the Stage back to its previous width", () => Precision.AlmostEquals(displayWidth(), lockedWidth, 0.01f));
         AddStep("apply the selected width to all lanes", () =>
         {
             var width = slider(BmsStrings.StageColumnWidth);
             var widthChange = Playfield.Stage.Columns.Sum(column => width.Current.Value - ((Drawable)column).DrawWidth);
             batchWidth = lockedWidth + widthChange * unlockedScale;
-            width.Parent.ChildrenOfType<IconButton>().Single().TriggerClick();
+            applyToAll(width).TriggerClick();
         });
         AddUntilStep("the unlocked Stage fits the batch width change", () => Precision.AlmostEquals(displayWidth(), batchWidth, 0.01f));
         AddStep("restore the width lock and edit a lane", () =>
         {
-            keepWidth().ApplyDefault();
-            slider(BmsStrings.StageColumnWidth).ApplyDefault();
+            reset(keepWidth()).TriggerClick();
+            reset(slider(BmsStrings.StageColumnWidth)).TriggerClick();
         });
         AddUntilStep("the locked Stage retains its new width", () => Precision.AlmostEquals(displayWidth(), batchWidth, 0.01f));
 
         BmsStageHud hud() => Player.HUDOverlay.ChildrenOfType<BmsStageHud>().Single();
         float displayWidth() => Playfield.Stage.DrawWidth * Playfield.Stage.Scale.X;
-        SettingsCheckbox keepWidth() => stageEditor.ChildrenOfType<SettingsCheckbox>().Single(control => control.LabelText.Equals(BmsStrings.StageKeepTotalWidth));
-        SettingsSlider<float> slider(LocalisableString label) => stageEditor.ChildrenOfType<SettingsSlider<float>>().Single(control => control.LabelText.Equals(label));
+        FormCheckBox keepWidth() => stageEditor.ChildrenOfType<FormCheckBox>().Single(control => control.Caption.Equals(BmsStrings.StageKeepTotalWidth));
+        FormSliderBar<float> slider(LocalisableString label) => stageEditor.ChildrenOfType<FormSliderBar<float>>().Single(control => control.Caption.Equals(label));
     }
+
+    private static IconButton applyToAll(Drawable control) => control.ChildrenOfType<FormFieldCaption>().Single()
+        .ChildrenOfType<IconButton>().Single(button => button.Icon.Equals(FontAwesome.Regular.Clone));
+
+    private static IconButton reset(Drawable control) => control.ChildrenOfType<FormFieldCaption>().Single()
+        .ChildrenOfType<IconButton>().Single(button => button.Icon.Equals(FontAwesome.Solid.Undo));
 
     private sealed partial class StageSettingsHost(SkinEditorChangeHandler changes) : Container
     {

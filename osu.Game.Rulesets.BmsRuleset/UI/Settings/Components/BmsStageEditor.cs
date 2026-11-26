@@ -1,16 +1,21 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Cursor;
+using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.UserInterface;
+using osu.Framework.Input;
 using osu.Framework.Localisation;
+using osu.Game.Graphics;
+using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterface;
-using osu.Game.Overlays;
+using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
@@ -44,6 +49,9 @@ internal sealed partial class BmsStageEditor : FillFlowContainer, IHasCurrentVal
     private FillFlowContainer laneSettings = null!;
     private bool writingStyle;
     private FillFlowContainer gapSettings = null!;
+
+    [Resolved]
+    private OsuColour colours { get; set; } = null!;
 
     [Resolved]
     private SkinManager skins { get; set; } = null!;
@@ -84,12 +92,12 @@ internal sealed partial class BmsStageEditor : FillFlowContainer, IHasCurrentVal
         {
             Children =
             [
-                new SettingsCheckbox
+                withCaptionActions(new FormCheckBox
                 {
-                    LabelText = BmsStrings.StageKeepTotalWidth,
-                    TooltipText = BmsStrings.StageKeepTotalWidthDescription,
+                    Caption = BmsStrings.StageKeepTotalWidth,
+                    HintText = BmsStrings.StageKeepTotalWidthDescription,
                     Current = settingValue(true, style.KeepTotalWidth, (currentStyle, value) => currentStyle.KeepTotalWidth = value ?? true),
-                },
+                }),
                 boundSlider(BmsStrings.NoteHeightScale, BmsStrings.NoteHeightScaleDescription, stage.NoteHeightScale),
             ],
         });
@@ -155,8 +163,8 @@ internal sealed partial class BmsStageEditor : FillFlowContainer, IHasCurrentVal
                 Children =
                 [
                     imageFileSelector(BmsStageImage.HitTarget, null, style, files, BmsStrings.StageHitTarget),
-                    slider(BmsStrings.StageHitTargetHeight, 1, style.HitTargetHeightScale, 0.1f, BmsStageStyle.MAX_HIT_TARGET_HEIGHT_SCALE,
-                        (currentStyle, value) => currentStyle.HitTargetHeightScale = value),
+                    withCaptionActions(slider(BmsStrings.StageHitTargetHeight, 1, style.HitTargetHeightScale, 0.1f, BmsStageStyle.MAX_HIT_TARGET_HEIGHT_SCALE,
+                        (currentStyle, value) => currentStyle.HitTargetHeightScale = value)),
                     boundSlider(BmsStrings.JudgementLineOffset, BmsStrings.JudgementLineOffsetDescription, stage.JudgementLineOffset),
                     boundSlider(BmsStrings.LightPositionOffset, BmsStrings.LightPositionOffsetDescription, stage.LightPositionOffset),
                 ],
@@ -165,9 +173,9 @@ internal sealed partial class BmsStageEditor : FillFlowContainer, IHasCurrentVal
             {
                 Children =
                 [
-                    new SettingsCheckbox { LabelText = BmsStrings.StageShowMeasureLines, Current = showLines },
-                    slider(BmsStrings.StageBarHeight, baseBarHeight, style.BarHeight, 0, BmsStageStyle.MAX_LINE_WIDTH,
-                        (currentStyle, value) => currentStyle.BarHeight = value),
+                    withCaptionActions(new FormCheckBox { Caption = BmsStrings.StageShowMeasureLines, Current = showLines }),
+                    withCaptionActions(slider(BmsStrings.StageBarHeight, baseBarHeight, style.BarHeight, 0, BmsStageStyle.MAX_LINE_WIDTH,
+                        (currentStyle, value) => currentStyle.BarHeight = value)),
                     new SettingsColour { LabelText = BmsStrings.StageBarColour, Current = colour },
                 ],
             },
@@ -185,19 +193,19 @@ internal sealed partial class BmsStageEditor : FillFlowContainer, IHasCurrentVal
         rebuildLaneFields();
     }
 
-    private SettingsSlider<float> boundSlider(LocalisableString label, LocalisableString tooltip, BindableFloat value)
+    private Drawable boundSlider(LocalisableString label, LocalisableString tooltip, BindableFloat value)
     {
-        var control = new SettingsSlider<float>
+        var control = new FormSliderBar<float>
         {
-            LabelText = label,
-            TooltipText = tooltip,
+            Caption = label,
+            HintText = tooltip,
             Current = value,
             KeyboardStep = value.Precision,
         };
         // The toolbox listens to top-level settings only; these sliders still edit the original HUD bindables.
         if (changeHandler != null)
-            control.SettingChanged += changeHandler.SaveState;
-        return control;
+            control.ValueChanged += changeHandler.SaveState;
+        return withCaptionActions(control);
     }
 
     private void rebuildLaneFields()
@@ -256,7 +264,7 @@ internal sealed partial class BmsStageEditor : FillFlowContainer, IHasCurrentVal
             return batchSlider(control, values, count, BmsStrings.StageApplyToAllColumns);
         }
 
-        SettingsSlider<float> laneSlider(LocalisableString label, float defaultValue, float min, float max, Func<BmsStageStyle, Dictionary<int, float>> values) =>
+        FormSliderBar<float> laneSlider(LocalisableString label, float defaultValue, float min, float max, Func<BmsStageStyle, Dictionary<int, float>> values) =>
             indexedSlider(label, defaultValue, min, max, index, values);
     }
 
@@ -297,7 +305,7 @@ internal sealed partial class BmsStageEditor : FillFlowContainer, IHasCurrentVal
             new BmsSkinComponentLookup(BmsSkinComponents.ColumnBackground, layout, columnAt(boundary + 1)), true);
     }
 
-    private SettingsSlider<float> indexedSlider(LocalisableString label, float defaultValue, float min, float max, int index,
+    private FormSliderBar<float> indexedSlider(LocalisableString label, float defaultValue, float min, float max, int index,
                                                 Func<BmsStageStyle, Dictionary<int, float>> values)
     {
         var entries = values(stage.GetStageStyle(layout));
@@ -310,13 +318,13 @@ internal sealed partial class BmsStageEditor : FillFlowContainer, IHasCurrentVal
         });
     }
 
-    private Drawable batchSlider(SettingsSlider<float> control, Func<BmsStageStyle, Dictionary<int, float>> values, int count, LocalisableString label,
+    private Drawable batchSlider(FormSliderBar<float> control, Func<BmsStageStyle, Dictionary<int, float>> values, int count, LocalisableString label,
                                  Func<int, float>? defaultValue = null)
     {
         if (count == 1)
-            return control;
+            return withCaptionActions(control);
 
-        return batchRow(control, label, () => updateStyle(style =>
+        return withCaptionActions(control, label, () => updateStyle(style =>
         {
             var entries = values(style);
             var value = control.Current.Value;
@@ -332,22 +340,22 @@ internal sealed partial class BmsStageEditor : FillFlowContainer, IHasCurrentVal
 
     private Drawable imageFileSelector(BmsStageImage slot, int? selectedColumn, BmsStageStyle style, IReadOnlyDictionary<string, string> files, LocalisableString label)
     {
-        var imageName = new Bindable<string>(style.GetImage(slot, selectedColumn) ?? string.Empty);
+        var imageName = new Bindable<string>(string.Empty) { Value = style.GetImage(slot, selectedColumn) ?? string.Empty };
         imageName.BindValueChanged(change => updateStyle(currentStyle => currentStyle.SetImage(slot, selectedColumn, change.NewValue)));
         var original = baseImageName(slot, selectedColumn);
         var defaultLabel = original == null ? BmsStrings.StageUseSkin : BmsStrings.StageUseSkinImage(original);
-        var control = new LabelledDropdown<string>(name => string.IsNullOrEmpty(name) ? defaultLabel : files.GetValueOrDefault(name, name))
+        var control = new StageImageDropdown(name => string.IsNullOrEmpty(name) ? defaultLabel : files.GetValueOrDefault(name, name))
         {
-            LabelText = label,
+            Caption = label,
             AlwaysShowSearchBar = true,
             Items = files.Keys.Prepend(string.Empty).Append(imageName.Value).Distinct(StringComparer.Ordinal),
             Current = imageName,
         };
         var count = BmsLayout.GetTotalColumns(layout);
         if (selectedColumn == null || count == 1)
-            return control;
+            return withCaptionActions(control);
 
-        return batchRow(control, BmsStrings.StageApplyToAllColumns, () => updateStyle(currentStyle =>
+        return withCaptionActions(control, BmsStrings.StageApplyToAllColumns, () => updateStyle(currentStyle =>
         {
             currentStyle.SetImage(slot, null, null);
             for (var i = 0; i < count; i++)
@@ -386,28 +394,116 @@ internal sealed partial class BmsStageEditor : FillFlowContainer, IHasCurrentVal
 
     private IReadOnlyDictionary<string, string> imageFiles() => BmsSkinImageFiles.StageChoices(skins, stage.GameplaySkin);
 
-    private static Drawable batchRow(Drawable control, LocalisableString label, Action apply) => new Container
+    private Drawable withCaptionActions<T>(IHasCurrentValue<T> control, LocalisableString applyLabel = default, Action? apply = null)
     {
-        RelativeSizeAxes = Axes.X,
-        AutoSizeAxes = Axes.Y,
-        Children =
-        [
-            control,
-            new IconButton
+        var drawable = (Drawable)control;
+        var value = control.Current;
+        drawable.OnLoadComplete += _ =>
+        {
+            var caption = findCaption(drawable)!;
+            caption.OnLoadComplete += _ =>
             {
-                Anchor = Anchor.TopRight,
-                Origin = Anchor.TopRight,
-                Y = 15,
-                Size = new Vector2(SettingsPanel.CONTENT_MARGINS),
-                IconScale = new Vector2(0.68f),
-                Icon = FontAwesome.Regular.Clone,
-                TooltipText = label,
-                Action = apply,
-            },
-        ],
-    };
+                var text = (OsuTextFlowContainer)getInternalChildren(caption).Single();
+                var resetButton = new CaptionActionButton
+                {
+                    Size = new Vector2(16),
+                    // Match the question mark inside the help circle while keeping the full hit target.
+                    IconScale = new Vector2(0.34f),
+                    Icon = FontAwesome.Solid.Undo,
+                    IconColour = colours.BlueLight,
+                    TooltipText = BmsStrings.StageRestoreDefault,
+                    Action = () =>
+                    {
+                        // Commit a focused number field before resetting it.
+                        drawable.FindClosestParent<IFocusManager>()!.ChangeFocus(null);
+                        value.SetDefault();
+                    },
+                };
 
-    private SettingsSlider<float> slider(LocalisableString caption, float defaultValue, float? value, float min, float max, Action<BmsStageStyle, float?> apply)
+                resetButton.Add(new Circle
+                {
+                    Anchor = Anchor.Centre,
+                    Origin = Anchor.Centre,
+                    Size = new Vector2(11),
+                    Depth = 1,
+                    Colour = colours.Gray4,
+                });
+
+                var actions = new CaptionActions
+                {
+                    AutoSizeAxes = Axes.Both,
+                    Direction = FillDirection.Horizontal,
+                    Children = [resetButton],
+                };
+
+                if (apply != null)
+                {
+                    actions.Add(new CaptionActionButton
+                    {
+                        Size = new Vector2(16),
+                        IconScale = new Vector2(0.58f),
+                        Icon = FontAwesome.Regular.Clone,
+                        TooltipText = applyLabel,
+                        Action = () =>
+                        {
+                            drawable.FindClosestParent<IFocusManager>()!.ChangeFocus(null);
+                            apply();
+                        },
+                    });
+                }
+
+                updateReset();
+                value.ValueChanged += _ => updateReset();
+                value.DefaultChanged += _ => updateReset();
+                value.DisabledChanged += _ => updateReset();
+
+                // Use the caption's text flow so the actions follow the help icon even when a translation wraps.
+                text.AddArbitraryDrawable(actions);
+
+                void updateReset()
+                {
+                    var canReset = !value.IsDefault && !value.Disabled;
+                    resetButton.Alpha = canReset ? 1 : 0;
+                    resetButton.Enabled.Value = canReset;
+                }
+            };
+        };
+        return drawable;
+    }
+
+    private sealed partial class CaptionActions : FillFlowContainer<IconButton>, IHasLineBaseHeight
+    {
+        // FormFieldCaption draws its 10-unit help icon one unit below the baseline.
+        public float LineBaseHeight => DrawHeight > 0 ? DrawHeight / 2 + 4 : 0;
+    }
+
+    private sealed partial class CaptionActionButton : IconButton
+    {
+        public override bool HandlePositionalInput => Enabled.Value && base.HandlePositionalInput;
+    }
+
+    private static FormFieldCaption? findCaption(Drawable drawable)
+    {
+        if (drawable is FormFieldCaption caption)
+            return caption;
+
+        if (drawable is CompositeDrawable composite)
+        {
+            foreach (var child in getInternalChildren(composite))
+            {
+                if (findCaption(child) is { } found)
+                    return found;
+            }
+        }
+
+        return null;
+    }
+
+    // Form controls construct their captions privately and expose no caption accessory slot.
+    [UnsafeAccessor(UnsafeAccessorKind.Method, Name = "get_InternalChildren")]
+    private static extern IReadOnlyList<Drawable> getInternalChildren(CompositeDrawable drawable);
+
+    private FormSliderBar<float> slider(LocalisableString caption, float defaultValue, float? value, float min, float max, Action<BmsStageStyle, float?> apply)
     {
         var currentValue = new BindableFloat(defaultValue)
         {
@@ -416,10 +512,13 @@ internal sealed partial class BmsStageEditor : FillFlowContainer, IHasCurrentVal
             Value = value ?? defaultValue,
         };
         bindOverride(currentValue, apply);
-        return new SettingsSlider<float>
+        return new FormSliderBar<float>
         {
-            LabelText = caption,
+            Caption = caption,
+            RelativeSizeAxes = Axes.X,
             Current = currentValue,
+            // The display rounds long decimals. Only committed input should become a skin override.
+            TransferValueOnCommit = true,
             KeyboardStep = 1,
         };
     }
@@ -520,6 +619,8 @@ internal sealed partial class BmsStageEditor : FillFlowContainer, IHasCurrentVal
             RelativeSizeAxes = Axes.X;
             AutoSizeAxes = Axes.Y;
             TabContainer.Spacing = new Vector2(6, 3);
+            TabContainer.Anchor = Anchor.TopLeft;
+            TabContainer.Origin = Anchor.TopLeft;
             SelectFirstTabByDefault = false;
         }
 
@@ -531,7 +632,8 @@ internal sealed partial class BmsStageEditor : FillFlowContainer, IHasCurrentVal
             RelativeSizeAxes = Axes.X,
             AutoSizeAxes = Axes.Y,
             AllowMultiline = true,
-            Padding = new MarginPadding { Horizontal = SettingsPanel.CONTENT_MARGINS },
+            Anchor = Anchor.TopLeft,
+            Origin = Anchor.TopLeft,
         };
 
         protected override TabItem<T> CreateTabItem(T value) => new InlineTabItem(value, label(value), tooltip?.Invoke(value) ?? default);
@@ -552,13 +654,19 @@ internal sealed partial class BmsStageEditor : FillFlowContainer, IHasCurrentVal
         }
     }
 
-    private sealed partial class LabelledDropdown<T>(Func<T, LocalisableString> name) : SettingsDropdown<T>
+    private sealed partial class StageImageDropdown(Func<string, LocalisableString> name) : FormDropdown<string>
     {
-        protected override OsuDropdown<T> CreateDropdown() => new LabelledDropdownControl(name);
-
-        private sealed partial class LabelledDropdownControl(Func<T, LocalisableString> itemName) : DropdownControl
+        protected override void LoadComplete()
         {
-            protected override LocalisableString GenerateItemText(T item) => itemName(item);
+            base.LoadComplete();
+
+            // The header's last child is its full-area click handler. Give the caption buttons priority.
+            changeInternalChildDepth(Header, getInternalChildren(Header).Last(), 1);
         }
+
+        protected override LocalisableString GenerateItemText(string item) => name(item);
+
+        [UnsafeAccessor(UnsafeAccessorKind.Method, Name = "ChangeInternalChildDepth")]
+        private static extern void changeInternalChildDepth(CompositeDrawable parent, Drawable child, float depth);
     }
 }

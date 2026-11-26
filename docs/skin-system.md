@@ -185,6 +185,10 @@ In `[Mania]` sections, use mania standard judgement names: `Hit300g` (PGREAT), `
 
 Open the osu! skin editor and select the BMS Stage component. The preview beatmap determines the layout. Stage-wide controls appear above the track, column boundary, judgement line, measure line, and border settings.
 
+<p align="center">
+  <img src="images/skin-component-stage.png" width="734" alt="Selected BMS Stage with resize handles, Stage-wide settings, and the track Size &amp; scale tab">
+</p>
+
 - **Keep total width** is on by default. Turn it off to let the Stage grow or shrink as you edit lane widths and gaps.
 - Click a lane number, then choose **Size & scale** or **Images**. The file picker lists imported images and built-in artwork available to the preview. Select an animation by its first frame. Choose **Use skin default** to restore the original artwork.
 - Click an adjacent pair to edit its gap and divider width. An N-lane preview has N−1 interior boundaries. **Separator colour** applies to all dividers in the current layout.
@@ -192,6 +196,11 @@ Open the osu! skin editor and select the BMS Stage component. The preview beatma
 - Use the copy button beside a setting to apply its value to all lanes, gaps, or dividers in the preview layout. Other settings stay unchanged.
 
 Judgement-line, stage-border, and measure-line settings are independent of the selected lane. Changes are saved with the current skin layout.
+
+<p align="center">
+  <img src="images/skin-component-stage-settings.png" width="48%" alt="Column spacing, divider colour and width, judgement line and hit effect offsets, measure lines, and Stage border settings">
+  <img src="images/skin-component-stage-images.png" width="48%" alt="Track Images tab showing all lane artwork slots, from lane background and notes to keys and hit effects">
+</p>
 
 ## Skin Components
 
