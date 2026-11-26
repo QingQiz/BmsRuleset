@@ -122,14 +122,14 @@ public class BmsReplaySimulationTest
             BmsJudgementEventProjection.CreateScoringHitEvents(result.Judgements), result.Gauges);
         var presses = BmsHitScatterStatistic.FilterData(statistics.Scatter.Overall, true, false);
         var releases = BmsHitScatterStatistic.FilterData(statistics.Scatter.Overall, false, true);
-        var releaseOffsets = BmsHitOffsetStatistic.FilterSummary(statistics.Offset, false, true, column => column == 1);
+        var releaseOffsets = BmsHitOffsetStatistic.FilterStatistics(statistics.Offset, false, true);
 
         Assert.Multiple(() =>
         {
             Assert.That(presses.Points.Select(point => (point.Time, point.Offset)), Is.EqualTo(new[] { (1000d, 40d) }));
             Assert.That(releases.Points.Select(point => (point.Time, point.Offset)), Is.EqualTo(new[] { (2000d, -10d) }));
-            Assert.That(releaseOffsets.Count, Is.EqualTo(1));
-            Assert.That(releaseOffsets.AverageOffset, Is.EqualTo(-10));
+            Assert.That(releaseOffsets.Keys[1].Summary.Count, Is.EqualTo(1));
+            Assert.That(releaseOffsets.Overall.AverageOffset, Is.EqualTo(-10));
         });
     }
 
@@ -408,8 +408,8 @@ public class BmsReplaySimulationTest
         Assert.That(course.Timeline.Notes.Categories.Sum(category => category.Buckets.Sum()), Is.EqualTo(2));
         Assert.That(course.Timeline.Judgements.Categories.Sum(category => category.Buckets.Sum()), Is.EqualTo(1));
         Assert.That(course.Scatter.Overall.Points, Has.Count.EqualTo(1));
-        Assert.That(course.Scatter.Lanes, Has.Count.EqualTo(stage.Scatter.Lanes.Count));
-        Assert.That(course.Offset.Lanes, Has.Count.EqualTo(stage.Offset.Lanes.Count));
+        Assert.That(course.Scatter.Keys, Has.Count.EqualTo(stage.Scatter.Keys.Count));
+        Assert.That(course.Offset.Keys, Has.Count.EqualTo(stage.Offset.Keys.Count));
         Assert.That(source.HitEvents, Is.Empty);
     }
 

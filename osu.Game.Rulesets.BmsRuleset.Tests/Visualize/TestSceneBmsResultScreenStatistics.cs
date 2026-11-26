@@ -151,20 +151,19 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
             AddStep("leave local back button", () => InputManager.MoveMouseTo(new Vector2(-100)));
             AddUntilStep("back button returns to resting size", () => backButton.ScreenSpaceDrawQuad.AlmostEquals(originalBounds[backButton]));
             AddAssert("result leaves global scale unchanged", () => config.Get<float>(OsuSetting.UIScale), () => Is.EqualTo(scale));
-            AddStep("hide the scratch lane", () =>
+            AddStep("expand offset by pointer", () =>
             {
-                var offset = screen.ChildrenOfType<BmsHitOffsetStatistic>().Single();
-                InputManager.MoveMouseTo(offset.LaneFilter.ChildrenOfType<OsuAnimatedButton>().Single(button => button.Name == "Lane 0"));
+                InputManager.MoveMouseTo(originalBounds[screen.ChildrenOfType<BmsHitOffsetStatistic>().Single()].Centre);
                 InputManager.Click(MouseButton.Left);
             });
-            assertHitOffsetText("7 lanes");
-            AddStep("restore all lanes", () =>
+            AddUntilStep("offset expanded", () => screen.ChildrenOfType<BmsHitOffsetStatistic>().Single()
+                .ChildrenOfType<SpriteText>().Any(text => text.Text.ToString() == "Scratch"));
+            AddStep("collapse offset by pointer", () =>
             {
-                var offset = screen.ChildrenOfType<BmsHitOffsetStatistic>().Single();
-                InputManager.MoveMouseTo(offset.LaneFilter.ChildrenOfType<IconButton>().Single(button => button.Name == "Select all lanes"));
+                InputManager.MoveMouseTo(originalBounds[screen.ChildrenOfType<BmsHitOffsetStatistic>().Single()].Centre);
                 InputManager.Click(MouseButton.Left);
             });
-            AddUntilStep("layout restored after selecting all lanes", () => originalBounds.All(pair => pair.Key.ScreenSpaceDrawQuad.AlmostEquals(pair.Value)));
+            AddUntilStep("layout restored after collapse", () => originalBounds.All(pair => pair.Key.ScreenSpaceDrawQuad.AlmostEquals(pair.Value)));
         }
 
         AddStep(keyboardBack ? "return with escape" : "return with local back button", () =>
@@ -353,8 +352,7 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
             var filters = screen.ChildrenOfType<BmsResultTimingFilter>();
             var scatterLabels = screen.ChildrenOfType<BmsHitScatterStatistic>().Single().ChildrenOfType<SpriteText>();
             var offsetLabels = screen.ChildrenOfType<BmsHitOffsetStatistic>().Single().ChildrenOfType<SpriteText>();
-            return ChartsFitViewport(screen) && filters.All(filter => filter.ShowReleases && !filter.ShowPresses
-                                     && filter.Children.First().TooltipText == BmsStrings.ResultShowFilter(BmsStrings.ResultTimingPress))
+            return ChartsFitViewport(screen) && filters.All(filter => filter.ShowReleases && !filter.ShowPresses)
                                  && scatterLabels.Any(text => text.Text.Equals(BmsStrings.HitCount(0)))
                                  && offsetLabels.Any(text => text.Text.Equals(BmsStrings.HitCount(0)));
         });
@@ -389,106 +387,15 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
         AddStep("press enter", () => InputManager.Key(Key.Enter));
         AddAssert("enter keeps statistics open", () => screen.ChildrenOfType<BmsStatisticsPanel>().Single().State.Value == Visibility.Visible);
         AddAssert("back does not consume a statistics collapse", () => screen.OnBackButton(), () => Is.False);
-        AddStep("hide Scratch on both charts", () =>
+        AddStep("expand per-key offset charts", () =>
         {
-            foreach (var filter in screen.ChildrenOfType<BmsResultLaneFilter>())
-            {
-                var lanes = filter.ChildrenOfType<OsuAnimatedButton>().Where(button => button.Name?.StartsWith("Lane ", StringComparison.Ordinal) == true).ToArray();
-                Assert.That(lanes, Has.Length.EqualTo(8));
-                Assert.That(lanes[0].ChildrenOfType<SpriteIcon>().Single().Icon, Is.EqualTo(BmsIcons.Scratch));
-                Assert.That(lanes.Select(button => button.Alpha), Has.All.EqualTo(1));
-                InputManager.MoveMouseTo(lanes[0]);
-                InputManager.Click(MouseButton.Left);
-            }
-        });
-        assertHitOffsetText("7 lanes");
-        assertHitScatterText("7 lanes");
-        AddStep("restore press timing on both charts", () =>
-        {
-            foreach (var button in screen.ChildrenOfType<BmsResultTimingFilterButton>().Where(button => button.Name == "Press timing filter"))
-            {
-                InputManager.MoveMouseTo(button);
-                InputManager.Click(MouseButton.Left);
-            }
-        });
-        assertHitOffsetText("500 hits");
-        assertHitScatterText("500 hits");
-        AddStep("hide Key 1 only in the offset distribution", () =>
-        {
-            var filter = screen.ChildrenOfType<BmsHitOffsetStatistic>().Single().LaneFilter;
-            InputManager.MoveMouseTo(filter.ChildrenOfType<OsuAnimatedButton>().Single(button => button.Name == "Lane 1"));
+            var offset = screen.ChildrenOfType<BmsHitOffsetStatistic>().Single();
+            InputManager.MoveMouseTo(offset);
             InputManager.Click(MouseButton.Left);
         });
-        assertHitOffsetText("6 lanes");
-        assertHitOffsetText("0 hits");
-        assertHitScatterText("500 hits");
-        AddStep("show Scratch again while Key 1 stays hidden", () =>
-        {
-            var filter = screen.ChildrenOfType<BmsHitOffsetStatistic>().Single().LaneFilter;
-            InputManager.MoveMouseTo(filter.ChildrenOfType<OsuAnimatedButton>().Single(button => button.Name == "Lane 0"));
-            InputManager.Click(MouseButton.Left);
-        });
-        assertHitOffsetText("7 lanes");
-        assertHitOffsetText("500 hits");
-        AddAssert("multiple selected lanes fit the original chart rows", () => ChartsFitViewport(screen));
-        AddStep("select all lanes from a partial selection", clickAllLanesButtons);
-        assertHitOffsetText("1000 hits");
-        assertHitScatterText("1000 hits");
-        AddStep("clear all lanes from a full selection", clickAllLanesButtons);
-        assertHitOffsetText("0 lanes");
-        assertHitScatterText("0 lanes");
-        assertHitOffsetText("0 hits");
-        assertHitScatterText("0 hits");
-        AddAssert("empty selection fits the original chart rows", () => ChartsFitViewport(screen));
-        AddStep("select all lanes from an empty selection", clickAllLanesButtons);
-        assertHitOffsetText("1000 hits");
-        assertHitScatterText("1000 hits");
-        AddUntilStep("all charts fit after resetting lane selection", () => ChartsFitViewport(screen));
-
-        void clickAllLanesButtons()
-        {
-            foreach (var filter in screen.ChildrenOfType<BmsResultLaneFilter>())
-            {
-                InputManager.MoveMouseTo(filter.ChildrenOfType<IconButton>().Single(button => button.Name == "Select all lanes"));
-                InputManager.Click(MouseButton.Left);
-            }
-        }
-    }
-
-    [Test]
-    public void TestWideLaneFilterCanToggleLastKey()
-    {
-        BmsHitOffsetStatistic offset = null!;
-        OsuScrollContainer laneScroll = null!;
-        AddStep("load a narrow chart with a 64-key layout", () =>
-        {
-            var note = new BmsNote { Column = 63, StartTime = 1000 };
-            var beatmap = new BmsBeatmap { LayoutVariant = BmsLayout.GenericLayout(64), TotalColumns = 64, HitObjects = [note] };
-            var score = new ScoreInfo { HitEvents = [new HitEvent(10, 1, HitResult.Perfect, note, null, null)] };
-            var grid = new BmsResultStatisticsGrid(BmsGameplayProfile.INSTANCE);
-            grid.SetData(BmsResultStatisticsData.Create(score, beatmap));
-            offset = grid.ChildrenOfType<BmsHitOffsetStatistic>().Single();
-            laneScroll = offset.LaneFilter.ChildrenOfType<OsuScrollContainer>().Single();
-            Child = new Container { Width = 560, RelativeSizeAxes = Axes.Y, Child = grid };
-        });
-        AddUntilStep("lane buttons overflow the header", () => laneScroll.ScrollableExtent > 0);
-        AddStep("scroll to the last key", () =>
-        {
-            InputManager.MoveMouseTo(laneScroll);
-            InputManager.ScrollHorizontalBy(-30);
-        });
-        AddUntilStep("last key is visible", () =>
-        {
-            var lastKey = offset.LaneFilter.ChildrenOfType<OsuAnimatedButton>().Single(button => button.Name == "Lane 63");
-            return laneScroll.ScreenSpaceDrawQuad.AABBFloat.Right >= lastKey.ScreenSpaceDrawQuad.AABBFloat.Right;
-        });
-        AddStep("hide the last key", () =>
-        {
-            InputManager.MoveMouseTo(offset.LaneFilter.ChildrenOfType<OsuAnimatedButton>().Single(button => button.Name == "Lane 63"));
-            InputManager.Click(MouseButton.Left);
-        });
-        assertHitOffsetText("63 lanes");
-        assertHitOffsetText("0 hits");
+        AddUntilStep("per-key rows expanded", () => screen.ChildrenOfType<BmsHitOffsetStatistic>().Single().ChildrenOfType<SpriteText>().Any(text => text.Text.ToString() == "Scratch"));
+        AddUntilStep("expanded charts can scroll", () => screen.ChildrenOfType<BmsResultStatisticsGrid>().Single()
+            .ChildrenOfType<OsuScrollContainer>().Single().ScrollableExtent > 0);
     }
 
     internal static bool ChartsFitViewport(Drawable screen)
@@ -505,7 +412,7 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
             return chartBounds.Top >= bounds.Top && chartBounds.Bottom <= bounds.Bottom + 1
                                                  && chartBounds.Left >= bounds.Left && chartBounds.Right <= bounds.Right + 1
                                                  && chartBounds.Height > (chart is BmsHitOffsetStatistic ? 50 : 80);
-        }) && grid.ChildrenOfType<OsuScrollContainer>().Single(scroll => scroll.ScrollDirection == Direction.Vertical).ScrollableExtent < 1;
+        }) && grid.ChildrenOfType<OsuScrollContainer>().Single().ScrollableExtent < 1;
     }
 
     internal static bool OverviewFitsViewport(BmsResultsScreen screen)
@@ -756,6 +663,9 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
 
     private void assertHitScatterText(string text) =>
         AddUntilStep($"hit scatter {text} shown", () => hitScatterStatisticContainsText(text));
+
+    private void assertNoHitScatterText(string text) =>
+        AddUntilStep($"hit scatter {text} hidden", () => !hitScatterStatisticContainsText(text));
 
     private bool hitScatterStatisticContainsText(string text) =>
         this.ChildrenOfType<BmsHitScatterStatistic>().Single().ChildrenOfType<SpriteText>().Any(t => t.Text.ToString() == text);
@@ -1025,6 +935,52 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
     }
 
     [Test]
+    public void TestHitOffsetStatisticTogglesKeyChartsOnClick()
+    {
+        BmsHitOffsetStatistic hitOffsetStatistic = null!;
+
+        AddStep("load hit offset statistic", () =>
+        {
+            var beatmap = new BmsBeatmap
+            {
+                LayoutVariant = BmsLayoutVariant.Bms5K,
+                TotalColumns = BmsLayout.GetTotalColumns(BmsLayoutVariant.Bms5K),
+            };
+
+            Child = new Container
+            {
+                Anchor = Anchor.Centre,
+                Origin = Anchor.Centre,
+                Width = 720,
+                AutoSizeAxes = Axes.Y,
+                Child = hitOffsetStatistic = new BmsHitOffsetStatistic(BmsHitOffsetStatistic.CreateStatistics(BmsGameplayProfile.INSTANCE, beatmap, createGaugeHitEvents()), BmsGameplayProfile.INSTANCE),
+            };
+        });
+
+        AddUntilStep("hit offset statistic loaded", () => hitOffsetStatistic.IsLoaded && hitOffsetStatistic.DrawHeight > 0);
+        assertNoHitOffsetText("Scratch");
+        assertNoHitOffsetText("Key 1");
+
+        AddStep("expand from component body", () =>
+        {
+            InputManager.MoveMouseTo(hitOffsetStatistic);
+            InputManager.Click(MouseButton.Left);
+        });
+
+        assertHitOffsetText("Scratch");
+        assertHitOffsetText("Key 1");
+
+        AddStep("collapse from component body", () =>
+        {
+            InputManager.MoveMouseTo(hitOffsetStatistic);
+            InputManager.Click(MouseButton.Left);
+        });
+
+        assertNoHitOffsetText("Scratch");
+        assertNoHitOffsetText("Key 1");
+    }
+
+    [Test]
     public void TestHitOffsetStatisticUsesManiaTimingDistributionStyle()
     {
         BmsHitOffsetStatistic hitOffsetStatistic = null!;
@@ -1159,12 +1115,22 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
 
         AddUntilStep("hit scatter statistic loaded", () => hitScatterStatistic.IsLoaded && hitScatterStatistic.DrawHeight > 0);
         AddWaitStep("render overall scatter", 5);
-        AddStep("validate overall batch rendering", drawScatterBatches);
+        AddStep("validate overall batch rendering", () => drawScatterBatches(1));
 
-        void drawScatterBatches()
+        AddStep("expand key charts", () =>
+        {
+            InputManager.MoveMouseTo(hitScatterStatistic);
+            InputManager.Click(MouseButton.Left);
+        });
+
+        assertHitScatterText("Scratch");
+        AddWaitStep("render per-key scatter", 5);
+        AddStep("validate per-key batch rendering", () => drawScatterBatches(7));
+
+        void drawScatterBatches(int expectedPlotCount)
         {
             var plots = hitScatterStatistic.ChildrenOfType<Container>().Where(c => c.Name == "Hit scatter data").ToArray();
-            Assert.That(plots, Has.Length.EqualTo(1));
+            Assert.That(plots, Has.Length.EqualTo(expectedPlotCount));
 
             // Headless tests skip drawing, so invoke the batch draw nodes to exercise the renderer's size validation.
             if (Dependencies.Get<IRenderer>() is not DummyRenderer renderer)
@@ -1180,6 +1146,53 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
                 draw.CreateDelegate<Action<IRenderer>>(node)(renderer);
             }
         }
+    }
+
+    [Test]
+    public void TestHitScatterStatisticTogglesKeyChartsOnClick()
+    {
+        BmsHitScatterStatistic hitScatterStatistic = null!;
+
+        AddStep("load hit scatter statistic", () =>
+        {
+            var beatmap = new BmsBeatmap
+            {
+                LayoutVariant = BmsLayoutVariant.Bms5K,
+                TotalColumns = BmsLayout.GetTotalColumns(BmsLayoutVariant.Bms5K),
+            };
+
+            Child = new Container
+            {
+                Anchor = Anchor.Centre,
+                Origin = Anchor.Centre,
+                Width = 720,
+                AutoSizeAxes = Axes.Y,
+                Child = hitScatterStatistic = new BmsHitScatterStatistic(
+                    BmsHitScatterStatistic.CreateStatistics(BmsGameplayProfile.INSTANCE, beatmap, createGaugeHitEvents()), BmsGameplayProfile.INSTANCE),
+            };
+        });
+
+        AddUntilStep("hit scatter statistic loaded", () => hitScatterStatistic.IsLoaded && hitScatterStatistic.DrawHeight > 0);
+        assertNoHitScatterText("Scratch");
+        assertNoHitScatterText("Key 1");
+
+        AddStep("expand from component body", () =>
+        {
+            InputManager.MoveMouseTo(hitScatterStatistic);
+            InputManager.Click(MouseButton.Left);
+        });
+
+        assertHitScatterText("Scratch");
+        assertHitScatterText("Key 1");
+
+        AddStep("collapse from component body", () =>
+        {
+            InputManager.MoveMouseTo(hitScatterStatistic);
+            InputManager.Click(MouseButton.Left);
+        });
+
+        assertNoHitScatterText("Scratch");
+        assertNoHitScatterText("Key 1");
     }
 
     [TestCase(0.813197)]

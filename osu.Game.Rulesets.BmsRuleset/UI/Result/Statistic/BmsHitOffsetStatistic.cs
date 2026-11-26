@@ -5,11 +5,14 @@ using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
+using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
+using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
@@ -22,6 +25,7 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
 public sealed partial class BmsHitOffsetStatistic : CompositeDrawable, IBmsResultStatistic
 {
     private const float graph_height = 200;
+    private const float key_graph_height = 100;
     private const int bins_per_side = 50;
     private const int bin_count = bins_per_side * 2 + 1;
     private const int centre_bin_index = bins_per_side;
@@ -31,11 +35,12 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable, IBmsResul
 
     private HitOffsetStatistics statistics;
 
+    private FillFlowContainer content = null!;
+    private bool expanded;
+    private Drawable overallRow = null!;
     private float summaryHeight = graph_height;
 
     internal BmsResultTimingFilter TimingFilter { get; }
-
-    internal BmsResultLaneFilter LaneFilter { get; }
 
     private readonly GameplayProfile profile;
 
@@ -46,16 +51,27 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable, IBmsResul
         this.statistics = statistics;
         this.profile = profile;
         TimingFilter = new BmsResultTimingFilter(rebuild);
-        LaneFilter = new BmsResultLaneFilter(statistics.Lanes, rebuild);
     }
 
+    public override bool HandlePositionalInput => true;
+
     [BackgroundDependencyLoader]
-    private void load() => rebuild();
+    private void load()
+    {
+        InternalChild = content = new FillFlowContainer
+        {
+            RelativeSizeAxes = Axes.X,
+            AutoSizeAxes = Axes.Y,
+            Direction = FillDirection.Vertical,
+            Spacing = new Vector2(0, 8),
+        };
+
+        rebuild();
+    }
 
     internal void SetData(HitOffsetStatistics data)
     {
         statistics = data;
-        LaneFilter.SetLanes(data.Lanes);
         if (LoadState >= LoadState.Ready)
             rebuild();
     }
@@ -63,38 +79,86 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable, IBmsResul
     internal static HitOffsetStatistics CreateStatistics(GameplayProfile profile, IBeatmap playableBeatmap, IReadOnlyList<HitEvent> hitEvents)
     {
         var observations = hitEvents.Where(profile.IsTimingEvent).Select(hit => new HitOffsetObservation(hit, profile.TimingKindFor(hit.Result))).ToArray();
-        var lanes = BmsResultLane.ForBeatmap(playableBeatmap, observations.Select(observation => observation.Column));
-        return new HitOffsetStatistics(createSummary(observations), lanes, observations);
+        var noteObservations = observations.Where(observation => observation.Hit.HitObject is BmsHitObject).ToArray();
+
+        var variant = playableBeatmap is BmsBeatmap bms ? bms.LayoutVariant : BmsLayoutVariant.Bms5K;
+        var totalColumns = playableBeatmap is BmsBeatmap { TotalColumns: > 0 } bmsWithColumns
+            ? bmsWithColumns.TotalColumns
+            : Math.Max(BmsLayout.GetTotalColumns(variant), noteObservations.Select(observation => ((BmsHitObject)observation.Hit.HitObject).Column + 1).DefaultIfEmpty(0).Max());
+
+        var hitsByColumn = noteObservations.ToLookup(observation => ((BmsHitObject)observation.Hit.HitObject).Column);
+        var keyIndex = 0;
+
+        var keyGroups = Enumerable.Range(0, totalColumns)
+            .Select(column => new KeyHitOffsetStatistics(labelFor(column, variant, ref keyIndex), createSummary(hitsByColumn[column])))
+            .ToArray();
+
+        return new HitOffsetStatistics(createSummary(observations), keyGroups, observations);
+    }
+
+    private static LocalisableString labelFor(int column, BmsLayoutVariant variant, ref int keyIndex)
+    {
+        if (BmsLayout.IsScratchColumn(column, variant))
+            return BmsStrings.Scratch;
+
+        return BmsStrings.Key(++keyIndex);
     }
 
     internal static HitOffsetStatistics CombineStatistics(IReadOnlyList<HitOffsetStatistics> attempts)
     {
         // Keep each stage's interpretation and original offsets when choosing new histogram bins.
         var observations = attempts.SelectMany(attempt => attempt.Observations).ToArray();
-        return new HitOffsetStatistics(createSummary(observations), BmsResultLane.Combine(attempts.Select(attempt => attempt.Lanes)), observations);
+        var keyCount = attempts.Select(attempt => attempt.Keys.Count).DefaultIfEmpty().Max();
+        var hitsByColumn = observations.Where(observation => observation.Hit.HitObject is BmsHitObject)
+            .ToLookup(observation => ((BmsHitObject)observation.Hit.HitObject).Column);
+        return new HitOffsetStatistics(
+            createSummary(observations),
+            Enumerable.Range(0, keyCount).Select(column => new KeyHitOffsetStatistics(
+                attempts.First(attempt => attempt.Keys.Count > column).Keys[column].Label,
+                createSummary(hitsByColumn[column]))).ToArray(), observations);
     }
 
     private void rebuild()
     {
-        var summary = FilterSummary(statistics, TimingFilter.ShowPresses, TimingFilter.ShowReleases, LaneFilter.AllSelected ? null : LaneFilter.Includes);
-        InternalChild = createRow(LaneFilter.SelectionLabel, summary, summaryHeight);
+        content.Clear();
+
+        var filtered = FilterStatistics(statistics, TimingFilter.ShowPresses, TimingFilter.ShowReleases);
+        content.Add(overallRow = createRow(BmsStrings.Overall, filtered.Overall, summaryHeight));
+
+        if (expanded)
+        {
+            foreach (var key in filtered.Keys)
+                content.Add(createRow(key.Label, key.Summary, key_graph_height));
+        }
     }
 
-    internal static HitOffsetSummary FilterSummary(HitOffsetStatistics statistics, bool showPresses, bool showReleases, Func<int?, bool>? includesLane = null)
+    internal static HitOffsetStatistics FilterStatistics(HitOffsetStatistics statistics, bool showPresses, bool showReleases)
     {
-        if (showPresses && showReleases && includesLane == null)
-            return statistics.Overall;
+        if (showPresses && showReleases)
+            return statistics;
 
-        return createSummary(statistics.Observations.Where(observation =>
-            (observation.Hit.HitObject is BmsLongNoteTailHitObject ? showReleases : showPresses)
-            && (includesLane?.Invoke(observation.Column) ?? true)));
+        var observations = statistics.Observations.Where(observation => observation.Hit.HitObject is BmsLongNoteTailHitObject ? showReleases : showPresses).ToArray();
+        var byColumn = observations.Where(observation => observation.Hit.HitObject is BmsHitObject)
+            .ToLookup(observation => ((BmsHitObject)observation.Hit.HitObject).Column);
+        return new HitOffsetStatistics(
+            createSummary(observations),
+            statistics.Keys.Select((key, column) => key with { Summary = createSummary(byColumn[column]) }).ToArray(),
+            observations);
     }
 
     void IBmsResultStatistic.FitSummaryToHeight(float height)
     {
         summaryHeight = Math.Max(0, height);
         if (IsLoaded)
-            InternalChild.Height = summaryHeight;
+            overallRow.Height = summaryHeight;
+    }
+
+    protected override bool OnClick(ClickEvent e)
+    {
+        expanded = !expanded;
+        rebuild();
+
+        return true;
     }
 
     private Drawable createRow(LocalisableString label, HitOffsetSummary summary, float height) => new GridContainer
@@ -205,12 +269,11 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable, IBmsResul
     }
 
 
-    internal readonly record struct HitOffsetObservation(HitEvent Hit, ResultTimingKind Kind)
-    {
-        internal int? Column => (Hit.HitObject as BmsHitObject)?.Column;
-    }
+    internal readonly record struct HitOffsetObservation(HitEvent Hit, ResultTimingKind Kind);
 
-    internal sealed record HitOffsetStatistics(HitOffsetSummary Overall, IReadOnlyList<BmsResultLane> Lanes, IReadOnlyList<HitOffsetObservation> Observations);
+    internal sealed record HitOffsetStatistics(HitOffsetSummary Overall, IReadOnlyList<KeyHitOffsetStatistics> Keys, IReadOnlyList<HitOffsetObservation> Observations);
+
+    internal sealed record KeyHitOffsetStatistics(LocalisableString Label, HitOffsetSummary Summary);
 
     internal sealed record HitOffsetSummary(
         int Count,

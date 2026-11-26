@@ -17,16 +17,14 @@ internal partial class BmsResultTimingFilterButton : IconButton
     internal BmsResultTimingFilterButton(bool release, Action selectionChanged)
     {
         Name = release ? "Release timing filter" : "Press timing filter";
-        Size = new Vector2(23);
+        Size = new Vector2(26);
         Icon = release ? FontAwesome.Solid.HandPaper : FontAwesome.Solid.HandPointer;
         IconScale = new Vector2(0.75f);
-        var label = release ? BmsStrings.ResultTimingRelease : BmsStrings.ResultTimingPress;
-        TooltipText = BmsStrings.ResultHideFilter(label);
+        TooltipText = release ? BmsStrings.ResultTimingRelease : BmsStrings.ResultTimingPress;
         Action = () =>
         {
             Selected = !Selected;
             IconColour = Selected ? Color4.White : Color4.White.Opacity(0.35f);
-            TooltipText = Selected ? BmsStrings.ResultHideFilter(label) : BmsStrings.ResultShowFilter(label);
             selectionChanged();
         };
     }
@@ -45,6 +43,7 @@ internal partial class BmsResultTimingFilter : FillFlowContainer<BmsResultTiming
         Anchor = Origin = Anchor.CentreRight;
         AutoSizeAxes = Axes.Both;
         Direction = FillDirection.Horizontal;
+        Spacing = new Vector2(2, 0);
         Children =
         [
             press = new BmsResultTimingFilterButton(false, selectionChanged),

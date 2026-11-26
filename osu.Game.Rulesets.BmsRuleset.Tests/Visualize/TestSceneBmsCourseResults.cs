@@ -435,8 +435,13 @@ public partial class TestSceneBmsCourseResults : ScreenTestScene
         AddStep("return to aggregate summary", () => screen.OnBackButton());
         AddUntilStep("aggregate charts visible", () => screen.SelectedStageIndex == null
             && TestSceneBmsResultScreenStatistics.ChartsFitViewport(screen));
-        AddStep("hide two lanes in the aggregate offset chart", () => hideOffsetLanes(screen.ChildrenOfType<BmsCourseAggregateStatistics>().Single()));
-        AddAssert("filtered aggregate charts still fit", () => TestSceneBmsResultScreenStatistics.ChartsFitViewport(screen));
+        AddStep("expand aggregate key charts", () =>
+        {
+            InputManager.MoveMouseTo(screen.ChildrenOfType<BmsCourseAggregateStatistics>().Single().ChildrenOfType<BmsHitOffsetStatistic>().Single());
+            InputManager.Click(MouseButton.Left);
+        });
+        AddUntilStep("expanded aggregate charts scroll", () => screen.ChildrenOfType<BmsCourseAggregateStatistics>().Single()
+            .ChildrenOfType<OsuScrollContainer>().Single().ScrollableExtent > 0);
         AddStep("select stage before exiting", () => clickCourseStage("Course stage 2 result"));
         AddUntilStep("stage statistics loaded before exiting", () => ReferenceEquals(screen.SelectedScore.Value, secondScore)
             && screen.ChildrenOfType<BmsStatisticsPanel>().Single(panel => panel is not BmsCourseAggregateStatistics)
@@ -582,8 +587,13 @@ public partial class TestSceneBmsCourseResults : ScreenTestScene
         assertNativeButtonHover(() => button(screen, "Abandon course")!, "abandon button");
         assertNativeButtonHover(() => button(screen, "Start next stage")!, "next stage button");
         AddAssert("only gauge and timeline share a row", () => TestSceneBmsResultScreenStatistics.ChartsUseExpectedRows(screen));
-        AddStep("hide two lanes in the stage offset chart", () => hideOffsetLanes(screen));
-        AddAssert("filtered stage charts still fit", () => TestSceneBmsResultScreenStatistics.ChartsFitViewport(screen));
+        AddStep("expand stage key charts", () =>
+        {
+            InputManager.MoveMouseTo(screen.ChildrenOfType<BmsHitOffsetStatistic>().Single());
+            InputManager.Click(MouseButton.Left);
+        });
+        AddUntilStep("expanded stage charts scroll", () => screen.ChildrenOfType<BmsResultStatisticsGrid>().Single()
+            .ChildrenOfType<OsuScrollContainer>().Single().ScrollableExtent > 0);
 
         AddStep("request abandon through pointer", () =>
         {
@@ -630,15 +640,4 @@ public partial class TestSceneBmsCourseResults : ScreenTestScene
         AddAssert("statistics remain expanded", () => screen.ChildrenOfType<BmsStatisticsPanel>().Single().State.Value,
             () => Is.EqualTo(Visibility.Visible));
     }
-
-    private void hideOffsetLanes(Drawable result)
-    {
-        var filter = result.ChildrenOfType<BmsHitOffsetStatistic>().Single().LaneFilter;
-        foreach (var lane in new[] { "Lane 0", "Lane 1" })
-        {
-            InputManager.MoveMouseTo(filter.ChildrenOfType<OsuAnimatedButton>().Single(button => button.Name == lane));
-            InputManager.Click(MouseButton.Left);
-        }
-    }
-
 }
