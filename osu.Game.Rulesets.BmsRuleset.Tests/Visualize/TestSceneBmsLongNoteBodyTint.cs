@@ -13,6 +13,7 @@ using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Profiles;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 using osu.Game.Rulesets.Replays;
+using osu.Game.Rulesets.Scoring;
 using osu.Game.Tests.Visual;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
@@ -29,14 +30,21 @@ public partial class TestSceneBmsLongNoteBodyTint : BmsPlayerTestScene
     private BmsLongNoteMode mode = BmsLongNoteMode.ChargeNote;
     private bool? useLazer;
     private double secondReleaseOffset;
+    private Func<BmsBeatmap, IList<ReplayFrame>> replayFrames = null!;
 
     protected override TestPlayer CreatePlayer(Ruleset ruleset)
-        => CreateBmsPlayer(createReplayFrames);
+        => CreateBmsPlayer(replayFrames);
 
     private void loadPlayer()
-        => LoadPlayer(useLazer.HasValue
+        => loadPlayer(createReplayFrames);
+
+    private void loadPlayer(Func<BmsBeatmap, IList<ReplayFrame>> frames)
+    {
+        replayFrames = frames;
+        LoadPlayer(useLazer.HasValue
             ? [new BmsModManiaProfile { OverallDifficulty = { Value = 8 }, UseLazer = { Value = useLazer.Value } }]
             : []);
+    }
 
     protected override IBeatmap CreateBeatmap(RulesetInfo ruleset)
     {
@@ -184,6 +192,46 @@ public partial class TestSceneBmsLongNoteBodyTint : BmsPlayerTestScene
                 ? Math.Abs(headY - judgementLineY) <= 1
                 : headY > judgementLineY + 1;
         });
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void TestImmediateChargeNoteRepressRetainsDimStyle(bool missedManiaHead)
+    {
+        const double release_time = start_time + 200;
+        AddStep("load CN replay", () =>
+        {
+            mode = BmsLongNoteMode.ChargeNote;
+            useLazer = missedManiaHead ? true : null;
+            loadPlayer(beatmap =>
+            {
+                var action = BmsKeyBindingConfiguration.ActionForColumn(beatmap.LayoutVariant, 1)!.Value;
+                return [
+                    new BmsReplayFrame(0),
+                    new BmsReplayFrame(missedManiaHead ? start_time - 300 : start_time, action),
+                    new BmsReplayFrame(release_time),
+                    new BmsReplayFrame(release_time + 1, action),
+                    new BmsReplayFrame(start_time + duration),
+                ];
+            });
+        });
+        AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1 && Playfield.Stage.IsLoaded);
+        seek(start_time - 400);
+
+        foreach (var time in new[] { release_time, release_time + 1, release_time + 100, release_time + 250 })
+        {
+            AddStep($"play to {time}", () => SeekReplayInFrames(time));
+            AddAssert("body retains its drawn opacity", () =>
+            {
+                var note = Playfield.GetAliveObjectAtTime(start_time);
+                return note != null && (!missedManiaHead || note.Result.Type == HitResult.Miss)
+                       && Math.Abs(longNoteBodyOf(note).DrawColourInfo.Colour.MinAlpha - 0.4f) < 0.001f
+                       && Math.Abs(longNoteTailOf(note).DrawColourInfo.Colour.MinAlpha - 0.4f) < 0.001f;
+            });
+        }
+
+        AddStep("play past tail deadline", () => SeekReplayInFrames(start_time + duration + 300));
+        AddAssert("long note retired", () => Playfield.GetAliveObjectAtTime(start_time) == null);
     }
 
     [Test]

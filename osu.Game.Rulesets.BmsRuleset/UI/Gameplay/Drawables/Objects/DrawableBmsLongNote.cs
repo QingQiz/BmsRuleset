@@ -296,12 +296,22 @@ public sealed partial class DrawableBmsLongNote : DrawableBmsHitObject
 
     protected override void UpdateHitStateTransforms(ArmedState state)
     {
-        if (state == ArmedState.Hit && HitObject != null)
+        if (state != ArmedState.Idle && HitObject != null)
         {
             var current = readPresentation(Time.Current);
-            Alpha = current.KeepVisibleAfterHit ? 1 : 0;
-            LifetimeEnd = current.KeepVisibleAfterHit ? current.LifetimeEnd : Time.Current;
-            return;
+            // A head miss can leave a playable tail. Fading the whole note would also fade its dimmed body.
+            if (state == ArmedState.Miss && current.KeepAlive)
+            {
+                applyPresentationLifetime(current);
+                return;
+            }
+
+            if (state == ArmedState.Hit)
+            {
+                Alpha = current.KeepVisibleAfterHit ? 1 : 0;
+                LifetimeEnd = current.KeepVisibleAfterHit ? current.LifetimeEnd : Time.Current;
+                return;
+            }
         }
 
         base.UpdateHitStateTransforms(state);
