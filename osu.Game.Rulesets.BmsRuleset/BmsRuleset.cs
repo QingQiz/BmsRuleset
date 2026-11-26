@@ -92,17 +92,17 @@ public partial class BmsRuleset : Ruleset
 
     public override LocalisableString GetVariantName(int variant) => (BmsLayoutVariant)variant switch
     {
-        BmsLayoutVariant.Bms5K => "5K",
-        BmsLayoutVariant.Bms5K2P => "5K (2P)",
-        BmsLayoutVariant.Bme7K => "7K",
-        BmsLayoutVariant.Bme7K2P => "7K (2P)",
+        BmsLayoutVariant.Bms5K => BmsStrings.BmsSingleLayout(5),
+        BmsLayoutVariant.Bms5K2P => BmsStrings.BmsRightScratchLayout(5),
+        BmsLayoutVariant.Bme7K => BmsStrings.BmsSingleLayout(7),
+        BmsLayoutVariant.Bme7K2P => BmsStrings.BmsRightScratchLayout(7),
         BmsLayoutVariant.Popn9K => BmsStrings.PopnLayout(9),
         BmsLayoutVariant.Popn5K => BmsStrings.PopnLayout(5),
         BmsLayoutVariant.Keyboard24K => BmsStrings.KeyboardLayout(24),
         BmsLayoutVariant.Keyboard24KDouble => BmsStrings.KeyboardDoubleLayout(24),
         var layout when BmsLayout.IsGeneric(layout) => BmsStrings.GenericLayout(BmsLayout.GetTotalColumns(layout)),
-        BmsLayoutVariant.Bms5KDouble => "DP 5K",
-        BmsLayoutVariant.Bme7KDouble => "DP 7K",
+        BmsLayoutVariant.Bms5KDouble => BmsStrings.BmsDoubleLayout(5),
+        BmsLayoutVariant.Bme7KDouble => BmsStrings.BmsDoubleLayout(7),
         BmsLayoutVariant.Popn9KDouble => BmsStrings.PopnDoubleLayout(9),
         _ => string.Empty,
     };

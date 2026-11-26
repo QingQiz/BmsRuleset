@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
@@ -6,6 +6,8 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Components;
+using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Configuration;
+using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Embedded;
 using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Legacy;
 using osu.Game.Skinning;
 using osuTK;
@@ -25,11 +27,12 @@ internal sealed partial class LegacyBmsHitExplosion : CompositeDrawable
     // Geometry, tint and animation are already inherited by the sprite's own draw node.
     protected override bool CanBeFlattened => !Masking && !HasProxy && !ForceLocalVertexBatch;
 
-    public float ResolvedScale { get; }
+    public float ResolvedScale { get; private set; }
 
     private readonly string imageName;
     private readonly Color4 colour;
     private readonly float hitPosition;
+    private readonly BmsSkinComponentLookup lookup;
 
     private Drawable? hitExplosion;
 
@@ -38,6 +41,7 @@ internal sealed partial class LegacyBmsHitExplosion : CompositeDrawable
     public LegacyBmsHitExplosion(BmsLegacySkinTransformer transformer, BmsSkinComponentLookup lookup, Texture[] textures)
     {
         RelativeSizeAxes = Axes.Both;
+        this.lookup = lookup;
 
         imageName = transformer.GetHitExplosionImageName(lookup);
         var scale = transformer
@@ -55,7 +59,23 @@ internal sealed partial class LegacyBmsHitExplosion : CompositeDrawable
     [BackgroundDependencyLoader]
     private void load(ISkinSource skin)
     {
-        if (hitExplosion == null)
+        var style = (skin as BmsEmbeddedSkinSource)?.StageSkin?.Style;
+        var scales = lookup.IsLongNote ? style?.HoldLightScales : style?.HitLightScales;
+        if (lookup.ColumnIndex is int column && scales?.TryGetValue(column, out var customScale) == true)
+        {
+            ResolvedScale = customScale;
+            if (hitExplosion != null)
+                hitExplosion.Scale = new Vector2(customScale);
+        }
+
+        var image = lookup.IsLongNote ? BmsStageImage.HoldLight : BmsStageImage.HitLight;
+        if ((skin as BmsEmbeddedSkinSource)?.StageSkin?.GetImage(image, lookup.ColumnIndex) is { Length: > 0 } custom)
+        {
+            setTextures(skin.GetTextures(custom, default, default, true, "-", null, out _));
+            if (hitExplosion != null)
+                hitExplosion.Colour = Color4.White;
+        }
+        else if (hitExplosion == null)
         {
             setTextures(skin.GetTextures(imageName, default, default, true, "-", null, out _));
             if (hitExplosion == null)

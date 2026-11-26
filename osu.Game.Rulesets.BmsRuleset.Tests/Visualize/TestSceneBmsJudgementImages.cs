@@ -76,8 +76,23 @@ public partial class TestSceneBmsJudgementImages : BmsPlayerTestScene
             controls.Single(control => control.LabelText.Equals(BmsStrings.JudgementDisplayMissImage)).Current.Value = image_name);
         AddAssert("POOR keeps its own default image", () => display().MissImage.Value == image_name && display().MehImage.IsDefault);
         AddAssert("only one grade uses the custom image", () => customJudgements().Count(), () => Is.EqualTo(1));
-        AddStep("show an E-POOR judgement", () => ((BmsDrawableRuleset)Player.DrawableRuleset).GameplayEvents.RaiseJudgementDisplayed(HitResult.Miss));
-        AddUntilStep("the custom judgement is visible", () => customJudgements().Any(d => d.Parent?.Alpha > 0 && d.Drawable.Alpha > 0));
+        var customJudgementWasVisible = false;
+        AddStep("show an E-POOR judgement", () =>
+        {
+            var customJudgement = customJudgements().Single();
+            customJudgement.OnUpdate += observeJudgement;
+            ((BmsDrawableRuleset)Player.DrawableRuleset).GameplayEvents.RaiseJudgementDisplayed(HitResult.Miss);
+
+            void observeJudgement(Drawable drawable)
+            {
+                if (drawable.Parent?.Alpha > 0 && customJudgement.Drawable.Alpha > 0)
+                {
+                    customJudgementWasVisible = true;
+                    drawable.OnUpdate -= observeJudgement;
+                }
+            }
+        });
+        AddUntilStep("the custom judgement is visible", () => customJudgementWasVisible);
         AddStep("choose a built-in image for PGREAT", () =>
             controls.Single(control => control.LabelText.Equals(BmsStrings.JudgementDisplayPerfectImage)).Current.Value = builtInImage);
         AddAssert("the built-in image and its display scale are applied", selectedBuiltInImageIsReady);

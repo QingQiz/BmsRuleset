@@ -742,4 +742,53 @@ Click to open the BMS log for the complete list and error details.</value>
   <data name="long_note_mode_longnote" xml:space="preserve"><value>LN</value></data>
   <data name="long_note_mode_chargenote" xml:space="preserve"><value>CN</value></data>
   <data name="long_note_mode_hellchargenote" xml:space="preserve"><value>HCN</value></data>
+  <data name="stage_column_settings" xml:space="preserve"><value>Track</value></data>
+  <data name="stage_keep_total_width" xml:space="preserve"><value>Keep total width</value></data>
+  <data name="stage_keep_total_width_description" xml:space="preserve"><value>Fit the columns and gaps to the current Stage width when editing their sizes.</value></data>
+  <data name="stage_boundary_settings" xml:space="preserve"><value>Column spacing and dividers</value></data>
+  <data name="stage_judgement_line_settings" xml:space="preserve"><value>Judgement line</value></data>
+  <data name="stage_measure_line_settings" xml:space="preserve"><value>Measure lines</value></data>
+  <data name="stage_border_settings" xml:space="preserve"><value>Stage borders</value></data>
+  <data name="stage_gap_number" xml:space="preserve"><value>{0}–{1}</value></data>
+  <data name="stage_gap_boundary" xml:space="preserve"><value>Between columns {0} and {1}</value></data>
+  <data name="stage_note_width_for_height_scale" xml:space="preserve"><value>Note width for height scaling</value></data>
+  <data name="stage_hit_light_scale" xml:space="preserve"><value>Explosion scale</value></data>
+  <data name="stage_hold_light_scale" xml:space="preserve"><value>Hold explosion scale</value></data>
+  <data name="stage_hit_target_height" xml:space="preserve"><value>Height scale</value></data>
+  <data name="stage_show_measure_lines" xml:space="preserve"><value>Show measure lines</value></data>
+  <data name="stage_column_number" xml:space="preserve"><value>{0}</value></data>
+  <data name="stage_scratch_column" xml:space="preserve"><value>SC</value></data>
+  <data name="stage_column" xml:space="preserve"><value>Lane {0}</value></data>
+  <data name="stage_column_width" xml:space="preserve"><value>Lane width</value></data>
+  <data name="stage_gap" xml:space="preserve"><value>Lane spacing</value></data>
+  <data name="stage_separator" xml:space="preserve"><value>Separator width</value></data>
+  <data name="stage_bar_height" xml:space="preserve"><value>Bar line height</value></data>
+  <data name="stage_separator_colour" xml:space="preserve"><value>Separator colour</value></data>
+  <data name="stage_bar_colour" xml:space="preserve"><value>Bar line colour</value></data>
+  <data name="stage_use_skin" xml:space="preserve"><value>Use skin default</value></data>
+  <data name="stage_use_skin_image" xml:space="preserve"><value>Skin default ({0})</value></data>
+  <data name="stage_lane_geometry" xml:space="preserve"><value>Size &amp; scale</value></data>
+  <data name="stage_lane_images" xml:space="preserve"><value>Images</value></data>
+  <data name="stage_apply_to_all_columns" xml:space="preserve"><value>Apply this value to all lanes</value></data>
+  <data name="stage_apply_to_all_gaps" xml:space="preserve"><value>Apply this gap to all boundaries</value></data>
+  <data name="stage_apply_to_all_separators" xml:space="preserve"><value>Apply this width to all dividers</value></data>
+  <data name="stage_global_settings" xml:space="preserve"><value>Stage-wide settings</value></data>
+  <data name="stage_hit_target" xml:space="preserve"><value>Judgement line image</value></data>
+  <data name="stage_left_border" xml:space="preserve"><value>Left border</value></data>
+  <data name="stage_right_border" xml:space="preserve"><value>Right border</value></data>
+  <data name="stage_bottom_border" xml:space="preserve"><value>Bottom border</value></data>
+  <data name="stage_column_background" xml:space="preserve"><value>Lane background</value></data>
+  <data name="stage_note" xml:space="preserve"><value>Note</value></data>
+  <data name="stage_hold_head" xml:space="preserve"><value>Long note head</value></data>
+  <data name="stage_hold_body" xml:space="preserve"><value>Long note body</value></data>
+  <data name="stage_hold_tail" xml:space="preserve"><value>Long note tail</value></data>
+  <data name="stage_mine" xml:space="preserve"><value>Mine</value></data>
+  <data name="stage_key" xml:space="preserve"><value>Key</value></data>
+  <data name="stage_key_down" xml:space="preserve"><value>Pressed key</value></data>
+  <data name="stage_light" xml:space="preserve"><value>Lane light</value></data>
+  <data name="stage_hit_light" xml:space="preserve"><value>Hit light</value></data>
+  <data name="stage_hold_light" xml:space="preserve"><value>Long note light</value></data>
+  <data name="bms_single_layout" xml:space="preserve"><value>{0}K</value></data>
+  <data name="bms_right_scratch_layout" xml:space="preserve"><value>{0}K (2P)</value></data>
+  <data name="bms_double_layout" xml:space="preserve"><value>DP {0}K</value></data>
 </root>

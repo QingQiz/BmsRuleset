@@ -10,6 +10,104 @@ namespace osu.Game.Rulesets.BmsRuleset.Localisation;
 
 public static class BmsStrings
 {
+    public static LocalisableString StageColumnSettings => get("stage_column_settings");
+
+    public static LocalisableString StageKeepTotalWidth => get("stage_keep_total_width");
+
+    public static LocalisableString StageKeepTotalWidthDescription => get("stage_keep_total_width_description");
+
+    public static LocalisableString StageBoundarySettings => get("stage_boundary_settings");
+
+    public static LocalisableString StageJudgementLineSettings => get("stage_judgement_line_settings");
+
+    public static LocalisableString StageMeasureLineSettings => get("stage_measure_line_settings");
+
+    public static LocalisableString StageBorderSettings => get("stage_border_settings");
+
+    public static LocalisableString StageGapNumber(LocalisableString left, LocalisableString right) => get("stage_gap_number", left, right);
+
+    public static LocalisableString StageGapBoundary(LocalisableString left, LocalisableString right) => get("stage_gap_boundary", left, right);
+
+    public static LocalisableString StageNoteWidthForHeightScale => get("stage_note_width_for_height_scale");
+
+    public static LocalisableString StageHitLightScale => get("stage_hit_light_scale");
+
+    public static LocalisableString StageHoldLightScale => get("stage_hold_light_scale");
+
+    public static LocalisableString StageHitTargetHeight => get("stage_hit_target_height");
+
+    public static LocalisableString StageShowMeasureLines => get("stage_show_measure_lines");
+
+    public static LocalisableString StageColumnNumber(int value) => get("stage_column_number", value);
+
+    public static LocalisableString StageScratchColumn => get("stage_scratch_column");
+
+    public static LocalisableString StageColumn(LocalisableString label) => get("stage_column", label);
+
+    public static LocalisableString StageColumnWidth => get("stage_column_width");
+
+    public static LocalisableString StageGap => get("stage_gap");
+
+    public static LocalisableString StageSeparator => get("stage_separator");
+
+    public static LocalisableString StageSeparatorColour => get("stage_separator_colour");
+
+    public static LocalisableString StageBarHeight => get("stage_bar_height");
+
+    public static LocalisableString StageBarColour => get("stage_bar_colour");
+
+    public static LocalisableString StageUseSkin => get("stage_use_skin");
+
+    public static LocalisableString StageUseSkinImage(string image) => get("stage_use_skin_image", image);
+
+    public static LocalisableString StageLaneGeometry => get("stage_lane_geometry");
+
+    public static LocalisableString StageLaneImages => get("stage_lane_images");
+
+    public static LocalisableString StageApplyToAllColumns => get("stage_apply_to_all_columns");
+
+    public static LocalisableString StageApplyToAllGaps => get("stage_apply_to_all_gaps");
+
+    public static LocalisableString StageApplyToAllSeparators => get("stage_apply_to_all_separators");
+
+    public static LocalisableString StageGlobalSettings => get("stage_global_settings");
+
+    public static LocalisableString StageHitTarget => get("stage_hit_target");
+
+    public static LocalisableString StageLeftBorder => get("stage_left_border");
+
+    public static LocalisableString StageRightBorder => get("stage_right_border");
+
+    public static LocalisableString StageBottomBorder => get("stage_bottom_border");
+
+    public static LocalisableString StageColumnBackground => get("stage_column_background");
+
+    public static LocalisableString StageNote => get("stage_note");
+
+    public static LocalisableString StageHoldHead => get("stage_hold_head");
+
+    public static LocalisableString StageHoldBody => get("stage_hold_body");
+
+    public static LocalisableString StageHoldTail => get("stage_hold_tail");
+
+    public static LocalisableString StageMine => get("stage_mine");
+
+    public static LocalisableString StageKey => get("stage_key");
+
+    public static LocalisableString StageKeyDown => get("stage_key_down");
+
+    public static LocalisableString StageLight => get("stage_light");
+
+    public static LocalisableString StageHitLight => get("stage_hit_light");
+
+    public static LocalisableString StageHoldLight => get("stage_hold_light");
+
+    public static LocalisableString BmsSingleLayout(int value) => get("bms_single_layout", value);
+
+    public static LocalisableString BmsRightScratchLayout(int value) => get("bms_right_scratch_layout", value);
+
+    public static LocalisableString BmsDoubleLayout(int value) => get("bms_double_layout", value);
+
     public static LocalisableString ModManiaProfileName => get("mod_mania_profile_name");
 
     public static LocalisableString ModManiaProfile => get("mod_mania_profile");

@@ -4,6 +4,8 @@ using System.Linq;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Primitives;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
+using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Configuration;
 using osu.Game.Skinning;
 using osuTK;
 
@@ -70,7 +72,12 @@ internal sealed partial class BmsStageHudController : Component
         updateHudGeometry();
         SetHitTargetPositionOffset(hud.JudgementLineOffset.Value);
         SetLightPositionOffset(hud.LightPositionOffset.Value);
+        playfield.RefreshStageSkin();
     }
+
+    internal BmsStageStyle GetStageStyle(BmsLayoutVariant layout) => stageHud?.GetStageStyle(layout) ?? new BmsStageStyle();
+
+    internal void RefreshStageStyle() => playfield.RefreshStageSkin();
 
     internal void SetHitTargetPositionOffset(float offset) => playfield.Stage.SetHitTargetPositionOffset(offset);
 
@@ -80,15 +87,20 @@ internal sealed partial class BmsStageHudController : Component
 
     internal void Unregister(BmsStageHud hud)
     {
-        if (stageHud != hud)
-            return;
+        // HUD disposal can run on the asynchronous disposal queue while gameplay is still updating.
+        Schedule(() =>
+        {
+            if (stageHud != hud)
+                return;
 
-        stageHud = null;
-        invalidateCaches();
-        playfield.Stage.SetHitTargetPositionOffset(0);
-        playfield.Stage.SetLightPositionOffset(0);
-        playfield.Stage.SetNoteHeightScale(1);
-        playfield.Stage.ClearHudTransform();
+            stageHud = null;
+            invalidateCaches();
+            playfield.Stage.SetHitTargetPositionOffset(0);
+            playfield.Stage.SetLightPositionOffset(0);
+            playfield.Stage.SetNoteHeightScale(1);
+            playfield.Stage.ClearHudTransform();
+            playfield.RefreshStageSkin();
+        });
     }
 
     internal void RegisterContainer(ISerialisableDrawableContainer container)
@@ -186,6 +198,9 @@ internal sealed partial class BmsStageHudController : Component
         {
             // Deleting the handle resets the current layout, not layouts which are not being edited.
             removedStageHud = removed;
+
+            // The replacement's automatic size must be measured from the restored skin geometry.
+            playfield.RefreshStageSkin();
         }
 
         // SkinnableContainer clears its component list before marking a reload as incomplete.

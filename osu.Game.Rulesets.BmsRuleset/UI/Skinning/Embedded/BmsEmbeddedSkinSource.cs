@@ -1,22 +1,29 @@
 using System;
 using System.Buffers;
 using System.Collections.Generic;
+using System.Linq;
 using osu.Framework.Audio.Sample;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Textures;
 using osu.Game.Audio;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Configuration;
 using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Runtime;
+using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Legacy;
+using osu.Game.Rulesets.BmsRuleset.UI.Skinning.NoteTextures;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Skinning;
+using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Skinning.Embedded;
 
 public sealed class BmsEmbeddedSkinSource : ISkinSource, IDisposable, IBmsGameplaySkinDrawableSource
 {
+    internal BmsStageSkin? StageSkin { get; set; }
+
     public IEnumerable<ISkin> AllSources
     {
         get
@@ -81,6 +88,9 @@ public sealed class BmsEmbeddedSkinSource : ISkinSource, IDisposable, IBmsGamepl
                 () => parent?.GetDrawableComponent(lookup) ?? embeddedFallbacks?.GetDrawableComponent(lookup), out var mainHud))
             return mainHud;
 
+        if (lookup is BmsSkinComponentLookup component && getNoteOverride(component) is { } factory)
+            return factory.Create();
+
         return lookup is
             BmsSkinComponentLookup or
             SkinComponentLookup<HitResult> or
@@ -110,10 +120,31 @@ public sealed class BmsEmbeddedSkinSource : ISkinSource, IDisposable, IBmsGamepl
     public IBindable<TValue>? GetConfig<TLookup, TValue>(TLookup lookup)
         where TLookup : notnull
         where TValue : notnull
-        => lookup is BmsSkinConfigurationLookup
-            ? parent?.GetConfig<TLookup, TValue>(lookup)
-              ?? embeddedFallbacks?.GetConfig<TLookup, TValue>(lookup)
-            : parent?.GetConfig<TLookup, TValue>(lookup);
+    {
+        if (lookup is not BmsSkinConfigurationLookup bmsLookup)
+            return parent?.GetConfig<TLookup, TValue>(lookup);
+
+        if (StageSkin?.Style is { } style)
+        {
+            object? value = bmsLookup.Lookup switch
+            {
+                LegacyManiaSkinConfigurationLookups.ColumnWidth when bmsLookup.ComponentLookup?.ColumnIndex is int column
+                    && style.Widths.TryGetValue(column, out var width) => width,
+                LegacyManiaSkinConfigurationLookups.WidthForNoteHeightScale when bmsLookup.ComponentLookup?.ColumnIndex is int column
+                    && style.NoteWidthForHeightScales.TryGetValue(column, out var noteWidth) => noteWidth,
+                LegacyManiaSkinConfigurationLookups.BarLineHeight => style.BarHeight,
+                LegacyManiaSkinConfigurationLookups.BarLineColour => (Color4?)style.GetBarColour(),
+                _ => null,
+            };
+            if (value is TValue typed)
+                return new Bindable<TValue>(typed);
+        }
+
+        return GetBaseConfig<TValue>(bmsLookup);
+    }
+
+    internal IBindable<T>? GetBaseConfig<T>(BmsSkinConfigurationLookup lookup) where T : notnull =>
+        parent?.GetConfig<BmsSkinConfigurationLookup, T>(lookup) ?? embeddedFallbacks?.GetConfig<BmsSkinConfigurationLookup, T>(lookup);
 
     /// <inheritdoc/>
     public ISkin? FindProvider(Func<ISkin, bool> lookupFunction)
@@ -140,6 +171,9 @@ public sealed class BmsEmbeddedSkinSource : ISkinSource, IDisposable, IBmsGamepl
 
     BmsResolvedDrawableFactory? IBmsGameplaySkinDrawableSource.GetDrawableFactory(BmsSkinComponentLookup lookup)
     {
+        if (getNoteOverride(lookup) is { } custom)
+            return custom;
+
         if (parent != null)
         {
             foreach (var source in parent.AllSources)
@@ -160,6 +194,51 @@ public sealed class BmsEmbeddedSkinSource : ISkinSource, IDisposable, IBmsGamepl
 
         return embeddedFallbacks?.GetDrawableFactory(lookup);
     }
+
+    private BmsResolvedDrawableFactory? getNoteOverride(BmsSkinComponentLookup lookup)
+    {
+        var image = lookup.Component switch
+        {
+            BmsSkinComponents.Note => BmsStageImage.Note,
+            BmsSkinComponents.HoldNoteHead => BmsStageImage.HoldHead,
+            BmsSkinComponents.HoldNoteTail => BmsStageImage.HoldTail,
+            BmsSkinComponents.Mine => BmsStageImage.Mine,
+            _ => (BmsStageImage?)null,
+        };
+        if (image is not { } slot || StageSkin?.Style is not { } style)
+            return null;
+
+        var imageName = style.GetImage(slot, lookup.ColumnIndex);
+        var widthOverride = lookup.ColumnIndex is int column && style.NoteWidthForHeightScales.TryGetValue(column, out var configuredWidth)
+            ? configuredWidth
+            : (float?)null;
+
+        if (string.IsNullOrEmpty(imageName) && widthOverride == null)
+            return null;
+
+        var textures = imageName == null ? [] : this.GetTextures(imageName, WrapMode.ClampToEdge, WrapMode.ClampToEdge, true, "-", null, out _);
+        if (textures.Length == 0)
+        {
+            if (widthOverride == null)
+                return null;
+
+            var original = AllSources.OfType<BmsLegacySkinTransformer>().FirstOrDefault(transformer => transformer.IsProvidingLegacyResources);
+            if (original == null)
+                return null;
+
+            textures = BmsLegacyTextureResolver.ResolveNoteTextures(original, lookup);
+            if (textures.Length == 0)
+                return null;
+        }
+
+        var widthForNoteHeightScale = widthOverride
+                                      ?? GetBaseConfig<float>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.WidthForNoteHeightScale, lookup))?.Value;
+        return new BmsResolvedDrawableFactory(() => textures.Length == 1 && textures[0].DisplayWidth >= 1 && (widthForNoteHeightScale == null || widthForNoteHeightScale > 0)
+            ? new BmsResolvedNoteSprite(textures[0], widthForNoteHeightScale)
+            : new BmsResolvedNotePiece(lookup, textures, widthForNoteHeightScale));
+    }
+
+    internal void Refresh() => raiseSourceChanged();
 
     private void addSourceChangedHandler(Action handler)
     {

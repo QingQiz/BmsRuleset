@@ -107,7 +107,7 @@ public partial class BmsColumn : Playfield, IBmsColumn
         LayoutVariant = playfield.LayoutVariant;
         IsScratch = BmsLayout.IsScratchColumn(index, LayoutVariant);
         RelativeSizeAxes = Axes.Y;
-        Width = defaultColumnWidth(index, LayoutVariant);
+        Width = BmsStageColumnLayout.DefaultWidth(index, LayoutVariant);
         HitObjectContainer.Depth = HIT_OBJECT_DEPTH;
 
         HitExplosionArea = new BmsHitExplosionLayer(LayoutVariant, Index, spawnHitExplosion);
@@ -185,9 +185,6 @@ public partial class BmsColumn : Playfield, IBmsColumn
         InvisibleNoteLayer.Alpha = showInvisibleNotes.Value ? 1 : 0;
     }
 
-    private static float defaultColumnWidth(int index, BmsLayoutVariant layoutVariant) =>
-        BmsLayout.IsScratchColumn(index, layoutVariant) ? SCRATCH_COLUMN_WIDTH : COLUMN_WIDTH;
-
     [BackgroundDependencyLoader(true)]
     private void load(BmsRulesetConfigManager? config)
     {
@@ -204,43 +201,8 @@ public partial class BmsColumn : Playfield, IBmsColumn
     private void updateFromSkin()
     {
         var lookup = new BmsSkinComponentLookup(BmsSkinComponents.ColumnBackground, LayoutVariant, Index);
-        Width = skin.GetConfig<BmsSkinConfigurationLookup, float>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.ColumnWidth, lookup))?.Value
-                ?? defaultColumnWidth(Index, LayoutVariant);
-
-        // For 2P/scratch-on-right, ColumnSpacing indices must be remapped to follow
-        // visual column order [keys…, scratch] rather than BMS index order.
-        int? spacingLeftCol;
-        int? spacingRightCol;
-
-        if (BmsLayout.Is2P(lookup.LayoutVariant) && lookup.ColumnIndex is int colIdx)
-        {
-            var totalCols = BmsLayout.GetTotalColumns(LayoutVariant);
-            (spacingLeftCol, spacingRightCol) = BmsLayout.RemapColum2PGapIdx(colIdx, totalCols);
-        }
-        else
-        {
-            spacingLeftCol = lookup.ColumnIndex;
-            spacingRightCol = lookup.ColumnIndex;
-        }
-
-        var spacingLookupLeft = spacingLeftCol != null
-            ? new BmsSkinComponentLookup(BmsSkinComponents.ColumnBackground, LayoutVariant, spacingLeftCol.Value)
-            : null;
-
-        var spacingLookupRight = spacingRightCol != null
-            ? new BmsSkinComponentLookup(BmsSkinComponents.ColumnBackground, LayoutVariant, spacingRightCol.Value)
-            : null;
-
-        Margin = new MarginPadding
-        {
-            Left = spacingLookupLeft != null
-                ? skin.GetConfig<BmsSkinConfigurationLookup, float>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.LeftColumnSpacing, spacingLookupLeft))?.Value ?? 0
-                : 0,
-            Right = spacingLookupRight != null
-                ? skin.GetConfig<BmsSkinConfigurationLookup, float>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.RightColumnSpacing, spacingLookupRight))?.Value ?? 0
-                : 0,
-        };
-
+        Width = BmsStageColumnLayout.GetWidth(skin, lookup);
+        Margin = BmsStageColumnLayout.GetMargin(skin, lookup);
     }
 
     #region Hit explosions / landmine

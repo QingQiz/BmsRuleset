@@ -2,6 +2,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
+using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Configuration;
 using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Legacy;
 using osu.Game.Skinning;
 using osuTK;
@@ -33,9 +34,10 @@ internal sealed partial class LegacyBmsHitTarget : CompositeDrawable
     [BackgroundDependencyLoader]
     private void load(ISkinSource skin)
     {
+        var custom = BmsStageSkin.GetDrawable(skin, BmsStageImage.HitTarget);
         InternalChildren =
         [
-            Target = skin.GetAnimation(targetImage, true, true)?.With(d =>
+            Target = (custom ?? skin.GetAnimation(targetImage, true, true))?.With(d =>
             {
                 d.RelativeSizeAxes = Axes.X;
                 d.Width = 1;
@@ -47,7 +49,7 @@ internal sealed partial class LegacyBmsHitTarget : CompositeDrawable
                 RelativeSizeAxes = Axes.X,
                 Height = 1,
                 Colour = lineColour,
-                Alpha = showJudgementLine ? 0.9f : 0,
+                Alpha = showJudgementLine && custom == null ? 0.9f : 0,
             },
         ];
     }

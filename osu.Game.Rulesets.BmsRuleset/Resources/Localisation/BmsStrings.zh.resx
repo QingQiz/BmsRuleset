@@ -742,4 +742,53 @@
   <data name="long_note_mode_longnote" xml:space="preserve"><value>LN</value></data>
   <data name="long_note_mode_chargenote" xml:space="preserve"><value>CN</value></data>
   <data name="long_note_mode_hellchargenote" xml:space="preserve"><value>HCN</value></data>
+  <data name="stage_column_settings" xml:space="preserve"><value>轨道</value></data>
+  <data name="stage_keep_total_width" xml:space="preserve"><value>保持总宽度</value></data>
+  <data name="stage_keep_total_width_description" xml:space="preserve"><value>编辑列宽或列间距时，将所有列和间距缩放到当前 Stage 的总宽度。</value></data>
+  <data name="stage_boundary_settings" xml:space="preserve"><value>列间距和分隔线</value></data>
+  <data name="stage_judgement_line_settings" xml:space="preserve"><value>判定线</value></data>
+  <data name="stage_measure_line_settings" xml:space="preserve"><value>小节线</value></data>
+  <data name="stage_border_settings" xml:space="preserve"><value>Stage 边框</value></data>
+  <data name="stage_gap_number" xml:space="preserve"><value>{0}–{1}</value></data>
+  <data name="stage_gap_boundary" xml:space="preserve"><value>{0} 与 {1} 之间</value></data>
+  <data name="stage_note_width_for_height_scale" xml:space="preserve"><value>音符高度缩放参考宽度</value></data>
+  <data name="stage_hit_light_scale" xml:space="preserve"><value>判定特效缩放</value></data>
+  <data name="stage_hold_light_scale" xml:space="preserve"><value>长按判定特效缩放</value></data>
+  <data name="stage_hit_target_height" xml:space="preserve"><value>高度倍率</value></data>
+  <data name="stage_show_measure_lines" xml:space="preserve"><value>显示小节线</value></data>
+  <data name="stage_column_number" xml:space="preserve"><value>{0}</value></data>
+  <data name="stage_scratch_column" xml:space="preserve"><value>SC</value></data>
+  <data name="stage_column" xml:space="preserve"><value>第 {0} 列</value></data>
+  <data name="stage_column_width" xml:space="preserve"><value>列宽</value></data>
+  <data name="stage_gap" xml:space="preserve"><value>列间距</value></data>
+  <data name="stage_separator" xml:space="preserve"><value>分隔线宽度</value></data>
+  <data name="stage_bar_height" xml:space="preserve"><value>小节线高度</value></data>
+  <data name="stage_separator_colour" xml:space="preserve"><value>分隔线颜色</value></data>
+  <data name="stage_bar_colour" xml:space="preserve"><value>小节线颜色</value></data>
+  <data name="stage_use_skin" xml:space="preserve"><value>使用皮肤默认值</value></data>
+  <data name="stage_use_skin_image" xml:space="preserve"><value>皮肤默认（{0}）</value></data>
+  <data name="stage_lane_geometry" xml:space="preserve"><value>尺寸与缩放</value></data>
+  <data name="stage_lane_images" xml:space="preserve"><value>图片</value></data>
+  <data name="stage_apply_to_all_columns" xml:space="preserve"><value>将此项应用到所有列</value></data>
+  <data name="stage_apply_to_all_gaps" xml:space="preserve"><value>将此间距应用到所有相邻列</value></data>
+  <data name="stage_apply_to_all_separators" xml:space="preserve"><value>将此宽度应用到所有分隔线</value></data>
+  <data name="stage_global_settings" xml:space="preserve"><value>全局设置</value></data>
+  <data name="stage_hit_target" xml:space="preserve"><value>判定线图片</value></data>
+  <data name="stage_left_border" xml:space="preserve"><value>左边框</value></data>
+  <data name="stage_right_border" xml:space="preserve"><value>右边框</value></data>
+  <data name="stage_bottom_border" xml:space="preserve"><value>底边框</value></data>
+  <data name="stage_column_background" xml:space="preserve"><value>列背景</value></data>
+  <data name="stage_note" xml:space="preserve"><value>普通音符</value></data>
+  <data name="stage_hold_head" xml:space="preserve"><value>长音符头部</value></data>
+  <data name="stage_hold_body" xml:space="preserve"><value>长音符主体</value></data>
+  <data name="stage_hold_tail" xml:space="preserve"><value>长音符尾部</value></data>
+  <data name="stage_mine" xml:space="preserve"><value>地雷</value></data>
+  <data name="stage_key" xml:space="preserve"><value>按键</value></data>
+  <data name="stage_key_down" xml:space="preserve"><value>按下的按键</value></data>
+  <data name="stage_light" xml:space="preserve"><value>列光效</value></data>
+  <data name="stage_hit_light" xml:space="preserve"><value>击中光效</value></data>
+  <data name="stage_hold_light" xml:space="preserve"><value>长音符光效</value></data>
+  <data name="bms_single_layout" xml:space="preserve"><value>{0}K</value></data>
+  <data name="bms_right_scratch_layout" xml:space="preserve"><value>{0}K（2P）</value></data>
+  <data name="bms_double_layout" xml:space="preserve"><value>DP {0}K</value></data>
 </root>

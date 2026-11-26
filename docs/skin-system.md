@@ -181,6 +181,18 @@ If the current skin cannot supply a judgement component, a lower-priority skin m
 In `[Mania]` sections, use mania standard judgement names: `Hit300g` (PGREAT), `Hit300` (GREAT), `Hit200` (GOOD),
 `Hit50` (BAD), `Hit0` (POOR).
 
+## Stage editor
+
+Open the osu! skin editor and select the BMS Stage component. The preview beatmap determines the layout. Stage-wide controls appear above the track, column boundary, judgement line, measure line, and border settings.
+
+- **Keep total width** is on by default. Turn it off to let the Stage grow or shrink as you edit lane widths and gaps.
+- Click a lane number, then choose **Size & scale** or **Images**. The file picker lists imported images and built-in artwork available to the preview. Select an animation by its first frame. Choose **Use skin default** to restore the original artwork.
+- Click an adjacent pair to edit its gap and divider width. An N-lane preview has N−1 interior boundaries. **Separator colour** applies to all dividers in the current layout.
+- **Revert to default** restores the skin’s original setting, including values from `skin.ini`.
+- Use the copy button beside a setting to apply its value to all lanes, gaps, or dividers in the preview layout. Other settings stay unchanged.
+
+Judgement-line, stage-border, and measure-line settings are independent of the selected lane. Changes are saved with the current skin layout.
+
 ## Skin Components
 
 Open the **Skin Editor** during gameplay to add, remove, move, and resize components. Select a component to edit its

@@ -1,19 +1,21 @@
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using NUnit.Framework;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.IO.Serialization;
-using osu.Framework.Testing;
 using osu.Framework.Threading;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
+using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
+using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Configuration;
 using osu.Game.Skinning;
 using osuTK;
 
@@ -558,6 +560,21 @@ public partial class BmsGameplayVirtualisationTest
     }
 
     [Test]
+    public void TestStageHudRestoresSharedDividerWidthAsIndividualWidths()
+    {
+        var info = new BmsStageHud().CreateSerialisedInfo();
+        info.Settings["stage_styles"] = new JObject { ["7"] = new JObject { ["SeparatorWidth"] = 0 } };
+
+        var hud = (BmsStageHud)info.CreateInstance();
+        var widths = hud.GetStageStyle(BmsLayoutVariant.Bme7K).SeparatorWidths;
+        Assert.Multiple(() =>
+        {
+            Assert.That(widths.Keys, Is.EquivalentTo(Enumerable.Range(0, BmsLayout.BME7_KEY_COLUMNS - 1)));
+            Assert.That(widths.Values, Is.All.Zero);
+        });
+    }
+
+    [Test]
     public void TestStageHudContainerRegeneratesRemovedHud()
     {
         var controller = createController();
@@ -565,6 +582,11 @@ public partial class BmsGameplayVirtualisationTest
         var otherLayout = new BmsStageHud();
         otherLayout.UseLayout(BmsLayoutVariant.Bme7K2P);
         otherLayout.Width = 500;
+        otherLayout.StageStyles.Value = new Dictionary<int, BmsStageStyle>
+        {
+            [(int)BmsLayoutVariant.Bme7K] = new() { KeepTotalWidth = false },
+            [(int)BmsLayoutVariant.Bme7K2P] = new() { Widths = { [0] = 76 } },
+        };
 
         var hud = (BmsStageHud)otherLayout.CreateSerialisedInfo().CreateInstance();
         container.Add(hud);
@@ -589,6 +611,8 @@ public partial class BmsGameplayVirtualisationTest
             Assert.That(replacement.Size, Is.EqualTo(Vector2.Zero));
             Assert.That(replacement.Scale, Is.EqualTo(Vector2.One));
             Assert.That(restoredOtherLayout.Width, Is.EqualTo(500));
+            Assert.That(replacement.GetStageStyle(BmsLayoutVariant.Bme7K).KeepTotalWidth, Is.True);
+            Assert.That(restoredOtherLayout.GetStageStyle(BmsLayoutVariant.Bme7K2P).Widths[0], Is.EqualTo(76));
         });
     }
 

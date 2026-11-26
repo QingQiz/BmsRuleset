@@ -21,6 +21,7 @@ using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Judgement;
+using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Configuration;
 using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Embedded;
 using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Runtime;
 using osu.Game.Rulesets.Objects.Drawables;
@@ -120,7 +121,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         parentSkin.SourceChanged -= updateEmbeddedSkinFallback;
         base.Dispose(isDisposing);
         skinCache.Dispose();
-        activeSkin.DisposeEmbeddedSkins();
+        activeSkin.Dispose();
     }
 
     #endregion
@@ -146,6 +147,8 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     #endregion
 
     #region Skin
+
+    internal void RefreshStageSkin() => activeSkin.Refresh();
 
     private void updateEmbeddedSkinFallback()
     {
@@ -204,6 +207,8 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     [Cached(typeof(ISkinSource))]
     private readonly BmsEmbeddedSkinSource activeSkin;
 
+    internal BmsEmbeddedSkinSource GameplaySkin => activeSkin;
+
     [Cached]
     private readonly BmsGameplaySkinCache skinCache;
 
@@ -224,6 +229,9 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     [Resolved]
     private ISkinSource parentSkin { get; set; } = null!;
+
+    [Resolved]
+    private DrawableRuleset drawableRuleset { get; set; } = null!;
 
     [Resolved]
     private IBmsGameplayEvents gameplayEvents { get; set; } = null!;
@@ -414,6 +422,9 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     [BackgroundDependencyLoader(true)]
     private void load()
     {
+        activeSkin.StageSkin = new BmsStageSkin(() => drawableRuleset is BmsDrawableRuleset bmsRuleset
+            ? bmsRuleset.StageHudController.GetStageStyle(LayoutVariant)
+            : new BmsStageStyle());
         initialiseJudgementEngine();
         ScrollController.SetHitTargetPosition(Stage.SkinHitTargetPosition);
 

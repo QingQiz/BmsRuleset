@@ -1,6 +1,7 @@
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Configuration;
 using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Legacy;
 using osu.Game.Skinning;
 using osuTK;
@@ -27,7 +28,7 @@ internal sealed partial class LegacyBmsStageForeground : CompositeDrawable
     [BackgroundDependencyLoader]
     private void load(ISkinSource skin)
     {
-        InternalChild = skin.GetAnimation(imageName, true, true)?.With(d =>
+        InternalChild = (BmsStageSkin.GetDrawable(skin, BmsStageImage.BottomBorder) ?? skin.GetAnimation(imageName, true, true))?.With(d =>
         {
             d.Anchor = Anchor.BottomCentre;
             d.Origin = Anchor.BottomCentre;

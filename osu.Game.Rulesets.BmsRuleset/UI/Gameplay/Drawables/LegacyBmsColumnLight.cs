@@ -7,6 +7,7 @@ using osu.Framework.Input.Events;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
 using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Components;
+using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Configuration;
 using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Legacy;
 using osu.Game.Skinning;
 using osuTK;
@@ -51,14 +52,15 @@ internal sealed partial class LegacyBmsColumnLight : CompositeDrawable, IKeyBind
     private void load(ISkinSource skin)
     {
         // The active source includes the embedded legacy assets used when a user skin omits mania-stage-light.
-        InternalChild = light = skin.GetAnimation(lightImage, true, true, frameLength: lightFrameLength)?.With(d =>
+        var custom = BmsStageSkin.GetDrawable(skin, BmsStageImage.Light, lookup.ColumnIndex);
+        InternalChild = light = (custom ?? skin.GetAnimation(lightImage, true, true, frameLength: lightFrameLength))?.With(d =>
         {
             d.Anchor = Anchor.BottomCentre;
             d.Origin = Anchor.BottomCentre;
             d.Y = -lightPosition;
             d.RelativeSizeAxes = Axes.X;
             d.Width = 1;
-            d.Colour = LegacyColourCompatibility.DisallowZeroAlpha(lightColour);
+            d.Colour = custom != null ? Color4.White : LegacyColourCompatibility.DisallowZeroAlpha(lightColour);
             d.Alpha = 0;
         }) ?? Empty();
     }

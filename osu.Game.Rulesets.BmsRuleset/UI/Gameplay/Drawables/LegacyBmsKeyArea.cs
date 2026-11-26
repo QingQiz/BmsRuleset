@@ -7,6 +7,7 @@ using osu.Framework.Input.Events;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
 using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Components;
+using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Configuration;
 using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Legacy;
 using osu.Game.Skinning;
 
@@ -35,7 +36,8 @@ internal sealed partial class LegacyBmsKeyArea : CompositeDrawable, IKeyBindingH
     [BackgroundDependencyLoader]
     private void load(ISkinSource skin)
     {
-        upSprite = skin.GetAnimation(upImage, WrapMode.ClampToEdge, WrapMode.ClampToEdge, true, true)?.With(d =>
+        upSprite = (BmsStageSkin.GetDrawable(skin, BmsStageImage.Key, lookup.ColumnIndex)
+            ?? skin.GetAnimation(upImage, WrapMode.ClampToEdge, WrapMode.ClampToEdge, true, true))?.With(d =>
         {
             d.Anchor = Anchor.BottomCentre;
             d.Origin = Anchor.BottomCentre;
@@ -43,7 +45,8 @@ internal sealed partial class LegacyBmsKeyArea : CompositeDrawable, IKeyBindingH
             d.Width = 1;
         });
 
-        downSprite = skin.GetAnimation(downImage, WrapMode.ClampToEdge, WrapMode.ClampToEdge, true, true)?.With(d =>
+        downSprite = (BmsStageSkin.GetDrawable(skin, BmsStageImage.KeyDown, lookup.ColumnIndex)
+            ?? skin.GetAnimation(downImage, WrapMode.ClampToEdge, WrapMode.ClampToEdge, true, true))?.With(d =>
         {
             d.Anchor = Anchor.BottomCentre;
             d.Origin = Anchor.BottomCentre;

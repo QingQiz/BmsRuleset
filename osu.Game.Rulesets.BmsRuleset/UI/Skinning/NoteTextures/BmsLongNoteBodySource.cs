@@ -9,6 +9,7 @@ using osu.Framework.Graphics.Textures;
 using osu.Framework.IO.Stores;
 using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Embedded;
+using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Configuration;
 using osu.Game.Skinning;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
@@ -55,7 +56,12 @@ public static class BmsLongNoteBodySource
         IRenderer renderer,
         BmsLongNoteBodyTextureCache rawSliceCache)
     {
-        foreach (var candidate in BmsLegacyTextureResolver.HoldBodyImageCandidates(skin, lookup).Where(c => !string.IsNullOrWhiteSpace(c)).Distinct())
+        var custom = (skin as BmsEmbeddedSkinSource)?.StageSkin?.GetImage(BmsStageImage.HoldBody, lookup.ColumnIndex);
+        var candidates = custom == null
+            ? BmsLegacyTextureResolver.HoldBodyImageCandidates(skin, lookup)
+            : new[] { custom }.Concat(BmsLegacyTextureResolver.HoldBodyImageCandidates(skin, lookup));
+
+        foreach (var candidate in candidates.Where(c => !string.IsNullOrWhiteSpace(c)).Distinct())
         {
             // Try raw bytes before normal GetTextures(). This is the critical Argon/ultra-tall path:
             // normal texture stores may apply maximum-dimension scaling before the renderer sees the

@@ -1,9 +1,10 @@
-﻿using System;
+using System;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
+using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Configuration;
 using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Legacy;
 using osu.Game.Skinning;
 using osuTK;
@@ -43,12 +44,14 @@ internal sealed partial class LegacyBmsStageBackground : CompositeDrawable
     {
         InternalChildren =
         [
-            leftSprite = skin.GetAnimation(images[0], true, true)?.With(d =>
+            leftSprite = (BmsStageSkin.GetDrawable(skin, BmsStageImage.LeftBorder)
+                ?? skin.GetAnimation(images[0], true, true))?.With(d =>
             {
                 d.Anchor = Anchor.TopLeft;
                 d.Origin = Anchor.TopRight;
             }) ?? Empty(),
-            rightSprite = skin.GetAnimation(images[1], true, true)?.With(d =>
+            rightSprite = (BmsStageSkin.GetDrawable(skin, BmsStageImage.RightBorder)
+                ?? skin.GetAnimation(images[1], true, true))?.With(d =>
             {
                 d.Anchor = Anchor.TopRight;
                 d.Origin = Anchor.TopLeft;

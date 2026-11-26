@@ -8,6 +8,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Configuration;
+using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Embedded;
 using osu.Game.Skinning;
 using osuTK;
 using osuTK.Graphics;
@@ -17,6 +18,8 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 public sealed partial class BmsStage : CompositeDrawable
 {
     public const float HIT_TARGET_POSITION = 80;
+    internal const float DEFAULT_BAR_LINE_HEIGHT = 1;
+    internal static readonly Color4 DEFAULT_BAR_LINE_COLOUR = Color4.White.Opacity(0.35f);
 
     public IBmsColumn[] Columns { get; }
 
@@ -116,8 +119,8 @@ public sealed partial class BmsStage : CompositeDrawable
     }
 
     private readonly BindableFloat hitTargetPosition = new(HIT_TARGET_POSITION);
-    private readonly BindableFloat barLineHeight = new(1);
-    private readonly Bindable<Color4> barLineColour = new(Color4.White.Opacity(0.35f));
+    private readonly BindableFloat barLineHeight = new(DEFAULT_BAR_LINE_HEIGHT);
+    private readonly Bindable<Color4> barLineColour = new(DEFAULT_BAR_LINE_COLOUR);
     private readonly SkinnableDrawable hitTarget;
 
     private readonly FillFlowContainer keyAreaOverNotesLayer = new()
@@ -375,9 +378,13 @@ public sealed partial class BmsStage : CompositeDrawable
                             ?? 0;
         applyHitTargetPosition(true);
         barLineHeight.Value = skin.GetConfig<BmsSkinConfigurationLookup, float>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.BarLineHeight))?.Value
-                              ?? 1;
+                              ?? DEFAULT_BAR_LINE_HEIGHT;
         barLineColour.Value = skin.GetConfig<BmsSkinConfigurationLookup, Color4>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.BarLineColour))?.Value
-                              ?? Color4.White.Opacity(0.35f);
+                              ?? DEFAULT_BAR_LINE_COLOUR;
+
+        var stageStyle = (skin as BmsEmbeddedSkinSource)?.StageSkin?.Style;
+        MeasureLineArea.Alpha = stageStyle?.ShowMeasureLines == false ? 0 : 1;
+        hitTarget.Scale = new Vector2(1, stageStyle?.HitTargetHeightScale ?? 1);
 
         updateKeyAreaLayer(skin.GetConfig<BmsSkinConfigurationLookup, bool>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.KeysUnderNotes))?.Value ?? false);
 
@@ -444,18 +451,8 @@ public sealed partial class BmsStage : CompositeDrawable
 
     private void addColumnsInVisualOrder(FillFlowContainer target, Func<IBmsColumn, Drawable> selector)
     {
-        if (BmsLayout.Is2P(layoutVariant))
-        {
-            for (var i = 1; i < Columns.Length; i++)
-                target.Add(selector(Columns[i]));
-
-            target.Add(selector(Columns[0]));
-        }
-        else
-        {
-            for (var i = 0; i < Columns.Length; i++)
-                target.Add(selector(Columns[i]));
-        }
+        for (var i = 0; i < Columns.Length; i++)
+            target.Add(selector(Columns[BmsStageColumnLayout.ColumnAtVisualIndex(layoutVariant, i, Columns.Length)]));
     }
 
     private void updateStageCentre()

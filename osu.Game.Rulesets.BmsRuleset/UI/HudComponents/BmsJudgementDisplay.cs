@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
@@ -10,7 +9,6 @@ using osu.Framework.Localisation;
 using osu.Framework.Platform;
 using osu.Game.Configuration;
 using osu.Game.Graphics.UserInterface;
-using osu.Game.IO;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Profiles;
@@ -22,7 +20,6 @@ using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Embedded;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Skinning;
-using osu.Game.Utils;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 
@@ -216,31 +213,8 @@ public sealed partial class BmsJudgementDisplay : BmsHudComponent
         private void load(SkinManager skins)
         {
             var display = (BmsJudgementDisplay)SettingSourceObject;
-            var files = skins.CurrentSkin.Value.SkinInfo.PerformRead(skin => skin.Files.Select(file => file.Filename).ToArray());
-            var resources = ((IStorageResourceProvider)skins).Resources;
-            var embeddedFiles = display.activeSkin.AllSources.SelectMany(source =>
-            {
-                var skin = source is ISkinTransformer transformer ? transformer.Skin : source;
-
-                return skin switch
-                {
-                    BmsEmbeddedSkin embedded => embedded.Resources.GetAvailableResources(),
-                    DefaultLegacySkin => filesIn("Skins/Legacy/"),
-                    RetroSkin => filesIn("Skins/Retro/"),
-                    _ => Enumerable.Empty<string>()
-                };
-            });
-
-            // Opening the settings must not clear a saved choice if its file has been removed.
-            Items = files.Concat(embeddedFiles)
-                .Where(name => SupportedExtensions.IMAGE_EXTENSIONS.Contains(Path.GetExtension(name), StringComparer.OrdinalIgnoreCase))
-                .Order(StringComparer.OrdinalIgnoreCase).Prepend(string.Empty).Append(Current.Value).Distinct();
-            return;
-
-            // Editable copies retain their built-in skin type, but Realm only tracks imported files.
-            IEnumerable<string> filesIn(string prefix) => resources.GetAvailableResources()
-                .Where(name => name.StartsWith(prefix, StringComparison.Ordinal))
-                .Select(name => name[prefix.Length..]);
+            // Preserve saved choices even when their source files have been removed.
+            Items = BmsSkinImageFiles.Enumerate(skins, display.activeSkin).Prepend(string.Empty).Append(Current.Value).Distinct(StringComparer.Ordinal);
         }
 
         protected override OsuDropdown<string> CreateDropdown() => new ImageDropdown();

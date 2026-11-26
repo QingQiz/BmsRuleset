@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Globalization;
 using Newtonsoft.Json.Linq;
 using osu.Framework.Allocation;
@@ -8,9 +10,10 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.Configuration;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.Settings.Components;
+using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Configuration;
+using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Embedded;
 using osu.Game.Rulesets.UI;
 using osu.Game.Skinning;
 using osuTK;
@@ -20,7 +23,7 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 
 internal sealed partial class BmsStageHud : BmsHudComponent, ISerialisableDrawable
 {
-    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.JudgementLineOffset), nameof(BmsStrings.JudgementLineOffsetDescription))]
+    [SettingSource(null, SettingControlType = typeof(BmsHiddenSetting<float>))]
     public BindableFloat JudgementLineOffset { get; } = new()
     {
         MinValue = -768,
@@ -28,7 +31,7 @@ internal sealed partial class BmsStageHud : BmsHudComponent, ISerialisableDrawab
         Precision = 1,
     };
 
-    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.LightPositionOffset), nameof(BmsStrings.LightPositionOffsetDescription))]
+    [SettingSource(null, SettingControlType = typeof(BmsHiddenSetting<float>))]
     public BindableFloat LightPositionOffset { get; } = new()
     {
         MinValue = -768,
@@ -36,7 +39,7 @@ internal sealed partial class BmsStageHud : BmsHudComponent, ISerialisableDrawab
         Precision = 1,
     };
 
-    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.NoteHeightScale), nameof(BmsStrings.NoteHeightScaleDescription))]
+    [SettingSource(null, SettingControlType = typeof(BmsHiddenSetting<float>))]
     public BindableFloat NoteHeightScale { get; } = new(1)
     {
         MinValue = 0.01f,
@@ -51,8 +54,18 @@ internal sealed partial class BmsStageHud : BmsHudComponent, ISerialisableDrawab
     public Bindable<Dictionary<int, StageLayout>> Layouts { get; }
 
     private const int legacy_layout = 0;
+
+    [SettingSource(null, SettingControlType = typeof(BmsStageEditorSetting))]
+    public Bindable<Dictionary<int, BmsStageStyle>> StageStyles { get; } = new(new Dictionary<int, BmsStageStyle>());
+
     private Dictionary<int, StageLayout> savedLayouts = [];
     private BmsLayoutVariant? activeLayout;
+    internal BmsLayoutVariant LayoutVariant => activeLayout ?? throw new InvalidOperationException("Stage settings require an active gameplay layout.");
+    internal BmsEmbeddedSkinSource GameplaySkin => ((BmsPlayfield)drawableRuleset.Playfield).GameplaySkin;
+
+    // Use the column geometry directly so the sidebar can resize the handle before the next autosize pass.
+    internal float ColumnLayoutWidth => ((BmsPlayfield)drawableRuleset.Playfield).Stage.Columns.Sum(column => ((Drawable)column).LayoutSize.X);
+
     private StageLayout? inheritedLayout;
     private readonly Container editHandle;
     private BmsStageHudController? controller;
@@ -113,6 +126,7 @@ internal sealed partial class BmsStageHud : BmsHudComponent, ISerialisableDrawab
         {
             controller = bmsDrawableRuleset.StageHudController;
             controller.Register(this, this.FindClosestParent<ISerialisableDrawableContainer>());
+            StageStyles.ValueChanged += onStageStylesChanged;
             JudgementLineOffset.ValueChanged += onJudgementLineOffsetChanged;
             LightPositionOffset.ValueChanged += onLightPositionOffsetChanged;
             NoteHeightScale.ValueChanged += onNoteHeightScaleChanged;
@@ -136,6 +150,7 @@ internal sealed partial class BmsStageHud : BmsHudComponent, ISerialisableDrawab
 
     protected override void Dispose(bool isDisposing)
     {
+        StageStyles.ValueChanged -= onStageStylesChanged;
         JudgementLineOffset.ValueChanged -= onJudgementLineOffsetChanged;
         LightPositionOffset.ValueChanged -= onLightPositionOffsetChanged;
         NoteHeightScale.ValueChanged -= onNoteHeightScaleChanged;
@@ -158,10 +173,25 @@ internal sealed partial class BmsStageHud : BmsHudComponent, ISerialisableDrawab
         restoreLayout();
     }
 
+    internal BmsStageStyle GetStageStyle(BmsLayoutVariant layout)
+    {
+        var layouts = StageStyles.Value;
+        if (layouts.TryGetValue((int)layout, out var style))
+            return style;
+
+        var firstPlayerVariant = BmsLayout.Is2P(layout) ? BmsLayout.FirstPlayerVariant(layout) : layout;
+        return layouts.GetValueOrDefault((int)firstPlayerVariant) ?? empty_style;
+    }
+
+    private static readonly BmsStageStyle empty_style = new();
+
     internal BmsStageHud CreateResetForLayout(BmsLayoutVariant layout)
     {
         var replacement = new BmsStageHud();
         replacement.savedLayouts = new Dictionary<int, StageLayout>(savedLayouts);
+        var styles = new Dictionary<int, BmsStageStyle>(StageStyles.Value);
+        styles.Remove((int)layout);
+        replacement.StageStyles.Value = styles;
         if (!BmsLayout.Is2P(layout))
             replacement.savedLayouts[(int)layout] = replacement.captureLayout();
         return replacement;
@@ -171,6 +201,21 @@ internal sealed partial class BmsStageHud : BmsHudComponent, ISerialisableDrawab
     {
         if (target != Layouts)
         {
+            if (target == StageStyles)
+            {
+                var styles = source is JObject styleJson ? deserializeStyles(styleJson) : (Dictionary<int, BmsStageStyle>)source;
+                foreach (var layout in styles.Keys.ToArray())
+                {
+                    if (styles[layout] == null)
+                        styles.Remove(layout);
+                    else
+                        styles[layout].Normalize((BmsLayoutVariant)layout);
+                }
+
+                StageStyles.Value = new Dictionary<int, BmsStageStyle>(styles);
+                return;
+            }
+
             ((IParseable)target).Parse(source, CultureInfo.InvariantCulture);
             return;
         }
@@ -181,6 +226,26 @@ internal sealed partial class BmsStageHud : BmsHudComponent, ISerialisableDrawab
         // Undo can apply serialised info to an already loaded handle, after the ordinary
         // drawable properties and legacy settings have been restored.
         restoreLayout();
+    }
+
+    private static Dictionary<int, BmsStageStyle> deserializeStyles(JObject json)
+    {
+        var styles = json.ToObject<Dictionary<int, BmsStageStyle>>()!;
+        foreach (var (layout, style) in styles)
+        {
+            // Older saves used a single width for all interior boundaries.
+            if (json[layout.ToString(CultureInfo.InvariantCulture)] is not JObject values
+                || values[nameof(BmsStageStyle.SeparatorWidths)] != null
+                || values["SeparatorWidth"] is not JValue { Type: JTokenType.Integer or JTokenType.Float } width)
+                continue;
+
+            var count = BmsLayout.GetTotalColumns((BmsLayoutVariant)layout) - 1;
+            var sharedWidth = width.Value<float>();
+            for (var i = 0; i < count; i++)
+                style.SeparatorWidths[i] = sharedWidth;
+        }
+
+        return styles;
     }
 
     private void restoreLayout()
@@ -254,6 +319,8 @@ internal sealed partial class BmsStageHud : BmsHudComponent, ISerialisableDrawab
             }
         }
     }
+
+    private void onStageStylesChanged(ValueChangedEvent<Dictionary<int, BmsStageStyle>> _) => controller?.RefreshStageStyle();
 
     private void onJudgementLineOffsetChanged(ValueChangedEvent<float> offset) => controller?.SetHitTargetPositionOffset(offset.NewValue);
 
